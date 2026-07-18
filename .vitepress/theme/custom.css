@@ -24,9 +24,6 @@
   flex-shrink: 0;
 }
 
-.VPNavBarTitle .title {
-  display: none;
-}
 
 /* Hero image sizing */
 .VPHero .image-container .image-bg {

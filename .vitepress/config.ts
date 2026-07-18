@@ -24,6 +24,7 @@ export default defineConfig({
     nav: [
       { text: 'API Reference', link: '/api/getting-started' },
       { text: 'SDKs', link: '/sdk/python' },
+      { text: 'Integrations', link: '/integrations/overview' },
       { text: 'Guides', link: '/guides/quickstart' },
       { text: 'Console', link: 'https://fotohub.app/console' },
     ],
@@ -71,7 +72,21 @@ export default defineConfig({
           items: [
             { text: 'Python SDK', link: '/sdk/python' },
             { text: 'TypeScript SDK', link: '/sdk/typescript' },
+            { text: 'PHP SDK', link: '/sdk/php' },
             { text: 'Examples', link: '/sdk/examples' },
+          ],
+        },
+      ],
+      '/integrations/': [
+        {
+          text: 'Integrations',
+          items: [
+            { text: 'Overview', link: '/integrations/overview' },
+            { text: 'Shopify', link: '/integrations/shopify' },
+            { text: 'WordPress', link: '/integrations/wordpress' },
+            { text: 'WooCommerce', link: '/integrations/woocommerce' },
+            { text: 'PrestaShop', link: '/integrations/prestashop' },
+            { text: 'Zapier & Make', link: '/integrations/zapier' },
           ],
         },
       ],
@@ -80,6 +95,7 @@ export default defineConfig({
           text: 'Guides',
           items: [
             { text: 'Quickstart', link: '/guides/quickstart' },
+            { text: 'CLI Setup', link: '/guides/cli-setup' },
             { text: 'SDK Installation', link: '/guides/sdk-setup' },
             { text: 'Image Generation', link: '/guides/image-generation' },
             { text: 'Video Generation', link: '/guides/video-generation' },
