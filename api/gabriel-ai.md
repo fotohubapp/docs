@@ -2,7 +2,7 @@
 
 Gabriel is FOTOhub's intelligent platform orchestrator — a lightweight AI layer that classifies user intent in natural language and routes requests to the optimal feature with pre-configured parameters.
 
-Powered by **Gemma 4 E2B** via AWS Bedrock (eu-central-1), Gabriel costs ~$0.00003 per call and requires no authentication.
+Gabriel AI is a proprietary orchestration model optimized for intent classification. It's free to use and requires no authentication.
 
 ## Endpoints
 
@@ -161,7 +161,7 @@ Until July 6, 2026: All Seedance/Seedream models = **1 credit flat** regardless 
 
 ## POST /v1/ai/translate
 
-Translate text between languages using Amazon Nova Micro — the fastest, cheapest model on Bedrock.
+Translate text between languages using FOTOhub's built-in translation engine.
 
 **Rate limit:** 60 requests/minute per IP
 

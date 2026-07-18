@@ -32,22 +32,96 @@ Standard chat completions endpoint compatible with OpenAI SDKs. Supports Google 
 | `max_tokens` | integer | No | `2048` | Maximum number of tokens to generate in the response. Limits output length. Does not guarantee exact length -- model may stop earlier at a natural completion point. |
 | `stream` | boolean | No | `false` | Enable Server-Sent Events streaming. When true, partial message deltas are sent as they become available. See Streaming section below for parsing details. |
 
-### Available Models (Credit-Based)
+### Available Models
 
-| Model | ID | Price (per 1K tokens) | Credits |
-|-------|-----|----------------------|---------|
-| Gemini Flash | `gemini-flash` | 0.00045 PLN | 1 ::: tip Recommended |
-| Gemini Pro | `gemini-pro` | 0.0075 PLN | 1 |
-| Gemini Ultra | `gemini-ultra` | 0.03 PLN | 2 |
-| GPT-4o | `gpt-4o` | 0.015 PLN | 2 |
-| Claude Sonnet | `claude-sonnet` | 0.018 PLN | 2 |
+FOTOhub supports 30+ LLM models from 12 providers. All accessible through the same `/v1/ai/chat/completions` endpoint.
+
+#### FOTOhub
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| FOTOhub AI | `fotohub-ai` | Default model — fast, capable, balanced |
+| FOTOhub Coder | `fotohub-coder` | Optimized for code generation |
+
+#### Anthropic Claude
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| Claude Haiku 4.5 | `claude-haiku-4-5` | Fast, cheap — good for simple tasks |
+| Claude Sonnet 4.6 | `claude-sonnet-4-6` | Intelligent + fast — best value |
+| Claude Opus 4.5 | `claude-opus-4-5` | Deep thinking, extended reasoning |
+| Claude Opus 4.6 | `claude-opus-4-6` | Maximum capabilities — latest |
+
+#### OpenAI
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| GPT-5.1 | `gpt-5.1` | Creative, multi-modal |
+
+#### xAI Grok
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| Grok 4 Fast | `grok-4-fast-reasoning` | Fast reasoning, 2M context |
+| Grok 4.1 Fast | `grok-4-1-fast-reasoning` | Latest reasoning, 2M context |
+| Grok 4.1 Fast NR | `grok-4-1-fast-non-reasoning` | No reasoning overhead |
+
+#### DeepSeek
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| DeepSeek V4 Flash | `deepseek-v4-flash-260425` | Fast, efficient |
+| DeepSeek V3.2 | `deepseek-v3-2-251201` | Balanced |
+| DeepSeek V4 Pro | `deepseek-v4-pro-260425` | Deep reasoning |
+| DeepSeek R1 | `deepseek-r1` | Chain-of-thought reasoning |
+
+#### Alibaba Qwen
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| Qwen Flash | `qwen-flash` | Efficient, cheap |
+| Qwen Plus | `qwen-plus` | Reasoning-focused |
+| Qwen 3 Max | `qwen3-max` | Maximum capabilities |
+
+#### Moonshot Kimi
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| Kimi K2.5 | `kimi-k2.5` | Latest, intelligent |
+
+#### Amazon Nova
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| Nova Micro | `nova-micro` | Ultra fast, ultra cheap |
+| Nova Lite | `nova-lite` | Fast, cheap |
+| Nova 2 Lite | `nova-2-lite` | New gen, fast |
+| Nova Pro | `nova-pro` | Balanced, efficient |
+
+#### Mistral AI
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| Mistral Large 3 | `mistral-large-3` | 675B parameters, maximum capabilities |
+
+#### MiniMax
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| MiniMax M2.5 | `minimax-m2.5` | Creative, fast |
+
+#### Z.AI
+
+| Model | ID | Description |
+|-------|-----|-------------|
+| GLM 5 | `glm-5` | Intelligent, balanced |
 
 ::: tip Model Selection Guide
-- **gemini-flash** -- Best for fast, simple tasks (summarization, classification, extraction). Ultra-low latency.
-- **gemini-pro** -- Balanced choice for general tasks. Good reasoning at low cost.
-- **gemini-ultra** -- Complex reasoning, code generation, creative writing. Google's best model.
-- **gpt-4o** -- OpenAI's flagship. Excellent for nuanced tasks, instruction following.
-- **claude-sonnet** -- Anthropic's balanced model via proxy. Strong at analysis and coding.
+- **Fast & cheap**: `fotohub-ai`, `nova-micro`, `qwen-flash`, `claude-haiku-4-5`
+- **Best balance**: `claude-sonnet-4-6`, `deepseek-v3-2-251201`, `qwen-plus`
+- **Maximum quality**: `claude-opus-4-6`, `gpt-5.1`, `mistral-large-3`
+- **Reasoning/thinking**: `deepseek-r1`, `deepseek-v4-pro-260425`, `grok-4-fast-reasoning`, `claude-opus-4-5`
+- **Code generation**: `fotohub-coder`, `claude-sonnet-4-6`, `deepseek-v4-flash-260425`
 :::
 
 ### Response
