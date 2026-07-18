@@ -53,7 +53,7 @@ for r in results:
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient } from "@fotohub/sdk";
+import { FotohubClient } from "fotohub";
 
 const client = new FotohubClient({ apiKey: process.env.FOTOHUB_API_KEY! });
 
@@ -164,7 +164,7 @@ while True:
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient } from "@fotohub/sdk";
+import { FotohubClient } from "fotohub";
 import * as readline from "readline";
 
 const client = new FotohubClient({ apiKey: process.env.FOTOHUB_API_KEY! });
@@ -280,7 +280,7 @@ else:
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient } from "@fotohub/sdk";
+import { FotohubClient } from "fotohub";
 
 const client = new FotohubClient({ apiKey: process.env.FOTOHUB_API_KEY! });
 
@@ -362,7 +362,7 @@ for style in styles:
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient } from "@fotohub/sdk";
+import { FotohubClient } from "fotohub";
 import * as fs from "fs";
 import * as https from "https";
 
@@ -453,7 +453,7 @@ print(f"  Final image: {upscaled.images[0]}")
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient } from "@fotohub/sdk";
+import { FotohubClient } from "fotohub";
 
 const client = new FotohubClient({ apiKey: process.env.FOTOHUB_API_KEY! });
 
@@ -559,7 +559,7 @@ print_usage_report()
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient, InsufficientCreditsError } from "@fotohub/sdk";
+import { FotohubClient, InsufficientCreditsError } from "fotohub";
 
 const client = new FotohubClient({ apiKey: process.env.FOTOHUB_API_KEY! });
 
@@ -659,7 +659,7 @@ for prompt in prompts:
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient, RateLimitError, ApiError } from "@fotohub/sdk";
+import { FotohubClient, RateLimitError, ApiError } from "fotohub";
 
 const client = new FotohubClient({ apiKey: process.env.FOTOHUB_API_KEY! });
 
@@ -898,7 +898,7 @@ video_url = image_to_video_pipeline(
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient } from "@fotohub/sdk";
+import { FotohubClient } from "fotohub";
 
 const client = new FotohubClient({ apiKey: process.env.FOTOHUB_API_KEY! });
 
@@ -1050,7 +1050,7 @@ import {
   ModelUnavailableError,
   ApiError,
   ValidationError,
-} from "@fotohub/sdk";
+} from "fotohub";
 
 const client = new FotohubClient({ apiKey: process.env.FOTOHUB_API_KEY! });
 

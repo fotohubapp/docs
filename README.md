@@ -72,7 +72,7 @@ docs-site/
 │   └── errors.md            #   Error codes & handling
 ├── sdk/                     # SDK Documentation (3 pages)
 │   ├── python.md            #   Python SDK (fotohub on PyPI)
-│   ├── typescript.md        #   TypeScript SDK (@fotohub/sdk)
+│   ├── typescript.md        #   TypeScript SDK (fotohub)
 │   └── examples.md          #   Code examples & recipes
 ├── guides/                  # Guides (4 pages)
 │   ├── quickstart.md        #   5-minute quickstart
@@ -111,8 +111,8 @@ docs-site/
 | SDK | Package | Install |
 |-----|---------|---------|
 | Python | [fotohub](https://pypi.org/project/fotohub/) | `pip install fotohub` |
-| TypeScript | [@fotohub/sdk](https://www.npmjs.com/package/@fotohub/sdk) | `npm install @fotohub/sdk` |
+| TypeScript | [fotohub](https://www.npmjs.com/package/fotohub) | `npm install fotohub` |
 
 ## License
 
-[MIT](./LICENSE) — Copyright 2026 FOTOhub
+[MIT](https://github.com/fotohubapp/docs/blob/main/LICENSE) — Copyright 2026 FOTOhub

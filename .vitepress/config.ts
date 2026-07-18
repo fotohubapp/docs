@@ -89,7 +89,9 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/fotohub' },
+      { icon: 'github', link: 'https://github.com/fotohubapp' },
+      { icon: 'npm', link: 'https://www.npmjs.com/package/fotohub' },
+      { icon: { svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.585 11.692h4.328s2.432.039 2.432-2.35V5.391S16.714 3 11.936 3C7.362 3 7.647 4.983 7.647 4.983l.006 2.055h4.363v.617H7.14S4.5 7.33 4.5 11.869c0 4.541 2.316 4.381 2.316 4.381h1.384v-2.105s-.074-2.316 2.286-2.316l.003-.001h-.001l.001.001zm-.287-4.5a.783.783 0 110-1.566.783.783 0 010 1.566z" fill="currentColor"/><path d="M14.415 12.308h-4.328s-2.432-.039-2.432 2.35v3.951S7.286 21 12.064 21c4.574 0 4.289-1.983 4.289-1.983l-.006-2.055h-4.363v-.617h4.876S19.5 16.67 19.5 12.131c0-4.541-2.316-4.381-2.316-4.381h-1.384v2.105s.074 2.316-2.286 2.316l-.003.001h.001l-.001-.001zm.287 4.5a.783.783 0 110 1.566.783.783 0 010-1.566z" fill="currentColor"/></svg>' }, link: 'https://pypi.org/project/fotohub/' },
     ],
 
     search: {
@@ -97,7 +99,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/fotohub/docs/edit/main/:path',
+      pattern: 'https://github.com/fotohubapp/docs/edit/main/:path',
       text: 'Suggest changes',
     },
 

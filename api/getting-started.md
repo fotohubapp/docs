@@ -338,8 +338,8 @@ Official SDKs are available for Python and TypeScript/JavaScript. They provide t
 
 | Language | Package | Install Command | Requirements |
 |----------|---------|-----------------|--------------|
-| Python | `fotohub-sdk` | `pip install fotohub-sdk` | Python 3.8+ |
-| TypeScript | `@fotohub/sdk` | `npm install @fotohub/sdk` | Node.js 18+, Deno, edge runtimes |
+| Python | `fotohub` | `pip install fotohub` | Python 3.8+ |
+| TypeScript | `fotohub` | `npm install fotohub` | Node.js 18+, Deno, edge runtimes |
 
 ### SDK Usage
 
@@ -363,7 +363,7 @@ print(f"Credits used: {image.billing.credits_used}")
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient } from "@fotohub/sdk";
+import { FotohubClient } from "fotohub";
 
 const client = new FotohubClient({
   apiKey: "fh_live_your_api_key_here",

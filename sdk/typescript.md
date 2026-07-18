@@ -6,19 +6,19 @@ Official TypeScript/JavaScript SDK for the FOTOhub API. Provides full type safet
 
 ::: code-group
 ```bash [npm]
-npm install @fotohub/sdk
+npm install fotohub
 ```
 
 ```bash [pnpm]
-pnpm add @fotohub/sdk
+pnpm add fotohub
 ```
 
 ```bash [yarn]
-yarn add @fotohub/sdk
+yarn add fotohub
 ```
 
 ```bash [bun]
-bun add @fotohub/sdk
+bun add fotohub
 ```
 :::
 
@@ -27,7 +27,7 @@ bun add @fotohub/sdk
 ## Quick Start
 
 ```typescript
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 
 const client = new FotohubClient({ apiKey: 'fh_live_your_key_here' });
 
@@ -47,7 +47,7 @@ console.log(`Credits used: ${result.billing.credits_used}`);
 ### With API Key
 
 ```typescript
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 
 const client = new FotohubClient({
   apiKey: 'fh_live_your_key_here',
@@ -60,7 +60,7 @@ const client = new FotohubClient({
 ### With Environment Variable
 
 ```typescript
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 
 // Automatically reads FOTOHUB_API_KEY from process.env
 const client = new FotohubClient();
@@ -114,7 +114,7 @@ import type {
   Balance,
   UsageStats,
   Model,
-} from '@fotohub/sdk';
+} from 'fotohub';
 ```
 
 ### GenerateImageOptions
@@ -194,7 +194,7 @@ interface ChatMessage {
 ### Basic Generation
 
 ```typescript
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 
 const client = new FotohubClient({ apiKey: 'fh_live_your_key_here' });
 
@@ -475,7 +475,7 @@ console.log('Tokens used:', usage.total_tokens);
 
 ```typescript
 // Express.js / Node.js HTTP handler
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 
 app.post('/api/chat', async (req, res) => {
   const client = new FotohubClient();
@@ -533,20 +533,20 @@ import {
   RateLimitError,
   AuthenticationError,
   ValidationError,
-} from '@fotohub/sdk/errors';
+} from 'fotohub/errors';
 ```
 
 ### Comprehensive Error Handling
 
 ```typescript
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 import {
   FotohubError,
   InsufficientCreditsError,
   RateLimitError,
   AuthenticationError,
   ValidationError,
-} from '@fotohub/sdk/errors';
+} from 'fotohub/errors';
 
 const client = new FotohubClient({ apiKey: 'fh_live_your_key_here' });
 
@@ -634,7 +634,7 @@ class AuthenticationError extends FotohubError {
 When receiving webhooks (e.g., for async video generation results), verify the signature to ensure authenticity.
 
 ```typescript
-import { verifyWebhookSignature } from '@fotohub/sdk/webhooks';
+import { verifyWebhookSignature } from 'fotohub/webhooks';
 
 // Express.js middleware
 app.post('/webhooks/fotohub', express.raw({ type: 'application/json' }), (req, res) => {
@@ -693,7 +693,7 @@ interface VerifyWebhookOptions {
 
 ```typescript
 // app/api/generate/route.ts
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 import { NextResponse } from 'next/server';
 
 const client = new FotohubClient();
@@ -727,7 +727,7 @@ export async function POST(request: Request) {
 
 ```typescript
 // app/api/chat/route.ts
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 
 const client = new FotohubClient();
 
@@ -768,7 +768,7 @@ export async function POST(request: Request) {
 // app/actions/generate.ts
 'use server';
 
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 
 const client = new FotohubClient();
 
@@ -790,7 +790,7 @@ export async function generateImage(prompt: string) {
 
 ```typescript
 // app/api/chat/route.ts
-import { FotohubClient } from '@fotohub/sdk';
+import { FotohubClient } from 'fotohub';
 
 // Works on Vercel Edge, Cloudflare Workers, Deno Deploy
 export const runtime = 'edge';

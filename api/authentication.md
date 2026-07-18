@@ -51,7 +51,7 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 });
 
 // Using the SDK (recommended)
-import { FotohubClient } from "@fotohub/sdk";
+import { FotohubClient } from "fotohub";
 
 const client = new FotohubClient({
   apiKey: process.env.FOTOHUB_API_KEY!,

@@ -5,7 +5,7 @@ Official Python SDK for the FOTOhub API. Provides type-safe interfaces, automati
 ## Installation
 
 ```bash
-pip install fotohub-sdk
+pip install fotohub
 ```
 
 Requires **Python 3.8+**. For async support, Python 3.9+ is recommended.
@@ -14,13 +14,13 @@ Optional dependencies:
 
 ```bash
 # With async support (installs aiohttp)
-pip install fotohub-sdk[async]
+pip install fotohub[async]
 
 # With webhook verification (installs cryptography)
-pip install fotohub-sdk[webhooks]
+pip install fotohub[webhooks]
 
 # All extras
-pip install fotohub-sdk[all]
+pip install fotohub[all]
 ```
 
 ## Quick Start

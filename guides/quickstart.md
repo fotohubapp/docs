@@ -36,11 +36,11 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 ::: code-group
 
 ```bash [Python]
-pip install fotohub-sdk
+pip install fotohub
 ```
 
 ```bash [TypeScript]
-npm install @fotohub/sdk
+npm install fotohub
 ```
 
 :::
