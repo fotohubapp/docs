@@ -84,18 +84,38 @@ features:
 
 <div class="custom-home">
 
+<!-- ─── TECH TAGS ─── -->
+<section class="tech-tags">
+  <span class="tag tag-purple">REST API</span>
+  <span class="tag tag-blue">SSE Streaming</span>
+  <span class="tag tag-green">WebSockets</span>
+  <span class="tag tag-cyan">OpenAI-Compatible</span>
+  <span class="tag tag-orange">JWT + API Keys</span>
+  <span class="tag tag-pink">HMAC-SHA256 Webhooks</span>
+  <span class="tag tag-purple">pgvector</span>
+  <span class="tag tag-blue">S3-Compatible</span>
+  <span class="tag tag-green">CDN (CloudFront)</span>
+  <span class="tag tag-cyan">Edge Functions (Deno)</span>
+  <span class="tag tag-orange">GPU Inference</span>
+  <span class="tag tag-pink">Async Jobs</span>
+</section>
+
+<!-- ─── STATS BAR ─── -->
 <section class="stats-bar">
   <div class="stat"><span class="stat-number">200+</span><span class="stat-label">AI Models</span></div>
   <div class="stat-divider"></div>
   <div class="stat"><span class="stat-number">5</span><span class="stat-label">SDKs</span></div>
   <div class="stat-divider"></div>
-  <div class="stat"><span class="stat-number">60+</span><span class="stat-label">API Endpoints</span></div>
+  <div class="stat"><span class="stat-number">60+</span><span class="stat-label">Endpoints</span></div>
   <div class="stat-divider"></div>
-  <div class="stat"><span class="stat-number">&lt;200ms</span><span class="stat-label">P95 Latency</span></div>
+  <div class="stat"><span class="stat-number">252</span><span class="stat-label">Edge Functions</span></div>
   <div class="stat-divider"></div>
-  <div class="stat"><span class="stat-number">99.9%</span><span class="stat-label">Uptime</span></div>
+  <div class="stat"><span class="stat-number">&lt;180ms</span><span class="stat-label">P95 Latency</span></div>
+  <div class="stat-divider"></div>
+  <div class="stat"><span class="stat-number">99.9%</span><span class="stat-label">Uptime SLA</span></div>
 </section>
 
+<!-- ─── TERMINAL CODE PREVIEW ─── -->
 <section class="code-preview">
   <div class="code-header">
     <div class="code-dots"><span></span><span></span><span></span></div>
@@ -104,6 +124,7 @@ features:
       <span class="code-tab">TypeScript</span>
       <span class="code-tab">cURL</span>
     </div>
+    <span class="code-filename">app.py</span>
   </div>
 
 ```python
@@ -125,35 +146,149 @@ route = client.gabriel_classify(
     enhance_prompt=True
 )
 # → { action: "route", target: "/generate/video", model_selected: "seedance-2-0-fast" }
+
+# Stream chat completions (OpenAI-compatible)
+for chunk in client.chat(
+    messages=[{"role": "user", "content": "Explain diffusion models in 3 sentences"}],
+    model="gemini-flash",
+    stream=True
+):
+    print(chunk["choices"][0]["delta"].get("content", ""), end="")
 ```
 
 </section>
 
+<!-- ─── INFRA SPECS ─── -->
+<section class="infra-section">
+  <h3>Infrastructure Specs</h3>
+  <div class="infra-grid">
+    <div class="infra-card">
+      <div class="infra-icon">⚡</div>
+      <div class="infra-title">Inference</div>
+      <div class="infra-detail">NVIDIA A100 80GB + A10G<br>Local EU inference, no cold starts<br><code>avg 1.8s</code> image generation</div>
+    </div>
+    <div class="infra-card">
+      <div class="infra-icon">🗄️</div>
+      <div class="infra-title">Database</div>
+      <div class="infra-detail">PostgreSQL 15 + pgvector<br>Row-Level Security on all tables<br><code>252</code> edge functions (Deno)</div>
+    </div>
+    <div class="infra-card">
+      <div class="infra-icon">🌐</div>
+      <div class="infra-title">Network</div>
+      <div class="infra-detail">Cloudflare WAF + CDN<br>TLS 1.3, HTTP/3 (QUIC)<br><code>eu-central-1</code> data residency</div>
+    </div>
+    <div class="infra-card">
+      <div class="infra-icon">📦</div>
+      <div class="infra-title">Storage</div>
+      <div class="infra-detail">S3-compatible object storage<br>CloudFront CDN distribution<br><code>11 nines</code> durability</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── REQUEST FLOW ASCII ─── -->
+<section class="ascii-section">
+  <h3>Request Flow</h3>
+  <div class="ascii-box">
+<pre>
+  Client ─── HTTPS ──→ Cloudflare WAF ──→ nginx (API Gateway)
+                                               │
+                    ┌──────────────┬────────────┼────────────┬──────────────┐
+                    ▼              ▼            ▼            ▼              ▼
+              api-server     image-engine  video-engine  music-server  billing-engine
+              :8791          :8090         :8092         :8093         :8094
+                │              │              │
+                │         ┌────┴────┐    ┌────┴────┐
+                ▼         ▼         ▼    ▼         ▼
+             Gabriel    BytePlus   BFL  Google   ByteDance
+              (AI)      Seedream   FLUX  Veo     Seedance
+                        WAN        Grok  Sora    Hailuo
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  PostgreSQL 15 │ Supabase Auth │ S3 Storage │ Edge Functions (252)  │
+  └─────────────────────────────────────────────────────────────────────┘
+</pre>
+  </div>
+</section>
+
+<!-- ─── MODEL PROVIDERS ─── -->
+<section class="providers-section">
+  <h3>Providers Under the Hood</h3>
+  <div class="provider-tags">
+    <span class="provider">Google <span class="prov-count">Veo 3.1 · Imagen 4 · Gemini 2.5</span></span>
+    <span class="provider">BytePlus <span class="prov-count">Seedream 5 · Seedance 2</span></span>
+    <span class="provider">Black Forest Labs <span class="prov-count">FLUX 2 Pro/Max/Flex</span></span>
+    <span class="provider">Anthropic <span class="prov-count">Claude Opus 4 · Sonnet 4.6</span></span>
+    <span class="provider">OpenAI <span class="prov-count">GPT-4o · Sora 2</span></span>
+    <span class="provider">xAI <span class="prov-count">Grok Imagine · Grok Video</span></span>
+    <span class="provider">DeepSeek <span class="prov-count">R1 · V3</span></span>
+    <span class="provider">MiniMax <span class="prov-count">Hailuo · Music Gen</span></span>
+    <span class="provider">Stability AI <span class="prov-count">SD3 · Stable Audio</span></span>
+    <span class="provider">Kling <span class="prov-count">Kling 2.0</span></span>
+  </div>
+</section>
+
+<!-- ─── SDK INSTALL ─── -->
 <section class="sdk-strip">
   <h3>Install in seconds</h3>
   <div class="sdk-grid">
     <div class="sdk-card">
       <code>pip install fotohub</code>
-      <span class="sdk-badge">Python 3.8+</span>
+      <span class="sdk-badge">Python 3.8+ · PyPI</span>
     </div>
     <div class="sdk-card">
       <code>npm install fotohub</code>
-      <span class="sdk-badge">Node 18+</span>
+      <span class="sdk-badge">Node 18+ · npm</span>
     </div>
     <div class="sdk-card">
       <code>composer require fotohub/sdk</code>
-      <span class="sdk-badge">PHP 8.1+</span>
+      <span class="sdk-badge">PHP 8.1+ · Packagist</span>
+    </div>
+  </div>
+  <div class="sdk-features">
+    <span class="sdk-feat">Full TypeScript types</span>
+    <span class="sdk-feat">Streaming support</span>
+    <span class="sdk-feat">Auto-retry + backoff</span>
+    <span class="sdk-feat">Async/await</span>
+    <span class="sdk-feat">Zero dependencies (Node)</span>
+  </div>
+</section>
+
+<!-- ─── LATENCY TABLE ─── -->
+<section class="perf-section">
+  <h3>Performance Benchmarks</h3>
+  <div class="perf-table">
+    <div class="perf-row perf-header">
+      <span>Operation</span><span>Model</span><span>P50</span><span>P95</span><span>Credits</span>
+    </div>
+    <div class="perf-row">
+      <span>Image Gen</span><span class="mono">seedream-5-0</span><span class="perf-fast">1.8s</span><span>2.4s</span><span class="perf-credit">1.0</span>
+    </div>
+    <div class="perf-row">
+      <span>Image Gen</span><span class="mono">flux-2-pro</span><span>3.2s</span><span>4.8s</span><span class="perf-credit">1.5</span>
+    </div>
+    <div class="perf-row">
+      <span>Video Gen</span><span class="mono">seedance-2-fast</span><span>12s</span><span>18s</span><span class="perf-credit">1.0</span>
+    </div>
+    <div class="perf-row">
+      <span>Chat (TTFT)</span><span class="mono">gemini-flash</span><span class="perf-fast">85ms</span><span>140ms</span><span class="perf-credit">~0.2</span>
+    </div>
+    <div class="perf-row">
+      <span>Gabriel Route</span><span class="mono">gemma-4-e2b</span><span class="perf-fast">320ms</span><span>480ms</span><span class="perf-credit">0</span>
+    </div>
+    <div class="perf-row">
+      <span>Suggest</span><span class="mono">fuzzy-match</span><span class="perf-fast">8ms</span><span>18ms</span><span class="perf-credit">0</span>
     </div>
   </div>
 </section>
 
+<!-- ─── WHAT'S NEW ─── -->
 <section class="whats-new">
   <h3>What's New</h3>
   <div class="changelog-items">
     <div class="changelog-item">
       <span class="changelog-date">Jul 2026</span>
       <span class="changelog-badge new">NEW</span>
-      <span class="changelog-text">Gabriel AI Orchestrator — natural language routing with auto-send, prompt enhancement, inline suggestions</span>
+      <span class="changelog-text">Gabriel AI Orchestrator — NL routing, prompt enhancement, inline suggestions, auto-send</span>
     </div>
     <div class="changelog-item">
       <span class="changelog-date">Jul 2026</span>
@@ -163,13 +298,36 @@ route = client.gabriel_classify(
     <div class="changelog-item">
       <span class="changelog-date">Jul 2026</span>
       <span class="changelog-badge improved">UPD</span>
-      <span class="changelog-text">Seedance 2.0 Pro/Fast/Mini — next-gen video at 1 credit flat</span>
+      <span class="changelog-text">Seedance 2.0 Pro/Fast/Mini — next-gen video, 1 credit flat</span>
     </div>
     <div class="changelog-item">
       <span class="changelog-date">Jun 2026</span>
       <span class="changelog-badge improved">UPD</span>
-      <span class="changelog-text">Tier system v2 — PAYG auto-resolution, wallet, burst limits</span>
+      <span class="changelog-text">Tier system v2 — PAYG auto-resolution, wallet, burst limits, per-project caps</span>
     </div>
+    <div class="changelog-item">
+      <span class="changelog-date">Jun 2026</span>
+      <span class="changelog-badge new">NEW</span>
+      <span class="changelog-text">Brand Assets API — upload logos, colors, fonts for brand-consistent generation</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER CTA ─── -->
+<section class="footer-cta">
+  <div class="cta-content">
+    <h3>Ready to ship?</h3>
+    <p>50 free credits. No credit card required. First image in 60 seconds.</p>
+    <div class="cta-buttons">
+      <a href="/api/getting-started" class="cta-btn primary">Get API Key →</a>
+      <a href="/guides/quickstart" class="cta-btn secondary">Read Quickstart</a>
+    </div>
+  </div>
+  <div class="cta-terminal">
+    <code>$ curl -X POST apis.fotohub.app/v1/ai/generate/image \</code>
+    <code>    -H "Authorization: Bearer fh_live_..." \</code>
+    <code>    -d '{"prompt":"hello world","model":"seedream-5-0-260128"}'</code>
+    <code class="cta-response">← 200 OK  (1.8s · 1 credit · eu-central-1)</code>
   </div>
 </section>
 
@@ -650,5 +808,467 @@ route = client.gabriel_classify(
     gap: 0.4rem;
   }
   .changelog-date { min-width: auto; }
+}
+
+/* ─── Tech tags ─── */
+
+.tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: 800px;
+  margin: -1rem auto 2rem;
+  padding: 0 1rem;
+}
+
+.tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid;
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.tag:hover {
+  transform: translateY(-1px);
+}
+
+.tag-purple { background: rgba(124,58,237,0.08); border-color: rgba(124,58,237,0.2); color: #7c3aed; }
+.tag-blue { background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.2); color: #2563eb; }
+.tag-green { background: rgba(5,150,105,0.08); border-color: rgba(5,150,105,0.2); color: #059669; }
+.tag-cyan { background: rgba(8,145,178,0.08); border-color: rgba(8,145,178,0.2); color: #0891b2; }
+.tag-orange { background: rgba(217,119,6,0.08); border-color: rgba(217,119,6,0.2); color: #d97706; }
+.tag-pink { background: rgba(219,39,119,0.08); border-color: rgba(219,39,119,0.2); color: #db2777; }
+
+.dark .tag-purple { background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.25); color: #c4b5fd; }
+.dark .tag-blue { background: rgba(96,165,250,0.1); border-color: rgba(96,165,250,0.25); color: #93c5fd; }
+.dark .tag-green { background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.25); color: #6ee7b7; }
+.dark .tag-cyan { background: rgba(34,211,238,0.1); border-color: rgba(34,211,238,0.25); color: #67e8f9; }
+.dark .tag-orange { background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.25); color: #fcd34d; }
+.dark .tag-pink { background: rgba(244,114,182,0.1); border-color: rgba(244,114,182,0.25); color: #f9a8d4; }
+
+/* ─── Code filename ─── */
+
+.code-filename {
+  font-size: 0.68rem;
+  font-weight: 500;
+  opacity: 0.45;
+  font-family: 'JetBrains Mono', monospace;
+  margin-left: auto;
+}
+
+/* ─── Infrastructure Specs ─── */
+
+.infra-section {
+  max-width: 800px;
+  margin: 0 auto 3rem;
+  padding: 0 1rem;
+}
+
+.infra-section h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1.2rem;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.infra-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.infra-card {
+  padding: 1.2rem;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(0,0,0,0.06);
+  transition: all 0.25s ease;
+}
+
+.infra-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+
+.dark .infra-card {
+  background: rgba(22, 22, 29, 0.7);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.dark .infra-card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  border-color: rgba(167,139,250,0.2);
+}
+
+.infra-icon {
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.infra-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+  letter-spacing: -0.01em;
+}
+
+.infra-detail {
+  font-size: 0.75rem;
+  line-height: 1.6;
+  opacity: 0.7;
+}
+
+.infra-detail code {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #7c3aed;
+  background: rgba(124,58,237,0.08);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.dark .infra-detail code {
+  color: #c4b5fd;
+  background: rgba(167,139,250,0.12);
+}
+
+/* ─── ASCII Request Flow ─── */
+
+.ascii-section {
+  max-width: 800px;
+  margin: 0 auto 3rem;
+  padding: 0 1rem;
+}
+
+.ascii-section h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.ascii-box {
+  background: #0f172a;
+  border-radius: 12px;
+  padding: 1.5rem;
+  overflow-x: auto;
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.ascii-box pre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  line-height: 1.5;
+  color: #94a3b8;
+  margin: 0;
+  white-space: pre;
+}
+
+.dark .ascii-box {
+  background: #0c0c14;
+  border-color: rgba(124,58,237,0.15);
+}
+
+@media (max-width: 640px) {
+  .ascii-box pre { font-size: 0.5rem; }
+  .ascii-box { padding: 1rem 0.75rem; }
+}
+
+/* ─── Providers ─── */
+
+.providers-section {
+  max-width: 800px;
+  margin: 0 auto 3rem;
+  padding: 0 1rem;
+}
+
+.providers-section h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.provider-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.provider {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  background: #f1f5f9;
+  border: 1px solid rgba(0,0,0,0.06);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+}
+
+.provider:hover {
+  border-color: #7c3aed;
+  transform: translateY(-1px);
+}
+
+.dark .provider {
+  background: rgba(22, 22, 29, 0.7);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.dark .provider:hover {
+  border-color: #a78bfa;
+}
+
+.prov-count {
+  font-size: 0.65rem;
+  font-weight: 400;
+  opacity: 0.55;
+}
+
+/* ─── SDK features ─── */
+
+.sdk-features {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 1rem;
+}
+
+.sdk-feat {
+  font-size: 0.65rem;
+  font-weight: 500;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(124,58,237,0.06);
+  color: #6d28d9;
+}
+
+.dark .sdk-feat {
+  background: rgba(167,139,250,0.1);
+  color: #c4b5fd;
+}
+
+/* ─── Performance table ─── */
+
+.perf-section {
+  max-width: 720px;
+  margin: 0 auto 3rem;
+  padding: 0 1rem;
+}
+
+.perf-section h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.perf-table {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.dark .perf-table {
+  border-color: rgba(255,255,255,0.06);
+}
+
+.perf-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.5fr 0.7fr 0.7fr 0.8fr;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  font-size: 0.78rem;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+
+.dark .perf-row {
+  border-bottom-color: rgba(255,255,255,0.04);
+}
+
+.perf-row:last-child {
+  border-bottom: none;
+}
+
+.perf-header {
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  background: #f8fafc;
+}
+
+.dark .perf-header {
+  background: rgba(22, 22, 29, 0.8);
+}
+
+.perf-row:not(.perf-header):nth-child(even) {
+  background: rgba(0,0,0,0.015);
+}
+
+.dark .perf-row:not(.perf-header):nth-child(even) {
+  background: rgba(255,255,255,0.015);
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+}
+
+.perf-fast {
+  color: #059669;
+  font-weight: 600;
+}
+
+.dark .perf-fast {
+  color: #34d399;
+}
+
+.perf-credit {
+  font-weight: 600;
+  color: #7c3aed;
+}
+
+.dark .perf-credit {
+  color: #a78bfa;
+}
+
+@media (max-width: 640px) {
+  .perf-row { font-size: 0.68rem; padding: 0.5rem 0.6rem; }
+  .mono { font-size: 0.6rem; }
+}
+
+/* ─── Footer CTA ─── */
+
+.footer-cta {
+  max-width: 800px;
+  margin: 0 auto 3rem;
+  padding: 2rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(124,58,237,0.06), rgba(37,99,235,0.06));
+  border: 1px solid rgba(124,58,237,0.12);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+.dark .footer-cta {
+  background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(37,99,235,0.06));
+  border-color: rgba(124,58,237,0.2);
+}
+
+.cta-content h3 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.5rem;
+}
+
+.cta-content p {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.cta-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cta-btn {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.cta-btn.primary {
+  background: #7c3aed;
+  color: white;
+}
+
+.cta-btn.primary:hover {
+  background: #6d28d9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124,58,237,0.3);
+}
+
+.cta-btn.secondary {
+  background: rgba(0,0,0,0.04);
+  color: inherit;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.dark .cta-btn.secondary {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.cta-btn.secondary:hover {
+  background: rgba(0,0,0,0.08);
+}
+
+.dark .cta-btn.secondary:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.cta-terminal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  background: #0f172a;
+  padding: 1rem;
+  border-radius: 10px;
+  color: #94a3b8;
+  overflow-x: auto;
+}
+
+.dark .cta-terminal {
+  background: #0c0c14;
+}
+
+.cta-terminal code {
+  white-space: nowrap;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.cta-response {
+  color: #22c55e !important;
+  margin-top: 0.3rem;
+}
+
+@media (max-width: 768px) {
+  .footer-cta {
+    grid-template-columns: 1fr;
+    padding: 1.5rem;
+    gap: 1.5rem;
+  }
+  .cta-buttons { flex-direction: column; }
 }
 </style>
