@@ -84,22 +84,6 @@ features:
 
 <div class="custom-home">
 
-<!-- ─── TECH TAGS ─── -->
-<section class="tech-tags">
-  <span class="tag tag-purple">REST API</span>
-  <span class="tag tag-blue">SSE Streaming</span>
-  <span class="tag tag-green">WebSockets</span>
-  <span class="tag tag-cyan">OpenAI-Compatible</span>
-  <span class="tag tag-orange">JWT + API Keys</span>
-  <span class="tag tag-pink">HMAC-SHA256 Webhooks</span>
-  <span class="tag tag-purple">pgvector</span>
-  <span class="tag tag-blue">S3-Compatible</span>
-  <span class="tag tag-green">CDN (CloudFront)</span>
-  <span class="tag tag-cyan">Edge Functions (Deno)</span>
-  <span class="tag tag-orange">GPU Inference</span>
-  <span class="tag tag-pink">Async Jobs</span>
-</section>
-
 <!-- ─── STATS BAR ─── -->
 <section class="stats-bar">
   <div class="stat"><span class="stat-number">200+</span><span class="stat-label">AI Models</span></div>
