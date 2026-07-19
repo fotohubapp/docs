@@ -6,6 +6,11 @@
   --vp-button-brand-bg: #7c3aed;
   --vp-button-brand-hover-bg: #6d28d9;
   --vp-font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-alt: #f9fafb;
+  --vp-c-bg-soft: #f3f4f6;
+  --vp-sidebar-bg-color: #fafafa;
 }
 
 .dark {
@@ -13,14 +18,40 @@
   --vp-c-brand-2: #8b5cf6;
   --vp-c-brand-3: #7c3aed;
   --vp-c-brand-soft: rgba(167, 139, 250, 0.14);
-  --vp-c-bg: #0f0f14;
-  --vp-c-bg-alt: #16161d;
-  --vp-c-bg-soft: #1c1c26;
+  --vp-c-bg: #0c0c12;
+  --vp-c-bg-alt: #111118;
+  --vp-c-bg-soft: #18181f;
+  --vp-sidebar-bg-color: #0f0f16;
 }
 
-/* Logo sizing in navbar */
+/* ─── Global typography ─── */
+
+html {
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+.vp-doc h1, .vp-doc h2, .vp-doc h3 {
+  letter-spacing: -0.02em;
+}
+
+.vp-doc h1 {
+  font-weight: 800 !important;
+}
+
+.vp-doc h2 {
+  font-weight: 700 !important;
+  border-top: none !important;
+  padding-top: 1.5rem !important;
+}
+
+/* ─── Navbar ─── */
+
+.VPNavBar {
+  backdrop-filter: blur(12px) saturate(1.2);
+}
+
 .VPNavBarTitle .logo {
-  height: 32px;
+  height: 30px;
   width: auto;
 }
 
@@ -28,12 +59,106 @@
   flex-shrink: 0;
 }
 
-/* Hero image sizing */
+/* ─── Sidebar ─── */
+
+.VPSidebar {
+  font-size: 0.88rem !important;
+}
+
+.VPSidebarItem .text {
+  font-weight: 500 !important;
+}
+
+.VPSidebarItem.is-active > .item > .indicator {
+  background: var(--vp-c-brand-1) !important;
+}
+
+/* ─── Code blocks ─── */
+
+.vp-doc div[class*="language-"] {
+  border-radius: 10px !important;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.dark .vp-doc div[class*="language-"] {
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.vp-doc div[class*="language-"] code {
+  font-size: 0.82rem !important;
+  line-height: 1.65 !important;
+}
+
+/* ─── Tables ─── */
+
+.vp-doc table {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.dark .vp-doc table {
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.vp-doc th {
+  font-weight: 650 !important;
+  font-size: 0.8rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.vp-doc td {
+  font-size: 0.85rem !important;
+}
+
+/* ─── Tip/Warning boxes ─── */
+
+.vp-doc .custom-block {
+  border-radius: 10px !important;
+  border-left-width: 3px !important;
+}
+
+/* ─── Hero image ─── */
+
 .VPHero .image-container .image-bg {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .VPHero .VPImage {
-  max-height: 140px;
+  max-height: 120px;
   width: auto;
+}
+
+/* ─── Smooth scroll ─── */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ─── Links ─── */
+
+.vp-doc a {
+  text-decoration: none !important;
+  font-weight: 500;
+}
+
+.vp-doc a:hover {
+  text-decoration: underline !important;
+}
+
+/* ─── Footer ─── */
+
+.VPFooter {
+  border-top: 1px solid rgba(0,0,0,0.06) !important;
+}
+
+.dark .VPFooter {
+  border-top: 1px solid rgba(255,255,255,0.04) !important;
+}
+
+/* ─── Search ─── */
+
+.VPNavBarSearch .DocSearch-Button {
+  border-radius: 10px !important;
 }

@@ -12,6 +12,11 @@ export default defineConfig({
     ['meta', { name: 'theme-color', content: '#7c3aed' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'FOTOhub Docs' }],
+    ['meta', { property: 'og:title', content: 'FOTOhub Developer Docs — 200+ AI Models, One API' }],
+    ['meta', { property: 'og:description', content: 'Generate images, video, music, 3D, and chat with 200+ AI models through a single unified API. SDKs for Python, TypeScript, PHP.' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+    ['link', { href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap', rel: 'stylesheet' }],
   ],
 
   themeConfig: {
@@ -26,7 +31,15 @@ export default defineConfig({
       { text: 'SDKs', link: '/sdk/python' },
       { text: 'Integrations', link: '/integrations/overview' },
       { text: 'Guides', link: '/guides/quickstart' },
-      { text: 'Console', link: 'https://fotohub.app/console' },
+      {
+        text: 'Resources',
+        items: [
+          { text: 'Changelog', link: '/changelog' },
+          { text: 'Status', link: 'https://status.fotohub.app' },
+          { text: 'Console', link: 'https://fotohub.app/console' },
+          { text: 'Community', link: 'https://discord.gg/fotohub' },
+        ],
+      },
     ],
 
     sidebar: {
