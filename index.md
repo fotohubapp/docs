@@ -22,12 +22,12 @@ hero:
 features:
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>'
     title: Image Generation
-    details: "25+ models — SeedDream 5, FLUX 2, Grok Imagine, WAN, Imagen. Text-to-image, img2img, inpainting, upscaling. From 0.7 cr/image."
+    details: "25+ models — Seedream 5.0, FLUX.2, Grok Imagine, WAN 2.6, Gemini. Text-to-image, img2img, inpainting, upscaling. From 0.7 cr/image."
     link: /api/image-generation
     linkText: Image API →
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>'
     title: Video Generation
-    details: "15+ models — Seedance 2.0, Veo 3.1, Hailuo, Sora 2, Kling. Text-to-video, image-to-video, up to 60s. Async polling."
+    details: "15+ models — Seedance 2.0, Veo 3.1, Sora 2 Pro, Hailuo, WAN 2.6, Grok Video. Text-to-video, image-to-video, up to 60s. Async polling."
     link: /api/video-generation
     linkText: Video API →
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
@@ -37,7 +37,7 @@ features:
     linkText: Audio API →
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
     title: Chat / LLM
-    details: "OpenAI-compatible. Claude 4, GPT-4o, Gemini 2.5, DeepSeek. Streaming, tool use, vision. Per-token billing."
+    details: "OpenAI-compatible. Claude Opus 4.6, GPT-5.1, DeepSeek V4, Grok 4.1, Qwen3, Mistral. Streaming, tool use, vision. Per-token billing."
     link: /api/chat-llm
     linkText: Chat API →
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 4.5v9L12 21l-9-4.5v-9L12 3z"/><path d="M12 12l9-4.5"/><path d="M12 12v9"/><path d="M12 12L3 7.5"/></svg>'
@@ -158,73 +158,115 @@ for chunk in client.chat(
 
 </section>
 
-<!-- ─── INFRA SPECS ─── -->
+<!-- ─── HOW IT WORKS ─── -->
 <section class="infra-section">
-  <h3>Infrastructure Specs</h3>
+  <h3>How It Works</h3>
   <div class="infra-grid">
     <div class="infra-card">
       <div class="infra-icon">⚡</div>
-      <div class="infra-title">Inference</div>
-      <div class="infra-detail">NVIDIA A100 80GB + A10G<br>Local EU inference, no cold starts<br><code>avg 1.8s</code> image generation</div>
+      <div class="infra-title">Instant Inference</div>
+      <div class="infra-detail">GPU-accelerated generation<br>No cold starts, no queuing<br><code>avg 1.8s</code> per image</div>
     </div>
     <div class="infra-card">
-      <div class="infra-icon">🗄️</div>
-      <div class="infra-title">Database</div>
-      <div class="infra-detail">PostgreSQL 15 + pgvector<br>Row-Level Security on all tables<br><code>252</code> edge functions (Deno)</div>
+      <div class="infra-icon">🔀</div>
+      <div class="infra-title">Smart Routing</div>
+      <div class="infra-detail">Auto-failover across providers<br>Best model selected per task<br><code>0ms</code> downtime on failures</div>
     </div>
     <div class="infra-card">
       <div class="infra-icon">🌐</div>
-      <div class="infra-title">Network</div>
-      <div class="infra-detail">Cloudflare WAF + CDN<br>TLS 1.3, HTTP/3 (QUIC)<br><code>eu-central-1</code> data residency</div>
+      <div class="infra-title">EU-First</div>
+      <div class="infra-detail">All data stays in EU (Frankfurt)<br>TLS 1.3, HTTP/3, GDPR-compliant<br><code>&lt;50ms</code> from EU clients</div>
     </div>
     <div class="infra-card">
-      <div class="infra-icon">📦</div>
-      <div class="infra-title">Storage</div>
-      <div class="infra-detail">S3-compatible object storage<br>CloudFront CDN distribution<br><code>11 nines</code> durability</div>
+      <div class="infra-icon">🛡️</div>
+      <div class="infra-title">Enterprise Security</div>
+      <div class="infra-detail">WAF + DDoS protection<br>Row-Level Security, encrypted at rest<br><code>99.9%</code> uptime SLA</div>
     </div>
   </div>
 </section>
 
-<!-- ─── REQUEST FLOW ASCII ─── -->
+<!-- ─── REQUEST LIFECYCLE ─── -->
 <section class="ascii-section">
-  <h3>Request Flow</h3>
+  <h3>Request Lifecycle</h3>
   <div class="ascii-box">
 <pre>
-  Client ─── HTTPS ──→ Cloudflare WAF ──→ nginx (API Gateway)
-                                               │
-                    ┌──────────────┬────────────┼────────────┬──────────────┐
-                    ▼              ▼            ▼            ▼              ▼
-              api-server     image-engine  video-engine  music-server  billing-engine
-              :8791          :8090         :8092         :8093         :8094
-                │              │              │
-                │         ┌────┴────┐    ┌────┴────┐
-                ▼         ▼         ▼    ▼         ▼
-             Gabriel    BytePlus   BFL  Google   ByteDance
-              (AI)      Seedream   FLUX  Veo     Seedance
-                        WAN        Grok  Sora    Hailuo
-
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  PostgreSQL 15 │ Supabase Auth │ S3 Storage │ Edge Functions (252)  │
-  └─────────────────────────────────────────────────────────────────────┘
+                         YOUR APP
+            ┌─────────────────────────────────┐
+            │  from fotohub import FotoHub     │
+            │  client.generate_image(...)      │
+            └────────────────┬────────────────┘
+                             │
+                     HTTPS / TLS 1.3
+                             │
+                             ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                          EDGE LAYER                                      │
+  │    WAF · DDoS Protection · Rate Limiting · GeoIP · Bot Detection         │
+  └────────────────────────────────┬─────────────────────────────────────────┘
+                                   │
+                                   ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                          API GATEWAY                                     │
+  │         Auth (JWT / API Key) · Credit Check · Tier Enforcement           │
+  │                                                                          │
+  │    ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────────────┐   │
+  │    │ Validate │ → │  Deduct  │ → │  Route   │ → │ Select Provider  │   │
+  │    │  Token   │   │ Credits  │   │ by Type  │   │  (best avail.)   │   │
+  │    └──────────┘   └──────────┘   └──────────┘   └──────────────────┘   │
+  └───────────┬──────────────┬──────────────┬───────────────┬───────────────┘
+              │              │              │               │
+              ▼              ▼              ▼               ▼
+  ┌────────────────┐ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐
+  │  IMAGE ENGINE  │ │  VIDEO ENGINE  │ │  AUDIO ENGINE  │ │   CHAT / LLM   │
+  │                │ │                │ │                │ │                │
+  │  Seedream 5.0  │ │  Seedance 2.0  │ │  MiniMax       │ │  Claude 4.6    │
+  │  FLUX.2 Pro    │ │  Veo 3.1       │ │  Stable Audio  │ │  GPT-5.1       │
+  │  Grok Imagine  │ │  Sora 2 Pro    │ │  ElevenLabs    │ │  DeepSeek V4   │
+  │  WAN 2.6       │ │  Hailuo        │ │  Chatterbox    │ │  Grok 4.1      │
+  │  Gemini 3      │ │  Grok Video    │ │  IDA Music     │ │  Qwen3 Max     │
+  └───────┬────────┘ └───────┬────────┘ └───────┬────────┘ └───────┬────────┘
+          │                  │                  │                   │
+          ▼                  ▼                  ▼                   ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                        RESPONSE PIPELINE                                 │
+  │                                                                          │
+  │   CDN Upload → Signed URL → Webhook Notify → Usage Logged → Return      │
+  │                                                                          │
+  │   On failure: auto-retry with next provider → refund credits if failed   │
+  └──────────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+            ┌─────────────────────────────────┐
+            │   { "images": ["https://..."],  │
+            │     "credits_used": 1,          │
+            │     "generation_time_ms": 1840  │
+            │   }                             │
+            └─────────────────────────────────┘
 </pre>
+  </div>
+  <div class="flow-legend">
+    <span class="flow-dot flow-green"></span> <span>Sync response (~2s for images)</span>
+    <span class="flow-dot flow-blue"></span> <span>Async polling (video/3D — returns job_id)</span>
+    <span class="flow-dot flow-purple"></span> <span>SSE stream (chat/Gabriel)</span>
   </div>
 </section>
 
 <!-- ─── MODEL PROVIDERS ─── -->
 <section class="providers-section">
-  <h3>Providers Under the Hood</h3>
+  <h3>200+ Models from 10+ Providers</h3>
   <div class="provider-tags">
-    <span class="provider">Google <span class="prov-count">Veo 3.1 · Imagen 4 · Gemini 2.5</span></span>
-    <span class="provider">BytePlus <span class="prov-count">Seedream 5 · Seedance 2</span></span>
-    <span class="provider">Black Forest Labs <span class="prov-count">FLUX 2 Pro/Max/Flex</span></span>
-    <span class="provider">Anthropic <span class="prov-count">Claude Opus 4 · Sonnet 4.6</span></span>
-    <span class="provider">OpenAI <span class="prov-count">GPT-4o · Sora 2</span></span>
-    <span class="provider">xAI <span class="prov-count">Grok Imagine · Grok Video</span></span>
-    <span class="provider">DeepSeek <span class="prov-count">R1 · V3</span></span>
-    <span class="provider">MiniMax <span class="prov-count">Hailuo · Music Gen</span></span>
-    <span class="provider">Stability AI <span class="prov-count">SD3 · Stable Audio</span></span>
-    <span class="provider">Kling <span class="prov-count">Kling 2.0</span></span>
+    <span class="provider">Google <span class="prov-count">Veo 3.1 · Gemini 3 Pro · Gemini 2.5 Flash</span></span>
+    <span class="provider">BytePlus <span class="prov-count">Seedream 5.0 · Seedance 2.0</span></span>
+    <span class="provider">Black Forest Labs <span class="prov-count">FLUX.2 Pro/Max/Flex/Klein</span></span>
+    <span class="provider">Anthropic <span class="prov-count">Claude Opus 4.6 · Sonnet 4.6</span></span>
+    <span class="provider">OpenAI <span class="prov-count">GPT-5.1 · Sora 2 Pro</span></span>
+    <span class="provider">xAI <span class="prov-count">Grok 4.1 · Grok Imagine · Grok Video</span></span>
+    <span class="provider">DeepSeek <span class="prov-count">V4 Pro · V4 Flash</span></span>
+    <span class="provider">MiniMax <span class="prov-count">Hailuo · M2.5 · Music Gen</span></span>
+    <span class="provider">Alibaba <span class="prov-count">Wan 2.6 · Qwen3 Max</span></span>
+    <span class="provider">Mistral <span class="prov-count">Large 3</span></span>
   </div>
+  <p class="providers-note">One API key. One SDK. Automatic failover between providers — your users never see errors.</p>
 </section>
 
 <!-- ─── SDK INSTALL ─── -->
@@ -258,7 +300,7 @@ for chunk in client.chat(
   <h3>Performance Benchmarks</h3>
   <div class="perf-table">
     <div class="perf-row perf-header">
-      <span>Operation</span><span>Model</span><span>P50</span><span>P95</span><span>Credits</span>
+      <span>Operation</span><span>Example Model</span><span>P50</span><span>P95</span><span>Credits</span>
     </div>
     <div class="perf-row">
       <span>Image Gen</span><span class="mono">seedream-5-0</span><span class="perf-fast">1.8s</span><span>2.4s</span><span class="perf-credit">1.0</span>
@@ -270,13 +312,13 @@ for chunk in client.chat(
       <span>Video Gen</span><span class="mono">seedance-2-fast</span><span>12s</span><span>18s</span><span class="perf-credit">1.0</span>
     </div>
     <div class="perf-row">
-      <span>Chat (TTFT)</span><span class="mono">gemini-flash</span><span class="perf-fast">85ms</span><span>140ms</span><span class="perf-credit">~0.2</span>
+      <span>Chat (TTFT)</span><span class="mono">deepseek-v4-flash</span><span class="perf-fast">85ms</span><span>140ms</span><span class="perf-credit">0.5</span>
     </div>
     <div class="perf-row">
-      <span>Gabriel Route</span><span class="mono">gemma-4-e2b</span><span class="perf-fast">320ms</span><span>480ms</span><span class="perf-credit">0</span>
+      <span>Gabriel AI</span><span class="mono">auto-route</span><span class="perf-fast">320ms</span><span>480ms</span><span class="perf-credit">0</span>
     </div>
     <div class="perf-row">
-      <span>Suggest</span><span class="mono">fuzzy-match</span><span class="perf-fast">8ms</span><span>18ms</span><span class="perf-credit">0</span>
+      <span>Suggestions</span><span class="mono">—</span><span class="perf-fast">8ms</span><span>18ms</span><span class="perf-credit">0</span>
     </div>
   </div>
 </section>
@@ -978,9 +1020,33 @@ for chunk in client.chat(
   border-color: rgba(124,58,237,0.15);
 }
 
+.flow-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  margin-top: 0.75rem;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  flex-wrap: wrap;
+}
+
+.flow-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.3rem;
+}
+
+.flow-green { background: #22c55e; }
+.flow-blue { background: #3b82f6; }
+.flow-purple { background: #a78bfa; }
+
 @media (max-width: 640px) {
-  .ascii-box pre { font-size: 0.5rem; }
-  .ascii-box { padding: 1rem 0.75rem; }
+  .ascii-box pre { font-size: 0.45rem; }
+  .ascii-box { padding: 1rem 0.5rem; }
+  .flow-legend { gap: 0.6rem; font-size: 0.6rem; }
 }
 
 /* ─── Providers ─── */
@@ -1037,6 +1103,14 @@ for chunk in client.chat(
   font-size: 0.65rem;
   font-weight: 400;
   opacity: 0.55;
+}
+
+.providers-note {
+  text-align: center;
+  font-size: 0.8rem;
+  opacity: 0.6;
+  margin-top: 1rem;
+  font-style: italic;
 }
 
 /* ─── SDK features ─── */
