@@ -97,20 +97,62 @@ Every API response includes a `billing` field with a complete breakdown of the c
 Parse the `billing` object in every response to track your spending in real time. The `method` field tells you whether you are still using credits or have fallen through to wallet billing.
 :::
 
-## API Plans
+## API Tiers
 
-FOTOhub offers 5 tiers designed for different usage levels, from hobbyists to enterprise teams.
+FOTOhub offers two categories of access tiers:
 
-| Plan | Monthly Price | Credits | Rate Limit | Storage | Max Upload | API Keys |
-|------|--------------|---------|------------|---------|------------|----------|
-| Free | 0 PLN | 50 | 10 rpm | 1 GB | 10 MB | 1 |
-| Developer | 49 PLN | 500 | 60 rpm | 10 GB | 50 MB | 5 |
-| **Startup** | **199 PLN** | **5,000** | **300 rpm** | **100 GB** | **100 MB** | **20** |
-| Business | 799 PLN | 25,000 | 1,000 rpm | 500 GB | 500 MB | Unlimited |
-| Enterprise | Custom | Unlimited | 5,000 rpm | Unlimited | 2 GB | Unlimited |
+### Pay-As-You-Go (PAYG)
+
+No subscription required. Fund your wallet and pay per operation. Tier upgrades are automatic based on wallet balance and lifetime spending.
+
+| Tier | Requirements | Rate Limit | Models | Features |
+|------|-------------|------------|--------|----------|
+| PAYG Basic | Register + fund wallet | 30 rpm | Basic models | Standard API access |
+| PAYG Standard | Min 100 PLN balance OR 200 PLN lifetime | 120 rpm | All standard | Webhooks, video, music |
+| PAYG Premium | Min 500 PLN balance OR 2,000 PLN lifetime | 500 rpm | All + beta | Agents, batch, compute |
+
+### Subscription Plans
+
+Monthly subscription with included credit allowance. Overage is charged from wallet at 1.5x provider cost.
+
+| Plan | Monthly Price | Credits/mo | Rate Limit | Storage | Models |
+|------|-------------|-----------|-----------|---------|--------|
+| Developer | 49 PLN | 500 | 60 rpm | 10 GB | All standard |
+| **Startup** | **199 PLN** | **5,000** | **300 rpm** | **100 GB** | **All models** |
+| Business | 799 PLN | 25,000 | 1,000 rpm | 500 GB | All + beta |
+| Enterprise | Custom | Unlimited | 5,000 rpm | Unlimited | Custom |
+
+### Tier Endpoints
+
+```bash
+# Get full tier catalog (no auth required)
+curl https://apis.fotohub.app/v1/tiers/catalog
+
+# Get your current tier and usage
+curl https://apis.fotohub.app/v1/tiers/current \
+  -H "Authorization: Bearer fh_live_your_key"
+
+# Subscribe to a tier
+curl -X POST https://apis.fotohub.app/v1/tiers/subscribe \
+  -H "Authorization: Bearer YOUR_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"tier": "sub-startup"}'
+
+# Apply for enterprise
+curl -X POST https://apis.fotohub.app/v1/tiers/enterprise/apply \
+  -H "Authorization: Bearer YOUR_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "company_name": "Acme Corp",
+    "contact_email": "cto@acme.com",
+    "company_size": "51-200",
+    "use_case": "AI-powered product photography for e-commerce catalog",
+    "expected_monthly_volume": "50k images, 5k videos"
+  }'
+```
 
 ::: info Enterprise Plans
-Enterprise plans include dedicated infrastructure, SLA guarantees, priority support, and custom rate limits. Contact sales@fotohub.app for a tailored quote.
+Enterprise plans include dedicated infrastructure, SLA guarantees (custom), priority support, SSO/SAML, and custom rate limits. Submit an application or contact sales@fotohub.app.
 :::
 
 ## Credit Costs by Operation
@@ -119,53 +161,116 @@ Each operation type has a fixed credit cost. For token-based models, credits are
 
 ### Image Generation
 
-| Model ID | Name | Credits | PLN Cost | Unit |
-|----------|------|---------|----------|------|
-| `flux-schnell` | Flux Schnell | 1 | 0.15 PLN | per image |
-| `flux-dev` | Flux Dev | 2 | 0.30 PLN | per image |
-| `flux-pro` | Flux Pro | 4 | 0.60 PLN | per image |
-| `stable-diffusion-xl` | SDXL | 2 | 0.30 PLN | per image |
-| `ideogram-v2` | Ideogram v2 | 5 | 0.75 PLN | per image |
-| `recraft-v3` | Recraft v3 | 4 | 0.60 PLN | per image |
-| `imagen-3` | Imagen 3 | 3 | 0.45 PLN | per image |
-| `dall-e-3` | DALL-E 3 | 8 | 1.20 PLN | per image |
+| Model ID | Name | Credits | Unit |
+|----------|------|---------|------|
+| `imagen-3-fast` | Imagen 3 Fast | 1 | per image |
+| `imagen-3-standard` | Imagen 3 Standard | 2 | per image |
+| `imagen-4-fast` | Imagen 4 Fast | 2 | per image |
+| `imagen-4-standard` | Imagen 4 Standard | 3 | per image |
+| `imagen-4-ultra` | Imagen 4 Ultra | 5 | per image |
+| `dall-e-3` | DALL-E 3 | 2 | per image |
+| `dall-e-3-hd` | DALL-E 3 HD | 4 | per image |
+| `gpt-image-1` | GPT Image 1 | 4 | per image |
+| `grok-imagine-image` | Grok Imagine | 1 | per image |
+| `grok-imagine-image-pro` | Grok Imagine Pro | 4 | per image |
+| `flux-2-klein-4b` | FLUX 2 Klein 4B | 1 | per image |
+| `flux-2-klein-9b` | FLUX 2 Klein 9B | 1 | per image |
+| `flux-2-pro` | FLUX 2 Pro | 2 | per image |
+| `flux-1.1-pro` | FLUX 1.1 Pro | 2 | per image |
+| `flux-1.1-pro-ultra` | FLUX 1.1 Pro Ultra | 3 | per image |
+| `flux-1.1-pro-raw` | FLUX 1.1 Pro Raw | 3 | per image |
+| `flux-kontext-pro` | FLUX Kontext Pro | 2 | per image |
+| `flux-kontext-max` | FLUX Kontext Max | 4 | per image |
+| `flux-fill-pro` | FLUX Fill Pro | 3 | per image |
+| `flux-2-max` | FLUX 2 Max | 4 | per image |
+| `minimax-image-01` | MiniMax Image | 1 | per image |
+| `kling-v2-1` | Kling V2.1 | 2 | per image |
+| `kling-v3` | Kling V3 | 5 | per image |
+| `kling-v3-omni` | Kling V3 Omni | 8 | per image |
 
 ### Video Generation
 
-| Model ID | Name | Credits | PLN Cost | Unit |
-|----------|------|---------|----------|------|
-| `kling-v1` | Kling v1 | 8 | 1.20 PLN | per 5s clip |
-| `kling-v2` | Kling v2 | 10 | 1.50 PLN | per 5s clip |
-| `minimax-video` | MiniMax Video | 12 | 1.80 PLN | per 5s clip |
-| `runway-gen3` | Runway Gen-3 | 15 | 2.25 PLN | per 5s clip |
+Credits are multiplied by `max(1, duration ÷ 5)` for longer clips.
+
+| Model ID | Name | Base Credits (5s) | Unit |
+|----------|------|-------------------|------|
+| `veo-2` | Veo 2 (Google) | 10 | per 5s segment |
+| `veo-3` | Veo 3 (Google) | 15 | per 5s segment |
+| `wan` | WAN | 8 | per 5s segment |
+| `kling` | Kling Video | 10 | per 5s segment |
+| `hailuo` | Hailuo (MiniMax) | 8 | per 5s segment |
+| `seedance` | Seedance 2.0 (BytePlus) | 10 | per 5s segment |
+| `sora-2` | Sora 2 (OpenAI) | 12 | per 5s segment |
+
+::: info Video Billing Example
+A 30-second video with `veo-2` costs: `10 × (30 ÷ 5) = 60 credits`. A 5-second clip costs 10 credits.
+:::
 
 ### Music Generation
 
-| Model ID | Name | Credits | PLN Cost | Unit |
-|----------|------|---------|----------|------|
-| `stable-audio` | Stable Audio | 5 | 0.75 PLN | per 30s |
-| `musicgen-large` | MusicGen Large | 10 | 1.50 PLN | per 60s |
-| `udio-v2` | Udio v2 | 15 | 2.25 PLN | per 60s |
-| `suno-v4` | Suno v4 | 25 | 3.75 PLN | per song |
+| Model ID | Name | Credits | Unit |
+|----------|------|---------|------|
+| `ida-music` | IDA Music (≤3 min) | 2 | per generation |
+| `ida-music` | IDA Music (>3 min) | 4 | per generation |
+| `minimax` | MiniMax Music (≤30s) | 5 | per generation |
+| `minimax` | MiniMax Music (≤60s) | 10 | per generation |
+| `minimax` | MiniMax Music (>60s) | 25 | per generation |
 
 ### Chat & Analysis
 
-| Model ID | Name | Credits | PLN Cost | Unit |
-|----------|------|---------|----------|------|
-| `claude-haiku` | Claude Haiku | 1 | 0.15 PLN | per request |
-| `claude-sonnet` | Claude Sonnet | 2 | 0.30 PLN | per request |
-| `gpt-4o-mini` | GPT-4o Mini | 1 | 0.15 PLN | per request |
-| `gpt-4o` | GPT-4o | 2 | 0.30 PLN | per request |
-| `gemini-flash` | Gemini Flash | 1 | 0.15 PLN | per request |
-| `image-analysis` | Image Analysis | 1 | 0.15 PLN | per analysis |
+| Model ID | Name | Credits | Unit |
+|----------|------|---------|------|
+| `gemini-flash` | Gemini Flash | 1 | per request |
+| `gemini-pro` | Gemini Pro | 2 | per request |
+| `gpt-4o` | GPT-4o | 2 | per request |
+| `claude-sonnet` | Claude Sonnet | 2 | per request |
+| `image-analysis` | Image Analysis | 1 | per analysis |
+| `enhance-prompt` | Prompt Enhancement | 1 | per request |
 
-### Voice & TTS
+### Bedrock Chat (Token-Based)
 
-| Model ID | Name | Credits | PLN Cost | Unit |
-|----------|------|---------|----------|------|
-| `elevenlabs-turbo` | ElevenLabs Turbo | 1 | 0.15 PLN | per 1000 chars |
-| `elevenlabs-v2` | ElevenLabs v2 | 2 | 0.30 PLN | per 1000 chars |
-| `chatterbox-tts` | Chatterbox TTS | 1 | 0.15 PLN | per 1000 chars |
+| Model ID | Input (USD/1M) | Output (USD/1M) | ~PLN/1K tokens |
+|----------|---------------|-----------------|----------------|
+| `claude-sonnet-4.6` | $3.00 | $15.00 | per-token |
+| `claude-sonnet-4.5` | $3.00 | $15.00 | per-token |
+| `claude-haiku-4.5` | $0.80 | $4.00 | per-token |
+| `nova-pro` | $0.80 | $3.20 | per-token |
+| `nova-lite` | $0.25 | $1.00 | per-token |
+| `nova-micro` | $0.10 | $0.40 | per-token |
+
+### Voice & Audio
+
+| Model ID | Name | Credits | Unit |
+|----------|------|---------|------|
+| `google` | IDA Voice (Standard) | 1 | per 1000 chars |
+| `ida-voice` | IDA Voice Pro | 2 | per 1000 chars |
+| Sound Effects | SFX Generation | 3 | per generation |
+| Transcription | Speech-to-Text | 1 | per minute |
+| Translation | Audio Translation | 2 | per minute |
+| Dubbing | Voice Dubbing | 5 | per minute |
+
+### 3D Generation
+
+| Model | Name | Credits | Unit |
+|-------|------|---------|------|
+| `triposr` | FH Lite 3D | 5 | per model |
+| `sf3d` | FH Fast 3D | 5 | per model |
+| `shap-e` | FH Text 3D | 10 | per model |
+| `trellis` | FH HD 3D | 15 | per model |
+| `hunyuan3d` | FH Pro 3D | 25 | per model |
+
+See [3D Generation](/api/3d-generation) for full endpoint reference and output format options (GLB, OBJ, STL, USDZ).
+
+### Image Editing & Tools
+
+| Operation | Credits | Unit |
+|-----------|---------|------|
+| Edit Image (inpaint/outpaint/bgswap/remove/upscale) | 2 | per request |
+| Stability Fast Upscale | 1 | per image |
+| Stability Remove Background | 1 | per image |
+| Stability Style Transfer | 2 | per image |
+| Stability Creative Upscale | 3 | per image |
+| Stability Inpaint/Outpaint | 3 | per image |
 
 ## Token-Based Pricing
 
@@ -176,16 +281,18 @@ Some models bill based on actual token consumption rather than a fixed credit co
 SeedDream models calculate tokens from the output image dimensions. The formula is:
 
 ```
-output_tokens = (width x height) / 256
+output_tokens = (width × height) / 256
+cost_usd = (output_tokens / 1,000,000) × rate_per_1m_usd
+cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
 ```
 
-| Model | Rate (USD / 1M tokens) | 1024x1024 Cost |
+| Model | Rate (USD / 1M tokens) | 1024×1024 Cost |
 |-------|----------------------|----------------|
-| `seedream-5-0` | $2.00 | 0.049 PLN |
-| `seedream-4-5` | $2.50 | 0.061 PLN |
-| `seedream-4-0` | $2.00 | 0.049 PLN |
-| `seedream-5-0-pro` | $3.50 | 0.086 PLN |
-| `seededit-3-0` | $2.50 | 0.061 PLN |
+| `seedream-5-0-260128` | $2.00 | 0.049 PLN |
+| `seedream-4-5-251128` | $2.50 | 0.061 PLN |
+| `seedream-4-0-250828` | $2.00 | 0.049 PLN |
+| `dola-seedream-5-0-pro-260628` | $3.50 | 0.086 PLN |
+| `seededit-3-0-i2i-250628` | $2.50 | 0.061 PLN |
 
 **PLN Calculation Formula:**
 
@@ -375,26 +482,46 @@ Returns your billing transaction history with pagination and metadata.
 
 ---
 
-### POST /v1/billing/topup
+### GET /v1/billing/topup/packages
 
-Initiate a wallet top-up. Returns a payment URL for completing the transaction.
+List available top-up packages with pricing and bonus credits.
 
-**Authentication:** API Key (Bearer token)
-
-**Request Body:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `amount_pln` | number | Yes | Amount to add in PLN. Must match a package: 50, 100, 250, 500, 1000, 5000 |
-| `return_url` | string | No | URL to redirect to after payment completion |
+**Authentication:** None required
 
 **Response:**
 
 ```json
 {
-  "payment_url": "https://checkout.stripe.com/c/pay/cs_live_...",
-  "session_id": "sess_xyz789",
+  "packages": [
+    {"slug": "topup-50", "amount_pln": 50, "bonus_credits": 100, "bonus_pct": 5},
+    {"slug": "topup-100", "amount_pln": 100, "bonus_credits": 250, "bonus_pct": 8},
+    {"slug": "topup-250", "amount_pln": 250, "bonus_credits": 700, "bonus_pct": 10},
+    {"slug": "topup-500", "amount_pln": 500, "bonus_credits": 1600, "bonus_pct": 12},
+    {"slug": "topup-1000", "amount_pln": 1000, "bonus_credits": 3500, "bonus_pct": 15},
+    {"slug": "topup-5000", "amount_pln": 5000, "bonus_credits": 20000, "bonus_pct": 20}
+  ]
+}
+```
+
+### POST /v1/billing/topup
+
+Initiate a wallet top-up via Stripe Checkout. Returns a payment URL.
+
+**Authentication:** JWT (session token)
+
+**Request Body:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `package` | string | **Yes** | Package slug: `topup-50`, `topup-100`, `topup-250`, `topup-500`, `topup-1000`, `topup-5000` |
+
+**Response:**
+
+```json
+{
+  "checkout_url": "https://checkout.stripe.com/c/pay/cs_live_...",
   "package": {
+    "slug": "topup-250",
     "amount_pln": 250,
     "bonus_credits": 700,
     "bonus_pct": 10
@@ -535,9 +662,9 @@ console.log(`Total transactions: ${total}, Recent spend: ${totalPln.toFixed(2)} 
 
 ```bash [cURL]
 curl -X POST "https://apis.fotohub.app/v1/billing/topup" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"amount_pln": 250, "return_url": "https://yourapp.com/billing/success"}'
+  -d '{"package": "topup-250"}'
 ```
 
 ```python [Python]
@@ -546,17 +673,14 @@ import requests
 response = requests.post(
     "https://apis.fotohub.app/v1/billing/topup",
     headers={
-        "Authorization": "Bearer YOUR_API_KEY",
+        "Authorization": "Bearer YOUR_JWT_TOKEN",
         "Content-Type": "application/json"
     },
-    json={
-        "amount_pln": 250,
-        "return_url": "https://yourapp.com/billing/success"
-    }
+    json={"package": "topup-250"}
 )
 
 result = response.json()
-print(f"Payment URL: {result['payment_url']}")
+print(f"Checkout URL: {result['checkout_url']}")
 print(f"Bonus: +{result['package']['bonus_credits']} credits ({result['package']['bonus_pct']}%)")
 ```
 
@@ -564,18 +688,15 @@ print(f"Bonus: +{result['package']['bonus_credits']} credits ({result['package']
 const response = await fetch("https://apis.fotohub.app/v1/billing/topup", {
   method: "POST",
   headers: {
-    "Authorization": "Bearer YOUR_API_KEY",
+    "Authorization": "Bearer YOUR_JWT_TOKEN",
     "Content-Type": "application/json"
   },
-  body: JSON.stringify({
-    amount_pln: 250,
-    return_url: "https://yourapp.com/billing/success"
-  })
+  body: JSON.stringify({ package: "topup-250" })
 });
 
 const result = await response.json();
 // Redirect user to complete payment
-window.location.href = result.payment_url;
+window.location.href = result.checkout_url;
 ```
 
 :::

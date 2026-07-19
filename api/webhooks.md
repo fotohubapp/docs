@@ -167,7 +167,7 @@ import hashlib
 def verify_signature(payload_bytes: bytes, signature: str, secret: str) -> bool:
     """Verify the webhook signature from X-FotoHub-Signature header."""
     expected = hmac.new(
-        secret.encode(),
+        secret.encode("utf-8"),
         payload_bytes,
         hashlib.sha256
     ).hexdigest()
@@ -230,7 +230,7 @@ After **10 consecutive failed delivery attempts** across any events, the webhook
 
 ## Webhook Management API
 
-All management endpoints require authentication with your API key.
+All management endpoints require JWT authentication (session token, not API key).
 
 ### Create Webhook
 
@@ -240,17 +240,20 @@ POST /v1/console/webhooks
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `url` | string | Yes | HTTPS endpoint URL that will receive events. Must be publicly accessible. |
-| `events` | string[] | Yes | Array of event types to subscribe to. Use `["*"]` for all events. |
-| `secret` | string | No | Custom signing secret. If omitted, one is generated and returned. |
+| `name` | string | **Yes** | Display name for the webhook (1-100 chars). |
+| `url` | string | **Yes** | HTTPS endpoint URL. Must be publicly accessible (no private IPs). |
+| `events` | string[] | **Yes** | Array of event types to subscribe to. Must be specific event names (no wildcards). |
+| `headers` | object | No | Custom headers to include with each delivery (max 10). |
 
 ```bash
 curl -X POST https://apis.fotohub.app/v1/console/webhooks \
-  -H "Authorization: Bearer fh_live_your_api_key_here" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
+    "name": "Production Notifications",
     "url": "https://your-server.com/webhook",
-    "events": ["generation.completed", "generation.failed", "credits.low"]
+    "events": ["generation.completed", "generation.failed", "credits.low"],
+    "headers": {"X-Custom-Source": "fotohub"}
   }'
 ```
 
@@ -259,16 +262,19 @@ curl -X POST https://apis.fotohub.app/v1/console/webhooks \
 ```json
 {
   "id": "wh_abc123",
+  "name": "Production Notifications",
   "url": "https://your-server.com/webhook",
   "events": ["generation.completed", "generation.failed", "credits.low"],
-  "secret": "whsec_7f8a9b2c3d4e5f6a7b8c9d0e1f2a3b4c",
+  "secret": "7f8a9b2c3d4e5f6a7b8c9d0e1f2a3b4c...",
   "active": true,
-  "created_at": "2026-07-17T12:00:00Z"
+  "headers": {"X-Custom-Source": "fotohub"},
+  "created_at": "2026-07-17T12:00:00Z",
+  "updated_at": "2026-07-17T12:00:00Z"
 }
 ```
 
 ::: warning Save the Secret
-The `secret` is shown **only once** at creation. Store it securely -- you need it to verify webhook signatures.
+The `secret` is auto-generated and shown **only once** at creation. You cannot supply a custom secret. Store it securely for signature verification.
 :::
 
 ### List Webhooks
@@ -277,7 +283,7 @@ The `secret` is shown **only once** at creation. Store it securely -- you need i
 GET /v1/console/webhooks
 ```
 
-Returns all registered webhooks for your account.
+Returns all registered webhooks for your account (max 10 per user).
 
 ### Update Webhook
 
@@ -285,13 +291,15 @@ Returns all registered webhooks for your account.
 PATCH /v1/console/webhooks/{id}
 ```
 
-Update the URL, events, or active status of an existing webhook.
+Update name, URL, events, active status, or custom headers of an existing webhook.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `url` | string | No | New endpoint URL |
+| `name` | string | No | Updated display name |
+| `url` | string | No | New endpoint URL (HTTPS only) |
 | `events` | string[] | No | Updated event subscriptions |
 | `active` | boolean | No | Enable or disable the webhook |
+| `headers` | object | No | Updated custom headers |
 
 ### Delete Webhook
 
@@ -299,7 +307,7 @@ Update the URL, events, or active status of an existing webhook.
 DELETE /v1/console/webhooks/{id}
 ```
 
-Permanently removes the webhook. Pending deliveries are cancelled.
+Permanently removes the webhook. Returns 204 No Content.
 
 ### Test Webhook
 
@@ -307,7 +315,7 @@ Permanently removes the webhook. Pending deliveries are cancelled.
 POST /v1/console/webhooks/{id}/test
 ```
 
-Sends a test event to your endpoint so you can verify connectivity and signature verification without triggering a real event.
+Sends a test event to your endpoint. The webhook must be active. Fires a `test` event type so you can verify connectivity and signature verification.
 
 ### View Delivery Logs
 
@@ -315,7 +323,7 @@ Sends a test event to your endpoint so you can verify connectivity and signature
 GET /v1/console/webhooks/{id}/logs
 ```
 
-Returns recent delivery attempts with status codes, response times, and any error messages. Useful for debugging failed deliveries.
+Returns the last 50 delivery attempts with status codes, response body, success flag, and timestamps. Useful for debugging failed deliveries.
 
 ## Webhook Handler Examples
 

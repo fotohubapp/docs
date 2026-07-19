@@ -21,7 +21,7 @@ POST /v1/ai/generate/image
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | string | **Yes** | — | Text description of the image to generate. Be specific — include subject, style, lighting, composition details for best results. Max 4096 characters. |
-| `model` | string | No | `"imagen-4-standard"` | Model identifier. See the full model list below for all 25 options. |
+| `model` | string | No | `"imagen-3-fast"` | Model identifier. See the full model list below for all 25 options. We recommend `seedream-5-0-260128` for best quality. |
 | `width` | integer | No | `1024` | Output image width in pixels. Range: 256–4096. Must be divisible by 64 for most models. |
 | `height` | integer | No | `1024` | Output image height in pixels. Range: 256–4096. Must be divisible by 64 for most models. |
 | `aspect_ratio` | string | No | `"1:1"` | Aspect ratio preset. Options: `"1:1"`, `"16:9"`, `"9:16"`, `"4:3"`, `"3:4"`. Overrides width/height when set. |
@@ -40,12 +40,12 @@ Use `aspect_ratio` instead of manual width/height for most use cases. The API au
 
 ```json
 {
-  "model": "imagen-4-standard",
-  "credits_used": 3,
+  "model": "seedream-5-0-260128",
+  "credits_used": 2,
   "billing": {
     "method": "credits",
-    "credits_used": 3,
-    "pln_charged": 0.45
+    "credits_used": 2,
+    "pln_charged": 0.30
   },
   "images": [
     "https://s1.fotohub.app/storage/v1/object/public/generations/img_abc123.png"
@@ -54,7 +54,7 @@ Use `aspect_ratio` instead of manual width/height for most use cases. The API au
     "width": 1024,
     "height": 1024,
     "seed": 42,
-    "model": "imagen-4-standard",
+    "model": "seedream-5-0-260128",
     "generation_time_ms": 3200
   }
 }
@@ -138,14 +138,14 @@ cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
 | `imagen-3-fast` | Imagen 3 Fast | 0.12 | 1 | 512px fast |
 | `imagen-3-standard` | Imagen 3 Standard | 0.24 | 2 | 1K |
 | `imagen-4-fast` | Imagen 4 Fast | 0.18 | 2 | — |
-| `imagen-4-standard` | Imagen 4 Standard | 0.45 | 3 | **Recommended** |
+| `imagen-4-standard` | Imagen 4 Standard | 0.45 | 3 | High quality |
 | `imagen-4-ultra` | Imagen 4 Ultra | 0.90 | 5 | 4K |
 
 ### OpenAI
 
 | Model ID | Name | Price (PLN) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `dall-e-3-standard` | DALL-E 3 Standard | 0.24 | 2 | — |
+| `dall-e-3` | DALL-E 3 | 0.24 | 2 | — |
 | `dall-e-3-hd` | DALL-E 3 HD | 0.48 | 4 | — |
 | `gpt-image-1` | GPT Image 1 | 0.60 | 4 | **Recommended** |
 

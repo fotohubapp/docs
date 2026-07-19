@@ -16,7 +16,7 @@ GET /v1/models
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `category` | string | Filter by category: `image`, `video`, `chat`, `audio`, `analysis` |
+| `category` | string | Filter by category: `image`, `video`, `3d`, `chat`, `audio`, `analysis` |
 | `status` | string | Filter by status: `active`, `deprecated`, `beta` |
 | `provider` | string | Filter by provider: `google`, `openai`, `bfl`, `byteplus`, `xai`, `kling`, `minimax`, `anthropic`, `deepseek`, `stability` |
 
@@ -45,10 +45,11 @@ GET /v1/models
       "created_at": "2025-03-15T00:00:00Z"
     }
   ],
-  "total": 52,
+  "total": 57,
   "category_counts": {
     "image": 25,
     "video": 7,
+    "3d": 5,
     "chat": 15,
     "audio": 6,
     "analysis": 4
@@ -118,7 +119,7 @@ All pricing is shown in PLN (Polish Zloty). Credits are deducted from your month
 
 | Model ID | Name | Price (PLN) | Credits | Unit | Status |
 |----------|------|-------------|---------|------|--------|
-| `dall-e-3-standard` | DALL-E 3 | 0.24 | 2 | per image, 1K | active |
+| `dall-e-3` | DALL-E 3 | 0.24 | 2 | per image, 1K | active |
 | `dall-e-3-hd` | DALL-E 3 HD | 0.48 | 4 | per image, 2K | active |
 | `gpt-image-1` | GPT Image 1 | 0.60 | 4 | per image, 1K-2K | active |
 
@@ -152,9 +153,12 @@ All pricing is shown in PLN (Polish Zloty). Credits are deducted from your month
 | Model ID | Name | Price (PLN) | Credits | Unit | Status |
 |----------|------|-------------|---------|------|--------|
 | `flux-2-klein-4b` | FLUX.2 Klein 4B | 0.084 | 1 | per image, 1K (ultra-fast) | active |
+| `flux-2-klein-9b` | FLUX.2 Klein 9B | 0.084 | 1 | per image, 1K (fast) | active |
 | `flux-2-pro` | FLUX.2 Pro | 0.18 | 2 | per image, 1K | active |
 | `flux-1.1-pro` | FLUX 1.1 Pro | 0.24 | 2 | per image, 1K | active |
+| `flux-1.1-pro-raw` | FLUX 1.1 Pro Raw | 0.36 | 3 | per image, unprocessed output | active |
 | `flux-kontext-pro` | FLUX Kontext Pro | 0.24 | 2 | per image, context-aware | active |
+| `flux-fill-pro` | FLUX Fill Pro | 0.36 | 3 | per image, inpainting | active |
 | `flux-1.1-pro-ultra` | FLUX 1.1 Pro Ultra | 0.36 | 3 | per image, 4K | active |
 | `flux-2-max` | FLUX.2 Max | 0.42 | 4 | per image, 4K | active |
 | `flux-kontext-max` | FLUX Kontext Max | 0.48 | 4 | per image, 2K | active |
@@ -183,108 +187,102 @@ All pricing is shown in PLN (Polish Zloty). Credits are deducted from your month
 
 ## Video Generation Models
 
-7 models for text-to-video and image-to-video generation. Priced per 5-second clip of output video.
+7 models for text-to-video and image-to-video generation. Base cost is per 5-second segment, multiplied by `max(1, duration ÷ 5)` for longer videos.
 
-| Model ID | Name | Price (PLN) | Credits | Unit | Status |
-|----------|------|-------------|---------|------|--------|
-| `wan-2.1` | Wan 2.1 | 0.90 | 8 | per 5-sec clip | active |
-| `hunyuan-video` | Hunyuan Video | 1.20 | 10 | per 5-sec clip | active |
-| `veo-2` | Veo 2 (Google) | 1.50 | 10 | per 5-sec clip | active |
-| `kling-v2-master` | Kling v2 Master | 1.80 | 15 | per 5-sec clip | active |
-| `runway-gen4` | Runway Gen-4 | 2.10 | 18 | per 5-sec clip | active |
-| `kling-v2.5-master` | Kling v2.5 Master | 2.40 | 20 | per 5-sec clip | active |
-| `veo-3` | Veo 3 (Google) | 3.00 | 25 | per 5-sec clip | active |
+| Model ID | Name | Base Credits (5s) | Max Duration | Status |
+|----------|------|-------------------|--------------|--------|
+| `wan` | WAN | 8 | 30s | active |
+| `hailuo` | Hailuo (MiniMax) | 8 | 30s | active |
+| `veo-2` | Veo 2 (Google) | 10 | 30s | active |
+| `kling` | Kling Video | 10 | 30s | active |
+| `seedance` | Seedance 2.0 (BytePlus) | 10 | 30s | active |
+| `sora-2` | Sora 2 (OpenAI) | 12 | 60s | active |
+| `veo-3` | Veo 3 (Google) | 15 | 60s | active |
 
-**Recommended:** `kling-v2.5-master` -- Best overall video quality with strong motion coherence and prompt adherence.
+**Recommended:** `veo-3` — Highest quality, cinematic output with natural motion and audio generation.
 
-**Budget pick:** `wan-2.1` -- Lowest cost per clip with acceptable quality for social media content.
+**Budget pick:** `wan` / `hailuo` — Lowest cost per clip with good quality for social media content.
 
-**Premium pick:** `veo-3` -- Highest quality, cinematic output with natural lighting and camera motion.
+**Best value:** `seedance` — Excellent motion quality at competitive pricing from BytePlus.
 
 ---
 
 ## Chat and LLM Models
 
-15 models accessible via the OpenAI-compatible `/v1/chat/completions` endpoint. Token-based billing (per 1K tokens).
+Two chat endpoints with different billing models:
+- **Credit-based** (`/v1/ai/chat/completions`) — flat credit cost per request
+- **Token-based** (`/v1/ai/chat/bedrock`) — exact per-token PLN billing via AWS Bedrock
 
-### Anthropic
+### Credit-Based Chat (`/v1/ai/chat/completions`)
 
-| Model ID | Name | Price (PLN) | Credits | Unit | Status |
-|----------|------|-------------|---------|------|--------|
-| `claude-3.5-haiku` | Claude 3.5 Haiku | 0.005 | 1 | per 1K tokens | active |
-| `claude-sonnet-4-20250514` | Claude Sonnet 4 | 0.018 | 1 | per 1K tokens | active |
-| `claude-opus-4-20250514` | Claude Opus 4 | 0.090 | 5 | per 1K tokens | active |
+OpenAI-compatible format. Flat credit cost per request regardless of token count.
 
-### OpenAI
+| Model ID | Credits | Best For |
+|----------|---------|----------|
+| `gemini-flash` | 1 | Fast responses, simple tasks |
+| `gemini-pro` | 2 | Complex reasoning, long context |
+| `gpt-4o` | 2 | General purpose, reliable |
+| `claude-sonnet` | 2 | Creative writing, analysis |
 
-| Model ID | Name | Price (PLN) | Credits | Unit | Status |
-|----------|------|-------------|---------|------|--------|
-| `gpt-4.1-nano` | GPT-4.1 Nano | 0.001 | 1 | per 1K tokens | active |
-| `gpt-4o-mini` | GPT-4o Mini | 0.002 | 1 | per 1K tokens | active |
-| `gpt-4.1-mini` | GPT-4.1 Mini | 0.003 | 1 | per 1K tokens | active |
-| `gpt-4.1` | GPT-4.1 | 0.012 | 1 | per 1K tokens | active |
-| `gpt-4o` | GPT-4o | 0.015 | 1 | per 1K tokens | active |
+**Default:** `gemini-flash` (1 credit)
 
-**Recommended:** `gpt-4o` -- Best general-purpose chat model. Strong reasoning, fast, reliable.
+### Token-Based Chat (`/v1/ai/chat/bedrock`)
 
-### Google
+Exact billing based on actual token usage. Charged in PLN (no credit deduction).
 
-| Model ID | Name | Price (PLN) | Credits | Unit | Status |
-|----------|------|-------------|---------|------|--------|
-| `gemini-2.0-flash` | Gemini 2.0 Flash | 0.001 | 1 | per 1K tokens | active |
-| `gemini-2.5-flash` | Gemini 2.5 Flash | 0.002 | 1 | per 1K tokens | active |
-| `gemini-2.5-pro` | Gemini 2.5 Pro | 0.008 | 1 | per 1K tokens | active |
+| Model ID | Input (PLN/1K) | Output (PLN/1K) | Best For |
+|----------|----------------|-----------------|----------|
+| `claude-sonnet-4.6` | per-token | per-token | Latest Anthropic, best quality |
+| `claude-sonnet-4.5` | per-token | per-token | Previous gen, fast |
+| `claude-haiku-4.5` | per-token | per-token | Budget, high speed |
+| `nova-pro` | per-token | per-token | Amazon, strong reasoning |
+| `nova-lite` | per-token | per-token | Amazon, fast + cheap |
+| `nova-micro` | per-token | per-token | Amazon, minimal cost |
 
-### DeepSeek
+**Default:** `claude-sonnet-4.6`
 
-| Model ID | Name | Price (PLN) | Credits | Unit | Status |
-|----------|------|-------------|---------|------|--------|
-| `deepseek-v3` | DeepSeek V3 | 0.002 | 1 | per 1K tokens | active |
-| `deepseek-r1` | DeepSeek R1 | 0.005 | 1 | per 1K tokens | active |
-
-### xAI
-
-| Model ID | Name | Price (PLN) | Credits | Unit | Status |
-|----------|------|-------------|---------|------|--------|
-| `grok-3-mini` | Grok 3 Mini | 0.004 | 1 | per 1K tokens | active |
-| `grok-3` | Grok 3 | 0.018 | 1 | per 1K tokens | active |
-
-::: info Token Billing
-Chat models are billed per token processed (input + output). The price shown is a blended average per 1K tokens. Input tokens are generally cheaper than output tokens. See the [Billing](/api/billing) section for exact per-direction rates.
+::: info Billing Difference
+Credit-based chat charges a flat fee per request — predictable but potentially overpaying for short queries. Token-based (Bedrock) charges exact per-token rates — you pay only for what you use, ideal for variable-length conversations.
 :::
 
 ---
 
 ## Music and Audio Models
 
-6 models for music generation, sound effects, text-to-speech, and speech-to-text.
-
 ### Music Generation
 
-| Model ID | Name | Price (PLN) | Credits | Unit | Status |
-|----------|------|-------------|---------|------|--------|
-| `minimax-music-01` | MiniMax Music | 0.18 | 2 | per 30-sec track | active |
-| `stable-audio-2` | Stable Audio 2.0 | 0.36 | 3 | per 30-sec track | active |
-| `mmaudio` | MMAudio | 0.24 | 2 | per 10-sec clip | active |
+| Model ID | Name | Credits | Duration | Status |
+|----------|------|---------|----------|--------|
+| `ida-music` | IDA Music | 2–4 | up to 5 min | active |
+| `minimax` | MiniMax Music | 5/10/25 | 30s/60s/120s | active |
+| `ida-cloud` | IDA Cloud Music | 5/10/25 | 30s/60s/120s | active |
 
-**Use case:** `minimax-music-01` for background music and jingles. `stable-audio-2` for higher quality production music. `mmaudio` for short sound effects and audio-for-video.
+**IDA Music** — FOTOhub's proprietary music model. Supports lyrics, instrumental, 30+ genres, quality presets. 2 credits (standard) / 4 credits (high quality).
+
+**MiniMax / IDA Cloud** — Cloud music generation. Tiered pricing by duration: 5cr (≤30s), 10cr (≤60s), 25cr (>60s).
+
+### Sound Effects (SFX)
+
+| Model ID | Credits | Duration | Status |
+|----------|---------|----------|--------|
+| `sfx` | 3 | up to 30s | active |
+
+Text-to-SFX generation via `/v1/ai/generate/sfx`. Uses `prompt` field for description.
 
 ### Text-to-Speech (TTS)
 
-| Model ID | Name | Price (PLN) | Credits | Unit | Status |
-|----------|------|-------------|---------|------|--------|
-| `chatterbox-tts` | Chatterbox TTS | 0.06 | 1 | per 1K characters | active |
-| `elevenlabs-tts` | ElevenLabs TTS | 0.18 | 2 | per 1K characters | active |
-
-**Use case:** `chatterbox-tts` for budget voiceovers and narration. `elevenlabs-tts` for premium natural-sounding voices with emotion control and voice cloning.
+| Provider | Credits | Features |
+|----------|---------|----------|
+| Google TTS | 1 | 30+ languages, neural voices |
+| IDA Voice Pro | 2 | Voice cloning, emotion control, 29 languages |
 
 ### Speech-to-Text (STT)
 
-| Model ID | Name | Price (PLN) | Credits | Unit | Status |
-|----------|------|-------------|---------|------|--------|
-| `whisper-large-v3` | Whisper Large v3 | 0.06 | 1 | per minute of audio | active |
+| Model | Credits | Features |
+|-------|---------|----------|
+| Whisper Large v3 | 1 | 99+ languages, auto-detection, timestamps |
 
-**Use case:** Transcription, subtitles, meeting notes. Supports 99+ languages with automatic language detection.
+**Use case:** Transcription, subtitles, meeting notes, dubbing pipelines.
 
 ---
 
@@ -302,6 +300,26 @@ Chat models are billed per token processed (input + output). The price shown is 
 **Recommended:** `gemini-2.5-pro-vision` -- Best accuracy-to-cost ratio for image understanding, OCR, and detailed captioning.
 
 **Budget pick:** `gemini-2.5-flash-vision` -- Fastest and cheapest, suitable for bulk analysis and classification tasks.
+
+---
+
+## 3D Generation Models
+
+5 models for converting images or text to 3D assets. See [3D Generation](/api/3d-generation) for full API reference.
+
+| Model ID | Name | Credits | Speed | Modes | Quality |
+|----------|------|---------|-------|-------|---------|
+| `triposr` | FH Lite 3D | 5 | ~3s | image-to-3d | ★★★ |
+| `sf3d` | FH Fast 3D | 5 | <1s | image-to-3d | ★★★★ |
+| `shap-e` | FH Text 3D | 10 | ~15s | text-to-3d | ★★ |
+| `trellis` | FH HD 3D | 15 | ~15s | image-to-3d | ★★★★★ |
+| `hunyuan3d` | FH Pro 3D | 25 | ~30s | both | ★★★★★ |
+
+**Recommended:** `triposr` — Best speed-to-quality ratio for product photography and e-commerce use cases.
+
+**Premium pick:** `hunyuan3d` — Highest quality with PBR textures, supports both image and text input. Ideal for production 3D assets.
+
+**Output formats:** GLB (web/AR), OBJ (editing), STL (3D printing), USDZ (Apple AR).
 
 ---
 

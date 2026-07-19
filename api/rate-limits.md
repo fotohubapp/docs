@@ -4,19 +4,39 @@ FOTOhub enforces rate limits per API key to ensure fair usage and protect servic
 
 ## Tier Limits
 
-Your rate limit is determined by your subscription tier. Limits are measured in requests per minute (rpm) and apply across all endpoints combined.
+Your rate limit is determined by your tier. Limits are measured in requests per minute (rpm) and apply across all endpoints for your API key.
 
-| Tier | Price | Requests / Minute | Burst Allowance (5s) |
-|------|-------|-------------------|----------------------|
-| Free | 0 PLN/mo | 10 | 20 rpm |
-| Developer | 49 PLN/mo | 60 | 120 rpm |
-| Startup | 199 PLN/mo | 300 | 600 rpm |
-| Business | 799 PLN/mo | 1,000 | 2,000 rpm |
-| Enterprise | Custom | 5,000 | 10,000 rpm |
+### Pay-As-You-Go Tiers
+
+| Tier | Requirements | Requests / Minute | Daily Quota |
+|------|-------------|-------------------|-------------|
+| PAYG Basic | Fund wallet | 30 | 200 |
+| PAYG Standard | 100 PLN balance or 200 PLN lifetime spend | 120 | 2,000 |
+| PAYG Premium | 500 PLN balance or 2,000 PLN lifetime spend | 500 | 10,000 |
+
+### Subscription Tiers
+
+| Tier | Price | Requests / Minute | Daily Quota | Monthly Credits |
+|------|-------|-------------------|-------------|-----------------|
+| Developer | 49 PLN/mo | 60 | 500 | 500 |
+| Startup | 199 PLN/mo | 300 | 5,000 | 5,000 |
+| Business | 799 PLN/mo | 1,000 | 50,000 | 25,000 |
+| Enterprise | Custom | 5,000 | Unlimited | Unlimited |
+
+### Your Current Tier
+
+Check your current tier and limits:
+
+```bash
+curl https://apis.fotohub.app/v1/tiers/current \
+  -H "Authorization: Bearer fh_live_your_key"
+```
+
+The `X-Tier` header in every response tells you which tier was resolved for that request.
 
 ### Burst Allowance
 
-Each tier allows temporary bursts at 2x the normal rate limit for up to 5 seconds. For example, a Developer plan (60 rpm) can burst to 120 rpm for 5 seconds before the standard limit kicks in. Sustained traffic above the base limit will trigger rate limiting after the burst window expires.
+Each tier allows temporary bursts within its 4-hour burst window. For example, a Developer plan (500 credit 4h burst) can use credits freely within that window before being throttled. This prevents rate-spiking bots while allowing legitimate traffic patterns.
 
 ## Rate Limit Headers
 

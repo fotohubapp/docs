@@ -350,6 +350,120 @@ for chunk in client.chat_bedrock_stream(
         print(content, end="", flush=True)
 ```
 
+## 3D Generation
+
+Generate 3D models from images or text prompts with export to GLB, OBJ, STL, or USDZ.
+
+### Image to 3D
+
+```python
+import base64
+
+client = FotoHub(api_key="fh_live_your_key")
+
+with open("product.jpg", "rb") as f:
+    image_b64 = base64.b64encode(f.read()).decode()
+
+result = client.generate_3d(
+    mode="image-to-3d",
+    model="triposr",
+    image=image_b64,
+    format="glb",
+)
+
+print(f"3D Model: {result['url']}")
+print(f"Credits: {result['billing']['credits_used']}")
+```
+
+### Text to 3D
+
+```python
+result = client.generate_3d(
+    mode="text-to-3d",
+    model="shap-e",
+    prompt="A medieval stone castle with towers",
+    quality="high",
+    format="glb",
+)
+
+# Wait for completion (for longer models)
+completed = client.wait_for_3d(result["id"], poll_interval=3.0, timeout=120.0)
+print(f"Download: {completed['url']}")
+```
+
+### List Available 3D Models
+
+```python
+models = client.list_3d_models()
+for m in models:
+    print(f"{m['name']} ({m['id']}): {m['credits']} credits — {m['speed']}")
+```
+
+### Async 3D Generation
+
+```python
+async with AsyncFotoHub(api_key="fh_live_your_key") as client:
+    result = await client.generate_3d(
+        mode="image-to-3d",
+        model="triposr",
+        image=image_b64,
+    )
+    completed = await client.wait_for_3d(result["id"])
+    print(completed["url"])
+```
+
+## Tier Management
+
+Manage API tiers, check usage, and handle wallet operations.
+
+### Get Current Tier
+
+```python
+tier = client.get_current_tier()
+print(f"Tier: {tier['name']} ({tier['type']})")
+print(f"Rate limit: {tier['limits']['rpm']} rpm")
+print(f"Credits used: {tier['usage']['credits_used']}")
+```
+
+### Browse Available Tiers
+
+```python
+catalog = client.get_tier_catalog()
+for tier in catalog["tiers"]:
+    print(f"{tier['name']}: {tier['rpm']} rpm, {tier['credits_monthly']} credits/mo")
+```
+
+### Subscribe to a Tier
+
+```python
+result = client.subscribe_tier("sub-developer")
+print(f"Checkout URL: {result['checkout_url']}")
+```
+
+### Wallet Operations
+
+```python
+# Check balance
+wallet = client.get_wallet()
+print(f"Balance: {wallet['balance']} {wallet['currency']}")
+
+# Top up
+result = client.topup_wallet(100)
+print(f"Payment URL: {result['session_url']}")
+```
+
+### Enterprise Application
+
+```python
+result = client.apply_enterprise(
+    company_name="Acme Corp",
+    contact_email="api@acme.com",
+    expected_usage="50,000+ generations/month",
+    use_case="E-commerce product photography at scale",
+)
+print(f"Application ID: {result['id']}")
+```
+
 ## Error Handling
 
 The SDK raises typed exceptions for different error conditions:

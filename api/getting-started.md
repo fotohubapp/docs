@@ -4,18 +4,19 @@ The FOTOhub API is a unified creative AI platform providing access to 80+ state-
 
 ## Platform Overview
 
-FOTOhub consolidates dozens of AI providers into a single REST API with unified authentication, billing, and response formats. Instead of managing separate accounts with OpenAI, Stability, Runway, ElevenLabs, and others, you integrate once and gain access to everything.
+FOTOhub consolidates dozens of AI providers into a single REST API with unified authentication, billing, and response formats. Instead of managing separate accounts with multiple providers, you integrate once and gain access to everything.
 
 ### Available Services
 
 | Service | Description | Models |
 |---------|-------------|--------|
-| **Image Generation** | Text-to-image, image-to-image, inpainting | FLUX, SDXL, SeedDream, Ideogram, Recraft |
-| **Video Generation** | Text-to-video, image-to-video, video extension | Kling, Runway, Veo, Wan, Hunyuan |
-| **Music & Audio** | Music generation, sound effects, audio-to-audio | Stable Audio, MMAudio, Chatterbox TTS |
+| **Image Generation** | Text-to-image, image-to-image, inpainting | SeedDream, FLUX, Imagen 4, DALL-E, Grok Imagine |
+| **Video Generation** | Text-to-video, image-to-video, video extension | Veo 3, Sora 2, Kling, WAN, Seedance, Hailuo |
+| **Music & Audio** | Music generation, sound effects, audio-to-audio | IDA Music, MiniMax |
+| **3D Generation** | Image-to-3D, text-to-3D, GLB/OBJ/STL export | FH Lite 3D, FH Pro 3D |
 | **Chat & Text** | Completions, reasoning, summarization | Claude, GPT-4o, Gemini, DeepSeek |
 | **Analysis & Vision** | Image analysis, OCR, captioning | Multi-modal LLMs |
-| **Text-to-Speech** | Voice synthesis, voice cloning | Chatterbox, ElevenLabs |
+| **Text-to-Speech** | Voice synthesis, voice cloning | IDA Voice |
 | **Speech-to-Text** | Transcription, translation | Whisper variants |
 | **Image Editing** | Upscaling, background removal, style transfer | Specialized editing models |
 | **Storage & Compute** | File management, agent workflows | Platform services |
@@ -291,15 +292,16 @@ See [Billing & Pricing](/api/billing) for full details on credit costs per model
 
 ## Rate Limits
 
-Rate limits are enforced per API key and vary by subscription tier. Limits are calculated on a per-minute sliding window. When exceeded, requests receive a `429 Too Many Requests` response.
+Rate limits are enforced per API key and vary by your tier. Limits are calculated on a per-minute sliding window. When exceeded, requests receive a `429 Too Many Requests` response.
 
-| Tier | Requests/Minute | Concurrent Jobs | Burst Limit |
-|------|----------------|-----------------|-------------|
-| Free | 10 | 2 | 15 |
-| Developer | 60 | 5 | 90 |
-| Startup | 300 | 20 | 450 |
-| Business | 1,000 | 50 | 1,500 |
-| Enterprise | 5,000 | 200 | 7,500 |
+| Tier | Requests/Minute | Concurrent Jobs | Monthly Credits |
+|------|----------------|-----------------|-----------------|
+| PAYG Basic | 30 | 3 | Wallet-funded |
+| PAYG Standard | 120 | 10 | Wallet-funded |
+| Developer | 60 | 5 | 500 |
+| Startup | 300 | 20 | 5,000 |
+| Business | 1,000 | 50 | 25,000 |
+| Enterprise | 5,000 | 200 | Unlimited |
 
 ### Rate Limit Headers
 

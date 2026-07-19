@@ -45,6 +45,7 @@ export default defineConfig({
           items: [
             { text: 'Image Generation', link: '/api/image-generation' },
             { text: 'Video Generation', link: '/api/video-generation' },
+            { text: '3D Generation', link: '/api/3d-generation' },
             { text: 'Music & Audio', link: '/api/music-audio' },
             { text: 'Chat / LLM', link: '/api/chat-llm' },
             { text: 'Image Editing', link: '/api/image-editing' },
@@ -87,6 +88,7 @@ export default defineConfig({
             { text: 'WooCommerce', link: '/integrations/woocommerce' },
             { text: 'PrestaShop', link: '/integrations/prestashop' },
             { text: 'Zapier & Make', link: '/integrations/zapier' },
+            { text: 'n8n', link: '/integrations/n8n' },
           ],
         },
       ],
@@ -97,6 +99,7 @@ export default defineConfig({
             { text: 'Quickstart', link: '/guides/quickstart' },
             { text: 'CLI Setup', link: '/guides/cli-setup' },
             { text: 'SDK Installation', link: '/guides/sdk-setup' },
+            { text: 'Integrations Hub', link: '/guides/integrations-hub' },
             { text: 'Image Generation', link: '/guides/image-generation' },
             { text: 'Video Generation', link: '/guides/video-generation' },
             { text: 'Chat & Streaming', link: '/guides/chat-streaming' },

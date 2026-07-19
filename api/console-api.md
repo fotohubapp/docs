@@ -331,27 +331,30 @@ POST /v1/auth/keys
 
 **Request Body:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | Yes | Human-readable key name |
-| `key_type` | string | Yes | `live` for production, `test` for sandbox |
-| `scopes` | string[] | Yes | Permission scopes (e.g., `ai:generate`, `billing:read`, `console:read`) |
-| `expiresInDays` | integer | No | Key expiration in days from creation |
-| `rateLimitPerMinute` | integer | No | Custom rate limit (requests per minute) |
-| `allowedIps` | string[] | No | IP allowlist for additional security |
-| `project_id` | string | No | Associate with a specific project |
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | string | No | Auto-generated | Human-readable key name |
+| `description` | string | No | — | Key description for your reference |
+| `keyType` | string | No | — | `live` for production, `test` for sandbox |
+| `scopes` | string[] | No | — | Permission scopes (e.g., `ai:generate`, `billing:read`, `console:read`) |
+| `expiresInDays` | integer | No | Never | Key expiration in days from creation |
+| `rateLimitPerMinute` | integer | No | `60` | Rate limit (1-600 requests per minute) |
+| `allowedIps` | string[] | No | — | IP allowlist for additional security |
+| `allowedReferrers` | string[] | No | — | HTTP referrer allowlist |
+| `projectId` | string | No | — | Associate with a specific project |
+| `metadata` | object | No | — | Custom metadata (key-value pairs) |
 
 **Request Example:**
 
 ```json
 {
   "name": "Production Backend",
-  "key_type": "live",
+  "keyType": "live",
   "scopes": ["ai:generate", "billing:read"],
   "expiresInDays": 90,
-  "rateLimitPerMinute": 60,
+  "rateLimitPerMinute": 120,
   "allowedIps": ["203.0.113.10"],
-  "project_id": "proj_abc123"
+  "projectId": "proj_abc123"
 }
 ```
 
@@ -395,32 +398,9 @@ DELETE /v1/auth/keys/{id}
 }
 ```
 
-### Update Key
-
-```
-PATCH /v1/auth/keys/{id}
-```
-
-**Scope required:** `console:write`
-
-**Request Body:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | No | Updated key name |
-| `rateLimitPerMinute` | integer | No | Updated rate limit |
-| `allowedIps` | string[] | No | Updated IP allowlist |
-| `scopes` | string[] | No | Updated permission scopes |
-
-**Response (200 OK):**
-
-```json
-{
-  "id": "key_abc123",
-  "name": "Updated Name",
-  "updated_at": "2026-07-17T15:30:00Z"
-}
-```
+::: warning No Key Update
+API keys cannot be modified after creation. To change a key's name, rate limit, IP allowlist, or scopes — revoke the existing key and create a new one with the desired settings.
+:::
 
 ---
 
@@ -620,6 +600,109 @@ POST /v1/billing/top-up
   "transaction_id": "txn_abc123"
 }
 ```
+
+---
+
+## Tier Management
+
+### Get Tier Catalog
+
+```
+GET /v1/tiers/catalog
+```
+
+No authentication required. Returns all available tiers with pricing and limits.
+
+### Get Current Tier
+
+```
+GET /v1/tiers/current
+```
+
+Returns the authenticated user's current tier, limits, usage, and upgrade options.
+
+**Response (200 OK):**
+
+```json
+{
+  "tier": "sub-startup",
+  "name": "Startup",
+  "category": "subscription",
+  "limits": {
+    "rpm": 300,
+    "burst_4h": 1000,
+    "monthly_credits": 5000,
+    "concurrent_jobs": 20
+  },
+  "usage": {
+    "used_4h": 45,
+    "used_period": 1230,
+    "requests_today": 89
+  },
+  "wallet": {
+    "balance_pln": 450.00,
+    "pending_pln": 0
+  }
+}
+```
+
+### Subscribe to Tier
+
+```
+POST /v1/tiers/subscribe
+```
+
+**Request Body:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `tier` | string | Yes | Target tier: `sub-developer`, `sub-startup`, `sub-business` |
+
+Returns a Stripe checkout URL for the subscription payment.
+
+### Enterprise Application
+
+```
+POST /v1/tiers/enterprise/apply
+```
+
+**Request Body:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `company_name` | string | Yes | Company legal name |
+| `contact_email` | string | Yes | Contact email |
+| `company_size` | string | Yes | `1-10`, `11-50`, `51-200`, `201-500`, `500+` |
+| `use_case` | string | Yes | Detailed description of intended usage (min 20 chars) |
+| `expected_monthly_volume` | string | Yes | E.g. "100k images, 10k videos" |
+| `budget_range` | string | No | E.g. "2000-5000 PLN/month" |
+| `nip` | string | No | Polish tax ID (NIP) |
+
+### Wallet
+
+```
+GET /v1/tiers/wallet
+```
+
+Returns wallet balance, recent transactions, and monthly summary.
+
+```
+POST /v1/tiers/wallet/topup
+```
+
+**Request Body (option A — package):**
+
+```json
+{"package": "topup-500"}
+```
+
+**Request Body (option B — custom amount):**
+
+```json
+{"amount_pln": 150}
+```
+
+Returns a Stripe checkout URL for the payment. Minimum 20 PLN, maximum 50,000 PLN.
 
 ---
 

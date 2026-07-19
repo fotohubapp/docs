@@ -520,6 +520,124 @@ interface ChatStreamChunk {
 }
 ```
 
+## 3D Generation
+
+Generate 3D models from images or text prompts. Supports GLB, OBJ, STL, and USDZ output formats.
+
+### Image to 3D
+
+```typescript
+import { readFileSync } from 'fs';
+
+const imageBase64 = readFileSync('product.jpg').toString('base64');
+
+const result = await client.generate3D({
+  mode: 'image-to-3d',
+  model: 'triposr',
+  image: imageBase64,
+  format: 'glb',
+  quality: 'standard',
+});
+
+console.log(`3D Model: ${result.url}`);
+console.log(`Credits: ${result.billing.credits_used}`);
+```
+
+### Text to 3D
+
+```typescript
+const result = await client.generate3D({
+  mode: 'text-to-3d',
+  model: 'shap-e',
+  prompt: 'A medieval stone castle with towers',
+  format: 'glb',
+  quality: 'high',
+});
+
+// For longer models, wait for completion
+const completed = await client.waitFor3D(result.id, {
+  pollInterval: 3000,
+  onProgress: (r) => console.log(`Status: ${r.status}`),
+});
+
+console.log(`Download: ${completed.url}`);
+```
+
+### List 3D Models
+
+```typescript
+const models = await client.list3DModels();
+for (const m of models) {
+  console.log(`${m.name} (${m.id}): ${m.credits} credits — ${m.speed}`);
+}
+```
+
+### Available Models
+
+| Model | Credits | Speed | Modes |
+|-------|---------|-------|-------|
+| `triposr` | 5 | ~3s | image-to-3d |
+| `sf3d` | 5 | <1s | image-to-3d |
+| `shap-e` | 10 | ~15s | text-to-3d |
+| `trellis` | 15 | ~15s | image-to-3d |
+| `hunyuan3d` | 25 | ~30s | both |
+
+## Tier Management
+
+Manage your API tier, view usage, and handle wallet operations programmatically.
+
+### Get Current Tier
+
+```typescript
+const tier = await client.getCurrentTier();
+console.log(`Tier: ${tier.name} (${tier.type})`);
+console.log(`Rate limit: ${tier.limits.rpm} rpm`);
+console.log(`Credits used: ${tier.usage.credits_used}/${tier.limits.credits_monthly}`);
+```
+
+### Browse Available Tiers
+
+```typescript
+const catalog = await client.getTierCatalog();
+for (const tier of catalog.tiers) {
+  console.log(`${tier.name}: ${tier.rpm} rpm, ${tier.credits_monthly} credits/mo`);
+  if (tier.price_monthly > 0) {
+    console.log(`  Price: ${tier.price_monthly} PLN/mo`);
+  }
+}
+```
+
+### Subscribe to a Tier
+
+```typescript
+const { checkout_url } = await client.subscribeTier('sub-developer');
+// Redirect user to checkout_url for payment
+```
+
+### Wallet Operations
+
+```typescript
+// Check wallet balance
+const wallet = await client.getWallet();
+console.log(`Balance: ${wallet.balance} ${wallet.currency}`);
+
+// Top up wallet
+const { session_url } = await client.topupWallet(100);
+// Redirect user to session_url
+```
+
+### Enterprise Application
+
+```typescript
+const { id } = await client.applyEnterprise({
+  company_name: 'Acme Corp',
+  contact_email: 'api@acme.com',
+  expected_usage: '50,000+ generations/month',
+  use_case: 'E-commerce product photography at scale',
+});
+console.log(`Application submitted: ${id}`);
+```
+
 ## Error Handling
 
 The SDK provides a typed error hierarchy for precise error handling.
