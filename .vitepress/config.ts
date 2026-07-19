@@ -49,6 +49,7 @@ export default defineConfig({
           items: [
             { text: 'Introduction', link: '/api/getting-started' },
             { text: 'Authentication', link: '/api/authentication' },
+            { text: 'Playground', link: '/api/playground' },
             { text: 'Rate Limits', link: '/api/rate-limits' },
             { text: 'Error Handling', link: '/api/errors' },
           ],
@@ -107,18 +108,37 @@ export default defineConfig({
       ],
       '/guides/': [
         {
-          text: 'Guides',
+          text: 'Getting Started',
           items: [
             { text: 'Quickstart', link: '/guides/quickstart' },
             { text: 'CLI Setup', link: '/guides/cli-setup' },
             { text: 'SDK Installation', link: '/guides/sdk-setup' },
-            { text: 'Integrations Hub', link: '/guides/integrations-hub' },
+          ],
+        },
+        {
+          text: 'Core Concepts',
+          items: [
+            { text: 'Architecture', link: '/guides/architecture' },
+            { text: 'Pricing & Costs', link: '/guides/pricing' },
+            { text: 'Token Billing', link: '/guides/token-billing' },
+            { text: 'Best Practices', link: '/guides/best-practices' },
+          ],
+        },
+        {
+          text: 'Tutorials',
+          items: [
             { text: 'Image Generation', link: '/guides/image-generation' },
             { text: 'Video Generation', link: '/guides/video-generation' },
             { text: 'Chat & Streaming', link: '/guides/chat-streaming' },
-            { text: 'Token Billing', link: '/guides/token-billing' },
             { text: 'Webhook Integration', link: '/guides/webhooks' },
-            { text: 'Best Practices', link: '/guides/best-practices' },
+            { text: 'Integrations Hub', link: '/guides/integrations-hub' },
+          ],
+        },
+        {
+          text: 'Resources',
+          items: [
+            { text: 'Migration Guide', link: '/guides/migration' },
+            { text: 'FOTOhub vs Others', link: '/guides/compare' },
           ],
         },
       ],
