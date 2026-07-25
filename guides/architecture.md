@@ -99,7 +99,7 @@ Request → Auth → Check balance → Deduct → Generate → Return result
 
 ### 5. Provider Routing
 
-Each service routes every model to the best available upstream provider, with automatic failover. If the primary provider for a model is unavailable, the service transparently retries against a healthy alternative — the caller sees no difference beyond a small latency increase. Provider selection, regional routing, and failover chains are managed internally and may change without notice; your integration only ever targets the stable public model ID (for example `seedream-5-0-260128`, `flux-2-pro`, or `veo-3`).
+Each service routes every model to the best available upstream provider, with automatic failover. If the primary provider for a model is unavailable, the service transparently retries against a healthy alternative — the caller sees no difference beyond a small latency increase. Provider selection, regional routing, and failover chains are managed internally and may change without notice; your integration only ever targets the stable public model ID (for example `seedream-5-0-260128`, `flux-2-pro`, or `veo-3.1-generate-001`).
 
 ## Infrastructure
 

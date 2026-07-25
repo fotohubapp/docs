@@ -110,8 +110,8 @@ const result = await client.gabriel.classify({
 // {
 //   "action": "route",
 //   "target": "/generate/video",
-//   "params": { "model": "seedance", "duration": 5, "prompt": "..." },
-//   "model_selected": "seedance",
+//   "params": { "model": "seedance-2-0-pro", "duration": 5, "prompt": "..." },
+//   "model_selected": "seedance-2-0-pro",
 //   "confidence": 0.92,
 //   "credits_estimated": 10,
 //   "tips": ["Seedance: describe camera movement for dynamic videos"]
@@ -506,17 +506,18 @@ Gabriel estimates costs for 50+ models across image, video, and chat:
 
 ### Video Models
 
-Video is billed per 5-second segment.
+Most models bill per second (see the [full catalog](/api/models#video-generation-models)); MiniMax Hailuo bills a flat per-video amount.
 
-| Model | Credits (5s) |
-|-------|-------------|
-| `wan-video` | 8.0 |
-| `hailuo` | 8.0 |
-| `veo-2` | 10.0 |
-| `kling` | 10.0 |
-| `seedance` | 10.0 |
-| `sora-2` | 12.0 |
-| `veo-3` | 15.0 |
+| Model | Credits/s |
+|-------|:---------:|
+| `wan2.2-t2v-plus` | 1.2 |
+| `hailuo-o2` | — (6 flat) |
+| `kling-v3` | 5 |
+| `seedance-2-0-pro` | 9.4 |
+| `sora-2` | 8 |
+| `gemini-omni-flash` | 6 |
+| `veo-3.1-generate-001` | 12 |
+| `grok-imagine-video-1.5` | 9 |
 
 ### Chat / LLM Models
 
@@ -528,7 +529,7 @@ Video is billed per 5-second segment.
 | `claude-sonnet` | 2.0 |
 
 ::: tip Best Value
-`seedream-5-0-260128` offers the best quality-to-credit ratio for image generation, and `wan-video` / `hailuo` are the most cost-effective for video. For chat, `gemini-flash` (1 cr) is the cheapest option.
+`seedream-5-0-260128` offers the best quality-to-credit ratio for image generation, and `wan2.2-t2v-plus` / `hailuo-o2` are the most cost-effective for video. For chat, `gemini-flash` (1 cr) is the cheapest option.
 :::
 
 ---

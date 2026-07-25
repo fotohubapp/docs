@@ -1,6 +1,6 @@
 # Image Generation
 
-FOTOhub provides access to **25+ image generation models** from 7 providers: Google Vertex AI, OpenAI, BytePlus, xAI, Black Forest Labs, MiniMax, and Kling. Generate photorealistic images, illustrations, concept art, and more via a single unified endpoint.
+FOTOhub provides access to **30+ image generation models** from 8 providers: Google (Vertex AI Imagen + Gemini), OpenAI, Microsoft, BytePlus, xAI, Black Forest Labs, MiniMax, and Kling. Generate photorealistic images, illustrations, concept art, and more via a single unified endpoint.
 
 ::: info Two Billing Modes
 - **Credit-based** — Fixed cost per image regardless of resolution. Most models use this mode.
@@ -126,7 +126,7 @@ cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
 | `seedream-5-0-260128` | $2.00 | 2 |
 | `seedream-4-5-251128` | $2.50 | 3 |
 | `seedream-4-0-250828` | $2.00 | 2 |
-| `dola-seedream-5-0-pro-260628` | $3.50 | 3 |
+| `dola-seedream-5-0-pro-260628` | $3.50 | 3 (0.60 PLN) |
 | `seededit-3-0-i2i-250628` | $2.50 | 3 |
 
 ## All Models — Complete Pricing
@@ -141,13 +141,33 @@ cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
 | `imagen-4-standard` | Imagen 4 Standard | 0.45 | 3 | High quality |
 | `imagen-4-ultra` | Imagen 4 Ultra | 0.90 | 5 | 4K |
 
+### Google — Gemini (Nano Banana family)
+
+Gemini's native multimodal image models — text-to-image, image-to-image, and multi-image composition (up to 10 reference images) in one model.
+
+| Model ID | Name | Price (PLN) | Credits | Notes |
+|----------|------|-------------|---------|-------|
+| `gemini-3.1-flash-lite-image` | Nano Banana 2 Lite | 0.20 | 1 | cheapest Gemini image model |
+| `gemini-2.5-flash-image` | Nano Banana | 0.40 | 2 | up to 10 reference images |
+| `gemini-3.1-flash-image` | Nano Banana 2 | 0.60 | 3 | GA |
+| `gemini-3.1-flash-image-preview` | Nano Banana 2 (Preview) | 0.60 | 3 | preview channel |
+| `gemini-3-pro-image` | Nano Banana Pro | 1.20 | 6 | **Recommended for quality** — 1K/2K/4K, advanced reasoning, precise text rendering |
+
 ### OpenAI
 
 | Model ID | Name | Price (PLN) | Credits | Notes |
 |----------|------|-------------|---------|-------|
 | `dall-e-3-standard` | DALL-E 3 | 0.24 | 2 | — |
 | `dall-e-3-hd` | DALL-E 3 HD | 0.48 | 4 | — |
-| `gpt-image-1` | GPT Image 1 | 0.60 | 4 | **Recommended** — highest fidelity |
+| `gpt-image-1` | GPT Image 1 | 0.60 | 4 | high fidelity |
+| `gpt-image-2` | GPT Image 2 | 2.00 | 10 | **Recommended** — highest fidelity, 4K, best text rendering |
+
+### Microsoft — MAI-Image
+
+| Model ID | Name | Price (PLN) | Credits | Notes |
+|----------|------|-------------|---------|-------|
+| `mai-image-2.5-flash` | MAI-Image 2.5 Flash | 0.20 | 1 | budget/fast |
+| `mai-image-2.5` | MAI-Image 2.5 | 0.20 | 1 | up to 1024x1024 |
 
 ### BytePlus SeedDream (Token-Based)
 
@@ -156,7 +176,7 @@ cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
 | `seedream-4-0-250828` | SeedDream 4.0 | 0.18 | 2 | token-based |
 | `seedream-5-0-260128` | SeedDream 5.0 Lite | 0.21 | 2 | **Recommended**, best value |
 | `seedream-4-5-251128` | SeedDream 4.5 | 0.24 | 3 | token-based |
-| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro (Dola) | 0.27 | 3 | token-based |
+| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro (Dola) | 0.60 | 3 | token-based |
 | `seededit-3-0-i2i-250628` | SeedEdit 3.0 (img2img) | 0.24 | 3 | token-based |
 
 ### xAI (Grok Imagine)
@@ -214,8 +234,8 @@ The Klein models are optimized for speed and cost, while Pro, Ultra, and Max del
 | Model ID | Name | Price (PLN) | Credits | Notes |
 |----------|------|-------------|---------|-------|
 | `kling-v2-1` | Kling V2.1 | 0.24 | 2 | balanced quality |
-| `kling-v3-image` | Kling V3 | 0.60 | 5 | high quality |
-| `kling-v3-omni` | Kling V3 Omni | 0.90 | 8 | premium, highest fidelity |
+| `kling-v3` | Kling V3 | 0.60 | 5 | high quality |
+| `kling-v3-omni` | Kling V3 Omni | 0.90 | 8 | premium, highest fidelity, all modes |
 
 ## Code Examples
 
@@ -1417,9 +1437,16 @@ A comprehensive overview of all available image models with their capabilities, 
 | `imagen-3-capability` | Google Vertex AI | 1024x1024 | 4/5 | 4/5 | 2 | Editing and customization |
 | `imagen-4-standard` | Google Vertex AI | 2048x2048 | 3/5 | 4/5 | 3 | High quality, good for production |
 | `imagen-4-ultra` | Google Vertex AI | 4096x4096 | 2/5 | 5/5 | 5 | Native 4K, highest fidelity from Google |
+| `gemini-3.1-flash-lite-image` | Google Gemini | 1024x1024 | 5/5 | 3/5 | 1 | Nano Banana 2 Lite, cheapest Gemini |
+| `gemini-2.5-flash-image` | Google Gemini | 1024x1024 | 4/5 | 4/5 | 2 | Nano Banana, up to 10 reference images |
+| `gemini-3.1-flash-image` | Google Gemini | 1024x1024 | 4/5 | 4/5 | 3 | Nano Banana 2, GA |
+| `gemini-3-pro-image` | Google Gemini | 4096x4096 | 2/5 | 5/5 | 6 | Nano Banana Pro, 1K/2K/4K, precise text rendering |
 | `dall-e-3-standard` | OpenAI | 1024x1024 | 3/5 | 4/5 | 2 | Strong prompt following, text rendering |
 | `dall-e-3-hd` | OpenAI | 1792x1792 | 3/5 | 4/5 | 4 | HD variant, better details |
-| `gpt-image-1` | OpenAI | 2048x2048 | 3/5 | 5/5 | 4 | Highest OpenAI fidelity, photorealism |
+| `gpt-image-1` | OpenAI | 2048x2048 | 3/5 | 5/5 | 4 | High OpenAI fidelity, photorealism |
+| `gpt-image-2` | OpenAI | 4096x4096 | 2/5 | 5/5 | 10 | Highest OpenAI fidelity, best text rendering, 4K |
+| `mai-image-2.5-flash` | Microsoft | 1024x1024 | 4/5 | 3/5 | 1 | Budget/fast Azure AI model |
+| `mai-image-2.5` | Microsoft | 1024x1024 | 3/5 | 4/5 | 1 | Azure AI flagship, prompt rewriting |
 | `seedream-5-0-260128` | BytePlus | 4096x4096 | 4/5 | 5/5 | 2 | **Recommended** -- best value, token-based |
 | `seedream-4-5-251128` | BytePlus | 4096x4096 | 3/5 | 4/5 | 3 | Token-based, excellent detail |
 | `seedream-4-0-250828` | BytePlus | 4096x4096 | 4/5 | 4/5 | 2 | Token-based, budget-friendly |
@@ -1436,16 +1463,17 @@ A comprehensive overview of all available image models with their capabilities, 
 | `flux-2-klein-4b` | Black Forest Labs | 1024x1024 | 5/5 | 3/5 | 1 | Ultra-fast, lightweight 4B model |
 | `flux-2-klein-9b` | Black Forest Labs | 1024x1024 | 5/5 | 3/5 | 1 | Fast, lightweight 9B model |
 | `minimax-image-01` | MiniMax | 1024x1024 | 4/5 | 3/5 | 1 | Lowest-cost budget option |
-| `kling-v3-omni` | Kling | 2048x2048 | 2/5 | 5/5 | 8 | Premium, highest fidelity |
-| `kling-v3-image` | Kling | 2048x2048 | 2/5 | 4/5 | 5 | High quality |
+| `kling-v3-omni` | Kling | 2048x2048 | 2/5 | 5/5 | 8 | Premium, highest fidelity, all modes |
+| `kling-v3` | Kling | 2048x2048 | 2/5 | 4/5 | 5 | High quality |
 | `kling-v2-1` | Kling | 1536x1536 | 3/5 | 4/5 | 2 | Balanced |
 
 ::: tip Choosing a Model
 - **Best value**: `seedream-5-0-260128` -- high quality at token-based pricing, scales to 4K
 - **Fastest**: `imagen-3-fast`, `flux-2-klein-4b`, or `flux-2-klein-9b` for sub-second generations
-- **Highest quality**: `gpt-image-1`, `imagen-4-ultra`, or `flux-2-max` for print/commercial work
+- **Highest quality**: `gemini-3-pro-image` (Nano Banana Pro), `gpt-image-2`, `imagen-4-ultra`, or `flux-2-max` for print/commercial work
+- **Multi-image composition**: `gemini-3.1-flash-image` or `gemini-2.5-flash-image` (Nano Banana) -- up to 10 reference images in one call
 - **Image editing**: `flux-kontext-pro` (style transfer), `seededit-3-0-i2i-250628` (img2img), `grok-imagine-image-pro` (multi-image)
-- **Budget**: `grok-imagine-image` or `minimax-image-01` at 1 credit per image
+- **Budget**: `grok-imagine-image`, `minimax-image-01`, or `gemini-3.1-flash-lite-image` at 1 credit per image
 :::
 
 ---

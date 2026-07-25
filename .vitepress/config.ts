@@ -59,6 +59,7 @@ export default defineConfig({
           text: 'AI Generation',
           items: [
             { text: 'Image Generation', link: '/api/image-generation' },
+            { text: 'IDA Q 1.0', link: '/api/ida-q' },
             { text: 'Video Generation', link: '/api/video-generation' },
             { text: '3D Generation', link: '/api/3d-generation' },
             { text: 'Music & Audio', link: '/api/music-audio' },

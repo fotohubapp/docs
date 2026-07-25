@@ -337,7 +337,7 @@ Click the **Test** button next to your webhook. Check delivery logs for the resp
   "data": {
     "job_id": "job_def456",
     "type": "video",
-    "model": "veo-3",
+    "model": "veo-3.1-generate-001",
     "error": "Model timeout after 300s",
     "error_code": "timeout"
   }
@@ -379,7 +379,7 @@ Click the **Test** button next to your webhook. Check delivery logs for the resp
   "event": "billing.charged",
   "timestamp": "2026-07-22T10:30:00Z",
   "data": {
-    "operation": "generate_video:seedance",
+    "operation": "generate_video:seedance-2-0-pro",
     "amount_pln": 1.50,
     "method": "wallet",
     "wallet_balance_pln": 48.50

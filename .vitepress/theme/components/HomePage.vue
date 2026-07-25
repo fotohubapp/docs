@@ -101,6 +101,13 @@ const features = [
     accent: '#7c3aed'
   },
   {
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>`,
+    title: 'IDA Q 1.0',
+    description: 'FOTOhub proprietary image model. Best-in-class text rendering, native multilingual prompts, top-5 worldwide benchmark. 0.10 PLN/image.',
+    link: '/api/ida-q',
+    accent: '#06b6d4'
+  },
+  {
     icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>`,
     title: 'Agent Workflows',
     description: 'Visual DAG editor for AI pipelines. 8 node types, event streaming, scheduled triggers, Temporal orchestration.',
@@ -205,6 +212,8 @@ const resources = [
             <code>pip install fotohub</code>
             <span class="hero-install-sep"></span>
             <code>npm install fotohub</code>
+            <span class="hero-install-sep"></span>
+            <code>npm install -g fotohubapp-cli</code>
           </div>
         </div>
         <div class="hero-right" :class="{ 'is-visible': revealed.has('hero') }">
@@ -213,32 +222,39 @@ const resources = [
             <pre><code><span class="hl-kw">from</span> <span class="hl-mod">fotohub</span> <span class="hl-kw">import</span> FotoHub
 client = FotoHub()
 
-<span class="hl-cm"># Generate an image…</span>
+<span class="hl-cm"># Generate an image</span>
 image = client.<span class="hl-fn">generate_image</span>(
     <span class="hl-param">prompt</span>=<span class="hl-str">"A serene mountain lake at golden hour"</span>,
     <span class="hl-param">model</span>=<span class="hl-str">"seedream-5-0-260128"</span>,
     <span class="hl-param">aspect_ratio</span>=<span class="hl-str">"16:9"</span>
 )
 
-<span class="hl-cm"># …then bring it to life</span>
-video = client.<span class="hl-fn">generate_video</span>(
-    <span class="hl-param">prompt</span>=<span class="hl-str">"Slow cinematic dolly, mist over water"</span>,
-    <span class="hl-param">image_url</span>=image[<span class="hl-str">"images"</span>][<span class="hl-num">0</span>],
-    <span class="hl-param">resolution</span>=<span class="hl-str">"4k"</span>
+<span class="hl-cm"># Chat with any model — same client</span>
+reply = client.<span class="hl-fn">chat</span>(
+    <span class="hl-param">message</span>=<span class="hl-str">"Describe this image in one sentence"</span>,
+    <span class="hl-param">image_url</span>=image[<span class="hl-str">"images"</span>][<span class="hl-num">0</span>]
 )</code></pre>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Stats Bar (with Gabriel AI orchestrator) -->
+    <!-- Stats Bar (with Gabriel AI orchestrator + IDA Q 1.0) -->
     <section class="stats-bar" data-reveal="stats">
-      <a href="/api/gabriel-ai" class="stat-gabriel" :class="{ 'is-visible': revealed.has('stats') }">
-        <div class="stat-gabriel-glow"></div>
-        <span class="stat-gabriel-badge"><span class="stat-gabriel-dot"></span>Orchestrator</span>
-        <span class="stat-gabriel-name">Gabriel AI</span>
-        <span class="stat-gabriel-desc">Natural-language routing to every model</span>
-      </a>
+      <div class="stat-proprietary-col">
+        <a href="/api/gabriel-ai" class="stat-gabriel" :class="{ 'is-visible': revealed.has('stats') }">
+          <div class="stat-gabriel-glow"></div>
+          <span class="stat-gabriel-badge"><span class="stat-gabriel-dot"></span>Orchestrator</span>
+          <span class="stat-gabriel-name">Gabriel AI</span>
+          <span class="stat-gabriel-desc">Natural-language routing to every model</span>
+        </a>
+        <a href="/api/ida-q" class="stat-idaq" :class="{ 'is-visible': revealed.has('stats') }">
+          <div class="stat-idaq-glow"></div>
+          <span class="stat-idaq-badge"><span class="stat-idaq-dot"></span>Proprietary Model</span>
+          <span class="stat-idaq-name">IDA Q 1.0</span>
+          <span class="stat-idaq-desc">Precision text rendering, in-house image generation</span>
+        </a>
+      </div>
       <div class="stat-grid">
         <div v-for="(stat, i) in stats" :key="stat.label" class="stat-item" :class="{ 'is-visible': revealed.has('stats') }" :style="{ transitionDelay: `${i * 80}ms` }">
           <span class="stat-value">{{ stat.value }}</span>
@@ -432,8 +448,8 @@ video = client.<span class="hl-fn">generate_video</span>(
 
 .hero-split {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 40px;
   align-items: center;
   position: relative;
 }
@@ -648,6 +664,14 @@ video = client.<span class="hl-fn">generate_video</span>(
   background: var(--vp-c-divider);
 }
 
+/* Column stacking Gabriel + IDA Q proprietary-model cells */
+.stat-proprietary-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--vp-c-divider);
+}
+
 /* Gabriel lead cell */
 .stat-gabriel {
   position: relative;
@@ -713,6 +737,80 @@ video = client.<span class="hl-fn">generate_video</span>(
 }
 
 .stat-gabriel-desc {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--vp-c-text-3);
+  position: relative;
+  z-index: 1;
+}
+
+/* IDA Q 1.0 lead cell (same treatment as Gabriel, cyan accent) */
+.stat-idaq {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px 28px;
+  text-decoration: none;
+  overflow: hidden;
+  background: linear-gradient(140deg, var(--vp-c-bg) 0%, rgba(6, 182, 212, 0.08) 160%);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s ease;
+  opacity: 0;
+  transform: translateY(16px);
+  transition-delay: 80ms;
+}
+
+.stat-idaq.is-visible { opacity: 1; transform: translateY(0); }
+.stat-idaq:hover { background: linear-gradient(140deg, var(--vp-c-bg-soft) 0%, rgba(6, 182, 212, 0.14) 140%); }
+
+.stat-idaq-glow {
+  position: absolute;
+  top: -70%;
+  right: -40%;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.18) 0%, transparent 65%);
+  border-radius: 50%;
+  animation: pulse-glow 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.stat-idaq-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #06b6d4;
+  position: relative;
+  z-index: 1;
+}
+
+.stat-idaq-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #06b6d4;
+  box-shadow: 0 0 6px #06b6d4;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.stat-idaq-name {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--vp-c-text-1);
+  line-height: 1.05;
+  position: relative;
+  z-index: 1;
+}
+
+.stat-idaq-desc {
   font-size: 12.5px;
   font-weight: 500;
   line-height: 1.4;
@@ -1158,6 +1256,8 @@ video = client.<span class="hl-fn">generate_video</span>(
   .stat-value { font-size: 26px; }
   .stat-gabriel { padding: 22px 24px; }
   .stat-gabriel-name { font-size: 21px; }
+  .stat-idaq { padding: 22px 24px; }
+  .stat-idaq-name { font-size: 21px; }
   .products-grid { grid-template-columns: 1fr; }
   .features-grid { grid-template-columns: 1fr; }
   .use-cases-grid { grid-template-columns: 1fr; }

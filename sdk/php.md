@@ -124,7 +124,7 @@ class ImageResult {
 ```php
 $job = $client->generateVideo(
     prompt: 'A drone flying over mountains, cinematic',
-    model: 'kling',
+    model: 'kling-v3',
     duration: 5,
     aspectRatio: '16:9'
 );
@@ -148,7 +148,7 @@ if ($job->isCompleted()) {
 ```php
 $job = $client->generateVideo(
     prompt: 'Gentle camera zoom with motion',
-    model: 'kling',
+    model: 'kling-v3',
     imageUrl: 'https://example.com/product.jpg',
     duration: 5
 );

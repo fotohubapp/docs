@@ -862,7 +862,7 @@ from fotohub.exceptions import ServerError
 try:
     result = client.generate_video(
         prompt="Complex scene with many characters...",
-        model="veo-3",
+        model="veo-3.1-generate-001",
         duration=10,
     )
 except ServerError as e:
@@ -870,7 +870,7 @@ except ServerError as e:
         # Reduce complexity
         result = client.generate_video(
             prompt="Simple scene...",
-            model="seedance",
+            model="seedance-2-0-pro",
             duration=5,
         )
 ```

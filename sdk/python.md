@@ -150,7 +150,7 @@ Video generation is synchronous — the call blocks until the video is ready and
 ```python
 result = client.generate_video(
     prompt="A drone shot flying over tropical islands at sunrise",
-    model="veo-3",
+    model="veo-3.1-generate-001",
     duration=5,
     aspect_ratio="16:9"
 )
@@ -164,7 +164,7 @@ print(f"Credits used: {result['billing']['credits_used']}")
 ```python
 result = client.generate_video(
     prompt="Camera slowly zooms in on the subject",
-    model="veo-3",
+    model="veo-3.1-generate-001",
     image_url="https://example.com/start-frame.jpg",
     duration=5,
     aspect_ratio="16:9"
@@ -176,7 +176,7 @@ result = client.generate_video(
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `prompt` | `str` | Yes | Text description of the video |
-| `model` | `str` | Yes | Model ID (`veo-3`, `veo-2`, `kling`, `hailuo`, `seedance`, `sora-2`, `wan-video`) |
+| `model` | `str` | Yes | Model ID — see `GET /v1/models?category=video` for the full list. Examples: `veo-3.1-generate-001`, `veo-2.0-generate-001`, `kling-v3`, `hailuo-o2`, `seedance-2-0-pro`, `sora-2`, `wan2.2-t2v-plus`, `gemini-omni-flash`, `grok-imagine-video-1.5` |
 | `duration` | `int` | No | Duration in seconds (model-dependent, default: 5) |
 | `aspect_ratio` | `str` | No | Aspect ratio (`16:9`, `9:16`, `1:1`) |
 | `image_url` | `str` | No | Start frame image URL for image-to-video |
@@ -1175,15 +1175,19 @@ client = FotoHub(base_url="https://apis.fotohub.app", timeout=120.0, max_retries
 
 ### Video Models
 
+30+ models across 6 providers — see `GET /v1/models?category=video` for the full, current list. Common picks:
+
 | Model ID | Description |
 |----------|-------------|
-| `veo-3` | Google Veo 3 (latest) |
-| `veo-2` | Google Veo 2 |
-| `kling` | Kling video |
-| `hailuo` | MiniMax Hailuo |
-| `seedance` | ByteDance Seedance |
+| `veo-3.1-generate-001` | Google Veo 3.1 (native audio, up to 4K) |
+| `veo-2.0-generate-001` | Google Veo 2 |
+| `kling-v3` | Kling v3 |
+| `hailuo-o2` | MiniMax Hailuo O2 |
+| `seedance-2-0-pro` | ByteDance Seedance 2.0 |
 | `sora-2` | OpenAI Sora 2 |
-| `wan-video` | Wan video |
+| `wan2.2-t2v-plus` | Wan 2.2 Plus |
+| `gemini-omni-flash` | Google Gemini Omni Flash (native audio) |
+| `grok-imagine-video-1.5` | xAI Grok Video 1.5 (lip-sync) |
 
 ### Chat Models
 

@@ -190,20 +190,22 @@ Each operation type has a fixed credit cost. For token-based models, credits are
 
 ### Video Generation
 
-Credits are multiplied by `max(1, duration ÷ 5)` for longer clips.
+Most models bill `credits_per_second × duration` (MiniMax Hailuo bills a flat per-video amount instead). See the [full Video Generation Models catalog](/api/models#video-generation-models) for pricing across all 30+ models.
 
-| Model ID | Name | Base Credits (5s) | Unit |
-|----------|------|-------------------|------|
-| `veo-2` | Veo 2 (Google) | 10 | per 5s segment |
-| `veo-3` | Veo 3 (Google) | 15 | per 5s segment |
-| `wan` | WAN | 8 | per 5s segment |
-| `kling` | Kling Video | 10 | per 5s segment |
-| `hailuo` | Hailuo (MiniMax) | 8 | per 5s segment |
-| `seedance` | Seedance 2.0 (BytePlus) | 10 | per 5s segment |
-| `sora-2` | Sora 2 (OpenAI) | 12 | per 5s segment |
+| Model ID | Name | Credits/s | Provider |
+|----------|------|:---------:|----------|
+| `veo-2.0-generate-001` | Veo 2 (Google) | 31 | Google |
+| `veo-3.1-generate-001` | Veo 3.1 (Google) | 12 | Google |
+| `wan2.2-t2v-plus` | Wan 2.2 Plus | 1.2 | Alibaba |
+| `kling-v3` | Kling v3 | 5 | Kuaishou |
+| `hailuo-o2` | Hailuo O2 (MiniMax) | — (6 cr flat/video) | MiniMax |
+| `seedance-2-0-pro` | Seedance 2.0 (ByteDance) | 9.4 | ByteDance |
+| `sora-2` | Sora 2 (OpenAI) | 8 | OpenAI |
+| `gemini-omni-flash` | Gemini Omni Flash (Google) | 6 | Google |
+| `grok-imagine-video-1.5` | Grok Video 1.5 (xAI) | 9 | xAI |
 
 ::: info Video Billing Example
-A 30-second video with `veo-2` costs: `10 × (30 ÷ 5) = 60 credits`. A 5-second clip costs 10 credits.
+A 5-second video with `veo-3.1-generate-001` costs: `12 × 5 = 60 credits`.
 :::
 
 ### Music Generation
@@ -416,8 +418,8 @@ Returns the full pricing catalog: every model grouped by category, plus credit-c
       "unit": "per second of video",
       "currency": "PLN",
       "models": {
-        "veo-3": { "name": "Google Veo 3", "price": 1.20, "credits": 15 },
-        "wan-video": { "name": "Wan AI Video", "price": 0.45, "credits": 8 }
+        "veo-3.1-generate-001": { "name": "Google Veo 3.1", "price": 2.40, "credits": 12 },
+        "wan2.2-t2v-plus": { "name": "Wan 2.2 Plus", "price": 0.24, "credits": 1.2 }
       }
     }
   },

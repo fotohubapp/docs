@@ -32,13 +32,18 @@ Output: from 0.0004 PLN/1K tokens (Gemini Flash)
 | flux-2-klein-4b | **1.0** | Good | ~2s |
 | minimax-image-01 | **1.0** | Good | ~2s |
 | grok-imagine-image | **1.0** | Good (1K) | ~5s |
+| gemini-3.1-flash-lite-image | **1.0** | Good (Nano Banana 2 Lite, budget/fast) | ~2s |
 | seedream-5-0-260128 | 2.0 | Excellent | ~2s |
 | flux-2-pro | 2.0 | Excellent | ~4s |
 | flux-1.1-pro | 2.0 | Excellent | ~4s |
 | flux-kontext-pro | 2.0 | Excellent (editing) | ~4s |
+| gemini-2.5-flash-image | 2.0 | Excellent (Nano Banana, up to 10 reference images) | ~3s |
 | imagen-4-standard | 3.0 | Premium | ~4s |
 | grok-imagine-image-pro | 3.0 | Premium (2K, multi-image) | ~8s |
+| gemini-3.1-flash-image | 3.0 | Premium (Nano Banana 2, GA) | ~4s |
+| gemini-3.1-flash-image-preview | 3.0 | Premium (Nano Banana 2, preview channel) | ~4s |
 | imagen-4-ultra | 5.0 | Premium (4K) | ~6s |
+| gemini-3-pro-image | 6.0 | Premium (Nano Banana Pro, 1K/2K/4K, advanced reasoning + precise text) | ~8s |
 
 ::: tip BEST VALUE
 **`seedream-5-0-260128`** delivers premium quality at 2 credits — the best quality-per-credit on the platform. Use it as your default.
@@ -46,20 +51,21 @@ Output: from 0.0004 PLN/1K tokens (Gemini Flash)
 
 ## Video Generation Costs
 
-Video is billed per 5-second segment (`max(1, duration ÷ 5)` for longer clips).
+Most video models bill per-second (`credits/s × duration`); MiniMax Hailuo bills a flat per-video amount instead. Per-second pricing for the most commonly used model per provider (see the [full catalog](/api/models#video-generation-models) for every variant):
 
-| Model | Credits (5s) | Max Duration | Quality |
-|-------|--------------|--------------|---------|
-| wan-video | 8.0 | 30s | Good (budget) |
-| hailuo | 8.0 | 30s | Premium |
-| veo-2 | 10.0 | 30s | Premium |
-| kling | 10.0 | 30s | Premium |
-| seedance | 10.0 | 30s | Premium |
-| sora-2 | 12.0 | 60s | Premium |
-| veo-3 | 15.0 | 60s | Premium (cinematic + audio) |
+| Model | ID | Credits/s | Provider | Notes |
+|-------|-----|:---------:|----------|-------|
+| Wan 2.2 Plus | `wan2.2-t2v-plus` | 1.2 | Alibaba | cheapest tier |
+| Seedance 2.0 Mini | `seedance-2-0-mini` | 2.8 | ByteDance | budget |
+| Kling v2.5 Turbo | `kling-v2-5-turbo` | 1.6 | Kuaishou | |
+| Hailuo O2 | `hailuo-o2` | — | MiniMax | 6 credits flat, per video |
+| **Google Veo 3.1** | `veo-3.1-generate-001` | **12** | Google | native audio, up to 4K |
+| Gemini Omni Flash | `gemini-omni-flash` | 6 | Google | native audio, T2V+I2V |
+| OpenAI Sora 2 | `sora-2` | 8 | OpenAI | |
+| Grok Video 1.5 | `grok-imagine-video-1.5` | 9 | xAI | lip-sync |
 
 ::: tip BEST VALUE
-**`wan-video`** / **`hailuo`** = lowest cost per clip (8 credits/5s) with solid quality for social content. Step up to **`veo-3`** for cinematic output with audio.
+**`wan2.2-t2v-plus`** / **`hailuo-o2`** = lowest cost per second with solid quality for social content. Step up to **`veo-3.1-generate-001`** for cinematic output with native audio, or **`gemini-omni-flash`** for automatic native audio at a lower per-second rate.
 :::
 
 ## Chat / LLM Costs
@@ -124,11 +130,11 @@ client.set_overage_limit(50)  # Max 50 PLN overage per period
 Generate quick previews with cheaper models, then regenerate final output with premium:
 
 ```python
-# Preview: budget model (8 credits / 5s)
-preview = client.generate_video(prompt="...", model="wan-video")
+# Preview: budget model (1.2 credits/s)
+preview = client.generate_video(prompt="...", model="wan2.2-t2v-plus")
 
-# Final: cinematic quality (15 credits / 5s)
-final = client.generate_video(prompt="...", model="veo-3")
+# Final: cinematic quality with native audio (12 credits/s)
+final = client.generate_video(prompt="...", model="veo-3.1-generate-001")
 ```
 
 ### 5. Monitor with Usage API
@@ -161,7 +167,7 @@ Before running operations, use the cost estimator:
 ```python
 estimate = client.estimate_cost([
     {"type": "image", "model": "seedream-5-0-260128", "count": 100},
-    {"type": "video", "model": "veo-3", "count": 20},
+    {"type": "video", "model": "veo-3.1-generate-001", "count": 20},
     {"type": "chat", "model": "gemini-flash", "tokens": 500000},
 ])
 print(f"Estimated: {estimate['total_credits']} credits ({estimate['total_pln']} PLN)")

@@ -469,7 +469,7 @@ async def batch_video(prompts: list[str], max_concurrent: int = 5):
         async with semaphore:
             job = await client.async_generate_video(
                 prompt=prompt,
-                model="seedance",
+                model="seedance-2-0-pro",
             )
             return job.job_id
 
@@ -521,7 +521,7 @@ async function batchVideo(prompts: string[], maxConcurrent = 5) {
     const chunk = prompts.slice(i, i + maxConcurrent);
     const jobs = await Promise.all(
       chunk.map((prompt) =>
-        client.generateVideo({ prompt, model: "seedance" })
+        client.generateVideo({ prompt, model: "seedance-2-0-pro" })
       )
     );
     jobIds.push(...jobs.map((j) => j.jobId));
@@ -691,7 +691,7 @@ async def batch_with_webhook(prompts: list[str]):
     for prompt in prompts:
         job = await client.async_generate_video(
             prompt=prompt,
-            model="seedance",
+            model="seedance-2-0-pro",
             webhook_url="https://your-app.com/webhooks/batch-progress",
             webhook_events=["generation.completed", "generation.failed"],
         )
@@ -713,7 +713,7 @@ Webhook payload for batch progress:
   "data": {
     "job_id": "job_abc123",
     "type": "video",
-    "model": "seedance",
+    "model": "seedance-2-0-pro",
     "video_url": "https://storage.fotohub.app/videos/abc123.mp4",
     "duration_s": 5,
     "cost_pln": 0.50

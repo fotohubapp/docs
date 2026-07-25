@@ -613,7 +613,7 @@ client = FotoHub(api_key="fh_live_your_api_key")
 # Start video generation (returns immediately with job_id)
 job = client.videos.generate(
     prompt="A timelapse of clouds over a mountain range",
-    model="veo-2",
+    model="veo-2.0-generate-001",
     duration=5,
     aspect_ratio="16:9",
 )
@@ -633,7 +633,7 @@ const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
 // Start video generation
 const job = await client.videos.generate({
   prompt: "A timelapse of clouds over a mountain range",
-  model: "veo-2",
+  model: "veo-2.0-generate-001",
   duration: 5,
   aspectRatio: "16:9",
 });
@@ -733,7 +733,7 @@ func main() {
     // Step 1: Start video generation
     payload := map[string]interface{}{
         "prompt":       "A timelapse of clouds over a mountain range",
-        "model":        "veo-2",
+        "model":        "veo-2.0-generate-001",
         "duration":     5,
         "aspect_ratio": "16:9",
     }
@@ -776,7 +776,7 @@ JOB_ID=$(curl -s -X POST https://apis.fotohub.app/v1/ai/generate/video \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A timelapse of clouds over a mountain range",
-    "model": "veo-2",
+    "model": "veo-2.0-generate-001",
     "duration": 5,
     "aspect_ratio": "16:9"
   }' | jq -r '.job_id')
@@ -1439,7 +1439,7 @@ print(f"Image: {img.url}")
 # Generate video (async)
 job = client.videos.generate(
     prompt="Logo animation with particle effects",
-    model="veo-2",
+    model="veo-2.0-generate-001",
     duration=5,
 )
 result = client.jobs.wait(job.job_id, timeout=600)
@@ -1468,7 +1468,7 @@ console.log(`Image: ${img.url}`);
 // Generate video (async)
 const job = await client.videos.generate({
   prompt: "Logo animation with particle effects",
-  model: "veo-2",
+  model: "veo-2.0-generate-001",
   duration: 5,
 });
 const result = await client.jobs.wait(job.jobId, { timeout: 600_000 });
@@ -1531,7 +1531,7 @@ func main() {
     // Step 3: Generate video (async)
     videoBody, err := client.Post("/v1/ai/generate/video", map[string]interface{}{
         "prompt":   "Logo animation with particle effects",
-        "model":    "veo-2",
+        "model":    "veo-2.0-generate-001",
         "duration": 5,
     })
     if err != nil {
@@ -1573,7 +1573,7 @@ curl -s -X POST https://apis.fotohub.app/v1/ai/generate/image \
 JOB=$(curl -s -X POST https://apis.fotohub.app/v1/ai/generate/video \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "Logo animation", "model": "veo-2", "duration": 5}' \
+  -d '{"prompt": "Logo animation", "model": "veo-2.0-generate-001", "duration": 5}' \
   | jq -r '.job_id')
 
 while true; do

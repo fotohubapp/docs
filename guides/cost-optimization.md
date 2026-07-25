@@ -24,7 +24,7 @@ Credits are consumed first. When depleted, the system falls back to wallet billi
 | Category | Range | Example |
 |----------|-------|---------|
 | Image generation | 1-5 credits | seedream-5-0-260128 = 2 credits |
-| Video generation | 8-15 credits (per 5s) | wan-video = 8 credits/5s |
+| Video generation | 8-15 credits (per 5s) | wan2.2-t2v-plus = 6 credits/5s |
 | Chat / text | 1-2 credits | gemini-flash = 1 credit |
 | Audio / TTS | 1-3 credits | IDA Voice = 1 credit |
 | Music generation | 3-8 credits | music generation = 3 credits |
@@ -68,15 +68,15 @@ Need premium quality?
 
 ```
 Quick preview / prototype?
-  → wan-video (8 credits / 5s)
+  → wan2.2-t2v-plus (6 credits / 5s)
 Budget-conscious bulk video?
-  → hailuo (8 credits / 5s)
+  → hailuo-o2 (8 credits / 5s)
 Production quality?
-  → veo-2 (10 credits / 5s), kling (10 credits / 5s), or seedance (10 credits / 5s)
+  → veo-2.0-generate-001 (155 credits / 5s), kling-v3 (25 credits / 5s), or seedance-2-0-pro (47 credits / 5s)
 Longer clips (up to 60s)?
   → sora-2 (12 credits / 5s)
 Maximum cinematic quality (with audio)?
-  → veo-3 (15 credits / 5s)
+  → veo-3.1-generate-001 (60 credits / 5s)
 ```
 
 ### Chat / Text AI
@@ -412,7 +412,7 @@ If you generate similar images repeatedly (e.g., product variants), use `seed` t
 
 ### 3. Start with Lite Models
 
-For video, always prototype with `wan-video` (8 credits / 5s) before committing to `veo-3` (15 credits / 5s).
+For video, always prototype with `wan2.2-t2v-plus` (6 credits / 5s) before committing to `veo-3.1-generate-001` (60 credits / 5s).
 
 ### 4. Use Appropriate Resolution
 
@@ -435,7 +435,7 @@ Review your usage weekly. The top 3 models by spend are usually where optimizati
 | Task | Cheap option | Premium option | Savings |
 |------|-------------|---------------|---------|
 | Product photo | flux-2-klein-4b (1 cr) | imagen-4-ultra (5 cr) | 80% |
-| Social video | wan-video (8 cr / 5s) | veo-3 (15 cr / 5s) | 47% |
+| Social video | wan2.2-t2v-plus (6 cr / 5s) | veo-3.1-generate-001 (60 cr / 5s) | 90% |
 | Chat summary | gemini-flash (1 cr) | claude-sonnet (2 cr) | 50% |
 | TTS narration | IDA Voice (1 cr) | — | — |
 | Bulk 100 images | 100 credits | 500 credits (premium) | 80% |

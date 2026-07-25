@@ -81,7 +81,7 @@ Returns a full analytics snapshot for the authenticated user covering the last 3
   "topModels": [
     { "modelId": "seedream-5-0-260128", "count": 1800 },
     { "modelId": "claude-sonnet-4-6", "count": 900 },
-    { "modelId": "seedance", "count": 380 },
+    { "modelId": "seedance-2-0-pro", "count": 380 },
     { "modelId": "flux-2-pro", "count": 220 },
     { "modelId": "music-minimax", "count": 150 }
   ],

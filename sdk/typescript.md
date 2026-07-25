@@ -155,7 +155,7 @@ interface GenerateImageOptions {
 interface GenerateVideoOptions {
   /** Text prompt describing the desired video */
   prompt: string;
-  /** Model ID. Supported: veo-2, veo-3, wan, kling, hailuo, seedance, sora-2 */
+  /** Model ID. See GET /v1/models?category=video for the full list. Examples: veo-3.1-generate-001, veo-2.0-generate-001, wan2.2-t2v-plus, kling-v3, hailuo-o2, seedance-2-0-pro, sora-2 */
   model?: string;
   /** Video duration in seconds */
   duration?: number;
@@ -298,7 +298,7 @@ Video generation is synchronous — the promise resolves once the video is ready
 ```typescript
 const result = await client.generateVideo({
   prompt: 'A drone flying over a mountain landscape, cinematic',
-  model: 'veo-3',
+  model: 'veo-3.1-generate-001',
   duration: 5,
   aspect_ratio: '16:9',
 });
@@ -312,7 +312,7 @@ console.log(`Credits used: ${result.credits_used}`);
 ```typescript
 const result = await client.generateVideo({
   prompt: 'Gentle camera zoom, subtle movement in the clouds',
-  model: 'veo-3',
+  model: 'veo-3.1-generate-001',
   image_url: 'https://example.com/my-image.jpg',
   duration: 5,
   aspect_ratio: '16:9',

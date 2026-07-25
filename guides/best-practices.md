@@ -64,7 +64,7 @@ def generate_safe(client, prompt, max_retries=3):
 | 4K quality | `imagen-4-ultra` | Native 4K generation |
 | Text in images | `seedream-5-0-260128` | Superior text rendering |
 | Photo editing | `imagen-4-standard` | Best editing |
-| Budget video | `hailuo` | 8 credits/5s |
-| Quality video | `veo-3` | Best motion quality |
+| Budget video | `hailuo-o2` | 8 credits/5s |
+| Quality video | `veo-3.1-generate-001` | Best motion quality, native audio |
 | Fast chat | `gemini-flash` | 1 credit, instant |
 | Complex reasoning | `claude-sonnet-4.6` | Top accuracy |

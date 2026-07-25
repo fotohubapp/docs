@@ -253,7 +253,7 @@ client = FotoHub()
 job = client.generate_video(
     prompt="Aerial drone shot flying over a misty mountain range at sunrise, "
     "cinematic color grading, 4K quality",
-    model="kling",
+    model="kling-v3",
     duration=5,
     aspect_ratio="16:9",
     webhook_url="https://yourapp.com/webhook/fotohub",
@@ -289,7 +289,7 @@ async function generateVideo() {
     prompt:
       "Aerial drone shot flying over a misty mountain range at sunrise, " +
       "cinematic color grading, 4K quality",
-    model: "kling",
+    model: "kling-v3",
     duration: 5,
     aspectRatio: "16:9",
     webhookUrl: "https://yourapp.com/webhook/fotohub",
@@ -862,7 +862,7 @@ def image_to_video_pipeline(
     video_job = client.generate_video(
         image_url=image_url,
         prompt=motion_prompt,
-        model="kling",
+        model="kling-v3",
         duration=video_duration,
         mode="image-to-video"
     )
@@ -920,7 +920,7 @@ async function imageToVideoPipeline(
   let videoJob = await client.generateVideo({
     imageUrl,
     prompt: motionPrompt,
-    model: "kling",
+    model: "kling-v3",
     duration: videoDuration,
     mode: "image-to-video",
   });
@@ -1567,7 +1567,7 @@ client = FotoHub()
 def generate_video_with_retry(prompt: str, max_wait: int = 300, max_retries: int = 3):
     for attempt in range(max_retries):
         try:
-            job = client.generate_video(prompt=prompt, model="kling", duration=5)
+            job = client.generate_video(prompt=prompt, model="kling-v3", duration=5)
             break
         except ApiError as e:
             if attempt == max_retries - 1:
@@ -1605,7 +1605,7 @@ async function generateVideoWithRetry(prompt: string, maxWait = 300, maxRetries 
   let job;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      job = await client.generateVideo({ prompt, model: "kling", duration: 5 });
+      job = await client.generateVideo({ prompt, model: "kling-v3", duration: 5 });
       break;
     } catch (e) {
       if (attempt === maxRetries - 1) throw e;
@@ -1649,7 +1649,7 @@ func main() {
 	for attempt := 0; attempt < 3; attempt++ {
 		var err error
 		job, err = client.GenerateVideo(&fotohub.GenerateVideoParams{
-			Prompt: "A cat playing piano in a jazz club, cinematic", Model: "kling", Duration: 5,
+			Prompt: "A cat playing piano in a jazz club, cinematic", Model: "kling-v3", Duration: 5,
 		})
 		if err == nil {
 			break
@@ -1678,7 +1678,7 @@ func main() {
 JOB_ID=$(curl -s -X POST https://apis.fotohub.app/v1/video/generate \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"A cat playing piano in a jazz club, cinematic","model":"kling","duration":5}' \
+  -d '{"prompt":"A cat playing piano in a jazz club, cinematic","model":"kling-v3","duration":5}' \
   | jq -r '.id')
 
 # Poll with exponential backoff
@@ -2184,7 +2184,7 @@ def cost_monitor(alert_threshold: int = 50):
     # Estimate cost of planned operations
     estimate = client.estimate_cost(operations=[
         {"type": "image_generate", "model": "seedream-5-0-260128", "count": 20},
-        {"type": "video_generate", "model": "kling", "count": 5},
+        {"type": "video_generate", "model": "kling-v3", "count": 5},
     ])
     print(f"\nPlanned cost estimate: {estimate.total_credits} credits ({estimate.total_pln} PLN)")
 
@@ -2216,7 +2216,7 @@ async function costMonitor(alertThreshold = 50) {
   const estimate = await client.estimateCost({
     operations: [
       { type: "image_generate", model: "seedream-5-0-260128", count: 20 },
-      { type: "video_generate", model: "kling", count: 5 },
+      { type: "video_generate", model: "kling-v3", count: 5 },
     ],
   });
   console.log(`\nPlanned cost: ${estimate.totalCredits} credits (${estimate.totalPln} PLN)`);
@@ -2253,7 +2253,7 @@ func main() {
 	estimate, _ := client.EstimateCost(&fotohub.EstimateCostParams{
 		Operations: []fotohub.Operation{
 			{Type: "image_generate", Model: "seedream-5-0-260128", Count: 20},
-			{Type: "video_generate", Model: "kling", Count: 5},
+			{Type: "video_generate", Model: "kling-v3", Count: 5},
 		},
 	})
 	fmt.Printf("Planned cost: %d credits (%.2f PLN)\n", estimate.TotalCredits, estimate.TotalPLN)
@@ -2281,7 +2281,7 @@ curl -s -X POST https://apis.fotohub.app/v1/billing/estimate \
   -d '{
     "operations": [
       {"type": "image_generate", "model": "seedream-5-0-260128", "count": 20},
-      {"type": "video_generate", "model": "kling", "count": 5}
+      {"type": "video_generate", "model": "kling-v3", "count": 5}
     ]
   }' | jq '{total_credits, total_pln}'
 ```

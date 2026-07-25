@@ -158,7 +158,15 @@ All pricing is shown in PLN (Polish Zloty). Credits are deducted from your month
 
 ## Image Generation Models
 
-27 image-generation models across multiple providers. Prices below are per-request in PLN, taken from the live `/v1/models` catalog. Query `GET /v1/models?category=image` for the authoritative, always-current list.
+30+ image-generation models across multiple providers. Prices below are per-request in PLN (or credits, where noted), taken from the live `/v1/models` catalog. Query `GET /v1/models?category=image` for the authoritative, always-current list.
+
+### FOTOhub — IDA Q 1.0
+
+| Model ID | Name | Price (PLN) | Unit |
+|----------|------|-------------|------|
+| `ida-q-image` | IDA Q 1.0 | 0.10 | per request (0.5 credits, async — see note below) |
+
+**IDA Q 1.0** — FOTOhub's proprietary image generation model, self-hosted on our own GPU infrastructure. Best-in-class text rendering, native multilingual prompts, top-5 worldwide on the DesignArena benchmark. Unlike every other model in this catalog, generation is **asynchronous**: submit returns `202` with a `job_id`, then poll `GET /v1/ai/generate/image/ida-q/{job_id}` until it completes (30s–3.5min depending on resolution). See the [full IDA Q 1.0 reference](/api/ida-q) for the polling contract and prompt-engine details.
 
 ### Google — Imagen
 
@@ -172,6 +180,22 @@ All pricing is shown in PLN (Polish Zloty). Credits are deducted from your month
 
 **Recommended:** `imagen-4-standard` -- Best balance of quality and cost for general-purpose photorealistic generation at up to 2K resolution.
 
+### Google — Gemini (Nano Banana family)
+
+Gemini's native multimodal image models — text-to-image, image-to-image, and multi-image composition (up to 10 reference images) in one model.
+
+| Model ID | Name | Credits | Unit |
+|----------|------|---------|------|
+| `gemini-3.1-flash-lite-image` | Nano Banana 2 Lite | 1 | per image, budget/fast |
+| `gemini-2.5-flash-image` | Nano Banana | 2 | per image, up to 10 refs |
+| `gemini-3.1-flash-image` | Nano Banana 2 | 3 | per image, GA |
+| `gemini-3.1-flash-image-preview` | Nano Banana 2 (Preview) | 3 | per image, preview channel |
+| `gemini-3-pro-image` | Nano Banana Pro | 6 | per image, 1K/2K/4K, advanced reasoning + precise text |
+
+**Recommended:** `gemini-3-pro-image` ("Nano Banana Pro") -- Advanced reasoning, precise in-image text rendering, and composition control up to 4K. Best for complex, detailed prompts.
+
+**Budget pick:** `gemini-3.1-flash-lite-image` -- Cheapest Gemini image model, ideal for prototyping and iteration.
+
 ### OpenAI — DALL-E and GPT Image
 
 | Model ID | Name | Price (PLN) | Unit |
@@ -179,8 +203,18 @@ All pricing is shown in PLN (Polish Zloty). Credits are deducted from your month
 | `dall-e-3-standard` | DALL-E 3 | 0.24 | per image, 1K |
 | `dall-e-3-hd` | DALL-E 3 HD | 0.48 | per image, 2K |
 | `gpt-image-1` | GPT Image 1 | 0.60 | per image, 1K-2K |
+| `gpt-image-2` | GPT Image 2 | 2.00 | per image, 4K, best text rendering |
 
-**Use case:** Strong text rendering in images, creative illustrations, premium photorealism.
+**Use case:** Strong text rendering in images, creative illustrations, premium photorealism. `gpt-image-2` for the highest fidelity and 4K output.
+
+### Microsoft — MAI-Image
+
+| Model ID | Name | Credits | Unit |
+|----------|------|---------|------|
+| `mai-image-2.5-flash` | MAI-Image 2.5 Flash | 1 | per image, budget/fast |
+| `mai-image-2.5` | MAI-Image 2.5 | 1 | per image, up to 1024x1024 |
+
+**Use case:** Azure AI flagship image models with prompt rewriting; budget-friendly alternative for standard generation.
 
 ### BytePlus — SeedDream
 
@@ -190,7 +224,7 @@ All pricing is shown in PLN (Polish Zloty). Credits are deducted from your month
 | `seedream-5-0-260128` | SeedDream 5.0 | 0.21 | per image |
 | `seedream-4-5-251128` | SeedDream 4.5 | 0.24 | per image |
 | `seededit-3-0-i2i-250628` | SeedEdit 3.0 | 0.24 | image-to-image |
-| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro | 0.27 | per image |
+| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro | 0.60 | per image |
 
 **Recommended:** `seedream-5-0-260128` -- Excellent quality-to-price ratio, the default model in most examples. Supports up to 4K output. `dola-seedream-5-0-pro-260628` for highest detail and prompt adherence.
 
@@ -230,35 +264,122 @@ FLUX models for text-to-image and context-aware editing. Max resolution: 1440px 
 
 ### Kling — Image
 
-| Model ID | Name | Price (PLN) | Unit |
-|----------|------|-------------|------|
-| `kling-v2-1` | Kling v2.1 | 0.24 | per image, 1K |
-| `kling-v3-image` | Kling v3 | 0.60 | per image, 1K |
-| `kling-v3-omni` | Kling v3 Omni | 0.90 | per image, 2K |
+| Model ID | Name | Credits | Unit |
+|----------|------|---------|------|
+| `kling-v2-1` | Kling v2.1 | 2 | per image, 1K |
+| `kling-v2-new` | Kling v2 (New) | 4 | per image, 1K |
+| `kling-v2` | Kling v2 | 5 | per image, 1K |
+| `kling-v3` | Kling v3 | 5 | per image, 1K |
+| `kling-v3-omni` | Kling v3 Omni | 8 | per image, 2K, all modes |
+| `kling-image-o1` | Kling Image O1 | 10 | per image, reasoning model |
 
-**Use case:** Versatile multi-style generation with strong coherence; `kling-v3-omni` for the highest quality.
+**Use case:** Versatile multi-style generation with strong coherence; `kling-v3-omni` for the highest quality; `kling-image-o1` for prompt-reasoning-driven composition.
 
 ---
 
 ## Video Generation Models
 
-7 models for text-to-video and image-to-video generation. Base cost is per 5-second segment, multiplied by `max(1, duration ÷ 5)` for longer videos.
+30+ models for text-to-video and image-to-video generation across 6 providers. Most bill per-second (`credits/s × duration`); MiniMax Hailuo bills a flat per-video amount. Query `GET /v1/models?category=video` for the authoritative, always-current list.
 
-| Model ID | Name | Base Credits (5s) | Max Duration | Status |
-|----------|------|-------------------|--------------|--------|
-| `wan-video` | WAN | 8 | 30s | active |
-| `hailuo` | Hailuo (MiniMax) | 8 | 30s | active |
-| `veo-2` | Veo 2 (Google) | 10 | 30s | active |
-| `kling` | Kling Video | 10 | 30s | active |
-| `seedance` | Seedance 2.0 (BytePlus) | 10 | 30s | active |
-| `sora-2` | Sora 2 (OpenAI) | 12 | 60s | active |
-| `veo-3` | Veo 3 (Google) | 15 | 60s | active |
+### Google — Veo (Vertex AI)
 
-**Recommended:** `veo-3` — Highest quality, cinematic output with natural motion and audio generation.
+| Model ID | Name | Credits/s | Max Resolution | Audio | Notes |
+|----------|------|-----------|-----------------|-------|-------|
+| `veo-3.1-lite-generate-001` | Veo 3.1 Lite | 2 | 1080p | native | cheapest Veo tier |
+| `veo-3.0-fast-generate-001` | Veo 3 Fast | 5 | 1080p | native | |
+| `veo-3.1-fast-generate-001` | Veo 3.1 Fast | 5 | 4K | native | |
+| `veo-3.0-generate-001` | Veo 3 | 12 | 1080p | native | |
+| `veo-3.1-generate-001` | Veo 3.1 | 12 | 4K | native | last-frame + reference images |
+| `veo-2.0-generate-001` | Veo 2 | 31 | 720p | none | legacy, no audio |
 
-**Budget pick:** `wan-video` / `hailuo` — Lowest cost per clip with good quality for social media content.
+**Recommended:** `veo-3.1-generate-001` — Highest quality, native audio, last-frame + reference-image support, up to 4K.
 
-**Best value:** `seedance` — Excellent motion quality at competitive pricing from BytePlus.
+### Google — Gemini Omni Flash (native audio)
+
+| Model ID | Name | Credits/s | Resolution | Audio | Notes |
+|----------|------|-----------|------------|-------|-------|
+| `gemini-omni-flash` | Gemini Omni Flash | 6 | 720p (fixed) | native (automatic) | T2V, I2V, reference-to-video (≤3 images), 2-10s |
+
+Unlike Veo, audio is generated automatically — there's no separate `audio` surcharge tier, and resolution/duration aren't independently configurable (duration is prompt-controlled, 2-10s).
+
+### ByteDance — Seedance
+
+| Model ID | Name | Credits/s | Notes |
+|----------|------|-----------|-------|
+| `seedance-2-0-mini` | Seedance 2.0 Mini | 2.8 | budget tier, 480p/720p |
+| `seedance-1-5-pro-251215` | Seedance 1.5 Pro | 2.9 | |
+| `seedance-1-0-pro-fast-251015` | Seedance 1.0 Pro Fast | 3 | |
+| `seedance-2-0-fast` | Seedance 2.0 Fast | 7.5 | |
+| `seedance-1-0-pro-250528` | Seedance 1.0 Pro | 7.5 | |
+| `seedance-2-0-pro` | Seedance 2.0 | 9.4 | highest quality |
+
+### Alibaba — Wan
+
+Wan covers text-to-video (t2v), image-to-video (i2v), keyframe interpolation (kf2v), reference-to-video (r2v), video editing (VACE), and digital-human (S2V).
+
+| Model ID | Name | Credits/s | Mode |
+|----------|------|-----------|------|
+| `wan2.2-t2v-plus` / `wan2.2-i2v-plus` | Wan 2.2 Plus | 1.2 | t2v / i2v |
+| `wan2.2-i2v-flash` | Wan 2.2 I2V Flash | 1.2 | i2v |
+| `wan2.2-kf2v-flash` | Wan 2.2 KF2V | 1.2 | keyframe |
+| `wan2.6-i2v-flash` | Wan 2.6 I2V Flash | 1.6 | i2v |
+| `wan2.1-i2v-turbo` / `wan2.1-t2v-turbo` | Wan 2.1 Turbo | 2.2 | t2v / i2v |
+| `wan2.6-r2v-flash` | Wan 2.6 R2V Flash | 40 | reference-to-video |
+| `wan2.6-t2v` / `wan2.6-i2v` | Wan 2.6 | 6 | t2v / i2v |
+| `wan2.5-t2v-preview` / `wan2.5-i2v-preview` | Wan 2.5 | 6 | t2v / i2v |
+| `wan2.1-t2v-plus` | Wan 2.1 Plus | 6 | t2v |
+| `wan2.1-kf2v-plus` | Wan 2.1 KF2V Plus | 30 | keyframe |
+| `wan-vace` | Wan VACE Editor | 30 | video editing (inpaint/outpaint/repaint/extend) |
+| `wan-s2v` | Wan S2V Digital Human | 30 | portrait + audio → talking head |
+| `wan2.6-r2v` | Wan 2.6 R2V | 90 | reference-to-video, highest fidelity |
+
+### Kuaishou — Kling AI
+
+| Model ID | Name | Credits/s |
+|----------|------|-----------|
+| `kling-v2-5-turbo` | Kling v2.5 Turbo | 1.6 |
+| `kling-v1` | Kling v1.0 | 2.4 |
+| `kling-v2-6` | Kling v2.6 | 2.4 |
+| `kling-v3` | Kling v3 | 5 |
+| `kling-v1-6` | Kling v1.6 | 3.2 |
+| `kling-v2-master` | Kling v2.0 Master | 3.2 |
+| `kling-v2-1-master` | Kling v2.1 Master | 3.2 |
+| `kling-v3-omni` | Kling v3 Omni | 60 (flat, per operation) |
+| `kling-video-o1` | Kling Video O1 | 80 |
+
+### MiniMax — Hailuo
+
+Flat per-video pricing (not per-second) — cost depends on resolution + duration tier, not a linear rate.
+
+| Model ID | Name | Credits (typical) | Notes |
+|----------|------|--------------------|-------|
+| `hailuo-o2` | Hailuo O2 | 6 | T2V + I2V + first/last-frame |
+| `hailuo-2.3-fast` | Hailuo 2.3 Fast | 12 | I2V only, faster/cheaper |
+| `hailuo-2.3` | Hailuo 2.3 | 17 | T2V + I2V, camera commands |
+| `hailuo-s2v` | Hailuo S2V | 17 | subject-reference (face consistency) |
+
+### OpenAI — Sora 2
+
+| Model ID | Name | Credits/s | Max Duration |
+|----------|------|-----------|---------------|
+| `sora-2` | Sora 2 | 8 | 12s |
+| `sora-2-azure` | Sora 2 — FOTOhub (Azure-hosted) | 8 | 12s |
+| `sora-2-pro` | Sora 2 Pro | 19 | 25s |
+
+### xAI — Grok Video
+
+| Model ID | Name | Credits/s | Notes |
+|----------|------|-----------|-------|
+| `grok-imagine-video` | Grok Video | 4 | T2V + I2V + video editing + reference-to-video |
+| `grok-imagine-video-1.5` | Grok Video 1.5 | 9 | I2V + editing + **lip-sync** (portrait + text → talking head), up to 1080p |
+
+**Recommended:** `veo-3.1-generate-001` — Highest quality, cinematic output with native audio.
+
+**Budget pick:** `wan2.2-t2v-plus` / `wan2.2-i2v-plus` — Lowest per-second cost with good quality for social media content.
+
+**Native audio without Veo:** `gemini-omni-flash` generates audio automatically for every clip, no separate surcharge.
+
+**Lip-sync generation:** `grok-imagine-video-1.5` — the only *generative* model with built-in lip-sync (portrait + script → talking head). For syncing existing footage to new audio instead, see [Lip-Sync](/api/lip-sync).
 
 ---
 

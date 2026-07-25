@@ -1,13 +1,17 @@
 # Video Generation
 
-Generate high-quality AI videos from text prompts or source images. FOTOhub provides access to 7 video models from 6 leading providers, supporting both text-to-video and image-to-video workflows. Generate clips from 5 to 60 seconds in length, with configurable aspect ratios and resolutions up to 4K.
+Generate high-quality AI videos from text prompts or source images. FOTOhub provides access to 30+ video models across 6 providers, supporting text-to-video, image-to-video, reference-to-video, and video editing workflows. Generate clips up to 60 seconds, with configurable aspect ratios and resolutions up to 4K.
 
 | | |
 |---|---|
-| **Models** | 7 models from 6 providers |
-| **Duration** | 5-60 seconds, configurable |
-| **Resolution** | 720p, 1080p, 4K |
-| **Modes** | Text-to-video, Image-to-video |
+| **Models** | 30+ models from 6 providers |
+| **Duration** | 2-60 seconds, model-dependent |
+| **Resolution** | 480p, 720p, 1080p, 4K (model-dependent) |
+| **Modes** | Text-to-video, image-to-video, reference-to-video, native audio, lip-sync |
+
+::: warning Canonical model catalog
+The set of `model` IDs accepted below is served dynamically. Always query `GET /v1/models?category=video` for the authoritative, always-current list — see the [full Video Generation Models catalog](/api/models#video-generation-models) for pricing across every provider.
+:::
 
 ## Endpoint
 
@@ -16,18 +20,18 @@ POST /v1/ai/generate/video
 ```
 
 **Authentication:** Bearer token (API key)  
-**Billing:** 8-15 credits per 5-second clip (scales with duration)
+**Billing:** per-second credits (model-dependent, 1.2-90 credits/s), or a flat per-video amount for MiniMax Hailuo models.
 
 ## Request Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | string | **Yes** | — | Detailed description of the video to generate. Include subject, action, style, camera movement, and lighting for best results. |
-| `model` | string | No | `"veo-2"` | Video generation model to use. Options: `"veo-2"`, `"veo-3"`, `"wan-video"`, `"kling"`, `"hailuo"`, `"seedance"`, `"sora-2"`. |
-| `duration` | integer | No | `5` | Video duration in seconds. Accepted values: 5, 10, 15, 30, 60. Longer durations consume proportionally more credits. |
+| `model` | string | No | `"veo-3.1-generate-001"` | Video generation model to use. See [Model Pricing](#model-pricing) below or `GET /v1/models?category=video` for the full, current list. Examples: `"veo-3.1-generate-001"`, `"wan2.6-t2v"`, `"seedance-2-0-pro"`, `"kling-v3"`, `"sora-2"`, `"grok-imagine-video-1.5"`, `"gemini-omni-flash"`. |
+| `duration` | integer | No | `5` | Video duration in seconds (capped at 60). Supported values vary by model. |
 | `aspect_ratio` | string | No | `"16:9"` | Output aspect ratio. Options: `"16:9"` (landscape), `"9:16"` (portrait/vertical), `"1:1"` (square). |
 | `image_url` | string | No | — | URL of a source image for image-to-video generation. When provided, the video will animate from this starting frame. Must be a publicly accessible URL or a FOTOhub storage URL. |
-| `resolution` | string | No | `"1080p"` | Output video resolution. Options: `"720p"` (1280x720), `"1080p"` (1920x1080), `"4k"` (3840x2160). Higher resolutions may increase generation time. |
+| `resolution` | string | No | `"1080p"` | Output video resolution. Options: `"720p"`, `"1080p"`, `"4k"` — availability depends on model (e.g. `veo-2.0-generate-001` is 720p-only; `gemini-omni-flash` is fixed at 720p). |
 
 ## Response Format
 
@@ -35,12 +39,12 @@ POST /v1/ai/generate/video
 
 ```json
 {
-  "model": "veo-2",
-  "credits_used": 10,
+  "model": "veo-3.1-generate-001",
+  "credits_used": 60,
   "billing": {
     "method": "credits",
-    "credits_used": 10,
-    "pln_charged": 3.75
+    "credits_used": 60,
+    "pln_charged": 12.00
   },
   "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/videos/vj_abc123.mp4",
   "job_id": "vj_abc123",
@@ -55,7 +59,7 @@ POST /v1/ai/generate/video
 {
   "job_id": "vj_abc123def456",
   "status": "processing",
-  "model": "veo-3",
+  "model": "veo-3.1-generate-001",
   "estimated_seconds": 120,
   "poll_url": "https://apis.fotohub.app/v1/ai/jobs/vj_abc123def456",
   "webhook_supported": true
@@ -68,58 +72,58 @@ Video generation can take 30 seconds to several minutes depending on the model a
 
 ## Model Pricing
 
-Base price per 5-second clip:
+Per-second pricing for the most commonly used model per provider (see the [full catalog](/api/models#video-generation-models) for every variant):
 
-| Model | ID | Credits (5s) | Price (PLN) | Provider |
-|-------|-----|:------------:|:-----------:|----------|
-| Wan Video (WAN) | `wan-video` | 8 | 0.45 | Alibaba |
-| Hailuo (MiniMax) | `hailuo` | 8 | 0.525 | MiniMax |
-| Kling AI | `kling` | 10 | 0.60 | Kuaishou |
-| Seedance | `seedance` | 10 | 0.675 | ByteDance |
-| **Google Veo 2** | `veo-2` | **10** | **0.75** | Google |
-| OpenAI Sora 2 | `sora-2` | 12 | 0.90 | OpenAI |
-| Google Veo 3 | `veo-3` | 15 | 1.20 | Google |
+| Model | ID | Credits/s | Provider | Notes |
+|-------|-----|:---------:|----------|-------|
+| Wan 2.2 Plus | `wan2.2-t2v-plus` | 1.2 | Alibaba | cheapest tier |
+| Seedance 2.0 Mini | `seedance-2-0-mini` | 2.8 | ByteDance | budget |
+| Kling v2.5 Turbo | `kling-v2-5-turbo` | 1.6 | Kuaishou | |
+| Hailuo O2 | `hailuo-o2` | — | MiniMax | 6 credits flat, per video |
+| **Google Veo 3.1** | `veo-3.1-generate-001` | **12** | Google | native audio, up to 4K |
+| Gemini Omni Flash | `gemini-omni-flash` | 6 | Google | native audio, T2V+I2V |
+| OpenAI Sora 2 | `sora-2` | 8 | OpenAI | |
+| Grok Video 1.5 | `grok-imagine-video-1.5` | 9 | xAI | lip-sync |
 
 ::: tip Recommended Model
-**Veo 2** offers the best balance of quality, speed, and cost for most use cases. Use **Veo 3** for maximum quality when budget allows, or **Wan** for budget-conscious batch processing.
+**`veo-3.1-generate-001`** offers the best balance of quality, native audio, and features (last-frame + reference images) for most use cases. Use **`wan2.2-t2v-plus`** or **`wan2.2-i2v-plus`** for budget-conscious batch processing, or **`gemini-omni-flash`** when you want native audio without Veo's higher per-second cost.
 :::
 
 ### Credit Scaling by Duration
 
-Credits scale linearly with video duration. The base credit cost shown above is for a 5-second clip. Longer durations multiply accordingly:
+Almost every model bills `credits/s × duration` (MiniMax Hailuo is the exception — flat per-video pricing regardless of duration):
 
-| Duration | Multiplier | Example (Veo 2) |
-|----------|:----------:|-----------------|
-| 5 seconds | 1x | 10 credits (0.75 PLN) |
-| 10 seconds | 2x | 20 credits (1.50 PLN) |
-| 15 seconds | 3x | 30 credits (2.25 PLN) |
-| 30 seconds | 5x | 50 credits (3.75 PLN) |
-| 60 seconds | 10x | 100 credits (7.50 PLN) |
+| Duration | Example (`veo-3.1-generate-001`, 12 cr/s) |
+|----------|---------------------------------------------|
+| 5 seconds | 60 credits (12.00 PLN) |
+| 10 seconds | 120 credits (24.00 PLN) |
+| 15 seconds | 180 credits (36.00 PLN) |
 
 ::: info Formula
-`total_credits = base_credits x (duration / 5)`
+`total_credits = credits_per_second × duration`
 
-For example, a 30-second Kling video costs: `10 x (30 / 5) = 60 credits`
+For example, a 10-second `wan2.2-t2v-plus` video costs: `1.2 × 10 = 12 credits`
 :::
 
 ## Model Comparison
 
-| Model | Provider | Credits/5s | PLN/sec | Max Duration | Resolution | Speed | Quality | Key Features |
-|-------|----------|:----------:|:-------:|:------------:|:----------:|:-----:|:-------:|--------------|
-| `veo-2` | Google | 10 | 0.50 | 30s | 1080p | Fast | High | img2vid, txt2vid |
-| `veo-3` | Google | 15 | 0.80 | 30s | 4K | Medium | Ultra | audio, cinematic |
-| `wan-video` | Alibaba | 8 | 0.30 | 30s | 1080p | Fast | Good | artistic, multishot |
-| `kling` | Kuaishou | 10 | 0.40 | 60s | 1080p | Medium | High | realistic, motion |
-| `hailuo` | MiniMax | 8 | 0.35 | 30s | 1080p | Fast | Good | balanced |
-| `seedance` | ByteDance | 10 | 0.45 | 30s | 1080p | Medium | High | dance, motion |
-| `sora-2` | OpenAI | 12 | 0.60 | 20s | 4K | Slow | Ultra | physics, premium |
+| Model | Provider | Credits/s | Max Duration | Resolution | Audio | Key Features |
+|-------|----------|:---------:|:------------:|:----------:|:-----:|--------------|
+| `veo-3.1-generate-001` | Google | 12 | 8s | 4K | native | last-frame, reference images |
+| `gemini-omni-flash` | Google | 6 | 10s | 720p | native (automatic) | reference-to-video |
+| `wan2.2-t2v-plus` / `-i2v-plus` | Alibaba | 1.2 | 15s | 1080p | none | cheapest, artistic |
+| `kling-v3` | Kuaishou | 5 | 15s | 1080p | optional | realistic motion |
+| `hailuo-o2` | MiniMax | — (flat) | 10s | 1080p | none | first+last frame |
+| `seedance-2-0-pro` | ByteDance | 9.4 | 15s | 1080p | optional | highest Seedance quality |
+| `sora-2` | OpenAI | 8 | 12s | 1080p | native | physics-accurate |
+| `grok-imagine-video-1.5` | xAI | 9 | 15s | 1080p | none | **lip-sync** generation |
 
 ::: tip Choosing a Model
-- **Best overall**: `veo-2` -- fast, high quality, competitive price
-- **Maximum quality**: `veo-3` or `sora-2` -- ultra-quality output, cinematic results
-- **Budget batch processing**: `wan-video` or `hailuo` -- lowest cost per second
-- **Longest clips**: `kling` -- supports up to 60 seconds
-- **With audio**: `veo-3` -- generates synchronized audio automatically
+- **Best overall**: `veo-3.1-generate-001` -- native audio, high quality, competitive price
+- **Maximum quality**: `veo-3.1-generate-001` or `sora-2` -- ultra-quality output, cinematic results
+- **Budget batch processing**: `wan2.2-t2v-plus` / `wan2.2-i2v-plus` -- lowest cost per second
+- **Native audio without Veo**: `gemini-omni-flash` -- automatic audio, no surcharge tier
+- **Lip-sync generation**: `grok-imagine-video-1.5` -- portrait + script → talking head
 :::
 
 ## Code Examples
@@ -141,7 +145,7 @@ response = requests.post(
         "prompt": "A golden retriever running through a sunlit meadow, "
                   "cinematic slow motion, shallow depth of field, "
                   "warm afternoon light, shot on 35mm film",
-        "model": "veo-2",
+        "model": "veo-3.1-generate-001",
         "duration": 5,
         "aspect_ratio": "16:9",
         "resolution": "1080p"
@@ -166,7 +170,7 @@ const response = await fetch(
       prompt: "A golden retriever running through a sunlit meadow, " +
               "cinematic slow motion, shallow depth of field, " +
               "warm afternoon light, shot on 35mm film",
-      model: "veo-2",
+      model: "veo-3.1-generate-001",
       duration: 5,
       aspect_ratio: "16:9",
       resolution: "1080p",
@@ -192,7 +196,7 @@ import (
 func main() {
 	payload := map[string]interface{}{
 		"prompt":       "A golden retriever running through a sunlit meadow, cinematic slow motion, shallow depth of field, warm afternoon light, shot on 35mm film",
-		"model":        "veo-2",
+		"model":        "veo-3.1-generate-001",
 		"duration":     5,
 		"aspect_ratio": "16:9",
 		"resolution":   "1080p",
@@ -222,7 +226,7 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A golden retriever running through a sunlit meadow, cinematic slow motion, shallow depth of field, warm afternoon light, shot on 35mm film",
-    "model": "veo-2",
+    "model": "veo-3.1-generate-001",
     "duration": 5,
     "aspect_ratio": "16:9",
     "resolution": "1080p"
@@ -247,7 +251,7 @@ response = requests.post(
     json={
         "prompt": "The subject slowly turns their head and smiles, "
                   "gentle breeze moves their hair, soft natural lighting",
-        "model": "kling",
+        "model": "kling-v3",
         "duration": 5,
         "aspect_ratio": "9:16",
         "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/portrait.jpg"
@@ -274,7 +278,7 @@ const response = await fetch(
     body: JSON.stringify({
       prompt: "The subject slowly turns their head and smiles, " +
               "gentle breeze moves their hair, soft natural lighting",
-      model: "kling",
+      model: "kling-v3",
       duration: 5,
       aspect_ratio: "9:16",
       image_url: "https://s1.fotohub.app/storage/v1/object/public/uploads/portrait.jpg",
@@ -304,7 +308,7 @@ import (
 func main() {
 	payload := map[string]interface{}{
 		"prompt":       "The subject slowly turns their head and smiles, gentle breeze moves their hair, soft natural lighting",
-		"model":        "kling",
+		"model":        "kling-v3",
 		"duration":     5,
 		"aspect_ratio": "9:16",
 		"image_url":    "https://s1.fotohub.app/storage/v1/object/public/uploads/portrait.jpg",
@@ -339,7 +343,7 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "The subject slowly turns their head and smiles, gentle breeze moves their hair, soft natural lighting",
-    "model": "kling",
+    "model": "kling-v3",
     "duration": 5,
     "aspect_ratio": "9:16",
     "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/portrait.jpg"
@@ -365,7 +369,7 @@ response = requests.post(
         "prompt": "Aerial drone shot of a coastal city at sunset, "
                   "golden hour lighting, waves crashing against cliffs, "
                   "smooth camera pan from left to right, hyperrealistic",
-        "model": "veo-3",
+        "model": "veo-3.1-generate-001",
         "duration": 10,
         "aspect_ratio": "16:9",
         "resolution": "4k"
@@ -395,7 +399,7 @@ const response = await fetch(
       prompt: "Aerial drone shot of a coastal city at sunset, " +
               "golden hour lighting, waves crashing against cliffs, " +
               "smooth camera pan from left to right, hyperrealistic",
-      model: "veo-3",
+      model: "veo-3.1-generate-001",
       duration: 10,
       aspect_ratio: "16:9",
       resolution: "4k",
@@ -427,7 +431,7 @@ import (
 func main() {
 	payload := map[string]interface{}{
 		"prompt":       "Aerial drone shot of a coastal city at sunset, golden hour lighting, waves crashing against cliffs, smooth camera pan from left to right, hyperrealistic",
-		"model":        "veo-3",
+		"model":        "veo-3.1-generate-001",
 		"duration":     10,
 		"aspect_ratio": "16:9",
 		"resolution":   "4k",
@@ -464,7 +468,7 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Aerial drone shot of a coastal city at sunset, golden hour lighting, waves crashing against cliffs, smooth camera pan from left to right, hyperrealistic",
-    "model": "veo-3",
+    "model": "veo-3.1-generate-001",
     "duration": 10,
     "aspect_ratio": "16:9",
     "resolution": "4k"
@@ -473,9 +477,12 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
 
 :::
 
-### Video with Audio (Veo 3)
+### Video with Audio (Veo 3.1 / Gemini Omni Flash)
 
-Veo 3 can generate synchronized audio alongside the video -- ambient sounds, speech, and music are produced automatically based on the scene described in your prompt. No separate audio generation step is required.
+Two model families generate synchronized audio alongside the video -- ambient sounds, speech, and music are produced automatically based on the scene described in your prompt. No separate audio generation step is required.
+
+- **`veo-3.1-generate-001`** (and other Veo 3.x models) -- audio is opt-in via the `audio: true` flag, billed at a higher per-second rate (audio tier vs. silent tier).
+- **`gemini-omni-flash`** -- audio is generated automatically on every clip, no flag needed and no separate billing tier.
 
 ::: code-group
 
@@ -492,7 +499,7 @@ response = requests.post(
         "prompt": "A street musician playing acoustic guitar in a busy market, "
                   "crowd chatter and footsteps in background, warm string tones, "
                   "camera slowly dollies in on the performer's hands",
-        "model": "veo-3",
+        "model": "veo-3.1-generate-001",
         "duration": 10,
         "aspect_ratio": "16:9",
         "resolution": "1080p",
@@ -521,7 +528,7 @@ const response = await fetch(
       prompt: "A street musician playing acoustic guitar in a busy market, " +
               "crowd chatter and footsteps in background, warm string tones, " +
               "camera slowly dollies in on the performer's hands",
-      model: "veo-3",
+      model: "veo-3.1-generate-001",
       duration: 10,
       aspect_ratio: "16:9",
       resolution: "1080p",
@@ -552,7 +559,7 @@ import (
 func main() {
 	payload := map[string]interface{}{
 		"prompt":       "A street musician playing acoustic guitar in a busy market, crowd chatter and footsteps in background, warm string tones, camera slowly dollies in on the performer's hands",
-		"model":        "veo-3",
+		"model":        "veo-3.1-generate-001",
 		"duration":     10,
 		"aspect_ratio": "16:9",
 		"resolution":   "1080p",
@@ -587,7 +594,7 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A street musician playing acoustic guitar in a busy market, crowd chatter and footsteps in background, warm string tones, camera slowly dollies in on the performers hands",
-    "model": "veo-3",
+    "model": "veo-3.1-generate-001",
     "duration": 10,
     "aspect_ratio": "16:9",
     "resolution": "1080p",
@@ -597,14 +604,14 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
 
 :::
 
-::: info Veo 3 Audio Generation
-When `audio: true` is set with `veo-3`, the model generates scene-appropriate audio synchronized to the visual content. This includes:
+::: info Veo / Omni Audio Generation
+When `audio: true` is set with a Veo 3.x model, or automatically with `gemini-omni-flash`, the audio track is scene-appropriate and synchronized to the visual content. This includes:
 - **Ambient sounds** -- environment noise matching the scene (traffic, wind, crowd)
 - **Sound effects** -- action-triggered audio (footsteps, impacts, splashes)
 - **Speech** -- if characters are talking in the prompt, dialogue is generated
 - **Music** -- if musical instruments or singing are described
 
-The output MP4 includes a full AAC audio track. Audio generation adds approximately 15-30 seconds to processing time. Other models (`veo-2`, `kling`, etc.) produce silent video by default.
+The output MP4 includes a full AAC audio track. Audio generation adds approximately 15-30 seconds to processing time. Other models (`veo-2.0-generate-001`, `kling-v3`, `wan2.2-t2v-plus`, etc.) produce silent video by default.
 :::
 
 ---
@@ -639,7 +646,7 @@ response = requests.post(
     json={
         "prompt": "Cinematic aerial shot of a mountain range at sunrise, "
                   "volumetric fog in valleys, golden light on peaks, drone flyover",
-        "model": "veo-3",
+        "model": "veo-3.1-generate-001",
         "duration": 15,
         "resolution": "4k"
     }
@@ -682,7 +689,7 @@ const submitResponse = await fetch(
     body: JSON.stringify({
       prompt: "Cinematic aerial shot of a mountain range at sunrise, " +
               "volumetric fog in valleys, golden light on peaks, drone flyover",
-      model: "veo-3",
+      model: "veo-3.1-generate-001",
       duration: 15,
       resolution: "4k",
     }),
@@ -741,7 +748,7 @@ func main() {
 	// Step 1: Submit generation request
 	payload := map[string]interface{}{
 		"prompt":     "Cinematic aerial shot of a mountain range at sunrise, volumetric fog in valleys, golden light on peaks, drone flyover",
-		"model":      "veo-3",
+		"model":      "veo-3.1-generate-001",
 		"duration":   15,
 		"resolution": "4k",
 	}
@@ -807,7 +814,7 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Cinematic aerial shot of a mountain range at sunrise, volumetric fog in valleys, golden light on peaks, drone flyover",
-    "model": "veo-3",
+    "model": "veo-3.1-generate-001",
     "duration": 15,
     "resolution": "4k"
   }'
@@ -858,7 +865,7 @@ response = requests.post(
     },
     json={
         "prompt": "A futuristic city skyline at night, neon reflections on wet streets",
-        "model": "veo-2",
+        "model": "veo-3.1-generate-001",
         "duration": 10,
         "webhook_url": "https://your-server.com/webhooks/fotohub"
     }
@@ -881,7 +888,7 @@ const response = await fetch(
     },
     body: JSON.stringify({
       prompt: "A futuristic city skyline at night, neon reflections on wet streets",
-      model: "veo-2",
+      model: "veo-3.1-generate-001",
       duration: 10,
       webhook_url: "https://your-server.com/webhooks/fotohub",
     }),
@@ -896,7 +903,7 @@ console.log("You will receive a POST to your webhook when ready");
 ```go [Go]
 payload := map[string]interface{}{
 	"prompt":      "A futuristic city skyline at night, neon reflections on wet streets",
-	"model":       "veo-2",
+	"model":       "veo-3.1-generate-001",
 	"duration":    10,
 	"webhook_url": "https://your-server.com/webhooks/fotohub",
 }
@@ -921,7 +928,7 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A futuristic city skyline at night, neon reflections on wet streets",
-    "model": "veo-2",
+    "model": "veo-3.1-generate-001",
     "duration": 10,
     "webhook_url": "https://your-server.com/webhooks/fotohub"
   }'
@@ -940,7 +947,7 @@ When the video is ready (or fails), FOTOhub sends a `POST` request to your `webh
   "data": {
     "job_id": "vj_abc123def456",
     "status": "completed",
-    "model": "veo-2",
+    "model": "veo-3.1-generate-001",
     "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/videos/vj_abc123def456.mp4",
     "duration": 10,
     "credits_used": 20,

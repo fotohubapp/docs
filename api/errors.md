@@ -259,9 +259,9 @@ Complete list of error codes returned in the `error` field. Use these for progra
 ```json
 {
   "error": "model_unavailable",
-  "message": "Model 'kling' is temporarily offline for maintenance.",
+  "message": "Model 'kling-v3' is temporarily offline for maintenance.",
   "details": {
-    "model": "kling",
+    "model": "kling-v3",
     "estimated_recovery": "2026-07-18T13:00:00Z"
   },
   "request_id": "req_4nWp8xKmQ5vL3yRz"
@@ -2349,7 +2349,7 @@ import time
 # Fallback model configuration
 FALLBACK_MODELS = {
     "seedream-5-0-260128": "flux-2-klein-4b",
-    "kling": "veo-2",
+    "kling-v3": "veo-3.1-generate-001",
     "music-minimax": None,  # No fallback
 }
 
@@ -2412,7 +2412,7 @@ print(f"URL: {result['url']}")
 // Fallback model configuration
 const FALLBACK_MODELS: Record<string, string | null> = {
   "seedream-5-0-260128": "flux-2-klein-4b",
-  "kling": "veo-2",
+  "kling-v3": "veo-3.1-generate-001",
   "music-minimax": null, // No fallback
 };
 
@@ -2479,7 +2479,7 @@ import (
 
 var fallbackModels = map[string]string{
 	"seedream-5-0-260128": "flux-2-klein-4b",
-	"kling":               "veo-2",
+	"kling-v3":               "veo-3.1-generate-001",
 }
 
 var modelErrorCodes = map[string]bool{

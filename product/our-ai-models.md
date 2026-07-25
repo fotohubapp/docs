@@ -60,6 +60,63 @@ See [Gabriel AI API Reference](/api/gabriel-ai) for complete endpoint documentat
 
 ---
 
+## IDA Q 1.0
+
+**IDA Q 1.0** is FOTOhub's proprietary text-to-image generation model — built and hosted entirely on our own GPU infrastructure, engineered around precise text rendering, deliberate composition control, and native multilingual understanding.
+
+### Capabilities
+
+| Feature | Specification |
+|---------|--------------|
+| **Generation** | Text-to-image (no image editing/img2img) |
+| **Max images per request** | 2 |
+| **Max resolution** | 2048 × 2048 |
+| **Aspect ratios** | 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 21:9 |
+| **Multilingual prompts** | Yes — automatic translation, any input language |
+| **Text rendering** | Best-in-class — headlines, labels, signage |
+| **Seed control** | Yes, reproducible outputs |
+| **Generation mode** | Asynchronous (submit + poll, single-GPU queue) |
+| **Generation time** | ~30s (1K) / ~90s (1.5K) / ~3.5min (2K) |
+
+### Benchmarks
+
+On the independent DesignArena benchmark (Elo rating, real-world design task quality):
+
+| Metric | IDA Q 1.0 | Industry Position |
+|--------|-----------|-------------------|
+| DesignArena Elo | 1285 | 5th worldwide |
+| vs. Recraft V4.1 Utility Pro (1245) | +40 Elo | Ahead |
+| vs. Krea 2 Large (1235) | +50 Elo | Ahead |
+| vs. FLUX.2 [pro] (1239) | +46 Elo | Ahead |
+| vs. Seedream Lite 5.0 (1236) | +49 Elo | Ahead |
+| vs. Imagen 4 Ultra Preview (1233) | +52 Elo | Ahead |
+| vs. GPT Image 2 (1405) | -120 Elo | Behind (top-tier gap) |
+
+### Prompt Intelligence
+
+Every prompt passes through FOTOhub's own prompt engine before generation — automatic translation to English, expansion of short/casual descriptions into fully detailed scene structure, and verbatim preservation of quoted text and named brands. You write a normal description in any language; the engine handles the rest. See the [full breakdown](/api/ida-q#how-prompt-structuring-works) of how this works.
+
+### Pricing
+
+| Model | Price | Unit |
+|-------|-------|------|
+| IDA Q 1.0 | 0.10 | PLN / request |
+
+::: tip Cost Advantage
+IDA Q 1.0 costs a fraction of Google's Nano Banana (Gemini Flash Image) and roughly 20x less than GPT Image 2 — a direct result of running on our own infrastructure with zero third-party licensing cost to pass through.
+:::
+
+### API Access
+
+```bash
+POST https://apis.fotohub.app/v1/ai/generate/image        # Submit (model: "ida-q-image")
+GET  https://apis.fotohub.app/v1/ai/generate/image/ida-q/{job_id}  # Poll for result
+```
+
+See [IDA Q 1.0 API Reference](/api/ida-q) for complete endpoint documentation.
+
+---
+
 ## IDA Music
 
 **IDA Music** is FOTOhub's proprietary music generation engine. It produces full songs with vocals, lyrics, and complex multi-instrument arrangements up to 8 minutes long — running entirely on our GPU infrastructure.

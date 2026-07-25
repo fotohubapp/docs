@@ -405,7 +405,7 @@ Generate a video from text (or animate an image with `image_url`). This is an **
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | `string` | Yes | — | Text description of the video |
-| `model` | `string` | No | `veo-3` | Model: `veo-2`, `veo-3`, `hailuo`, `kling`, `sora-2`, `seedance`, `wan-video` |
+| `model` | `string` | No | `veo-3.1-generate-001` | See `GET /v1/models?category=video` for the full list. Examples: `veo-3.1-generate-001`, `hailuo-o2`, `kling-v3`, `sora-2`, `seedance-2-0-pro`, `wan2.2-t2v-plus`, `gemini-omni-flash`, `grok-imagine-video-1.5` |
 | `duration` | `integer` | No | `5` | Duration in seconds: `5` or `10` (model-dependent) |
 | `aspect_ratio` | `string` | No | `16:9` | Aspect ratio: `16:9`, `9:16`, `1:1` |
 | `image_url` | `string` | No | `""` | Source image for image-to-video generation |
@@ -427,7 +427,7 @@ resp = httpx.post(
             "name": "generate_video",
             "arguments": {
                 "prompt": "A drone shot flying over snow-capped mountains at sunrise",
-                "model": "veo-3",
+                "model": "veo-3.1-generate-001",
                 "duration": 5,
                 "aspect_ratio": "16:9"
             }
@@ -453,7 +453,7 @@ const resp = await fetch("https://apis.fotohub.app/mcp/", {
       name: "generate_video",
       arguments: {
         prompt: "A drone shot flying over snow-capped mountains at sunrise",
-        model: "veo-3",
+        model: "veo-3.1-generate-001",
         duration: 5,
         aspect_ratio: "16:9"
       }
@@ -473,7 +473,7 @@ body, _ := json.Marshal(map[string]any{
         "name": "generate_video",
         "arguments": map[string]any{
             "prompt":       "A drone shot flying over snow-capped mountains at sunrise",
-            "model":        "veo-3",
+            "model":        "veo-3.1-generate-001",
             "duration":     5,
             "aspect_ratio": "16:9",
         },
@@ -501,7 +501,7 @@ curl -X POST https://apis.fotohub.app/mcp/ \
       "name": "generate_video",
       "arguments": {
         "prompt": "A drone shot flying over snow-capped mountains at sunrise",
-        "model": "veo-3",
+        "model": "veo-3.1-generate-001",
         "duration": 5,
         "aspect_ratio": "16:9"
       }
@@ -1517,7 +1517,7 @@ async def main():
                 "generate_video",
                 arguments={
                     "prompt": "A timelapse of clouds rolling over a valley",
-                    "model": "veo-3",
+                    "model": "veo-3.1-generate-001",
                     "duration": 5,
                 }
             )
@@ -1556,7 +1556,7 @@ async def generate_and_wait():
                 "generate_video",
                 arguments={
                     "prompt": "Ocean waves crashing on rocks, cinematic slow motion",
-                    "model": "kling",
+                    "model": "kling-v3",
                     "duration": 5,
                 }
             )

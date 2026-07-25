@@ -116,6 +116,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 | `flux-2-max` | Illustration, anime, stylized art | 6-10s | 3.0 |
 | `imagen-4-standard` | High detail, complex scenes | 6-10s | 3.0 |
 | `imagen-4-ultra` | Maximum quality, fine detail | 10-15s | 5.0 |
+| `gemini-3-pro-image` | Complex/precise prompts, in-image text rendering (up to 4K) | 8-14s | 6.0 |
 
 See the full [Models Catalog](/api/models) for all available models.
 
@@ -821,6 +822,7 @@ See the full [Error Handling Guide](/guides/error-handling) for retry patterns a
 | Architecture visualization | `imagen-4-standard` | Handles complex spatial scenes |
 | Social media batch (50+) | `grok-imagine-image` | Cheapest per image at scale |
 | Print-quality artwork | `imagen-4-ultra` | Highest resolution & detail |
+| Complex/precise prompts, in-image text | `gemini-3-pro-image` | Advanced reasoning + precise text rendering, up to 4K |
 
 ---
 

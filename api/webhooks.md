@@ -44,7 +44,7 @@ All webhook deliveries use a consistent envelope format. The `data` field contai
   "data": {
     "job_id": "vj_xyz",
     "generation_type": "video",
-    "model": "veo-2",
+    "model": "veo-2.0-generate-001",
     "output_url": "https://s3point.fotohub.app/generations/vj_xyz.mp4",
     "duration": 5,
     "billing": {
@@ -66,7 +66,7 @@ All webhook deliveries use a consistent envelope format. The `data` field contai
   "data": {
     "job_id": "vj_failed1",
     "generation_type": "video",
-    "model": "veo-2",
+    "model": "veo-2.0-generate-001",
     "error": "content_policy_violation",
     "error_message": "The prompt was rejected by the safety filter.",
     "billing": {
@@ -87,7 +87,7 @@ All webhook deliveries use a consistent envelope format. The `data` field contai
   "created_at": "2026-07-17T12:05:00Z",
   "data": {
     "job_id": "vj_render1",
-    "model": "kling",
+    "model": "kling-v3",
     "output_url": "https://s3point.fotohub.app/generations/vj_render1.mp4",
     "duration_seconds": 10,
     "resolution": "1080p",
@@ -170,7 +170,7 @@ All webhook deliveries use a consistent envelope format. The `data` field contai
   "created_at": "2026-07-17T10:45:00Z",
   "data": {
     "operation": "video_generation",
-    "model": "kling",
+    "model": "kling-v3",
     "amount_pln": 5.50,
     "wallet_balance_after": 94.50,
     "job_id": "vj_charged1"
@@ -1383,7 +1383,7 @@ func main() {
 # Test your webhook handler locally with a simulated delivery
 
 # 1. Generate a test signature
-PAYLOAD='{"id":"evt_test_001","type":"generation.completed","created_at":"2026-07-17T12:00:00Z","data":{"job_id":"vj_xyz","generation_type":"video","model":"veo-2","output_url":"https://s3point.fotohub.app/generations/vj_xyz.mp4","duration":5,"billing":{"method":"credits","credits_used":10,"pln_charged":3.75}}}'
+PAYLOAD='{"id":"evt_test_001","type":"generation.completed","created_at":"2026-07-17T12:00:00Z","data":{"job_id":"vj_xyz","generation_type":"video","model":"veo-2.0-generate-001","output_url":"https://s3point.fotohub.app/generations/vj_xyz.mp4","duration":5,"billing":{"method":"credits","credits_used":155,"pln_charged":31.00}}}'
 SECRET="your_webhook_secret_here"
 SIGNATURE="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')"
 

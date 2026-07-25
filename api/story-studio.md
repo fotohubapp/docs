@@ -69,7 +69,7 @@ POST /v1/story/generate
 |-----------|------|----------|---------|-------------|
 | `prompt` | string | **Yes** | — | Story description. Be specific about theme, setting, tone, and desired outcome. Max 2000 characters. |
 | `style` | string | No | `"cinematic"` | Visual style preset. See supported styles below. |
-| `video_model` | string | No | `"veo-2"` | Video generation model for scene clips. |
+| `video_model` | string | No | `"veo-3.1-generate-001"` | Video generation model for scene clips. |
 | `num_scenes` | integer | No | `4` | Number of scenes in the story. Range: 2–8. |
 | `duration` | integer | No | `60` | Target total duration in seconds. Range: 15–180. |
 | `aspect_ratio` | string | No | `"16:9"` | Output aspect ratio: `"16:9"`, `"9:16"`, `"1:1"`. |
@@ -143,7 +143,7 @@ data: {"step": 3, "code": "generation_failed", "message": "Frame generation fail
   ],
   "metadata": {
     "style": "cinematic",
-    "video_model": "veo-2",
+    "video_model": "veo-3.1-generate-001",
     "aspect_ratio": "16:9",
     "seed": 847291,
     "generation_time_ms": 142000
@@ -327,7 +327,7 @@ POST /v1/story/step/videos
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `story_id` | string | **Yes** | — | Story ID from previous steps. |
-| `video_model` | string | No | `"veo-2"` | Video generation model. See supported models below. |
+| `video_model` | string | No | `"veo-3.1-generate-001"` | Video generation model. See supported models below. |
 | `scene_indices` | array | No | all | Specific scene indices to generate. Useful for regenerating individual scenes. |
 | `motion_intensity` | string | No | `"medium"` | Camera/subject motion: `"low"`, `"medium"`, `"high"`. |
 | `fps` | integer | No | `24` | Frames per second: `24`, `30`. |
@@ -336,10 +336,10 @@ POST /v1/story/step/videos
 
 | Model | Provider | Best For | Max Duration |
 |-------|----------|----------|--------------|
-| `veo-2` | Google | Photorealistic, high consistency | 8s per clip |
-| `seedance` | ByteDance | Fast generation, good motion | 5s per clip |
-| `wan` | Alibaba | Artistic styles, anime | 5s per clip |
-| `hailuo` | MiniMax | Cinematic quality, smooth motion | 6s per clip |
+| `veo-3.1-generate-001` | Google | Photorealistic, native audio, up to 4K | 8s per clip |
+| `seedance-2-0-pro` | ByteDance | Fast generation, good motion | 15s per clip |
+| `wan2.2-t2v-plus` | Alibaba | Artistic styles, anime | 15s per clip |
+| `hailuo-o2` | MiniMax | Cinematic quality, smooth motion | 10s per clip |
 
 #### Response
 
@@ -352,13 +352,13 @@ POST /v1/story/step/videos
       "scene_index": 0,
       "video_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/scene_0.mp4",
       "duration": 5.2,
-      "model_used": "veo-2"
+      "model_used": "veo-3.1-generate-001"
     },
     {
       "scene_index": 1,
       "video_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/scene_1.mp4",
       "duration": 5.0,
-      "model_used": "veo-2"
+      "model_used": "veo-3.1-generate-001"
     }
   ]
 }
@@ -603,7 +603,7 @@ story = client.story.generate(
            "from the Louvre, only to discover the paintings are being replaced "
            "with forgeries that contain hidden messages.",
     style="cinematic",
-    video_model="veo-2",
+    video_model="veo-3.1-generate-001",
     num_scenes=4,
     duration=60,
     voice="narrator-male-1",
@@ -818,7 +818,7 @@ curl -N -X POST https://apis.fotohub.app/v1/story/generate \
   -d '{
     "prompt": "A lonely lighthouse keeper on a remote island receives mysterious messages in bottles that predict the future",
     "style": "cinematic",
-    "video_model": "veo-2",
+    "video_model": "veo-3.1-generate-001",
     "num_scenes": 4,
     "duration": 60,
     "voice": "narrator-male-1",
@@ -947,7 +947,7 @@ story = client.story.generate(
            "from morning workout tracking to seamless meeting reminders, "
            "ending with a sunset notification to relax. Product: TechWear Pro.",
     style="cinematic",
-    video_model="veo-2",
+    video_model="veo-3.1-generate-001",
     num_scenes=4,
     duration=30,
     aspect_ratio="9:16",
@@ -984,7 +984,7 @@ story = client.story.generate(
            "from the sun into a leaf cell, through the chloroplast, "
            "and witness the chemical transformation that feeds all life on Earth.",
     style="documentary",
-    video_model="veo-2",
+    video_model="veo-3.1-generate-001",
     num_scenes=6,
     duration=120,
     voice="narrator-female-1",
@@ -1070,7 +1070,7 @@ If `retry` is `true`, you can call the individual step endpoint to retry just th
 
 1. **Write detailed prompts** — Include setting, characters, mood, and narrative arc. Vague prompts produce generic results.
 
-2. **Choose the right model** — Use `veo-2` for photorealistic content, `wan` for anime/artistic styles, `hailuo` for cinematic smooth motion, `seedance` for fast iteration.
+2. **Choose the right model** — Use `veo-3.1-generate-001` for photorealistic content with native audio, `wan2.2-t2v-plus` for anime/artistic styles, `hailuo-o2` for cinematic smooth motion, `seedance-2-0-pro` for fast iteration.
 
 3. **Use step-by-step for production** — The individual step endpoints let you review and adjust at each stage, resulting in higher quality output.
 

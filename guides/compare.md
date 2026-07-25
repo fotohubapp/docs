@@ -7,7 +7,7 @@ Side-by-side comparison of FOTOhub with common AI API providers.
 | Feature | FOTOhub | Replicate | Stability | OpenAI | fal.ai |
 |---------|---------|-----------|-----------|--------|--------|
 | Image models | 25+ | 50+ | 5 | 2 | 30+ |
-| Video models | 15+ | 10+ | 1 | 1 | 10+ |
+| Video models | 30+ | 10+ | 1 | 1 | 10+ |
 | Music generation | Yes | Limited | No | No | No |
 | 3D generation | Yes | Limited | No | No | Limited |
 | Chat/LLM | Yes | No | No | Yes | No |
@@ -43,7 +43,9 @@ FOTOhub is competitive on price and often faster due to EU-local inference. Seed
 | Provider | Model | Cost | Quality |
 |----------|-------|------|---------|
 | **FOTOhub** | Seedance 2.0 Fast | ~0.15 PLN (1 cr) | Great |
-| **FOTOhub** | Veo 3.1 | ~2.25 PLN (15 cr) | Premium |
+| **FOTOhub** | Veo 3.1 | ~12.00 PLN (60 cr) | Premium, native audio, up to 4K |
+| **FOTOhub** | Gemini Omni Flash | ~6.00 PLN (30 cr) | Native audio automatically, no surcharge |
+| **FOTOhub** | Grok Video 1.5 | ~9.00 PLN (45 cr) | Only generative model with built-in lip-sync |
 | Replicate | Kling | ~$0.30 (~1.20 PLN) | Good |
 | Runway | Gen-3 | ~$0.50 (~2.00 PLN) | Premium |
 | Luma | Dream Machine | ~$0.30 (~1.20 PLN) | Good |
@@ -72,7 +74,7 @@ client = FotoHub(api_key="fh_live_...")
 If a provider is down, FOTOhub automatically routes to an alternative:
 
 ```
-seedream-5-0 (primary) → flux-2-pro (fallback) → wan-video (last resort)
+seedream-5-0-260128 (primary) → flux-2-pro (fallback) → grok-imagine-image (last resort)
 ```
 
 Your users never see errors — they get a result from the next best model.
@@ -90,7 +92,7 @@ result = client.gabriel_classify(
     prompt="I need a professional headshot",
     enhance_prompt=True
 )
-# → Routes to seedream-5-0 with optimized prompt + quality tips
+# → Routes to seedream-5-0-260128 with optimized prompt + quality tips
 ```
 
 ### 5. Predictable Pricing

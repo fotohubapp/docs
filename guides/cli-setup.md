@@ -205,13 +205,13 @@ Image generated successfully!
 ```bash
 # Text-to-video
 fotohub gen video "a drone shot flying over snow-capped mountains at golden hour" \
-  --model veo-3 \
+  --model veo-3.1-generate-001 \
   --duration 10
 
 # Image-to-video (animate a photo)
 fotohub gen video "camera slowly zooms in, subtle movement" \
   --image https://example.com/photo.jpg \
-  --model kling \
+  --model kling-v3 \
   --duration 5
 
 # Save output locally
@@ -223,7 +223,7 @@ fotohub gen video "waves crashing on a rocky shore" \
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-m, --model <id>` | Model ID (veo-3, kling, wan-video) | `veo-3` |
+| `-m, --model <id>` | Model ID (see `fotohub models list --category video`) | `veo-3.1-generate-001` |
 | `-d, --duration <seconds>` | Duration in seconds | 5 |
 | `--aspect-ratio <ratio>` | Aspect ratio (16:9, 9:16, 1:1) | 16:9 |
 | `--image <url>` | Input image for image-to-video | -- |
@@ -371,7 +371,7 @@ fotohub models list --provider anthropic
 
 Model ID                  Provider    Category  Cost    Status
 seedream-5-0-260128       bytedance   image     2 cr    active
-veo-3                     google      video     15 cr   active
+veo-3.1-generate-001      google      video     12 cr/s active
 claude-sonnet             anthropic   chat      2 cr    active
 music-minimax             minimax     audio     3 cr    active
 ...
