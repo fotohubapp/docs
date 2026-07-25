@@ -176,7 +176,8 @@ const guides = [
 
 const stats = [
   { value: '200+', label: 'AI models' },
-  { value: '10+', label: 'Providers' },
+  { value: '6+', label: 'Proprietary models' },
+  { value: '21', label: 'Providers' },
   { value: '99.9%', label: 'Uptime SLA' },
   { value: '<200ms', label: 'API latency' }
 ]
@@ -197,13 +198,15 @@ const resources = [
       <div class="hero-grid-bg"></div>
       <div class="hero-split">
         <div class="hero-left" :class="{ 'is-visible': revealed.has('hero') }">
-          <h1 class="hero-title">Build with the full power of generative AI</h1>
+          <h1 class="hero-title">Build with the full power of<br>generative AI</h1>
           <p class="hero-subtitle">Docs and resources to help you build with FOTOhub — images, video, music, 3D, chat, agents. One unified API.</p>
           <ul class="hero-points">
             <li><span class="hero-point-check">✓</span>One SDK, 200+ models — no provider juggling</li>
             <li><span class="hero-point-check">✓</span>Chain image &rarr; video &rarr; audio in a few lines</li>
             <li><span class="hero-point-check">✓</span>Typed Python &amp; TypeScript, streaming, auto-retry</li>
           </ul>
+        </div>
+        <div class="hero-right" :class="{ 'is-visible': revealed.has('hero') }">
           <div class="hero-actions">
             <a href="/api/getting-started" class="btn-primary">Get started</a>
             <a href="/api/image-generation" class="btn-secondary">API Reference</a>
@@ -216,32 +219,24 @@ const resources = [
             <code>npm install -g fotohubapp-cli</code>
           </div>
         </div>
-        <div class="hero-right" :class="{ 'is-visible': revealed.has('hero') }">
-          <div class="hero-code-window">
-            <div class="hero-code-dots"><span></span><span></span><span></span></div>
-            <pre><code><span class="hl-kw">from</span> <span class="hl-mod">fotohub</span> <span class="hl-kw">import</span> FotoHub
-client = FotoHub()
-
-<span class="hl-cm"># Generate an image</span>
-image = client.<span class="hl-fn">generate_image</span>(
-    <span class="hl-param">prompt</span>=<span class="hl-str">"A serene mountain lake at golden hour"</span>,
-    <span class="hl-param">model</span>=<span class="hl-str">"seedream-5-0-260128"</span>,
-    <span class="hl-param">aspect_ratio</span>=<span class="hl-str">"16:9"</span>
-)
-
-<span class="hl-cm"># Chat with any model — same client</span>
-reply = client.<span class="hl-fn">chat</span>(
-    <span class="hl-param">message</span>=<span class="hl-str">"Describe this image in one sentence"</span>,
-    <span class="hl-param">image_url</span>=image[<span class="hl-str">"images"</span>][<span class="hl-num">0</span>]
-)</code></pre>
-          </div>
-        </div>
       </div>
     </section>
 
-    <!-- Stats Bar (with Gabriel AI orchestrator + IDA Q 1.0) -->
+    <!-- Product Cards -->
+    <section class="section products" data-reveal="products">
+      <div class="products-grid">
+        <a v-for="(product, i) in products" :key="product.title" :href="product.link" class="product-card" :class="{ 'is-visible': revealed.has('products') }" :style="{ transitionDelay: `${i * 100}ms` }">
+          <div class="product-icon" v-html="product.icon"></div>
+          <h3 class="product-title">{{ product.title }}</h3>
+          <p class="product-desc">{{ product.description }}</p>
+          <span class="product-arrow">&rarr;</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- Stats Bar (Gabriel AI + IDA Q 1.0 on top, platform stats below) -->
     <section class="stats-bar" data-reveal="stats">
-      <div class="stat-proprietary-col">
+      <div class="stat-proprietary-row">
         <a href="/api/gabriel-ai" class="stat-gabriel" :class="{ 'is-visible': revealed.has('stats') }">
           <div class="stat-gabriel-glow"></div>
           <span class="stat-gabriel-badge"><span class="stat-gabriel-dot"></span>Orchestrator</span>
@@ -260,18 +255,6 @@ reply = client.<span class="hl-fn">chat</span>(
           <span class="stat-value">{{ stat.value }}</span>
           <span class="stat-label">{{ stat.label }}</span>
         </div>
-      </div>
-    </section>
-
-    <!-- Product Cards -->
-    <section class="section products" data-reveal="products">
-      <div class="products-grid">
-        <a v-for="(product, i) in products" :key="product.title" :href="product.link" class="product-card" :class="{ 'is-visible': revealed.has('products') }" :style="{ transitionDelay: `${i * 100}ms` }">
-          <div class="product-icon" v-html="product.icon"></div>
-          <h3 class="product-title">{{ product.title }}</h3>
-          <p class="product-desc">{{ product.description }}</p>
-          <span class="product-arrow">&rarr;</span>
-        </a>
       </div>
     </section>
 
@@ -652,10 +635,10 @@ reply = client.<span class="hl-fn">chat</span>(
 .dark .hero-code-window .hl-num { color: #67e8f9; }
 .dark .hero-code-window .hl-fn { color: #93c5fd; }
 
-/* ─── Stats Bar (Gabriel + stats) ─── */
+/* ─── Stats Bar (Gabriel + IDA Q row on top, platform stats below) ─── */
 .stats-bar {
-  display: grid;
-  grid-template-columns: 1.1fr 2fr;
+  display: flex;
+  flex-direction: column;
   gap: 1px;
   margin-bottom: 80px;
   border: 1px solid var(--vp-c-divider);
@@ -664,10 +647,10 @@ reply = client.<span class="hl-fn">chat</span>(
   background: var(--vp-c-divider);
 }
 
-/* Column stacking Gabriel + IDA Q proprietary-model cells */
-.stat-proprietary-col {
-  display: flex;
-  flex-direction: column;
+/* Row placing Gabriel + IDA Q proprietary-model cells side by side */
+.stat-proprietary-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 1px;
   background: var(--vp-c-divider);
 }
@@ -822,7 +805,7 @@ reply = client.<span class="hl-fn">chat</span>(
 /* Stats grid (nested) */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1px;
   background: var(--vp-c-divider);
 }
@@ -1251,7 +1234,8 @@ reply = client.<span class="hl-fn">chat</span>(
   .hero-split { grid-template-columns: 1fr; gap: 32px; }
   .hero-title { font-size: 30px; }
   .hero-subtitle { font-size: 15px; }
-  .stats-bar { grid-template-columns: 1fr; margin-bottom: 56px; }
+  .stats-bar { margin-bottom: 56px; }
+  .stat-proprietary-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .stat-value { font-size: 26px; }
   .stat-gabriel { padding: 22px 24px; }

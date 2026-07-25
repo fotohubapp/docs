@@ -32,13 +32,13 @@ export default defineConfig({
       { text: 'SDKs', link: '/sdk/python' },
       { text: 'Integrations', link: '/integrations/overview' },
       { text: 'Guides', link: '/guides/quickstart' },
+      { text: 'Product', link: '/product/our-ai-models' },
+      { text: 'Status', link: 'https://status.fotohub.app' },
       {
         text: 'Resources',
         items: [
           { text: 'Changelog', link: '/changelog' },
-          { text: 'Status', link: 'https://status.fotohub.app' },
           { text: 'Community', link: 'https://discord.gg/fotohub' },
-          { text: 'Product', link: '/product/our-ai-models' },
         ],
       },
     ],
@@ -136,6 +136,9 @@ export default defineConfig({
           text: 'Product',
           items: [
             { text: 'Our AI Models', link: '/product/our-ai-models' },
+            { text: 'Gabriel AI Orchestrator', link: '/product/our-ai-models#gabriel-ai-orchestrator' },
+            { text: 'IDA Q 1.0', link: '/product/our-ai-models#ida-q-1-0' },
+            { text: 'IDA Music', link: '/product/our-ai-models#ida-music' },
           ],
         },
       ],
