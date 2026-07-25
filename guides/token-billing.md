@@ -1,6 +1,6 @@
 # Token-Based Billing
 
-Some models (SeedDream, Bedrock LLMs) use token-based billing where cost scales with actual usage rather than fixed credits.
+Some models (SeedDream image models, premium FOTOhub AI chat models) use token-based billing where cost scales with actual usage rather than fixed credits.
 
 ## How It Works
 
@@ -34,9 +34,9 @@ SeedDream 5.0 always generates at 2048×2048 native resolution, then downscales 
 | SeedDream 4.5 | $2.40 |
 | SeedDream 4.0 | $1.80 |
 
-### LLM Tokens (Bedrock)
+### LLM Tokens (Premium Chat Models)
 
-Bedrock models bill per input + output token separately:
+Premium chat models bill per input + output token separately:
 
 ```
 cost = (input_tokens × input_rate) + (output_tokens × output_rate)
@@ -76,9 +76,9 @@ Token-based responses include detailed cost breakdown:
 Use the SDK to verify billing is correct:
 
 ```python
-from fotohub import FotohubClient
+from fotohub import FotoHub
 
-client = FotohubClient()
+client = FotoHub()
 
 result = client.generate_image(
     prompt="Test image",

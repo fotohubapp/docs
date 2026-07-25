@@ -14,7 +14,7 @@
 
 ## About
 
-Source for the [FOTOhub developer documentation](https://docs.fotohub.app) — covering 200+ AI models, cloud computing, storage, agent workflows, and the full platform API.
+Source for the [FOTOhub developer documentation](https://docs.fotohub.app) — covering 50+ AI models, cloud computing, storage, agent workflows, and the full platform API.
 
 Built with [VitePress](https://vitepress.dev), deployed on nginx at `docs.fotohub.app`.
 
@@ -50,35 +50,36 @@ npm run preview
 ```
 docs-site/
 ├── index.md                 # Landing page
-├── api/                     # API Reference (19 pages)
+├── api/                     # API Reference (32 pages)
 │   ├── getting-started.md   #   Introduction & setup
 │   ├── authentication.md    #   Auth & API keys
-│   ├── image-generation.md  #   Image generation (25+ models)
-│   ├── video-generation.md  #   Video generation (15+ models)
+│   ├── image-generation.md  #   Image generation (27 models)
+│   ├── video-generation.md  #   Video generation (7 models)
 │   ├── music-audio.md       #   Music, TTS, speech-to-text
-│   ├── chat-llm.md          #   Chat completions (OpenAI-compatible)
-│   ├── image-editing.md     #   Inpainting, upscaling, editing
-│   ├── image-analysis.md    #   Vision & analysis
+│   ├── chat-llm.md          #   Chat completions (credit & token billing)
 │   ├── gabriel-ai.md        #   Gabriel AI orchestrator
-│   ├── agents.md            #   Agent workflows & DAG editor
-│   ├── cloud-computing.md   #   GPU instances (A10G, A100, H100)
-│   ├── storage.md           #   S3 storage (60+ endpoints)
-│   ├── usage-analytics.md   #   Usage monitoring & analytics
-│   ├── console-api.md       #   Developer console API
+│   ├── shorts-clips.md      #   AI Shorts pipeline
 │   ├── billing.md           #   Credits, tokens, pricing
-│   ├── webhooks.md          #   Real-time event notifications
 │   ├── models.md            #   Full model catalog
-│   ├── rate-limits.md       #   Rate limiting policies
-│   └── errors.md            #   Error codes & handling
-├── sdk/                     # SDK Documentation (3 pages)
+│   └── ...                  #   plus editing, analysis, agents, storage,
+│                            #   compute, webhooks, rate-limits, errors, etc.
+├── sdk/                     # SDK Documentation (5 pages)
 │   ├── python.md            #   Python SDK (fotohub on PyPI)
-│   ├── typescript.md        #   TypeScript SDK (fotohub)
+│   ├── typescript.md        #   TypeScript SDK (fotohub on npm)
+│   ├── go.md                #   Go usage (REST)
+│   ├── php.md               #   PHP usage (REST)
 │   └── examples.md          #   Code examples & recipes
-├── guides/                  # Guides (4 pages)
+├── guides/                  # Guides (19 pages)
 │   ├── quickstart.md        #   5-minute quickstart
-│   ├── token-billing.md     #   Billing model explained
-│   ├── webhooks.md          #   Webhook integration guide
-│   └── best-practices.md    #   Production best practices
+│   ├── architecture.md      #   Platform architecture overview
+│   ├── pricing.md           #   Pricing & cost optimization
+│   ├── mcp-integration.md   #   MCP server integration
+│   └── ...                  #   plus token-billing, webhooks, migration,
+│                            #   best-practices, compare, and more
+├── integrations/            # Integration guides (8 pages)
+│   └── ...                  #   MCP, automation platforms, frameworks
+├── product/                 # Product pages (1 page)
+│   └── our-ai-models.md     #   Model line-up overview
 └── .vitepress/
     ├── config.ts            # VitePress configuration
     └── theme/               # Custom theme overrides

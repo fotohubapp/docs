@@ -59,8 +59,8 @@ Use `model: "ida-music"` to route to IDA Music.
 {
   "model": "ida-music",
   "credits_used": 2,
-  "audio_url": "https://gpu.fotohub.app/static/generations/acestep_abc123.mp3",
-  "audio_urls": ["https://gpu.fotohub.app/static/generations/acestep_abc123.mp3"],
+  "audio_url": "https://gpu.fotohub.app/static/generations/ida_m_abc123.mp3",
+  "audio_urls": ["https://gpu.fotohub.app/static/generations/ida_m_abc123.mp3"],
   "title": "Neon Pulse",
   "lyrics": "[verse]\nCity lights are burning bright...",
   "duration": 120,
@@ -172,6 +172,46 @@ const response = await fetch(
 
 const result = await response.json();
 console.log(`Audio: ${result.audio_url}`);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":          "Epic cinematic orchestral piece with soaring strings, powerful brass, and dramatic percussion.",
+		"model":           "ida-music",
+		"duration":        180,
+		"key_scale":       "D minor",
+		"time_signature":  "4/4",
+		"is_instrumental": true,
+		"quality":         "high",
+		"audio_format":    "flac",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/music", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	fmt.Printf("Audio: %s\n", result["audio_url"])
+	fmt.Printf("Credits: %v\n", result["credits_used"])
+}
 ```
 
 ```bash [cURL]
@@ -307,6 +347,46 @@ console.log(`Duration: ${result.duration}s`);
 console.log(`Credits used: ${result.credits_used}`);
 ```
 
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "Upbeat electronic dance track with pulsing synths, crisp hi-hats, deep bass drops, and euphoric buildup sections.",
+		"model":        "minimax",
+		"duration":     60,
+		"genre":        "electronic",
+		"mood":         "energetic",
+		"tempo":        128,
+		"instrumental": true,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/music", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	fmt.Printf("Audio URL: %s\n", result["audio_url"])
+	fmt.Printf("Duration: %vs\n", result["duration"])
+	fmt.Printf("Credits used: %v\n", result["credits_used"])
+}
+```
+
 ```bash [cURL]
 curl -X POST "https://apis.fotohub.app/v1/ai/generate/music" \
   -H "Authorization: Bearer fh_live_your_api_key" \
@@ -402,6 +482,39 @@ const response = await fetch(
 
 const result = await response.json();
 console.log("SFX URL:", result.audio_url);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":   "Sci-fi laser gun firing three rapid shots, with a reverberating echo in a metallic corridor",
+		"duration": 3,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/sfx", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	fmt.Printf("SFX URL: %s\n", result["audio_url"])
+}
 ```
 
 ```bash [cURL]
@@ -523,6 +636,45 @@ console.log(`Duration: ${result.duration}s`);
 console.log(`Characters: ${result.characters_processed}`);
 ```
 
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"text":     "Witaj w FOTOhub! Nasza platforma umozliwia generowanie obrazow, wideo i muzyki za pomoca sztucznej inteligencji.",
+		"model":    "google",
+		"voice_id": "pl-PL-Standard-B",
+		"language": "pl",
+		"speed":    1.0,
+		"pitch":    0,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/speech", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	fmt.Printf("Audio URL: %s\n", result["audio_url"])
+	fmt.Printf("Duration: %vs\n", result["duration"])
+	fmt.Printf("Characters processed: %v\n", result["characters_processed"])
+}
+```
+
 ```bash [cURL]
 curl -X POST "https://apis.fotohub.app/v1/ai/generate/speech" \
   -H "Authorization: Bearer fh_live_your_api_key" \
@@ -542,6 +694,360 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/speech" \
 ::: tip IDA Voice Cloning
 With IDA Voice Pro, you can use custom cloned voices. Upload a voice sample via the FOTOhub dashboard to create a custom voice_id, then reference it in API calls. Cloned voices support all languages with natural accent preservation.
 :::
+
+---
+
+## Text-to-Speech (Polly)
+
+Budget TTS with 106 neural/generative voices across 41 languages. 10-50x cheaper than premium providers.
+
+### Endpoints
+
+```
+GET  /v1/ai/tts/polly/voices
+POST /v1/ai/tts/polly/synthesize
+```
+
+**Billing:** 1 credit per 10,000 characters
+
+### List Voices
+
+```
+GET /v1/ai/tts/polly/voices?language=pl-PL
+```
+
+Returns available voices filtered by language code.
+
+**Response:**
+
+```json
+{
+  "voices": [
+    {
+      "id": "Ola",
+      "name": "Ola",
+      "language": "pl-PL",
+      "language_name": "Polish",
+      "gender": "Female",
+      "engines": ["generative", "neural"]
+    }
+  ],
+  "count": 5
+}
+```
+
+### Synthesize Speech
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `text` | string | **Yes** | — | Text to synthesize. Max 10,000 characters. Supports SSML. |
+| `voice_id` | string | No | `"Ola"` | Voice ID from the voices list. |
+| `engine` | string | No | `"neural"` | Engine: `"neural"`, `"generative"`, or `"standard"`. |
+| `output_format` | string | No | `"mp3"` | Format: `"mp3"`, `"ogg_vorbis"`, or `"pcm"`. |
+| `language_code` | string | No | — | Language hint (e.g., `"pl-PL"`, `"en-US"`). |
+
+**Response:** Audio stream (binary) with headers:
+- `X-Credits-Used` — credits charged
+- `X-Characters` — characters processed
+
+### Example
+
+::: code-group
+
+```python [Python]
+from fotohub import FotoHub
+
+client = FotoHub(api_key="fh_live_...")
+audio = client.tts.polly(
+    text="Witaj w FOTOhub!",
+    voice_id="Ola",
+    engine="neural"
+)
+# audio is bytes (mp3)
+with open("output.mp3", "wb") as f:
+    f.write(audio)
+```
+
+```typescript [TypeScript]
+const response = await fetch(
+  "https://apis.fotohub.app/v1/ai/tts/polly/synthesize",
+  {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer fh_live_your_api_key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text: "Witaj w FOTOhub! Generuje mowe za pomoca AI.",
+      voice_id: "Ola",
+      engine: "neural",
+      output_format: "mp3",
+    }),
+  }
+);
+
+const audioBuffer = await response.arrayBuffer();
+// Write to file (Node.js)
+import { writeFileSync } from "fs";
+writeFileSync("output.mp3", Buffer.from(audioBuffer));
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"text":          "Witaj w FOTOhub! Generuje mowe za pomoca AI.",
+		"voice_id":      "Ola",
+		"engine":        "neural",
+		"output_format": "mp3",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/tts/polly/synthesize", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	out, _ := os.Create("output.mp3")
+	defer out.Close()
+	io.Copy(out, resp.Body)
+}
+```
+
+```bash [cURL]
+curl -X POST "https://apis.fotohub.app/v1/ai/tts/polly/synthesize" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -o output.mp3 \
+  -d '{
+    "text": "Witaj w FOTOhub! Generuje mowe za pomoca AI.",
+    "voice_id": "Ola",
+    "engine": "neural",
+    "output_format": "mp3"
+  }'
+```
+
+:::
+
+### Pricing
+
+| Engine | Cost (AWS) | Credits | Languages |
+|--------|-----------|---------|-----------|
+| Neural | $0.016/1K chars | 1 per 10K chars | 41 |
+| Generative | $0.030/1K chars | 1 per 10K chars | 41 |
+| Standard | $0.004/1K chars | 1 per 10K chars | 41 |
+
+::: tip Polish Voices
+Available Polish voices: **Ola** (Female, neural+generative), **Ewa** (Female, generative), **Maja** (Female, standard), **Jan** (Male, standard), **Jacek** (Male, standard).
+:::
+
+---
+
+## Text-to-Speech (GPT Audio 1.5)
+
+Premium AI voice synthesis using OpenAI's GPT Audio 1.5 model. Natural-sounding speech with voice style instructions support — describe the tone, emotion, and pace you want.
+
+### Endpoint
+
+```
+POST /v1/ai/generate/speech/gpt
+```
+
+**Billing:** 2 credits per request
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `text` | string | **Yes** | — | Text to synthesize. Max 10,000 characters. |
+| `voice` | string | No | `"alloy"` | Voice: `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse` |
+| `instructions` | string | No | — | Voice style instructions. E.g., "Speak calmly like an audiobook narrator" or "Energetic sports commentator tone". |
+
+### Pricing
+
+| Model | Credits | PLN | Notes |
+|-------|---------|-----|-------|
+| GPT Audio 1.5 | 2 | 0.40 | per request, WAV HD output |
+
+### Response
+
+```json
+{
+  "credits_used": 2,
+  "audio_url": "https://s1.fotohub.app/storage/v1/object/public/audio/gpt-tts/...",
+  "transcript": "The text as spoken by the model",
+  "model": "gpt-audio-1.5",
+  "voice": "nova",
+  "format": "wav",
+  "usage": {
+    "input_tokens": 32,
+    "output_tokens": 216,
+    "total_tokens": 248
+  }
+}
+```
+
+### Example
+
+::: code-group
+
+```python [Python]
+from fotohub import FotoHub
+
+client = FotoHub(api_key="fh_live_your_key")
+
+result = client.audio.speech(
+    text="Welcome to FOTOhub! Generate images, video, and music with AI.",
+    voice="nova",
+    instructions="Speak warmly and naturally, like a podcast host",
+)
+print(f"Audio: {result.audio_url}")
+```
+
+```typescript [TypeScript]
+const response = await fetch(
+  "https://apis.fotohub.app/v1/ai/generate/speech/gpt",
+  {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer fh_live_your_api_key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text: "Welcome to FOTOhub! Generate images, video, and music with AI.",
+      voice: "nova",
+      instructions: "Speak warmly and naturally, like a podcast host",
+    }),
+  }
+);
+
+const result = await response.json();
+console.log(`Audio: ${result.audio_url}`);
+console.log(`Voice: ${result.voice}`);
+console.log(`Tokens: ${result.usage.total_tokens}`);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"text":         "Welcome to FOTOhub! Generate images, video, and music with AI.",
+		"voice":        "nova",
+		"instructions": "Speak warmly and naturally, like a podcast host",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/speech/gpt", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	fmt.Printf("Audio: %s\n", result["audio_url"])
+	fmt.Printf("Voice: %s\n", result["voice"])
+}
+```
+
+```bash [cURL]
+curl -X POST "https://apis.fotohub.app/v1/ai/generate/speech/gpt" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Welcome to FOTOhub! Generate images, video, and music with AI.",
+    "voice": "nova",
+    "instructions": "Speak warmly and naturally, like a podcast host"
+  }'
+```
+
+:::
+
+::: tip Voice Style Instructions
+GPT Audio 1.5 supports freeform instructions for voice style. You can control tone, pace, emotion, and speaking style. Examples:
+- `"Speak slowly and clearly, like a meditation guide"`
+- `"Excited and energetic, like announcing a product launch"`
+- `"Professional news anchor tone, neutral and clear"`
+- `"Whispered, intimate storytelling voice"`
+:::
+
+---
+
+## Speech-to-Text (Voxtral)
+
+LLM-quality transcription using Mistral Voxtral models. Better context understanding than traditional ASR.
+
+### Endpoints
+
+```
+POST /v1/ai/transcribe/voxtral/transcribe
+POST /v1/ai/transcribe/voxtral/summarize
+```
+
+**Billing:** 1–2 credits per audio file
+
+### Transcribe
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `audio` | string | **Yes** | — | Base64-encoded audio (WAV, MP3, OGG, FLAC, WebM). Max 25MB. |
+| `model` | string | No | `"voxtral-small"` | Model: `"voxtral-small"` (24B, quality) or `"voxtral-mini"` (3B, fast). |
+| `language` | string | No | — | Language hint for better accuracy. |
+| `prompt` | string | No | — | Context/instruction for the model. |
+
+**Response:**
+
+```json
+{
+  "text": "Transcribed text content here...",
+  "model": "voxtral-small",
+  "credits_used": 2,
+  "tokens": { "input": 1200, "output": 150 }
+}
+```
+
+### Summarize
+
+Same parameters as transcribe, plus:
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `format` | string | No | `"bullets"` | Summary format: `"bullets"` or `"paragraph"`. |
+
+Returns both transcription and summary in a single call (3 credits).
+
+### Pricing
+
+| Model | Credits | Quality | Speed |
+|-------|---------|---------|-------|
+| Voxtral Small 24B | 2 | High (LLM-quality context) | ~10s |
+| Voxtral Mini 3B | 1 | Good (fast) | ~3s |
 
 ---
 
@@ -657,6 +1163,43 @@ for (const segment of result.segments) {
     `[${segment.start.toFixed(1)}s - ${segment.end.toFixed(1)}s] ` +
     `Speaker ${speaker}: ${segment.text}`
   );
+}
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"audio_url":  "https://s1.fotohub.app/storage/v1/object/public/uploads/meeting-recording.mp3",
+		"language":   "auto",
+		"mode":       "transcribe",
+		"timestamps": true,
+		"diarize":    true,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/transcribe", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	fmt.Printf("Detected language: %s\n", result["language_detected"])
+	fmt.Printf("Full transcript: %s\n", result["text"])
 }
 ```
 
@@ -804,6 +1347,44 @@ console.log(`Speakers detected: ${result.speakers_detected}`);
 console.log(`Credits used: ${result.credits_used}`);
 ```
 
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"audio_url":       "https://s1.fotohub.app/storage/v1/object/public/uploads/podcast-ep01.mp3",
+		"mode":            "dub",
+		"target_language": "en",
+		"preserve_timing": true,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/transcribe", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	fmt.Printf("Dubbed audio: %s\n", result["audio_url"])
+	fmt.Printf("Source: %s -> Target: %s\n", result["source_language"], result["target_language"])
+	fmt.Printf("Speakers detected: %v\n", result["speakers_detected"])
+	fmt.Printf("Credits used: %v\n", result["credits_used"])
+}
+```
+
 ```bash [cURL]
 curl -X POST "https://apis.fotohub.app/v1/ai/transcribe" \
   -H "Authorization: Bearer fh_live_your_api_key" \
@@ -824,6 +1405,413 @@ Audio dubbing is the most computationally intensive audio operation. Expect proc
 
 ---
 
+## Audio Mastering
+
+Professional mastering chain — applies EQ, compression, limiting, stereo imaging, and loudness normalization.
+
+```
+POST /v1/ai/generate/music
+```
+
+Set `"mode": "master"` to use the mastering pipeline instead of generation.
+
+**Billing:** 3 credits per track
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `audio_url` | string | **Yes** | URL of the audio file to master |
+| `mode` | string | **Yes** | Must be `"master"` |
+| `preset` | string | No | Mastering preset: `"streaming"` (Spotify/YouTube), `"cd"` (dynamic), `"podcast"` (voice-optimized), `"loud"` (maximum loudness) |
+| `target_lufs` | number | No | Target integrated loudness (default: -14 LUFS for streaming) |
+| `format` | string | No | Output: `"wav"` (24-bit), `"flac"`, `"mp3"` (320kbps) |
+
+---
+
+## Stem Separation (Demucs)
+
+Separate a mixed audio track into individual stems using Meta's Demucs model.
+
+```
+POST /v1/ai/generate/music
+```
+
+Set `"mode": "stems"` to split audio into components.
+
+**Billing:** 3 credits per track
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `audio_url` | string | **Yes** | URL of the mixed audio file |
+| `mode` | string | **Yes** | Must be `"stems"` |
+| `stems` | integer | No | Number of stems: `2` (vocals + instrumental), `4` (vocals + drums + bass + other), `6` (adds piano + guitar). Default: 4. |
+| `format` | string | No | Output format per stem: `"wav"`, `"flac"`, `"mp3"` |
+
+### Response
+
+```json
+{
+  "credits_used": 3,
+  "stems": {
+    "vocals": "https://gpu.fotohub.app/static/stems/abc123_vocals.wav",
+    "drums": "https://gpu.fotohub.app/static/stems/abc123_drums.wav",
+    "bass": "https://gpu.fotohub.app/static/stems/abc123_bass.wav",
+    "other": "https://gpu.fotohub.app/static/stems/abc123_other.wav"
+  },
+  "duration_seconds": 245
+}
+```
+
+---
+
+## Audio Analysis
+
+Analyze audio properties: BPM, musical key, loudness (LUFS), dynamic range, frequency spectrum.
+
+```
+POST /v1/ai/generate/music
+```
+
+Set `"mode": "analyze"` for analysis (free, no credits).
+
+### Response
+
+```json
+{
+  "bpm": 128,
+  "key": "A minor",
+  "time_signature": "4/4",
+  "loudness_lufs": -8.2,
+  "dynamic_range_db": 6.4,
+  "peak_db": -0.3,
+  "duration_seconds": 234.5
+}
+```
+
+---
+
+## ACE-Step Composition
+
+AI-powered music composition using the ACE-Step model — creates structured compositions with lyrics support.
+
+```
+POST /v1/ai/generate/music
+```
+
+Set `"model": "ace-step"` to use ACE-Step.
+
+**Billing:** 3 credits per composition
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `prompt` | string | **Yes** | Musical description (genre, mood, instruments, style) |
+| `model` | string | **Yes** | Must be `"ace-step"` |
+| `lyrics` | string | No | Song lyrics with structure tags |
+| `duration` | integer | No | Duration in seconds (30-300) |
+| `seed` | integer | No | Reproducibility seed |
+
+---
+
+## Dubbing Pipeline
+
+A common production workflow: transcribe source audio, translate to another language, then synthesize speech in the target language. This 3-step pipeline gives you full control over each stage (edit the transcript, fix translations, choose voices).
+
+### Workflow
+
+1. **Transcribe** — extract text from source audio with timestamps
+2. **Translate** — convert transcript to the target language
+3. **Synthesize** — generate speech in the target language using Premium TTS
+
+### Example
+
+::: code-group
+
+```python [Python]
+import requests
+
+BASE = "https://apis.fotohub.app"
+HEADERS = {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json"
+}
+
+# Step 1: Transcribe the source audio
+transcribe_resp = requests.post(
+    f"{BASE}/v1/ai/transcribe",
+    headers=HEADERS,
+    json={
+        "audio_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/lecture-pl.mp3",
+        "language": "pl",
+        "mode": "transcribe",
+        "timestamps": True
+    }
+)
+transcript = transcribe_resp.json()
+print(f"Transcribed ({transcript['language_detected']}): {transcript['text'][:100]}...")
+
+# Step 2: Translate (using mode: translate for English, or use your own translation)
+translate_resp = requests.post(
+    f"{BASE}/v1/ai/transcribe",
+    headers=HEADERS,
+    json={
+        "audio_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/lecture-pl.mp3",
+        "mode": "translate"
+    }
+)
+translation = translate_resp.json()
+translated_text = translation["text"]
+print(f"Translated to EN: {translated_text[:100]}...")
+
+# Step 3: Synthesize with Premium TTS (GPT Audio 1.5)
+speech_resp = requests.post(
+    f"{BASE}/v1/ai/generate/speech/gpt",
+    headers=HEADERS,
+    json={
+        "text": translated_text,
+        "voice": "onyx",
+        "instructions": "Professional lecturer tone, clear and authoritative"
+    }
+)
+result = speech_resp.json()
+print(f"Dubbed audio: {result['audio_url']}")
+total_credits = (transcript["credits_used"] +
+                 translation["credits_used"] +
+                 result["credits_used"])
+print(f"Total credits: {total_credits}")
+```
+
+```typescript [TypeScript]
+const BASE = "https://apis.fotohub.app";
+const HEADERS = {
+  "Authorization": "Bearer fh_live_your_api_key",
+  "Content-Type": "application/json",
+};
+
+// Step 1: Transcribe the source audio
+const transcribeResp = await fetch(`${BASE}/v1/ai/transcribe`, {
+  method: "POST",
+  headers: HEADERS,
+  body: JSON.stringify({
+    audio_url: "https://s1.fotohub.app/storage/v1/object/public/uploads/lecture-pl.mp3",
+    language: "pl",
+    mode: "transcribe",
+    timestamps: true,
+  }),
+});
+const transcript = await transcribeResp.json();
+console.log(`Transcribed (${transcript.language_detected}): ${transcript.text.slice(0, 100)}...`);
+
+// Step 2: Translate to English
+const translateResp = await fetch(`${BASE}/v1/ai/transcribe`, {
+  method: "POST",
+  headers: HEADERS,
+  body: JSON.stringify({
+    audio_url: "https://s1.fotohub.app/storage/v1/object/public/uploads/lecture-pl.mp3",
+    mode: "translate",
+  }),
+});
+const translation = await translateResp.json();
+const translatedText = translation.text;
+console.log(`Translated to EN: ${translatedText.slice(0, 100)}...`);
+
+// Step 3: Synthesize with Premium TTS (GPT Audio 1.5)
+const speechResp = await fetch(`${BASE}/v1/ai/generate/speech/gpt`, {
+  method: "POST",
+  headers: HEADERS,
+  body: JSON.stringify({
+    text: translatedText,
+    voice: "onyx",
+    instructions: "Professional lecturer tone, clear and authoritative",
+  }),
+});
+const result = await speechResp.json();
+console.log(`Dubbed audio: ${result.audio_url}`);
+const totalCredits = transcript.credits_used + translation.credits_used + result.credits_used;
+console.log(`Total credits: ${totalCredits}`);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+const base = "https://apis.fotohub.app"
+
+func post(url string, payload map[string]interface{}) map[string]interface{} {
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	return result
+}
+
+func main() {
+	// Step 1: Transcribe
+	transcript := post(base+"/v1/ai/transcribe", map[string]interface{}{
+		"audio_url":  "https://s1.fotohub.app/storage/v1/object/public/uploads/lecture-pl.mp3",
+		"language":   "pl",
+		"mode":       "transcribe",
+		"timestamps": true,
+	})
+	fmt.Printf("Transcribed (%s): %s...\n", transcript["language_detected"], transcript["text"])
+
+	// Step 2: Translate
+	translation := post(base+"/v1/ai/transcribe", map[string]interface{}{
+		"audio_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/lecture-pl.mp3",
+		"mode":      "translate",
+	})
+	translatedText := translation["text"].(string)
+	fmt.Printf("Translated to EN: %s...\n", translatedText[:100])
+
+	// Step 3: Synthesize with Premium TTS
+	result := post(base+"/v1/ai/generate/speech/gpt", map[string]interface{}{
+		"text":         translatedText,
+		"voice":        "onyx",
+		"instructions": "Professional lecturer tone, clear and authoritative",
+	})
+	fmt.Printf("Dubbed audio: %s\n", result["audio_url"])
+}
+```
+
+```bash [cURL]
+# Step 1: Transcribe
+curl -s -X POST "https://apis.fotohub.app/v1/ai/transcribe" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "audio_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/lecture-pl.mp3",
+    "language": "pl",
+    "mode": "transcribe",
+    "timestamps": true
+  }' | jq '.text' > transcript.txt
+
+# Step 2: Translate
+curl -s -X POST "https://apis.fotohub.app/v1/ai/transcribe" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "audio_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/lecture-pl.mp3",
+    "mode": "translate"
+  }' | jq -r '.text' > translated.txt
+
+# Step 3: Synthesize with Premium TTS
+TRANSLATED=$(cat translated.txt)
+curl -X POST "https://apis.fotohub.app/v1/ai/generate/speech/gpt" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"text\": \"$TRANSLATED\",
+    \"voice\": \"onyx\",
+    \"instructions\": \"Professional lecturer tone, clear and authoritative\"
+  }"
+```
+
+:::
+
+::: info Pipeline Costs
+The manual dubbing pipeline costs approximately **5 credits per minute** of source audio: 1 credit (transcription) + 2 credits (translation) + 2 credits (GPT Audio TTS). For automated single-step dubbing with voice preservation, use `mode: "dub"` directly (5 credits/min).
+:::
+
+---
+
+## Supported Languages
+
+All audio services support the following 23 languages for transcription, translation, TTS, and dubbing.
+
+| Code | Language | Transcription | TTS | Translation | Dubbing |
+|------|----------|:---:|:---:|:---:|:---:|
+| `ar` | Arabic | Yes | Yes | Yes | Yes |
+| `da` | Danish | Yes | Yes | Yes | Yes |
+| `de` | German | Yes | Yes | Yes | Yes |
+| `el` | Greek | Yes | Yes | Yes | Yes |
+| `en` | English | Yes | Yes | Yes | Yes |
+| `es` | Spanish | Yes | Yes | Yes | Yes |
+| `fi` | Finnish | Yes | Yes | Yes | Yes |
+| `fr` | French | Yes | Yes | Yes | Yes |
+| `he` | Hebrew | Yes | Yes | Yes | Yes |
+| `hi` | Hindi | Yes | Yes | Yes | Yes |
+| `it` | Italian | Yes | Yes | Yes | Yes |
+| `ja` | Japanese | Yes | Yes | Yes | Yes |
+| `ko` | Korean | Yes | Yes | Yes | Yes |
+| `ms` | Malay | Yes | Yes | Yes | Yes |
+| `nl` | Dutch | Yes | Yes | Yes | Yes |
+| `no` | Norwegian | Yes | Yes | Yes | Yes |
+| `pl` | Polish | Yes | Yes | Yes | Yes |
+| `pt` | Portuguese | Yes | Yes | Yes | Yes |
+| `ru` | Russian | Yes | Yes | Yes | Yes |
+| `sv` | Swedish | Yes | Yes | Yes | Yes |
+| `sw` | Swahili | Yes | Yes | Yes | Yes |
+| `tr` | Turkish | Yes | Yes | Yes | Yes |
+| `zh` | Chinese | Yes | Yes | Yes | Yes |
+
+::: tip Language Auto-Detection
+When `language` is set to `"auto"` (default for transcription), FOTOhub automatically detects the spoken language from the first 30 seconds of audio. The detected language code is returned in the response as `language_detected`.
+:::
+
+---
+
+## Model Comparison
+
+Quick reference for choosing the right model for your use case.
+
+| Category | Model | Credits | PLN Cost | Best For |
+|----------|-------|---------|----------|----------|
+| **Music** | IDA Music (≤3 min) | 2 | 0.15 | Production music, European latency |
+| **Music** | IDA Music (>3 min) | 4 | 0.30 | Long-form compositions, albums |
+| **Music** | MiniMax (≤30s) | 5 | 0.38 | Short jingles, quick drafts |
+| **Music** | MiniMax (≤60s) | 10 | 0.75 | Medium tracks, ads |
+| **Music** | MiniMax (>60s) | 25 | 1.88 | Full tracks via cloud |
+| **Music** | ElevenLabs Music | 10 | 0.75 | Vocal-focused tracks |
+| **Music** | ACE-Step | 3 | 0.23 | Structured compositions with lyrics |
+| **SFX** | ElevenLabs SFX | 3 | 0.23 | Sound effects, foley |
+| **TTS** | Google Cloud TTS | 1 | 0.09 | Budget TTS, per 1K chars |
+| **TTS** | IDA Voice Pro | 2 | 0.18 | Natural voice, cloning, per 1K chars |
+| **TTS** | GPT Audio 1.5 | 2 | 0.40 | Premium quality, voice instructions |
+| **TTS** | Polly (Neural) | 1 per 10K | 0.09 | Bulk narration, 106 voices |
+| **Transcription** | Whisper | 1 | 0.06 | Per minute of audio |
+| **Transcription** | Voxtral Small | 2 | 0.15 | LLM-quality context |
+| **Transcription** | Voxtral Mini | 1 | 0.08 | Fast transcription |
+| **Translation** | Whisper Translate | 2 | 0.12 | Per minute, to English |
+| **Dubbing** | FOTOhub Dub | 5 | 0.30 | Per minute, voice preserved |
+| **Mastering** | FOTOhub Master | 3 | 0.23 | Per track |
+| **Stems** | Demucs | 3 | 0.23 | Per track, 2/4/6 stems |
+| **Analysis** | FOTOhub Analyze | 0 | Free | BPM, key, loudness |
+
+::: info Choosing a TTS Model
+- **Google Cloud TTS** (1 cr) — fast, cost-effective, good for UI narration and notifications
+- **IDA Voice Pro** (2 cr) — natural prosody, supports voice cloning, best for branded voices
+- **GPT Audio 1.5** (2 cr) — highest quality, supports freeform style instructions, ideal for podcasts and audiobooks
+- **Polly** (1 cr/10K chars) — cheapest for bulk content, 106 voices across 41 languages
+:::
+
+---
+
+## Related APIs
+
+- **[Voice Cloning](/api/voice-cloning)** — create and use cloned voices, emotional TTS, voice forensics
+- **[Shorts & Clips](/api/shorts-clips)** — audio-driven video clips with caption generation
+
+---
+
 ## Pricing Summary
 
 | Service | Model | Credits | PLN Cost | Unit |
@@ -831,12 +1819,19 @@ Audio dubbing is the most computationally intensive audio operation. Expect proc
 | Music | IDA Music (≤3 min) | 2 | 0.15 | per generation |
 | Music | IDA Music (>3 min) | 4 | 0.30 | per generation |
 | Music | MiniMax | 5–25 | 0.30/min | tiered by duration |
-| Sound Effects | — | 3 | 0.225 | fixed per generation |
-| TTS (IDA Voice) | google | 1 | 0.09 | per 1000 characters |
-| TTS (IDA Voice) | ida-voice | 2 | 0.18 | per 1000 characters |
-| Transcription | — | 1 | 0.06 | per minute of audio |
+| Music | ElevenLabs | 10 | 0.75 | per generation |
+| Music | ACE-Step | 3 | 0.23 | per composition |
+| Sound Effects | ElevenLabs SFX | 3 | 0.23 | fixed per generation |
+| TTS | Google Cloud | 1 | 0.09 | per 1000 characters |
+| TTS | IDA Voice Pro | 2 | 0.18 | per 1000 characters |
+| TTS | GPT Audio 1.5 | 2 | 0.40 | per request |
+| TTS | Polly (Neural) | 1 | 0.09 | per 10,000 characters |
+| Transcription | Whisper | 1 | 0.06 | per minute of audio |
+| Transcription | Voxtral Small | 2 | 0.15 | per audio file |
 | Translation | — | 2 | 0.12 | per minute of audio |
 | Dubbing | — | 5 | 0.30 | per minute of audio |
+| Mastering | — | 3 | 0.23 | per track |
+| Stems | Demucs | 3 | 0.23 | per track |
 
 ## Error Responses
 

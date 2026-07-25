@@ -26,12 +26,12 @@ Real-time monitoring and cost analytics for all API operations.
 - Anomaly detection alerts
 - Custom date range queries
 
-### Seedance 2.0 Models <Badge type="info" text="UPDATED" />
+### Seedance Video <Badge type="info" text="UPDATED" />
 
-Next-generation video models now available:
-- **seedance-2-0-pro**: Highest quality, cinematic output
-- **seedance-2-0-fast**: 3x faster, great quality, 1 credit
-- **seedance-2-0-mini**: Ultra-fast previews, 1 credit
+Next-generation Seedance video generation now available under the `seedance` model ID:
+- High-quality, cinematic output
+- Fast turnaround for social-format clips
+- Billed at 10 credits per 5-second segment
 
 ### Dola SeedDream 5.0 Pro <Badge type="info" text="UPDATED" />
 

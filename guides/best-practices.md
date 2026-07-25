@@ -61,7 +61,7 @@ def generate_safe(client, prompt, max_retries=3):
 |----------|-------------------|-----|
 | General images | `seedream-5-0-260128` | Best quality/price |
 | Fast previews | `imagen-3-fast` | 1 credit, fast |
-| 4K quality | `flux-2-max` | Best at 4K |
+| 4K quality | `imagen-4-ultra` | Native 4K generation |
 | Text in images | `seedream-5-0-260128` | Superior text rendering |
 | Photo editing | `imagen-4-standard` | Best editing |
 | Budget video | `hailuo` | 8 credits/5s |

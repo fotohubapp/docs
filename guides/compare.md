@@ -72,7 +72,7 @@ client = FotoHub(api_key="fh_live_...")
 If a provider is down, FOTOhub automatically routes to an alternative:
 
 ```
-seedream-5-0 (primary) → flux-2-pro (fallback) → wan2.5 (last resort)
+seedream-5-0 (primary) → flux-2-pro (fallback) → wan-video (last resort)
 ```
 
 Your users never see errors — they get a result from the next best model.

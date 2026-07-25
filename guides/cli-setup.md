@@ -143,8 +143,8 @@ fotohub > What is quantum computing?
   superposition and entanglement to process information in fundamentally
   different ways than classical computers...
 
-fotohub > /model deepseek-r1
-  Model set to deepseek-r1
+fotohub > /model gpt-4o
+  Model set to gpt-4o
 
 fotohub > Explain the same in simpler terms
 
@@ -211,7 +211,7 @@ fotohub gen video "a drone shot flying over snow-capped mountains at golden hour
 # Image-to-video (animate a photo)
 fotohub gen video "camera slowly zooms in, subtle movement" \
   --image https://example.com/photo.jpg \
-  --model kling-2.0 \
+  --model kling \
   --duration 5
 
 # Save output locally
@@ -223,7 +223,7 @@ fotohub gen video "waves crashing on a rocky shore" \
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-m, --model <id>` | Model ID (veo-3, kling-2.0, wan-2.1) | `veo-3` |
+| `-m, --model <id>` | Model ID (veo-3, kling, wan-video) | `veo-3` |
 | `-d, --duration <seconds>` | Duration in seconds | 5 |
 | `--aspect-ratio <ratio>` | Aspect ratio (16:9, 9:16, 1:1) | 16:9 |
 | `--image <url>` | Input image for image-to-video | -- |
@@ -252,7 +252,7 @@ fotohub gen music "gentle ambient piano with rain sounds" \
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-m, --model <id>` | Model ID | `minimax-music` |
+| `-m, --model <id>` | Model ID | `music-minimax` |
 | `-d, --duration <seconds>` | Duration in seconds (5-180) | 30 |
 | `--instrumental` | Generate instrumental only (no vocals) | -- |
 | `-o, --output <path>` | Save audio to local file | -- |
@@ -298,7 +298,7 @@ fotohub chat send "Explain REST APIs in 3 sentences"
 
 # With specific model and system prompt
 fotohub chat send "Review this code for security issues" \
-  --model claude-sonnet-4-20250514 \
+  --model claude-sonnet \
   --system "You are a senior security engineer" \
   --temperature 0.3
 
@@ -310,7 +310,7 @@ fotohub chat send "Generate 5 product names for a coffee brand" --no-stream
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-m, --model <id>` | Model ID | `claude-sonnet-4-20250514` |
+| `-m, --model <id>` | Model ID | `claude-sonnet` |
 | `-s, --system <prompt>` | System prompt | -- |
 | `-t, --temperature <temp>` | Temperature (0-2) | 1 |
 | `--no-stream` | Disable streaming | -- |
@@ -324,7 +324,7 @@ fotohub chat
 Launches a dedicated chat session with persistent context:
 
 ```
-FOTOhub Chat (claude-sonnet-4-20250514)
+FOTOhub Chat (claude-sonnet)
 Type /quit to exit, /clear to reset, /model <id> to switch
 
 You: What is quantum computing?
@@ -340,7 +340,7 @@ AI: Classical computers use bits (0 or 1), while quantum...
 |---------|-------------|
 | `/quit` | Exit chat session |
 | `/clear` | Reset conversation context |
-| `/model deepseek-r1` | Switch model mid-conversation |
+| `/model gpt-4o` | Switch model mid-conversation |
 | `/system You are a Python expert` | Set system prompt |
 
 ---
@@ -367,13 +367,13 @@ fotohub models list --provider anthropic
 ### Example Output
 
 ```
-80 models available
+50+ models available
 
 Model ID                  Provider    Category  Cost    Status
-seedream-5-0-260128       google      image     2 cr    active
-veo-3                     google      video     10 cr   active
-claude-sonnet-4-20250514  anthropic   chat      1 cr    active
-minimax-music             minimax     audio     5 cr    active
+seedream-5-0-260128       bytedance   image     2 cr    active
+veo-3                     google      video     15 cr   active
+claude-sonnet             anthropic   chat      2 cr    active
+music-minimax             minimax     audio     3 cr    active
 ...
 ```
 

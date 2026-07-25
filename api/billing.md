@@ -10,7 +10,7 @@ FOTOhub operates on a dual-mode billing system designed for flexibility and cost
 |------|-------------|
 | **Credits** | Prepaid monthly allowance included with your plan tier. Credits are deducted first for every operation. Reset monthly on your billing cycle. |
 | **Wallet (PLN)** | Pay-as-you-go fallback when credits are exhausted. Top up your wallet with packages. Charged in PLN with no expiration. |
-| **Token-Based** | Some models (BytePlus SeedDream, AWS Bedrock) bill per-token instead of a fixed credit cost. Billed after execution based on actual usage. |
+| **Token-Based** | Some models (BytePlus SeedDream image models, premium FOTOhub AI chat models) bill per-token instead of a fixed credit cost. Billed after execution based on actual usage. |
 
 ## How Billing Works
 
@@ -172,7 +172,7 @@ Each operation type has a fixed credit cost. For token-based models, credits are
 | `dall-e-3-hd` | DALL-E 3 HD | 4 | per image |
 | `gpt-image-1` | GPT Image 1 | 4 | per image |
 | `grok-imagine-image` | Grok Imagine | 1 | per image |
-| `grok-imagine-image-pro` | Grok Imagine Pro | 4 | per image |
+| `grok-imagine-image-quality` | Grok Imagine Quality | 3 | per image |
 | `flux-2-klein-4b` | FLUX 2 Klein 4B | 1 | per image |
 | `flux-2-klein-9b` | FLUX 2 Klein 9B | 1 | per image |
 | `flux-2-pro` | FLUX 2 Pro | 2 | per image |
@@ -227,7 +227,7 @@ A 30-second video with `veo-2` costs: `10 × (30 ÷ 5) = 60 credits`. A 5-second
 | `image-analysis` | Image Analysis | 1 | per analysis |
 | `enhance-prompt` | Prompt Enhancement | 1 | per request |
 
-### Bedrock Chat (Token-Based)
+### Premium Chat (Token-Based)
 
 | Model ID | Input (USD/1M) | Output (USD/1M) | ~PLN/1K tokens |
 |----------|---------------|-----------------|----------------|
@@ -310,9 +310,9 @@ cost_usd = (4,096 / 1,000,000) x $2.00 = $0.008192
 cost_pln = $0.008192 x 4.0 x 1.5 = 0.049 PLN
 ```
 
-### AWS Bedrock
+### Premium Chat Models
 
-Bedrock models are billed on actual input + output tokens. Rates are in PLN per 1,000 tokens.
+Premium chat models are billed on actual input + output tokens. Rates are in PLN per 1,000 tokens.
 
 | Model | Rate (PLN / 1K tokens) | Best For |
 |-------|----------------------|----------|
@@ -390,40 +390,45 @@ Returns your current credit balance and wallet PLN amount.
 
 ### GET /v1/billing/pricing
 
-Returns the full pricing catalog for all available models and operations.
+Returns the full pricing catalog: every model grouped by category, plus credit-cost conversions, subscription plans, and top-up/storage packages. This endpoint takes no query parameters — filter client-side by category key.
 
-**Authentication:** API Key (Bearer token)
-
-**Query Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `category` | string | No | Filter by category: `image`, `video`, `music`, `chat`, `voice`, `analysis` |
-| `model` | string | No | Filter by specific model ID |
+**Authentication:** Public (no auth required)
 
 **Response:**
 
 ```json
 {
-  "models": [
-    {
-      "id": "flux-pro",
-      "category": "image",
-      "billing_type": "credits",
-      "credits": 4,
-      "pln_cost": 0.60,
-      "unit": "per image"
+  "currency": "PLN",
+  "margin_info": "All prices include platform fee. Volume discounts available for Enterprise.",
+  "pricing": {
+    "image_generation": {
+      "description": "AI Image Generation",
+      "unit": "per image",
+      "currency": "PLN",
+      "models": {
+        "seedream-5-0-260128": { "name": "SeedDream 5.0 Lite (2K-4K)", "price": 0.21, "credits": 2 },
+        "flux-2-pro": { "name": "FLUX.2 Pro", "price": 0.18, "credits": 2 },
+        "imagen-4-ultra": { "name": "Imagen 4 Ultra (4K)", "price": 0.90, "credits": 5 }
+      }
     },
-    {
-      "id": "seedream-5-0",
-      "category": "image",
-      "billing_type": "token",
-      "rate_per_1m_tokens_usd": 2.00,
-      "unit": "per image (variable)"
+    "video_generation": {
+      "description": "AI Video Generation",
+      "unit": "per second of video",
+      "currency": "PLN",
+      "models": {
+        "veo-3": { "name": "Google Veo 3", "price": 1.20, "credits": 15 },
+        "wan-video": { "name": "Wan AI Video", "price": 0.45, "credits": 8 }
+      }
     }
-  ]
+  },
+  "credit_costs": { "image_standard": 2, "video_5s": 10 },
+  "api_plans": { },
+  "topup_packages": { },
+  "storage_packages": { }
 }
 ```
+
+Each category under `pricing` exposes a `description`, `unit`, `currency`, and a `models` map keyed by model ID. Each model entry has a display `name`, a per-unit `price` (PLN), and a `credits` cost. Use the live [`GET /v1/models`](/api/models) endpoint for the machine-readable, always-current model list.
 
 ---
 
@@ -452,9 +457,9 @@ Returns your billing transaction history with pagination and metadata.
       "id": "txn_abc123",
       "type": "generation",
       "method": "credits",
-      "credits_used": 4,
-      "pln_charged": 0.60,
-      "model": "flux-pro",
+      "credits_used": 2,
+      "pln_charged": 0.18,
+      "model": "flux-2-pro",
       "metadata": {
         "tokens": null,
         "resolution": "1024x1024"
@@ -464,10 +469,10 @@ Returns your billing transaction history with pagination and metadata.
     {
       "id": "txn_def456",
       "type": "generation",
-      "method": "token",
+      "method": "wallet",
       "credits_used": 0,
-      "pln_charged": 0.049,
-      "model": "seedream-5-0",
+      "pln_charged": 0.21,
+      "model": "seedream-5-0-260128",
       "metadata": {
         "tokens": 4096,
         "resolution": "1024x1024"
@@ -570,41 +575,30 @@ console.log(`Wallet: ${balance.wallet.balance_pln} PLN`);
 ::: code-group
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/billing/pricing?category=image" \
-  -H "Authorization: Bearer YOUR_API_KEY"
+# Public endpoint — no auth required
+curl -X GET "https://apis.fotohub.app/v1/billing/pricing"
 ```
 
 ```python [Python]
 import requests
 
-response = requests.get(
-    "https://apis.fotohub.app/v1/billing/pricing",
-    headers={"Authorization": "Bearer YOUR_API_KEY"},
-    params={"category": "image"}
-)
-
+response = requests.get("https://apis.fotohub.app/v1/billing/pricing")
 pricing = response.json()
-for model in pricing["models"]:
-    if model["billing_type"] == "credits":
-        print(f"{model['id']}: {model['credits']} credits ({model['pln_cost']} PLN)")
-    else:
-        print(f"{model['id']}: token-based @ ${model['rate_per_1m_tokens_usd']}/1M tokens")
+
+# Prices are grouped by category; models is a dict keyed by model ID
+for model_id, info in pricing["pricing"]["image_generation"]["models"].items():
+    print(f"{model_id}: {info['credits']} credits ({info['price']} PLN)")
 ```
 
 ```typescript [TypeScript]
-const response = await fetch(
-  "https://apis.fotohub.app/v1/billing/pricing?category=image",
-  { headers: { "Authorization": "Bearer YOUR_API_KEY" } }
-);
-
+const response = await fetch("https://apis.fotohub.app/v1/billing/pricing");
 const pricing = await response.json();
-pricing.models.forEach(model => {
-  if (model.billing_type === "credits") {
-    console.log(`${model.id}: ${model.credits} credits (${model.pln_cost} PLN)`);
-  } else {
-    console.log(`${model.id}: token-based @ $${model.rate_per_1m_tokens_usd}/1M tokens`);
-  }
-});
+
+// Prices are grouped by category; models is an object keyed by model ID
+const imageModels = pricing.pricing.image_generation.models;
+for (const [modelId, info] of Object.entries(imageModels)) {
+  console.log(`${modelId}: ${info.credits} credits (${info.price} PLN)`);
+}
 ```
 
 :::
@@ -733,7 +727,7 @@ Fired when both credits and wallet are empty. All subsequent requests will recei
     "credits_remaining": 0,
     "wallet_balance_pln": 0.00,
     "tier": "startup",
-    "last_operation": "flux-pro"
+    "last_operation": "flux-2-pro"
   },
   "timestamp": "2026-07-17T22:15:00Z"
 }
@@ -750,7 +744,7 @@ Fired whenever a wallet PLN charge occurs (i.e., credits were not sufficient and
     "transaction_id": "txn_abc123",
     "method": "wallet",
     "pln_charged": 0.60,
-    "model": "flux-pro",
+    "model": "flux-2-pro",
     "wallet_balance_after": 126.90
   },
   "timestamp": "2026-07-17T14:30:00Z"

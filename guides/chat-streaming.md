@@ -18,7 +18,7 @@ from fotohub import FotoHub
 client = FotoHub()
 
 response = client.chat(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet",
     messages=[
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "What is quantum computing in simple terms?"},
@@ -34,7 +34,7 @@ import { FotoHub } from "fotohub";
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
 
 const response = await client.chat({
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet",
   messages: [
     { role: "system", content: "You are a helpful assistant." },
     { role: "user", content: "What is quantum computing in simple terms?" },
@@ -58,7 +58,7 @@ from fotohub import FotoHub
 client = FotoHub()
 
 stream = client.chat_stream(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet",
     messages=[
         {"role": "user", "content": "Write a haiku about programming"},
     ],
@@ -75,7 +75,7 @@ import { FotoHub } from "fotohub";
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
 
 const stream = await client.chatStream({
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet",
   messages: [
     { role: "user", content: "Write a haiku about programming" },
   ],
@@ -94,22 +94,18 @@ console.log();
 
 ## Available Models
 
-FOTOhub supports 30+ LLM models from 12 providers. Popular options:
+The streaming `/v1/ai/chat/completions` endpoint bills flat credits (1 for `gemini-flash`, 2 otherwise). The four core credit-based chat IDs:
 
-| Model | Provider | Best for |
-|-------|----------|----------|
-| `fotohub-ai` | FOTOhub | Default — fast, capable |
-| `claude-sonnet-4-6` | Anthropic | Coding, analysis, best value |
-| `claude-opus-4-6` | Anthropic | Maximum capabilities |
-| `gpt-5.1` | OpenAI | Creative, multi-modal |
-| `grok-4-fast-reasoning` | xAI | Fast reasoning, 2M context |
-| `deepseek-r1` | DeepSeek | Chain-of-thought reasoning |
-| `qwen-flash` | Alibaba | Ultra fast, cheap |
-| `nova-micro` | Amazon | Ultra fast, ultra cheap |
-| `mistral-large-3` | Mistral | 675B, maximum quality |
-| `kimi-k2.5` | Moonshot | Latest intelligent |
+| Model | ID | Credits/req | Best for |
+|-------|-----|:-----------:|----------|
+| Gemini Flash | `gemini-flash` | 1 | Default — fast responses, bulk tasks |
+| Gemini Pro | `gemini-pro` | 2 | Balanced quality, general use |
+| GPT-4o | `gpt-4o` | 2 | Multimodal, vision, creative |
+| Claude Sonnet | `claude-sonnet` | 2 | Coding, analysis, reasoning |
 
-See the full [Chat / LLM API reference](/api/chat-llm) for all 30+ models.
+The endpoint also accepts additional provider-family IDs (Claude, GPT, Grok, Qwen, Gemini variants) at the same flat 1–2 credit rate. Always fetch the authoritative list at runtime via `GET /v1/models?category=text`. For per-token billing on premium models, use `/v1/ai/chat/claude`.
+
+See the full [Chat / LLM API reference](/api/chat-llm) for the complete model list and billing details.
 
 ---
 
@@ -124,12 +120,12 @@ messages = [
 
 # Turn 1
 messages.append({"role": "user", "content": "What is a decorator?"})
-response = client.chat(model="claude-sonnet-4-20250514", messages=messages)
+response = client.chat(model="claude-sonnet", messages=messages)
 messages.append({"role": "assistant", "content": response.choices[0].message.content})
 
 # Turn 2
 messages.append({"role": "user", "content": "Show me an example"})
-response = client.chat(model="claude-sonnet-4-20250514", messages=messages)
+response = client.chat(model="claude-sonnet", messages=messages)
 print(response.choices[0].message.content)
 ```
 
@@ -160,7 +156,7 @@ export async function POST(req: Request) {
   const { messages } = await req.json();
 
   const stream = await client.chatStream({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet",
     messages,
   });
 

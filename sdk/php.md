@@ -1,10 +1,15 @@
 # PHP SDK
 
-Official PHP SDK for the FOTOhub API. PSR-4 autoloaded, PHP 8.1+, Guzzle HTTP client, typed models, automatic retries, and streaming support for chat completions.
+A PHP client for the FOTOhub API. PSR-4 autoloaded, PHP 8.1+, Guzzle HTTP client, typed models, automatic retries, and streaming support for chat completions.
+
+::: info Preview — coming soon
+A first-party PHP package is on the roadmap. The `FotoHub\Client` interface shown below illustrates the intended shape and wraps the public REST API (base URL `https://apis.fotohub.app`). Until it publishes to Packagist you can either call the [REST API](/api/getting-started) directly with Guzzle/cURL or vendor a thin wrapper that mirrors these method signatures. All endpoints and model IDs used here are real and live today.
+:::
 
 ## Installation
 
 ```bash
+# Coming soon — package name reserved
 composer require fotohub/fotohub-php
 ```
 
@@ -119,7 +124,7 @@ class ImageResult {
 ```php
 $job = $client->generateVideo(
     prompt: 'A drone flying over mountains, cinematic',
-    model: 'kling-v2',
+    model: 'kling',
     duration: 5,
     aspectRatio: '16:9'
 );
@@ -143,7 +148,7 @@ if ($job->isCompleted()) {
 ```php
 $job = $client->generateVideo(
     prompt: 'Gentle camera zoom with motion',
-    model: 'kling-v2',
+    model: 'kling',
     imageUrl: 'https://example.com/product.jpg',
     duration: 5
 );
@@ -170,7 +175,7 @@ class VideoJob {
 ```php
 $result = $client->generateMusic(
     prompt: 'Upbeat electronic music, 120 BPM',
-    model: 'stable-audio',
+    model: 'music-minimax',
     duration: 30
 );
 
@@ -283,7 +288,7 @@ foreach ($models as $model) {
 
 // Filter by category
 $imageModels = $client->listModels(category: 'image');
-$chatModels = $client->listModels(category: 'chat');
+$chatModels = $client->listModels(category: 'text');
 ```
 
 ## Billing & Balance

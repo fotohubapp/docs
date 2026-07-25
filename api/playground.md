@@ -37,7 +37,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/video \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "seedance-2-0-fast",
+    "model": "seedance",
     "prompt": "Drone flying over a misty forest at sunrise, cinematic, 4K",
     "duration": 5,
     "aspect_ratio": "16:9"

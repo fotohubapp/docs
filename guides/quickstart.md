@@ -48,9 +48,9 @@ npm install fotohub
 ## 5. Use the SDK
 
 ```python
-from fotohub import FotohubClient
+from fotohub import FotoHub
 
-client = FotohubClient()  # reads FOTOHUB_API_KEY env var
+client = FotoHub()  # reads FOTOHUB_API_KEY env var
 
 # Generate an image
 result = client.generate_image(

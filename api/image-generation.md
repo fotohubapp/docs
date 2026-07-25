@@ -21,7 +21,7 @@ POST /v1/ai/generate/image
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | string | **Yes** | — | Text description of the image to generate. Be specific — include subject, style, lighting, composition details for best results. Max 4096 characters. |
-| `model` | string | No | `"imagen-3-fast"` | Model identifier. See the full model list below for all 25 options. We recommend `seedream-5-0-260128` for best quality. |
+| `model` | string | No | `"imagen-3-fast"` | Model identifier. See the full model list below. We recommend `seedream-5-0-260128` for best quality. |
 | `width` | integer | No | `1024` | Output image width in pixels. Range: 256–4096. Must be divisible by 64 for most models. |
 | `height` | integer | No | `1024` | Output image height in pixels. Range: 256–4096. Must be divisible by 64 for most models. |
 | `aspect_ratio` | string | No | `"1:1"` | Aspect ratio preset. Options: `"1:1"`, `"16:9"`, `"9:16"`, `"4:3"`, `"3:4"`. Overrides width/height when set. |
@@ -45,7 +45,7 @@ Use `aspect_ratio` instead of manual width/height for most use cases. The API au
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.30
+    "pln_charged": 0.21
   },
   "images": [
     "https://s1.fotohub.app/storage/v1/object/public/generations/img_abc123.png"
@@ -137,7 +137,7 @@ cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
 |----------|------|-------------|---------|-------|
 | `imagen-3-fast` | Imagen 3 Fast | 0.12 | 1 | 512px fast |
 | `imagen-3-standard` | Imagen 3 Standard | 0.24 | 2 | 1K |
-| `imagen-4-fast` | Imagen 4 Fast | 0.18 | 2 | — |
+| `imagen-3-capability` | Imagen 3 Capability | 0.24 | 2 | editing/customization |
 | `imagen-4-standard` | Imagen 4 Standard | 0.45 | 3 | High quality |
 | `imagen-4-ultra` | Imagen 4 Ultra | 0.90 | 5 | 4K |
 
@@ -145,9 +145,9 @@ cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
 
 | Model ID | Name | Price (PLN) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `dall-e-3` | DALL-E 3 | 0.24 | 2 | — |
+| `dall-e-3-standard` | DALL-E 3 | 0.24 | 2 | — |
 | `dall-e-3-hd` | DALL-E 3 HD | 0.48 | 4 | — |
-| `gpt-image-1` | GPT Image 1 | 0.60 | 4 | **Recommended** |
+| `gpt-image-1` | GPT Image 1 | 0.60 | 4 | **Recommended** — highest fidelity |
 
 ### BytePlus SeedDream (Token-Based)
 
@@ -159,38 +159,63 @@ cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
 | `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro (Dola) | 0.27 | 3 | token-based |
 | `seededit-3-0-i2i-250628` | SeedEdit 3.0 (img2img) | 0.24 | 3 | token-based |
 
-### xAI (Grok)
+### xAI (Grok Imagine)
 
 | Model ID | Name | Price (PLN) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `grok-imagine-image` | Grok Imagine | 0.12 | 1 | — |
-| `grok-imagine-image-pro` | Grok Imagine Pro | 0.42 | 4 | — |
+| `grok-imagine-image` | Grok Imagine | 0.12 | 1 | 1K, single-image edit |
+| `grok-imagine-image-pro` | Grok Imagine Pro | 0.42 | 3 | **2K**, multi-image combine (up to 3 refs), virtual try-on |
 
-### Black Forest Labs (FLUX)
+#### xAI Grok Image — Capabilities
+
+| Feature | `grok-imagine-image` | `grok-imagine-image-pro` |
+|---------|:-------------------:|:------------------------:|
+| Text-to-Image | Yes | Yes |
+| Single Image Edit | Yes | Yes |
+| Multi-Image Combine (up to 3) | — | Yes |
+| Virtual Try-On | — | Yes |
+| Max Resolution | 1K | 2K |
+| Max `num_images` per request | 10 | 10 |
+| Aspect Ratios | 7 | 7 |
+
+**Supported Aspect Ratios:** `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `9:16`, `16:9`
+
+::: tip xAI Grok Models
+Grok Imagine Pro is ideal for e-commerce: multi-image product listings, virtual try-on, and high-quality edits at 2K resolution. The basic model is a fast, budget-friendly option for social media and quick prototypes at 1K.
+:::
+
+### Black Forest Labs — FLUX
+
+FLUX models cover the full range from ultra-fast lightweight generation to maximum-fidelity output and context-aware editing.
 
 | Model ID | Name | Price (PLN) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `flux-2-klein-4b` | FLUX 2 Klein 4B | 0.084 | 1 | ultra-fast |
-| `flux-2-pro` | FLUX 2 Pro | 0.18 | 2 | — |
-| `flux-1.1-pro` | FLUX 1.1 Pro | 0.24 | 2 | — |
-| `flux-kontext-pro` | FLUX Kontext Pro | 0.24 | 2 | — |
-| `flux-1.1-pro-ultra` | FLUX 1.1 Pro Ultra | 0.36 | 3 | 4K |
-| `flux-2-max` | FLUX 2 Max | 0.42 | 4 | **Recommended** for 4K |
-| `flux-kontext-max` | FLUX Kontext Max | 0.48 | 4 | — |
+| `flux-2-klein-4b` | FLUX.2 Klein 4B | 0.084 | 1 | ultra-fast, lightweight 4B model |
+| `flux-2-klein-9b` | FLUX.2 Klein 9B | 0.09 | 1 | fast, lightweight 9B model |
+| `flux-2-pro` | FLUX.2 Pro | 0.18 | 2 | balanced, versatile |
+| `flux-1.1-pro` | FLUX 1.1 Pro | 0.24 | 2 | high quality, creative |
+| `flux-kontext-pro` | FLUX Kontext Pro | 0.24 | 2 | context-aware editing, style transfer |
+| `flux-1.1-pro-ultra` | FLUX 1.1 Pro Ultra | 0.36 | 3 | ultra detail, large canvas |
+| `flux-2-max` | FLUX.2 Max | 0.42 | 4 | highest FLUX quality |
+| `flux-kontext-max` | FLUX Kontext Max | 0.48 | 4 | maximum context fidelity |
+
+::: tip FLUX Model Range
+The Klein models are optimized for speed and cost, while Pro, Ultra, and Max deliver progressively higher fidelity. Kontext models specialize in context-aware editing and style transfer.
+:::
 
 ### MiniMax
 
 | Model ID | Name | Price (PLN) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `minimax-image-01` | MiniMax Image 01 | 0.021 | 1 | budget |
+| `minimax-image-01` | MiniMax Image 01 | 0.021 | 1 | lowest-cost budget option |
 
 ### Kling
 
 | Model ID | Name | Price (PLN) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `kling-v2-1` | Kling V2.1 | 0.24 | 2 | — |
-| `kling-v3` | Kling V3 | 0.60 | 5 | — |
-| `kling-v3-omni` | Kling V3 Omni | 0.90 | 8 | — |
+| `kling-v2-1` | Kling V2.1 | 0.24 | 2 | balanced quality |
+| `kling-v3-image` | Kling V3 | 0.60 | 5 | high quality |
+| `kling-v3-omni` | Kling V3 Omni | 0.90 | 8 | premium, highest fidelity |
 
 ## Code Examples
 
@@ -236,6 +261,45 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 const data = await response.json();
 console.log("Image URL:", data.images[0]);
 console.log("Credits used:", data.credits_used);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "A serene mountain landscape at golden hour, with mist rolling through valleys",
+		"model":        "seedream-5-0-260128",
+		"aspect_ratio": "16:9",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	images := data["images"].([]interface{})
+	fmt.Println("Image URL:", images[0])
+	fmt.Println("Credits used:", data["credits_used"])
+}
 ```
 
 ```bash [cURL]
@@ -303,6 +367,52 @@ console.log("Cost (PLN):", data.billing.cost_breakdown.cost_pln);
 // At 2048x2048: 16,384 tokens → ~0.197 PLN
 ```
 
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt": "Professional product photography of a luxury watch on marble surface",
+		"model":  "seedream-5-0-260128",
+		"width":  2048,
+		"height": 2048,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	usage := data["usage"].(map[string]interface{})
+	billing := data["billing"].(map[string]interface{})
+	breakdown := billing["cost_breakdown"].(map[string]interface{})
+	images := data["images"].([]interface{})
+
+	fmt.Println("Image URL:", images[0])
+	fmt.Println("Output tokens:", usage["output_tokens"])
+	fmt.Println("Cost (PLN):", breakdown["cost_pln"])
+	// At 2048x2048: 16,384 tokens -> ~0.197 PLN
+}
+```
+
 ```bash [cURL]
 curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
@@ -367,6 +477,47 @@ console.log("4K Image:", data.images[0]);
 console.log("Credits:", data.credits_used); // 5 credits for ultra
 ```
 
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "Ultra detailed architectural visualization of a modern glass house, surrounded by nature, photorealistic 8K quality",
+		"model":        "imagen-4-ultra",
+		"width":        4096,
+		"height":       2304,
+		"aspect_ratio": "16:9",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	images := data["images"].([]interface{})
+	fmt.Println("4K Image:", images[0])
+	fmt.Println("Credits:", data["credits_used"]) // 5 credits for ultra
+}
+```
+
 ```bash [cURL]
 curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
@@ -398,14 +549,14 @@ response = requests.post(
     },
     json={
         "prompt": "Minimalist logo design for a tech startup, clean vector style",
-        "model": "flux-2-max",
+        "model": "flux-2-pro",
         "num_images": 4,
         "aspect_ratio": "1:1"
     }
 )
 
 data = response.json()
-# Credits charged: 4 images x 4 credits = 16 credits total
+# Credits charged: 4 images x 2 credits = 8 credits total
 for i, url in enumerate(data["images"]):
     print(f"Variation {i+1}: {url}")
 print(f"Total credits: {data['credits_used']}")
@@ -421,18 +572,61 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
   },
   body: JSON.stringify({
     prompt: "Minimalist logo design for a tech startup, clean vector style",
-    model: "flux-2-max",
+    model: "flux-2-pro",
     num_images: 4,
     aspect_ratio: "1:1"
   })
 });
 
 const data = await response.json();
-// Credits charged: 4 images x 4 credits = 16 credits total
+// Credits charged: 4 images x 2 credits = 8 credits total
 data.images.forEach((url: string, i: number) => {
   console.log(`Variation ${i + 1}: ${url}`);
 });
 console.log("Total credits:", data.credits_used);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "Minimalist logo design for a tech startup, clean vector style",
+		"model":        "flux-2-pro",
+		"num_images":   4,
+		"aspect_ratio": "1:1",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	// Credits charged: 4 images x 2 credits = 8 credits total
+	images := data["images"].([]interface{})
+	for i, url := range images {
+		fmt.Printf("Variation %d: %s\n", i+1, url)
+	}
+	fmt.Println("Total credits:", data["credits_used"])
+}
 ```
 
 ```bash [cURL]
@@ -441,7 +635,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Minimalist logo design for a tech startup, clean vector style",
-    "model": "flux-2-max",
+    "model": "flux-2-pro",
     "num_images": 4,
     "aspect_ratio": "1:1"
   }'
@@ -464,7 +658,7 @@ response = requests.post(
     },
     json={
         "prompt": "Portrait of a woman in Renaissance style, oil painting, dramatic lighting, rich colors",
-        "model": "flux-kontext-max",
+        "model": "flux-kontext-pro",
         "negative_prompt": "blurry, low quality, distorted, deformed, watermark, text overlay, cartoon",
         "style": "oil-painting",
         "aspect_ratio": "3:4",
@@ -486,7 +680,7 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
   },
   body: JSON.stringify({
     prompt: "Portrait of a woman in Renaissance style, oil painting, dramatic lighting, rich colors",
-    model: "flux-kontext-max",
+    model: "flux-kontext-pro",
     negative_prompt: "blurry, low quality, distorted, deformed, watermark, text overlay, cartoon",
     style: "oil-painting",
     aspect_ratio: "3:4",
@@ -499,13 +693,56 @@ console.log("Image:", data.images[0]);
 console.log("Seed used:", data.metadata.seed); // 42 — same result every time
 ```
 
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":          "Portrait of a woman in Renaissance style, oil painting, dramatic lighting, rich colors",
+		"model":           "flux-kontext-pro",
+		"negative_prompt": "blurry, low quality, distorted, deformed, watermark, text overlay, cartoon",
+		"style":           "oil-painting",
+		"aspect_ratio":    "3:4",
+		"seed":            42,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	images := data["images"].([]interface{})
+	metadata := data["metadata"].(map[string]interface{})
+	fmt.Println("Image:", images[0])
+	fmt.Println("Seed used:", metadata["seed"]) // 42 - same result every time
+}
+```
+
 ```bash [cURL]
 curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Portrait of a woman in Renaissance style, oil painting, dramatic lighting, rich colors",
-    "model": "flux-kontext-max",
+    "model": "flux-kontext-pro",
     "negative_prompt": "blurry, low quality, distorted, deformed, watermark, text overlay, cartoon",
     "style": "oil-painting",
     "aspect_ratio": "3:4",
@@ -514,6 +751,572 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 ```
 
 :::
+
+## xAI Grok Imagine — Advanced Use Cases
+
+Grok Imagine models support generation, editing, multi-image combine, and virtual try-on through a unified API.
+
+### Product Launch (Text-to-Image, 2K)
+
+::: code-group
+
+```python [Python]
+import requests
+
+response = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/image",
+    headers={
+        "Authorization": "Bearer fh_live_your_api_key",
+        "Content-Type": "application/json"
+    },
+    json={
+        "prompt": "Premium product photography of a luxury perfume bottle on marble surface, "
+                  "dramatic studio lighting, soft shadows, bokeh background, commercial quality",
+        "model": "grok-imagine-image-pro",
+        "aspect_ratio": "2:3",
+        "num_images": 1
+    }
+)
+
+data = response.json()
+print(f"2K product shot: {data['images'][0]}")
+# 3 credits, 2K resolution, portrait 2:3 aspect
+```
+
+```typescript [TypeScript]
+const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    prompt: "Premium product photography of a luxury perfume bottle on marble surface, " +
+            "dramatic studio lighting, soft shadows, bokeh background, commercial quality",
+    model: "grok-imagine-image-pro",
+    aspect_ratio: "2:3",
+    num_images: 1
+  })
+});
+
+const data = await response.json();
+console.log("2K product shot:", data.images[0]);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "Premium product photography of a luxury perfume bottle on marble surface, dramatic studio lighting, soft shadows, bokeh background, commercial quality",
+		"model":        "grok-imagine-image-pro",
+		"aspect_ratio": "2:3",
+		"num_images":   1,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	images := data["images"].([]interface{})
+	fmt.Println("2K product shot:", images[0])
+	// 3 credits, 2K resolution, portrait 2:3 aspect
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Premium product photography of a luxury perfume bottle on marble surface, dramatic studio lighting, soft shadows, bokeh background, commercial quality",
+    "model": "grok-imagine-image-pro",
+    "aspect_ratio": "2:3",
+    "num_images": 1
+  }'
+```
+
+:::
+
+### Social Media Post (Text-to-Image, 1K)
+
+::: code-group
+
+```python [Python]
+import requests
+
+response = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/image",
+    headers={
+        "Authorization": "Bearer fh_live_your_api_key",
+        "Content-Type": "application/json"
+    },
+    json={
+        "prompt": "Trendy flat-lay coffee shop photo, latte art, notebook and laptop, "
+                  "warm tones, Instagram aesthetic, overhead shot",
+        "model": "grok-imagine-image",
+        "aspect_ratio": "1:1",
+        "num_images": 4
+    }
+)
+
+data = response.json()
+# 4 variations at 1 credit each = 4 credits total
+for i, url in enumerate(data["images"]):
+    print(f"Variation {i+1}: {url}")
+```
+
+```typescript [TypeScript]
+const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    prompt: "Trendy flat-lay coffee shop photo, latte art, notebook and laptop, " +
+            "warm tones, Instagram aesthetic, overhead shot",
+    model: "grok-imagine-image",
+    aspect_ratio: "1:1",
+    num_images: 4
+  })
+});
+
+const data = await response.json();
+// 4 variations at 1 credit each = 4 credits total
+data.images.forEach((url: string, i: number) => {
+  console.log(`Variation ${i + 1}: ${url}`);
+});
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "Trendy flat-lay coffee shop photo, latte art, notebook and laptop, warm tones, Instagram aesthetic, overhead shot",
+		"model":        "grok-imagine-image",
+		"aspect_ratio": "1:1",
+		"num_images":   4,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	// 4 variations at 1 credit each = 4 credits total
+	images := data["images"].([]interface{})
+	for i, url := range images {
+		fmt.Printf("Variation %d: %s\n", i+1, url)
+	}
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Trendy flat-lay coffee shop photo, latte art, notebook and laptop, warm tones, Instagram aesthetic",
+    "model": "grok-imagine-image",
+    "aspect_ratio": "1:1",
+    "num_images": 4
+  }'
+```
+
+:::
+
+### Product Display Edit (Single Reference Image)
+
+Edit an existing product photo — change background, lighting, or context while preserving the product.
+
+::: code-group
+
+```python [Python]
+import requests
+
+response = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/image",
+    headers={
+        "Authorization": "Bearer fh_live_your_api_key",
+        "Content-Type": "application/json"
+    },
+    json={
+        "prompt": "Place this product in a modern minimalist kitchen, marble countertop, "
+                  "soft natural window light, lifestyle photography",
+        "model": "grok-imagine-image-pro",
+        "aspect_ratio": "3:4",
+        "image_url": "https://your-storage.com/product-photo.jpg"
+    }
+)
+
+data = response.json()
+print(f"Edited product: {data['images'][0]}")
+# 3 credits — single image edit mode
+```
+
+```typescript [TypeScript]
+const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    prompt: "Place this product in a modern minimalist kitchen, marble countertop, " +
+            "soft natural window light, lifestyle photography",
+    model: "grok-imagine-image-pro",
+    aspect_ratio: "3:4",
+    image_url: "https://your-storage.com/product-photo.jpg"
+  })
+});
+
+const data = await response.json();
+console.log("Edited product:", data.images[0]);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "Place this product in a modern minimalist kitchen, marble countertop, soft natural window light, lifestyle photography",
+		"model":        "grok-imagine-image-pro",
+		"aspect_ratio": "3:4",
+		"image_url":    "https://your-storage.com/product-photo.jpg",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	images := data["images"].([]interface{})
+	fmt.Println("Edited product:", images[0])
+	// 3 credits - single image edit mode
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Place this product in a modern minimalist kitchen, marble countertop, soft natural window light",
+    "model": "grok-imagine-image-pro",
+    "aspect_ratio": "3:4",
+    "image_url": "https://your-storage.com/product-photo.jpg"
+  }'
+```
+
+:::
+
+### Combined Product Listing (Multi-Image, up to 3 References)
+
+Combine multiple product images into a single cohesive composition. Only available with `grok-imagine-image-pro`.
+
+::: code-group
+
+```python [Python]
+import requests
+
+response = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/image",
+    headers={
+        "Authorization": "Bearer fh_live_your_api_key",
+        "Content-Type": "application/json"
+    },
+    json={
+        "prompt": "Arrange all products in an elegant flat-lay composition, "
+                  "clean white background, consistent lighting, e-commerce catalog style",
+        "model": "grok-imagine-image-pro",
+        "aspect_ratio": "1:1",
+        "image_urls": [
+            "https://your-storage.com/product-1.jpg",
+            "https://your-storage.com/product-2.jpg",
+            "https://your-storage.com/product-3.jpg"
+        ]
+    }
+)
+
+data = response.json()
+print(f"Combined listing: {data['images'][0]}")
+# 3 credits — multi-image combine mode (max 3 reference images)
+```
+
+```typescript [TypeScript]
+const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    prompt: "Arrange all products in an elegant flat-lay composition, " +
+            "clean white background, consistent lighting, e-commerce catalog style",
+    model: "grok-imagine-image-pro",
+    aspect_ratio: "1:1",
+    image_urls: [
+      "https://your-storage.com/product-1.jpg",
+      "https://your-storage.com/product-2.jpg",
+      "https://your-storage.com/product-3.jpg"
+    ]
+  })
+});
+
+const data = await response.json();
+console.log("Combined listing:", data.images[0]);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "Arrange all products in an elegant flat-lay composition, clean white background, consistent lighting, e-commerce catalog style",
+		"model":        "grok-imagine-image-pro",
+		"aspect_ratio": "1:1",
+		"image_urls": []string{
+			"https://your-storage.com/product-1.jpg",
+			"https://your-storage.com/product-2.jpg",
+			"https://your-storage.com/product-3.jpg",
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	images := data["images"].([]interface{})
+	fmt.Println("Combined listing:", images[0])
+	// 3 credits - multi-image combine mode (max 3 reference images)
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Arrange all products in an elegant flat-lay composition, clean white background, consistent lighting",
+    "model": "grok-imagine-image-pro",
+    "aspect_ratio": "1:1",
+    "image_urls": [
+      "https://your-storage.com/product-1.jpg",
+      "https://your-storage.com/product-2.jpg",
+      "https://your-storage.com/product-3.jpg"
+    ]
+  }'
+```
+
+:::
+
+::: warning Multi-Image Limits
+- Maximum **3 reference images** per request
+- Only available with `grok-imagine-image-pro` model
+- All images must be publicly accessible URLs or FOTOhub storage URLs
+- Higher resolution images produce better combine results
+:::
+
+### Virtual Try-On (2 References — Person + Garment)
+
+Show a person wearing a specific garment or accessory. Provide the person photo and the product image.
+
+::: code-group
+
+```python [Python]
+import requests
+
+response = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/image",
+    headers={
+        "Authorization": "Bearer fh_live_your_api_key",
+        "Content-Type": "application/json"
+    },
+    json={
+        "prompt": "Virtual try-on: person wearing the garment from second image, "
+                  "natural fit, correct proportions, photorealistic, keep person's face and body",
+        "model": "grok-imagine-image-pro",
+        "aspect_ratio": "3:4",
+        "image_urls": [
+            "https://your-storage.com/model-photo.jpg",     # Person
+            "https://your-storage.com/dress-product.jpg"    # Garment
+        ]
+    }
+)
+
+data = response.json()
+print(f"Try-on result: {data['images'][0]}")
+# 3 credits — virtual try-on mode via multi-image
+```
+
+```typescript [TypeScript]
+const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    prompt: "Virtual try-on: person wearing the garment from second image, " +
+            "natural fit, correct proportions, photorealistic",
+    model: "grok-imagine-image-pro",
+    aspect_ratio: "3:4",
+    image_urls: [
+      "https://your-storage.com/model-photo.jpg",
+      "https://your-storage.com/dress-product.jpg"
+    ]
+  })
+});
+
+const data = await response.json();
+console.log("Try-on result:", data.images[0]);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "Virtual try-on: person wearing the garment from second image, natural fit, correct proportions, photorealistic, keep person's face and body",
+		"model":        "grok-imagine-image-pro",
+		"aspect_ratio": "3:4",
+		"image_urls": []string{
+			"https://your-storage.com/model-photo.jpg",
+			"https://your-storage.com/dress-product.jpg",
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	images := data["images"].([]interface{})
+	fmt.Println("Try-on result:", images[0])
+	// 3 credits - virtual try-on mode via multi-image
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Virtual try-on: person wearing the garment from second image, natural fit, photorealistic",
+    "model": "grok-imagine-image-pro",
+    "aspect_ratio": "3:4",
+    "image_urls": [
+      "https://your-storage.com/model-photo.jpg",
+      "https://your-storage.com/dress-product.jpg"
+    ]
+  }'
+```
+
+:::
+
+::: tip Virtual Try-On Best Practices
+1. **Person image first** — full-body or half-body shot, clear pose, neutral background
+2. **Garment image second** — flat-lay or mannequin shot showing full garment
+3. Use `3:4` or `2:3` aspect ratio for best full-body results
+4. Include "keep person's face" in prompt to preserve identity
+5. Works with clothing, accessories, eyewear, hats, shoes
+:::
+
+---
 
 ## Image Editing
 
@@ -602,6 +1405,735 @@ print(f"Upscaled image: {data['images'][0]}")
 ```
 
 :::
+
+## Model Comparison Table
+
+A comprehensive overview of all available image models with their capabilities, performance characteristics, and pricing.
+
+| Model ID | Provider | Max Resolution | Speed | Quality | Credits | Key Features |
+|----------|----------|---------------|:-----:|:-------:|:-------:|--------------|
+| `imagen-3-fast` | Google Vertex AI | 512x512 | 5/5 | 3/5 | 1 | Ultra-fast drafts, lowest cost |
+| `imagen-3-standard` | Google Vertex AI | 1024x1024 | 4/5 | 4/5 | 2 | Balanced speed/quality |
+| `imagen-3-capability` | Google Vertex AI | 1024x1024 | 4/5 | 4/5 | 2 | Editing and customization |
+| `imagen-4-standard` | Google Vertex AI | 2048x2048 | 3/5 | 4/5 | 3 | High quality, good for production |
+| `imagen-4-ultra` | Google Vertex AI | 4096x4096 | 2/5 | 5/5 | 5 | Native 4K, highest fidelity from Google |
+| `dall-e-3-standard` | OpenAI | 1024x1024 | 3/5 | 4/5 | 2 | Strong prompt following, text rendering |
+| `dall-e-3-hd` | OpenAI | 1792x1792 | 3/5 | 4/5 | 4 | HD variant, better details |
+| `gpt-image-1` | OpenAI | 2048x2048 | 3/5 | 5/5 | 4 | Highest OpenAI fidelity, photorealism |
+| `seedream-5-0-260128` | BytePlus | 4096x4096 | 4/5 | 5/5 | 2 | **Recommended** -- best value, token-based |
+| `seedream-4-5-251128` | BytePlus | 4096x4096 | 3/5 | 4/5 | 3 | Token-based, excellent detail |
+| `seedream-4-0-250828` | BytePlus | 4096x4096 | 4/5 | 4/5 | 2 | Token-based, budget-friendly |
+| `dola-seedream-5-0-pro-260628` | BytePlus | 4096x4096 | 3/5 | 5/5 | 3 | Pro quality, enhanced realism |
+| `seededit-3-0-i2i-250628` | BytePlus | 4096x4096 | 3/5 | 4/5 | 3 | Image-to-image editing, token-based |
+| `grok-imagine-image` | xAI | 1024x1024 | 4/5 | 3/5 | 1 | Fast budget option, single-image edit |
+| `grok-imagine-image-pro` | xAI | 2048x2048 | 3/5 | 4/5 | 3 | 2K, multi-image combine, virtual try-on |
+| `flux-1.1-pro` | Black Forest Labs | 1440x1440 | 3/5 | 4/5 | 2 | Creative, artistic styles |
+| `flux-1.1-pro-ultra` | Black Forest Labs | 2048x2048 | 2/5 | 5/5 | 3 | Ultra detail, large canvas |
+| `flux-kontext-pro` | Black Forest Labs | 1440x1440 | 3/5 | 4/5 | 2 | Context-aware editing, style transfer |
+| `flux-kontext-max` | Black Forest Labs | 2048x2048 | 2/5 | 5/5 | 4 | Maximum context fidelity |
+| `flux-2-max` | Black Forest Labs | 2048x2048 | 2/5 | 5/5 | 4 | Highest FLUX quality |
+| `flux-2-pro` | Black Forest Labs | 1440x1440 | 3/5 | 4/5 | 2 | Balanced, versatile |
+| `flux-2-klein-4b` | Black Forest Labs | 1024x1024 | 5/5 | 3/5 | 1 | Ultra-fast, lightweight 4B model |
+| `flux-2-klein-9b` | Black Forest Labs | 1024x1024 | 5/5 | 3/5 | 1 | Fast, lightweight 9B model |
+| `minimax-image-01` | MiniMax | 1024x1024 | 4/5 | 3/5 | 1 | Lowest-cost budget option |
+| `kling-v3-omni` | Kling | 2048x2048 | 2/5 | 5/5 | 8 | Premium, highest fidelity |
+| `kling-v3-image` | Kling | 2048x2048 | 2/5 | 4/5 | 5 | High quality |
+| `kling-v2-1` | Kling | 1536x1536 | 3/5 | 4/5 | 2 | Balanced |
+
+::: tip Choosing a Model
+- **Best value**: `seedream-5-0-260128` -- high quality at token-based pricing, scales to 4K
+- **Fastest**: `imagen-3-fast`, `flux-2-klein-4b`, or `flux-2-klein-9b` for sub-second generations
+- **Highest quality**: `gpt-image-1`, `imagen-4-ultra`, or `flux-2-max` for print/commercial work
+- **Image editing**: `flux-kontext-pro` (style transfer), `seededit-3-0-i2i-250628` (img2img), `grok-imagine-image-pro` (multi-image)
+- **Budget**: `grok-imagine-image` or `minimax-image-01` at 1 credit per image
+:::
+
+---
+
+## Advanced Use Cases
+
+### 4K Ultra-Resolution with Imagen 4 Ultra
+
+Generate native 4K images suitable for print, large-format displays, and premium marketing materials.
+
+::: code-group
+
+```python [Python]
+import requests
+
+# Imagen 4 Ultra generates native 4K at 5 credits per image
+response = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/image",
+    headers={
+        "Authorization": "Bearer fh_live_your_api_key",
+        "Content-Type": "application/json"
+    },
+    json={
+        "prompt": "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography, 8K quality",
+        "model": "imagen-4-ultra",
+        "width": 4096,
+        "height": 2304,
+        "aspect_ratio": "16:9",
+        "negative_prompt": "low quality, blurry, distorted, watermark, oversaturated"
+    }
+)
+
+data = response.json()
+print(f"4K Image URL: {data['images'][0]}")
+print(f"Resolution: {data['metadata']['width']}x{data['metadata']['height']}")
+print(f"Credits used: {data['credits_used']}")  # 5 credits
+print(f"Generation time: {data['metadata']['generation_time_ms']}ms")
+```
+
+```typescript [TypeScript]
+// Imagen 4 Ultra generates native 4K at 5 credits per image
+const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    prompt: "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography, 8K quality",
+    model: "imagen-4-ultra",
+    width: 4096,
+    height: 2304,
+    aspect_ratio: "16:9",
+    negative_prompt: "low quality, blurry, distorted, watermark, oversaturated"
+  })
+});
+
+const data = await response.json();
+console.log("4K Image URL:", data.images[0]);
+console.log(`Resolution: ${data.metadata.width}x${data.metadata.height}`);
+console.log("Credits used:", data.credits_used); // 5 credits
+console.log("Generation time:", data.metadata.generation_time_ms, "ms");
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":          "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography, 8K quality",
+		"model":           "imagen-4-ultra",
+		"width":           4096,
+		"height":          2304,
+		"aspect_ratio":    "16:9",
+		"negative_prompt": "low quality, blurry, distorted, watermark, oversaturated",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	images := data["images"].([]interface{})
+	metadata := data["metadata"].(map[string]interface{})
+	fmt.Println("4K Image URL:", images[0])
+	fmt.Printf("Resolution: %.0fx%.0f\n", metadata["width"], metadata["height"])
+	fmt.Println("Credits used:", data["credits_used"]) // 5 credits
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography, 8K quality",
+    "model": "imagen-4-ultra",
+    "width": 4096,
+    "height": 2304,
+    "aspect_ratio": "16:9",
+    "negative_prompt": "low quality, blurry, distorted, watermark, oversaturated"
+  }'
+```
+
+:::
+
+### Image-to-Image with FLUX Kontext Pro
+
+Use FLUX Kontext Pro for context-aware image editing, style transfer, and guided transformations. Provide a reference image and describe the desired modification.
+
+::: code-group
+
+```python [Python]
+import requests
+
+# FLUX Kontext Pro excels at style transfer and context-aware editing
+response = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/image",
+    headers={
+        "Authorization": "Bearer fh_live_your_api_key",
+        "Content-Type": "application/json"
+    },
+    json={
+        "prompt": "Transform this photograph into a Studio Ghibli anime art style, maintain composition and subject, soft watercolor textures, warm pastel palette, hand-drawn feel",
+        "model": "flux-kontext-pro",
+        "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/original-photo.jpg",
+        "aspect_ratio": "16:9",
+        "seed": 7777
+    }
+)
+
+data = response.json()
+print(f"Styled image: {data['images'][0]}")
+print(f"Credits: {data['credits_used']}")  # 2 credits
+# Use same seed for consistent style across multiple images
+```
+
+```typescript [TypeScript]
+// FLUX Kontext Pro excels at style transfer and context-aware editing
+const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    prompt: "Transform this photograph into a Studio Ghibli anime art style, maintain composition and subject, soft watercolor textures, warm pastel palette, hand-drawn feel",
+    model: "flux-kontext-pro",
+    image_url: "https://s1.fotohub.app/storage/v1/object/public/uploads/original-photo.jpg",
+    aspect_ratio: "16:9",
+    seed: 7777
+  })
+});
+
+const data = await response.json();
+console.log("Styled image:", data.images[0]);
+console.log("Credits:", data.credits_used); // 2 credits
+// Use same seed for consistent style across multiple images
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"prompt":       "Transform this photograph into a Studio Ghibli anime art style, maintain composition and subject, soft watercolor textures, warm pastel palette, hand-drawn feel",
+		"model":        "flux-kontext-pro",
+		"image_url":    "https://s1.fotohub.app/storage/v1/object/public/uploads/original-photo.jpg",
+		"aspect_ratio": "16:9",
+		"seed":         7777,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+
+	images := data["images"].([]interface{})
+	fmt.Println("Styled image:", images[0])
+	fmt.Println("Credits:", data["credits_used"]) // 2 credits
+	// Use same seed for consistent style across multiple images
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Transform this photograph into a Studio Ghibli anime art style, maintain composition and subject, soft watercolor textures, warm pastel palette, hand-drawn feel",
+    "model": "flux-kontext-pro",
+    "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/original-photo.jpg",
+    "aspect_ratio": "16:9",
+    "seed": 7777
+  }'
+```
+
+:::
+
+### Batch Generation with Count Parameter
+
+Generate multiple variations in a single API call using `num_images`. Credits are charged per image. Ideal for A/B testing, design exploration, and content pipelines.
+
+::: code-group
+
+```python [Python]
+import requests
+import concurrent.futures
+
+# Method 1: Single request with num_images (up to 4 per request)
+response = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/image",
+    headers={
+        "Authorization": "Bearer fh_live_your_api_key",
+        "Content-Type": "application/json"
+    },
+    json={
+        "prompt": "Professional headshot of a business person, neutral background, studio lighting, LinkedIn profile photo quality",
+        "model": "seedream-5-0-260128",
+        "num_images": 4,
+        "aspect_ratio": "1:1",
+        "width": 1024,
+        "height": 1024
+    }
+)
+
+data = response.json()
+print(f"Generated {len(data['images'])} variations")
+print(f"Total credits: {data['credits_used']}")  # 4 images x 2 credits = 8
+
+for i, url in enumerate(data["images"]):
+    print(f"  Variation {i+1}: {url}")
+
+# Method 2: Parallel requests for larger batches (e.g., 16 images)
+def generate_batch(seed_offset):
+    return requests.post(
+        "https://apis.fotohub.app/v1/ai/generate/image",
+        headers={
+            "Authorization": "Bearer fh_live_your_api_key",
+            "Content-Type": "application/json"
+        },
+        json={
+            "prompt": "Social media banner, abstract gradient, modern tech aesthetic",
+            "model": "flux-2-klein-4b",
+            "num_images": 4,
+            "aspect_ratio": "16:9",
+            "seed": 1000 + seed_offset
+        }
+    ).json()
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    results = list(executor.map(generate_batch, range(0, 16, 4)))
+    all_images = [url for r in results for url in r["images"]]
+    print(f"Total batch: {len(all_images)} images generated")
+```
+
+```typescript [TypeScript]
+// Method 1: Single request with num_images (up to 4 per request)
+const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    prompt: "Professional headshot of a business person, neutral background, studio lighting, LinkedIn profile photo quality",
+    model: "seedream-5-0-260128",
+    num_images: 4,
+    aspect_ratio: "1:1",
+    width: 1024,
+    height: 1024
+  })
+});
+
+const data = await response.json();
+console.log(`Generated ${data.images.length} variations`);
+console.log(`Total credits: ${data.credits_used}`); // 4 images x 2 credits = 8
+
+data.images.forEach((url: string, i: number) => {
+  console.log(`  Variation ${i + 1}: ${url}`);
+});
+
+// Method 2: Parallel requests for larger batches (e.g., 16 images)
+const batchPromises = Array.from({ length: 4 }, (_, i) =>
+  fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer fh_live_your_api_key",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      prompt: "Social media banner, abstract gradient, modern tech aesthetic",
+      model: "flux-2-klein-4b",
+      num_images: 4,
+      aspect_ratio: "16:9",
+      seed: 1000 + i * 4
+    })
+  }).then(r => r.json())
+);
+
+const results = await Promise.all(batchPromises);
+const allImages = results.flatMap(r => r.images);
+console.log(`Total batch: ${allImages.length} images generated`);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"sync"
+)
+
+func generateImages(payload map[string]interface{}) map[string]interface{} {
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	json.Unmarshal(respBody, &data)
+	return data
+}
+
+func main() {
+	// Method 1: Single request with num_images (up to 4)
+	data := generateImages(map[string]interface{}{
+		"prompt":       "Professional headshot of a business person, neutral background, studio lighting",
+		"model":        "seedream-5-0-260128",
+		"num_images":   4,
+		"aspect_ratio": "1:1",
+		"width":        1024,
+		"height":       1024,
+	})
+
+	images := data["images"].([]interface{})
+	fmt.Printf("Generated %d variations\n", len(images))
+	fmt.Printf("Total credits: %.0f\n", data["credits_used"])
+
+	// Method 2: Parallel requests for larger batches
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var allImages []interface{}
+
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func(offset int) {
+			defer wg.Done()
+			result := generateImages(map[string]interface{}{
+				"prompt":       "Social media banner, abstract gradient, modern tech aesthetic",
+				"model":        "flux-2-klein-4b",
+				"num_images":   4,
+				"aspect_ratio": "16:9",
+				"seed":         1000 + offset,
+			})
+			if result != nil {
+				mu.Lock()
+				allImages = append(allImages, result["images"].([]interface{})...)
+				mu.Unlock()
+			}
+		}(i * 4)
+	}
+	wg.Wait()
+	fmt.Printf("Total batch: %d images generated\n", len(allImages))
+}
+```
+
+```bash [cURL]
+# Single request with 4 variations
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Professional headshot of a business person, neutral background, studio lighting, LinkedIn profile photo quality",
+    "model": "seedream-5-0-260128",
+    "num_images": 4,
+    "aspect_ratio": "1:1",
+    "width": 1024,
+    "height": 1024
+  }'
+
+# Parallel batch using xargs (16 images via 4 parallel requests)
+seq 0 4 12 | xargs -P4 -I{} curl -s -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"prompt\": \"Social media banner, abstract gradient, modern tech aesthetic\",
+    \"model\": \"flux-2-klein-4b\",
+    \"num_images\": 4,
+    \"aspect_ratio\": \"16:9\",
+    \"seed\": $((1000 + {}))
+  }"
+```
+
+:::
+
+::: warning Batch Limits
+- Maximum **4 images** per single request (`num_images` max: 4)
+- Credits are charged **per image** -- 4 images at 2 credits each = 8 credits total
+- For larger batches, use parallel requests (respect rate limit: 20 req/min default, 300 req/min on Startup plan)
+- Use `seed` parameter to get reproducible results across batch runs
+:::
+
+### Style Presets
+
+Apply predefined artistic styles to guide the generation. Style presets work with all models and can be combined with custom prompts.
+
+::: code-group
+
+```python [Python]
+import requests
+
+# Available style presets
+STYLES = [
+    "photorealistic",   # Studio photography, natural lighting
+    "cinematic",        # Film-like color grading, dramatic lighting
+    "anime",            # Japanese animation style
+    "digital-art",      # Digital illustration, clean lines
+    "oil-painting",     # Classic oil painting textures
+    "watercolor",       # Soft watercolor washes
+    "3d-render",        # CGI / 3D rendered look
+    "pixel-art",        # Retro pixel art style
+    "comic-book",       # Bold lines, halftone shading
+    "minimalist",       # Clean, simple, whitespace-heavy
+]
+
+# Generate same prompt with different styles for comparison
+results = {}
+for style in ["photorealistic", "cinematic", "anime", "oil-painting"]:
+    response = requests.post(
+        "https://apis.fotohub.app/v1/ai/generate/image",
+        headers={
+            "Authorization": "Bearer fh_live_your_api_key",
+            "Content-Type": "application/json"
+        },
+        json={
+            "prompt": "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky",
+            "model": "seedream-5-0-260128",
+            "style": style,
+            "aspect_ratio": "16:9",
+            "seed": 42  # Same seed for fair comparison
+        }
+    )
+    results[style] = response.json()["images"][0]
+    print(f"Style '{style}': {results[style]}")
+```
+
+```typescript [TypeScript]
+// Available style presets
+const STYLES = [
+  "photorealistic",   // Studio photography, natural lighting
+  "cinematic",        // Film-like color grading, dramatic lighting
+  "anime",            // Japanese animation style
+  "digital-art",      // Digital illustration, clean lines
+  "oil-painting",     // Classic oil painting textures
+  "watercolor",       // Soft watercolor washes
+  "3d-render",        // CGI / 3D rendered look
+  "pixel-art",        // Retro pixel art style
+  "comic-book",       // Bold lines, halftone shading
+  "minimalist",       // Clean, simple, whitespace-heavy
+] as const;
+
+// Generate same prompt with different styles for comparison
+const stylesToCompare = ["photorealistic", "cinematic", "anime", "oil-painting"];
+const results: Record<string, string> = {};
+
+for (const style of stylesToCompare) {
+  const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer fh_live_your_api_key",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      prompt: "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky",
+      model: "seedream-5-0-260128",
+      style,
+      aspect_ratio: "16:9",
+      seed: 42 // Same seed for fair comparison
+    })
+  });
+
+  const data = await response.json();
+  results[style] = data.images[0];
+  console.log(`Style '${style}': ${results[style]}`);
+}
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	styles := []string{"photorealistic", "cinematic", "anime", "oil-painting"}
+
+	for _, style := range styles {
+		payload := map[string]interface{}{
+			"prompt":       "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky",
+			"model":        "seedream-5-0-260128",
+			"style":        style,
+			"aspect_ratio": "16:9",
+			"seed":         42, // Same seed for fair comparison
+		}
+		body, _ := json.Marshal(payload)
+
+		req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+
+		respBody, _ := io.ReadAll(resp.Body)
+		var data map[string]interface{}
+		json.Unmarshal(respBody, &data)
+
+		images := data["images"].([]interface{})
+		fmt.Printf("Style '%s': %s\n", style, images[0])
+	}
+}
+```
+
+```bash [cURL]
+# Generate with cinematic style preset
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky",
+    "model": "seedream-5-0-260128",
+    "style": "cinematic",
+    "aspect_ratio": "16:9",
+    "seed": 42
+  }'
+
+# Compare multiple styles using a loop
+for style in photorealistic cinematic anime oil-painting; do
+  echo "=== Style: $style ==="
+  curl -s -X POST https://apis.fotohub.app/v1/ai/generate/image \
+    -H "Authorization: Bearer fh_live_your_api_key" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"prompt\": \"A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky\",
+      \"model\": \"seedream-5-0-260128\",
+      \"style\": \"$style\",
+      \"aspect_ratio\": \"16:9\",
+      \"seed\": 42
+    }" | jq '.images[0]'
+done
+```
+
+:::
+
+::: tip Style Preset Tips
+- Style presets **modify** the prompt internally -- they do not override it. Your prompt details still matter.
+- Combine style with `negative_prompt` for best results (e.g., style `"anime"` + negative `"photorealistic, 3d render"`)
+- Not all models support all styles equally. FLUX and SeedDream models produce the most consistent style results.
+- Use `seed` to compare styles fairly -- same seed + same prompt ensures only the style changes.
+:::
+
+---
+
+## Performance Tips
+
+Optimize your image generation workflow for speed, cost, and quality.
+
+### Choose the Right Model for Your Use Case
+
+| Use Case | Recommended Model | Why |
+|----------|-------------------|-----|
+| Quick prototypes & drafts | `imagen-3-fast` or `flux-2-klein-4b` | Sub-2s generation, 1 credit |
+| Production web assets | `seedream-5-0-260128` | Best quality/price ratio, 2 credits |
+| Print & large-format | `imagen-4-ultra` or `gpt-image-1` | Native 4K, highest detail |
+| E-commerce product shots | `grok-imagine-image-pro` | Multi-image combine, virtual try-on |
+| Style transfer & editing | `flux-kontext-pro` | Context-aware, preserves composition |
+| Batch social media content | `flux-2-klein-4b` | Ultra-fast, 1 credit, good enough for social |
+| A/B testing creatives | `seedream-5-0-260128` with `num_images: 4` | 4 variations per request |
+
+### Resolution Strategy
+
+::: warning Token-Based Models Scale with Resolution
+For BytePlus SeedDream models, cost scales linearly with pixel count. A 4K image (4096x4096) costs **16x more** than a 1K image (1024x1024). Generate at the lowest resolution that meets your needs, then upscale if required.
+:::
+
+**Cost-effective resolution workflow:**
+1. **Draft at 1024x1024** -- validate composition and style (4,096 tokens, ~0.049 PLN)
+2. **Refine at 2048x2048** -- check details before committing (16,384 tokens, ~0.197 PLN)
+3. **Final at 4096x4096** -- only for approved compositions (65,536 tokens, ~0.786 PLN)
+
+For credit-based models (Imagen, DALL-E, FLUX), resolution does not affect price -- always generate at maximum supported resolution.
+
+### Speed Optimization
+
+1. **Use `aspect_ratio` instead of `width`/`height`** -- the API picks optimal dimensions for each model, avoiding unnecessary upsampling.
+2. **Parallel requests** -- send multiple requests concurrently rather than waiting sequentially. Respect your plan's rate limit.
+3. **Prefer fast models for iteration** -- use `imagen-3-fast` or `flux-2-klein-4b` during prompt development, switch to premium models for final output.
+4. **Set `seed` for reproducibility** -- when iterating on a prompt, a fixed seed lets you see only the effect of prompt changes.
+
+### Cost Optimization
+
+| Strategy | Savings |
+|----------|---------|
+| Use `seedream-5-0-260128` instead of `gpt-image-1` for standard quality | ~80% cheaper |
+| Generate 1K then upscale (edit endpoint) vs native 4K on token models | ~75% cheaper |
+| Use `flux-2-klein-4b` for non-critical assets | 1 credit vs 2-5 credits |
+| Batch with `num_images: 4` (one network round-trip) | Faster, same credits |
+| Use `aspect_ratio` preset (avoids wasted pixels from wrong dimensions) | Variable |
+
+### Prompt Engineering Best Practices
+
+1. **Be specific** -- "golden hour light casting long shadows on wet cobblestone street" beats "nice street"
+2. **Front-load important details** -- models pay more attention to the beginning of prompts
+3. **Include technical terms** -- "bokeh", "f/1.4", "ISO 100", "volumetric fog" help photorealistic models
+4. **Use negative prompts** -- explicitly exclude unwanted elements: `"blurry, watermark, text, distorted hands"`
+5. **Iterate with seeds** -- find a good seed, then refine the prompt while keeping the seed fixed
+
+### Rate Limits by Plan
+
+| Plan | Requests/min | Images/min (with num_images: 4) | Monthly Credits |
+|------|:------------:|:-------------------------------:|:---------------:|
+| Free | 10 | 40 | 50 |
+| Developer | 60 | 240 | 500 |
+| Startup | 300 | 1,200 | 5,000 |
+| Business | 1,000 | 4,000 | 25,000 |
+| Enterprise | 5,000 | 20,000 | Unlimited |
+
+::: tip Handling Rate Limits
+When you receive a `429` response, check the `Retry-After` header for the number of seconds to wait. Implement exponential backoff in production applications. Consider upgrading your plan if you consistently hit limits.
+:::
+
+---
 
 ## Error Responses
 

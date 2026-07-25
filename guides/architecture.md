@@ -7,7 +7,7 @@ How FOTOhub processes your requests — from API call to generated content.
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                         CLIENT (Your App)                         │
-│         Python SDK · TypeScript SDK · PHP SDK · REST API          │
+│         Python SDK · TypeScript SDK · REST API · MCP              │
 └─────────────────────────────┬────────────────────────────────────┘
                               │ HTTPS
                               ▼
@@ -18,35 +18,34 @@ How FOTOhub processes your requests — from API call to generated content.
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                       API GATEWAY (nginx)                         │
-│                    apis.fotohub.app:443                           │
+│                        API GATEWAY                                │
+│                    apis.fotohub.app (HTTPS)                       │
 │            Route splitting · Load balancing · CORS                │
 └──────┬──────────┬──────────┬──────────┬──────────┬───────────────┘
        │          │          │          │          │
        ▼          ▼          ▼          ▼          ▼
 ┌──────────┐┌──────────┐┌──────────┐┌──────────┐┌──────────┐
-│ api-     ││ image-   ││ video-   ││ music-   ││ billing- │
-│ server   ││ engine   ││ engine   ││ server   ││ engine   │
-│ (8791)   ││ (8090)   ││ (8092)   ││ (8093)   ││ (8094)   │
+│  Core    ││  Image   ││  Video   ││  Audio   ││ Billing  │
+│  API     ││  Service ││  Service ││  Service ││ Service  │
 │          ││          ││          ││          ││          │
-│ Gabriel  ││ Seedream ││ Seedance ││ MiniMax  ││ Credits  │
-│ Chat/LLM ││ FLUX     ││ Veo      ││ IDA      ││ Stripe   │
-│ Analyze  ││ Grok     ││ Sora     ││ Stable   ││ Tiers    │
-│ Translate││ WAN      ││ Hailuo   ││ Audio    ││ Wallet   │
+│ Gabriel  ││ Text-to- ││ Text-to- ││ Music    ││ Credits  │
+│ Chat/LLM ││ image +  ││ video +  ││ TTS/STT  ││ Payments │
+│ Analyze  ││ editing  ││ i2v      ││ SFX      ││ Tiers    │
+│ Translate││          ││          ││ Voice    ││ Wallet   │
 └──────┬───┘└──────┬───┘└──────┬───┘└──────────┘└──────────┘
        │           │           │
        ▼           ▼           ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                      GPU CLUSTER                                  │
-│    gpu.fotohub.app · A100/A10G · Local inference models          │
-│    Image (TripoSR, FLUX local) · Video (WAN) · TTS · Lip-sync   │
+│    gpu.fotohub.app · Local inference for select models           │
+│    Image · Video · 3D · TTS · Lip-sync                          │
 └──────────────────────────────────────────────────────────────────┘
        │
        ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                    DATA LAYER                                     │
-│  PostgreSQL (Supabase) · S3 Storage · Edge Functions (252)       │
-│  PostgREST · GoTrue (Auth) · Realtime · pgvector                 │
+│  PostgreSQL · Object Storage (S3) · Edge Functions               │
+│  Auth · Realtime · Vector search                                 │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -76,17 +75,17 @@ Exceeding limits returns `HTTP 429` with `Retry-After` header.
 
 ### 3. Routing
 
-The API gateway routes by path prefix:
+The API gateway routes by path prefix to the appropriate service:
 
-| Prefix | Service | Port |
-|--------|---------|------|
-| `/v1/ai/generate/image` | image-engine | 8090 |
-| `/v1/ai/generate/video` | video-engine | 8092 |
-| `/v1/ai/generate/music` | music-server | 8093 |
-| `/v1/ai/gabriel` | api-server | 8791 |
-| `/v1/ai/chat` | api-server | 8791 |
-| `/v1/billing` | billing-engine | 8094 |
-| `/v1/tiers` | billing-engine | 8094 |
+| Prefix | Handled by |
+|--------|-----------|
+| `/v1/ai/generate/image` | Image service |
+| `/v1/ai/generate/video` | Video service |
+| `/v1/ai/generate/music` | Audio service |
+| `/v1/ai/gabriel` | Core API |
+| `/v1/ai/chat` | Core API |
+| `/v1/billing` | Billing service |
+| `/v1/tiers` | Billing service |
 
 ### 4. Credit Deduction
 
@@ -100,18 +99,7 @@ Request → Auth → Check balance → Deduct → Generate → Return result
 
 ### 5. Provider Routing
 
-Each engine routes to the best available provider:
-
-```python
-# Internal model routing (simplified)
-PROVIDERS = {
-    "seedream-5-0-260128": ["byteplus-eu", "byteplus-us"],
-    "flux-2-pro": ["bfl-direct", "replicate-fallback"],
-    "veo-3.1": ["google-vertex-eu"],
-}
-```
-
-If the primary provider is down, the engine automatically fails over to the next in chain — transparent to the caller.
+Each service routes every model to the best available upstream provider, with automatic failover. If the primary provider for a model is unavailable, the service transparently retries against a healthy alternative — the caller sees no difference beyond a small latency increase. Provider selection, regional routing, and failover chains are managed internally and may change without notice; your integration only ever targets the stable public model ID (for example `seedream-5-0-260128`, `flux-2-pro`, or `veo-3`).
 
 ## Infrastructure
 
@@ -139,9 +127,9 @@ If the primary provider is down, the engine automatically fails over to the next
 | Layer | Protection |
 |-------|-----------|
 | Transport | TLS 1.3 (Cloudflare Full Strict) |
-| Authentication | JWT + API keys, IP allowlists |
+| Authentication | JWT + scoped API keys |
 | Database | Row-Level Security (RLS) on all tables |
-| Secrets | AWS Secrets Manager, rotated quarterly |
+| Secrets | Managed secret store with periodic rotation |
 | WAF | Cloudflare managed + OWASP rulesets |
 | Audit | All API calls logged with user/IP/action |
 

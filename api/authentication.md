@@ -30,13 +30,13 @@ headers = {
 }
 
 # Using the SDK (recommended)
-from fotohub import FotohubClient
+from fotohub import FotoHub
 
-client = FotohubClient(api_key="fh_live_sk2Kj8mN4pQ7rT1vX3yZ5bD9fH2gL6wA0cE4")
+client = FotoHub(api_key="fh_live_sk2Kj8mN4pQ7rT1vX3yZ5bD9fH2gL6wA0cE4")
 
 # Or from environment variable (best practice)
 import os
-client = FotohubClient(api_key=os.environ["FOTOHUB_API_KEY"])
+client = FotoHub(api_key=os.environ["FOTOHUB_API_KEY"])
 ```
 
 ```typescript [TypeScript]
@@ -51,9 +51,9 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 });
 
 // Using the SDK (recommended)
-import { FotohubClient } from "fotohub";
+import { FotoHub } from "fotohub";
 
-const client = new FotohubClient({
+const client = new FotoHub({
   apiKey: process.env.FOTOHUB_API_KEY!,
 });
 ```

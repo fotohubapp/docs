@@ -4,15 +4,17 @@ Gabriel is FOTOhub's intelligent platform orchestrator — a proprietary AI laye
 
 Gabriel AI is free to use for authenticated users and provides real-time suggestions, streaming responses, and proactive recommendations.
 
+All authenticated Gabriel endpoints accept your standard API key (`fh_live_*` / `fh_test_*`) via the `Authorization: Bearer` header — the same key you use for every other endpoint. A Supabase session JWT is also accepted (used by the web dashboard), but no separate credential is required for API integrations.
+
 ## Endpoints
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/v1/ai/gabriel` | Bearer JWT | Classify intent and route (single-shot) |
-| POST | `/v1/ai/gabriel/stream` | Bearer JWT | Streaming orchestration (SSE) |
+| POST | `/v1/ai/gabriel` | API key or JWT | Classify intent and route (single-shot) |
+| POST | `/v1/ai/gabriel/stream` | API key or JWT | Streaming orchestration (SSE) |
 | POST | `/v1/ai/gabriel/suggest` | None | Lightweight autocomplete suggestions |
 | POST | `/v1/ai/gabriel/recommend` | None | Proactive context-aware recommendations |
-| POST | `/v1/ai/translate` | None | Translate text |
+| POST | `/v1/ai/translate` | API key or JWT | Translate text |
 
 ---
 
@@ -22,7 +24,7 @@ Classify user intent and return a routing decision with optimal model selection,
 
 **Rate limit:** 30 requests/minute per user
 
-**Authentication:** Bearer JWT (from Supabase Auth)
+**Authentication:** API key (`fh_live_*` / `fh_test_*`) or Supabase session JWT
 
 ### Request Body
 
@@ -108,10 +110,10 @@ const result = await client.gabriel.classify({
 // {
 //   "action": "route",
 //   "target": "/generate/video",
-//   "params": { "model": "seedance-2-0-fast", "duration": 5, "prompt": "..." },
-//   "model_selected": "seedance-2-0-fast",
+//   "params": { "model": "seedance", "duration": 5, "prompt": "..." },
+//   "model_selected": "seedance",
 //   "confidence": 0.92,
-//   "credits_estimated": 1,
+//   "credits_estimated": 10,
 //   "tips": ["Seedance: describe camera movement for dynamic videos"]
 // }
 ```
@@ -119,7 +121,7 @@ const result = await client.gabriel.classify({
 ```bash [cURL]
 curl -X POST https://apis.fotohub.app/v1/ai/gabriel \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -d '{
     "prompt": "Create a brand identity for my coffee shop",
     "language": "en",
@@ -141,7 +143,7 @@ Streaming orchestration via Server-Sent Events (SSE). Provides progressive feedb
 
 **Rate limit:** 30 requests/minute per user
 
-**Authentication:** Bearer JWT
+**Authentication:** API key (`fh_live_*` / `fh_test_*`) or Supabase session JWT
 
 ### Request Body
 
@@ -363,9 +365,9 @@ curl -X POST https://apis.fotohub.app/v1/ai/gabriel/recommend \
 
 Translate text between languages using FOTOhub's built-in translation engine.
 
-**Rate limit:** 60 requests/minute per IP
+**Rate limit:** 30 requests/minute per user
 
-**Authentication:** None required
+**Authentication:** API key (`fh_live_*` / `fh_test_*`) or Supabase session JWT
 
 ### Request Body
 
@@ -458,7 +460,9 @@ When `enhance_prompt: true` is set, Gabriel applies model-specific prompt engine
 | Seedream | Adds photorealistic quality terms, resolution hints, optimized structure |
 | Seedance | Adds camera movement, temporal progression, cinematic terms |
 | FLUX | Adds detailed composition, style-specific tokens |
+| Imagen | Adds quality terms, structured scene description |
 | Wan | Adds motion description, scene progression |
+| Grok Imagine | Adds studio lighting terms, product photography markers, commercial quality |
 
 ### Multi-Step Workflows
 
@@ -482,49 +486,49 @@ When a request requires multiple operations, Gabriel returns `action: "workflow"
 
 ## Credit Estimation
 
-Gabriel estimates costs for 30+ models:
+Gabriel estimates costs for 50+ models across image, video, and chat:
 
 ### Image Models
 
 | Model | Credits/image |
 |-------|--------------|
-| `dola-seedream-5-0-pro-260628` | 1.0 |
-| `seedream-5-0-260128` | 1.0 |
-| `seedream-4-5-251128` | 1.0 |
-| `seedream-4-0-250828` | 1.0 |
-| `flux-2-pro` | 1.5 |
-| `flux-2-max` | 3.5 |
-| `flux-2-flex` | 2.5 |
-| `flux-2-klein-4b` | 0.7 |
-| `flux-2-klein-9b` | 1.0 |
-| `flux-1.1-pro-ultra` | 3.0 |
+| `flux-2-klein-4b` | 1.0 |
+| `minimax-image-01` | 1.0 |
+| `grok-imagine-image` | 1.0 |
+| `seedream-5-0-260128` | 2.0 |
+| `seedream-4-5-251128` | 2.0 |
 | `flux-1.1-pro` | 2.0 |
 | `flux-kontext-pro` | 2.0 |
-| `flux-kontext-max` | 4.0 |
-| `wan2.6-t2i` | 1.5 |
-| `wan2.5-t2i-preview` | 1.0 |
-| `z-image-turbo` | 0.8 |
-| `grok-imagine-image-pro` | 3.5 |
-| `grok-imagine-image` | 1.0 |
+| `flux-2-pro` | 2.0 |
+| `imagen-4-standard` | 3.0 |
+| `grok-imagine-image-pro` | 3.0 |
+| `imagen-4-ultra` | 5.0 |
 
 ### Video Models
 
-| Model | Credits/generation |
-|-------|-------------------|
-| `seedance-2-0-pro` | 1.0 |
-| `seedance-2-0-fast` | 1.0 |
-| `seedance-2-0-mini` | 1.0 |
-| `seedance-1-5-pro-251215` | 1.0 |
-| `seedance-1-0-pro-250528` | 1.0 |
-| `hailuo` | 8.0 |
-| `sora-2-azure` | 8.0 |
-| `sora-2-pro` | 19.0 |
-| `wan2.6-t2v` | 10.0 |
-| `grok-video` | 10.0 |
-| `veo-3.1` | 15.0 |
+Video is billed per 5-second segment.
 
-::: tip PROMO PRICING
-Seedance and Seedream models = **1 credit flat** regardless of resolution or duration.
+| Model | Credits (5s) |
+|-------|-------------|
+| `wan-video` | 8.0 |
+| `hailuo` | 8.0 |
+| `veo-2` | 10.0 |
+| `kling` | 10.0 |
+| `seedance` | 10.0 |
+| `sora-2` | 12.0 |
+| `veo-3` | 15.0 |
+
+### Chat / LLM Models
+
+| Model | Credits/message |
+|-------|----------------|
+| `gemini-flash` | 1.0 |
+| `gemini-pro` | 2.0 |
+| `gpt-4o` | 2.0 |
+| `claude-sonnet` | 2.0 |
+
+::: tip Best Value
+`seedream-5-0-260128` offers the best quality-to-credit ratio for image generation, and `wan-video` / `hailuo` are the most cost-effective for video. For chat, `gemini-flash` (1 cr) is the cheapest option.
 :::
 
 ---

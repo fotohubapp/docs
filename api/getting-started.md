@@ -285,7 +285,7 @@ Monthly allowance included with your subscription tier. Credits are consumed fir
 PLN balance that acts as a fallback when credits are exhausted. Top up via card, BLIK, or bank transfer. Charged at per-operation rates.
 
 ::: tip Billing Priority
-Credits are always deducted first. When your monthly credit allowance is exhausted, the system automatically falls back to your wallet balance. Some models (BytePlus SeedDream, AWS Bedrock-routed models) use token-based billing where cost is calculated per input/output token rather than a fixed credit amount per operation.
+Credits are always deducted first. When your monthly credit allowance is exhausted, the system automatically falls back to your wallet balance. Some models (BytePlus SeedDream image models, premium FOTOhub AI chat models) use token-based billing where cost is calculated per input/output token rather than a fixed credit amount per operation.
 :::
 
 See [Billing & Pricing](/api/billing) for full details on credit costs per model, wallet top-up, and invoicing.
@@ -348,9 +348,9 @@ Official SDKs are available for Python and TypeScript/JavaScript. They provide t
 ::: code-group
 
 ```python [Python]
-from fotohub import FotohubClient
+from fotohub import FotoHub
 
-client = FotohubClient(api_key="fh_live_your_api_key_here")
+client = FotoHub(api_key="fh_live_your_api_key_here")
 
 # Generate an image
 image = client.images.generate(
@@ -365,9 +365,9 @@ print(f"Credits used: {image.billing.credits_used}")
 ```
 
 ```typescript [TypeScript]
-import { FotohubClient } from "fotohub";
+import { FotoHub } from "fotohub";
 
-const client = new FotohubClient({
+const client = new FotoHub({
   apiKey: "fh_live_your_api_key_here",
 });
 
@@ -399,7 +399,7 @@ console.log(`Credits used: ${image.billing.creditsUsed}`);
 - [Authentication](/api/authentication) — Key types, scopes, rotation, and JWT auth
 - [Image Generation](/api/image-generation) — 25+ models, credit and token billing
 - [Video Generation](/api/video-generation) — Veo, Kling, Hailuo, Seedance
-- [Music & Audio](/api/music-audio) — Stable Audio, MMAudio
+- [Music & Audio](/api/music-audio) — IDA Music, sound effects, TTS
 - [Chat / LLM](/api/chat-llm) — Claude, GPT-4o, Gemini, DeepSeek
 - [Billing & Pricing](/api/billing) — Understand credits, tokens, wallet
 - [Webhooks](/api/webhooks) — Real-time event notifications

@@ -149,7 +149,7 @@ print(result["audio_url"])
 | Feature | Other Providers | FOTOhub |
 |---------|----------------|---------|
 | Billing | Per-provider accounts | Single wallet, credits or tokens |
-| Models | 1 provider = 1 SDK | 200+ models, 1 SDK |
+| Models | 1 provider = 1 SDK | 50+ models, 1 SDK |
 | Failover | Manual | Automatic (model chain) |
 | Rate limits | Per-model | Tier-based, shared across all |
 | Video polling | Custom implementation | Built-in `wait_for_video()` |

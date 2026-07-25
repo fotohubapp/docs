@@ -11,9 +11,9 @@ FOTOhub offers **dual billing** — pick what fits your workload:
 Fixed cost per operation. Best for production workloads where you need cost certainty.
 
 ```
-1 credit = 1 image (Seedream, Seedance)
-1 credit = 1 chat response (Gemini Flash)
-3 credits = 1 premium image (FLUX 2 Max, Imagen 4)
+1 credit = 1 chat response (flash-tier models)
+2 credits = 1 image (Seedream, FLUX Pro)
+5 credits = 1 premium image (Imagen 4 Ultra)
 ```
 
 ### Tokens (Precise)
@@ -29,44 +29,51 @@ Output: from 0.0004 PLN/1K tokens (Gemini Flash)
 
 | Model | Credits | Quality | Speed |
 |-------|---------|---------|-------|
-| seedream-5-0-260128 | **1.0** | Excellent | ~2s |
-| dola-seedream-5-0-pro | **1.0** | Premium | ~3s |
-| flux-2-pro | 1.5 | Excellent | ~4s |
-| flux-2-max | 3.5 | Premium | ~8s |
-| flux-2-klein-4b | 0.7 | Good | ~1s |
-| wan2.5-t2i | 1.0 | Good | ~3s |
-| grok-imagine-image | 1.0 | Good | ~5s |
-| grok-imagine-image-pro | 3.5 | Premium | ~8s |
+| flux-2-klein-4b | **1.0** | Good | ~2s |
+| minimax-image-01 | **1.0** | Good | ~2s |
+| grok-imagine-image | **1.0** | Good (1K) | ~5s |
+| seedream-5-0-260128 | 2.0 | Excellent | ~2s |
+| flux-2-pro | 2.0 | Excellent | ~4s |
+| flux-1.1-pro | 2.0 | Excellent | ~4s |
+| flux-kontext-pro | 2.0 | Excellent (editing) | ~4s |
+| imagen-4-standard | 3.0 | Premium | ~4s |
+| grok-imagine-image-pro | 3.0 | Premium (2K, multi-image) | ~8s |
+| imagen-4-ultra | 5.0 | Premium (4K) | ~6s |
 
 ::: tip BEST VALUE
-**Seedream 5.0** delivers premium quality at 1 credit — the best quality-per-credit on the platform. Use it as your default.
+**`seedream-5-0-260128`** delivers premium quality at 2 credits — the best quality-per-credit on the platform. Use it as your default.
 :::
 
 ## Video Generation Costs
 
-| Model | Credits | Duration | Quality |
-|-------|---------|----------|---------|
-| seedance-2-0-fast | **1.0** | 5s | Great |
-| seedance-2-0-mini | **1.0** | 5s | Good |
-| seedance-2-0-pro | **1.0** | 5s | Premium |
-| hailuo | 8.0 | 5s | Premium |
-| sora-2-azure | 8.0 | 10s | Premium |
-| veo-3.1 | 15.0 | 8s | Premium |
-| sora-2-pro | 19.0 | 20s | Premium |
+Video is billed per 5-second segment (`max(1, duration ÷ 5)` for longer clips).
+
+| Model | Credits (5s) | Max Duration | Quality |
+|-------|--------------|--------------|---------|
+| wan-video | 8.0 | 30s | Good (budget) |
+| hailuo | 8.0 | 30s | Premium |
+| veo-2 | 10.0 | 30s | Premium |
+| kling | 10.0 | 30s | Premium |
+| seedance | 10.0 | 30s | Premium |
+| sora-2 | 12.0 | 60s | Premium |
+| veo-3 | 15.0 | 60s | Premium (cinematic + audio) |
 
 ::: tip BEST VALUE
-**Seedance 2.0 Fast** = premium video for 1 credit. Start here, upgrade to Pro only if needed.
+**`wan-video`** / **`hailuo`** = lowest cost per clip (8 credits/5s) with solid quality for social content. Step up to **`veo-3`** for cinematic output with audio.
 :::
 
 ## Chat / LLM Costs
 
-| Model | Credits/response | Tokens (input/output) |
-|-------|-----------------|----------------------|
-| gemini-flash | 1.0 | 0.0001 / 0.0004 |
-| gpt-4o | 3.0 | 0.005 / 0.015 |
-| claude-sonnet-4.6 | 3.0 | 0.003 / 0.015 |
-| deepseek-r1 | 2.0 | 0.001 / 0.006 |
-| gemini-pro | 2.0 | 0.001 / 0.004 |
+The credit-based chat endpoint (`/v1/ai/chat/completions`) bills a flat **1 credit** for flash-tier models and **2 credits** for all others, per request.
+
+| Model | Credits/response |
+|-------|-----------------|
+| `gemini-flash` | 1.0 |
+| `gemini-pro` | 2.0 |
+| `gpt-4o` | 2.0 |
+| `claude-sonnet` | 2.0 |
+
+For exact per-token billing on premium models, use the token-based endpoint (`/v1/ai/chat/claude`). See the [Chat/LLM reference](/api/chat-llm) for token rates.
 
 ## Free Operations
 
@@ -112,16 +119,16 @@ Prevent unexpected bills:
 client.set_overage_limit(50)  # Max 50 PLN overage per period
 ```
 
-### 4. Use Fast/Mini Variants for Previews
+### 4. Use Budget Variants for Previews
 
-Generate quick previews with cheap models, then regenerate final output with premium:
+Generate quick previews with cheaper models, then regenerate final output with premium:
 
 ```python
-# Preview: 1 credit
-preview = client.generate_video(prompt="...", model="seedance-2-0-mini")
+# Preview: budget model (8 credits / 5s)
+preview = client.generate_video(prompt="...", model="wan-video")
 
-# Final: still 1 credit but higher quality  
-final = client.generate_video(prompt="...", model="seedance-2-0-pro")
+# Final: cinematic quality (15 credits / 5s)
+final = client.generate_video(prompt="...", model="veo-3")
 ```
 
 ### 5. Monitor with Usage API
@@ -154,7 +161,7 @@ Before running operations, use the cost estimator:
 ```python
 estimate = client.estimate_cost([
     {"type": "image", "model": "seedream-5-0-260128", "count": 100},
-    {"type": "video", "model": "seedance-2-0-fast", "count": 20},
+    {"type": "video", "model": "veo-3", "count": 20},
     {"type": "chat", "model": "gemini-flash", "tokens": 500000},
 ])
 print(f"Estimated: {estimate['total_credits']} credits ({estimate['total_pln']} PLN)")
