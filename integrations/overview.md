@@ -1,117 +1,121 @@
 # Integrations
 
-Connect FOTOhub AI to your existing tools and platforms. Generate product photos, remove backgrounds, create AI content, and automate your creative workflow directly from your e-commerce store, CMS, or automation platform.
+Connect FOTOhub AI to your store or CMS. Generate product photography, remove and replace backgrounds, write product copy, and process an entire catalog without leaving your admin.
 
-## Official Integrations
+## Supported platforms
 
-### E-commerce
+| Platform | Type | Bulk jobs | Draft review | Descriptions | Variants | Status |
+|----------|------|:---------:|:------------:|:------------:|:--------:|--------|
+| [Magento 2](/integrations/magento) | Composer module | yes | yes | yes | yes | Stable |
+| [WooCommerce](/integrations/woocommerce) | WordPress plugin | yes | yes | yes | yes | Stable |
+| [WordPress](/integrations/wordpress) | Plugin | yes | yes | yes | — | Stable |
+| [PrestaShop](/integrations/prestashop) | PS 8 module | yes | yes | yes | yes | Stable |
+| [Shopify](/integrations/shopify) | TS library + embedded app | yes | yes | yes | yes | Beta |
+| [BigCommerce](/integrations/bigcommerce) | Node app | yes | yes | yes | yes | Beta |
+| [Shoper](/integrations/shoper) | Node app | yes | yes | yes | — | Beta |
+| [n8n](/integrations/n8n) | Community node | yes | — | yes | — | Beta |
+| [MCP](/integrations/mcp) | AI assistants | — | — | yes | — | Stable |
+| [Zapier / Make](/integrations/zapier) | Webhooks | — | — | — | — | Planned |
 
-| Platform | Type | Features | Status |
-|----------|------|----------|--------|
-| [Shopify](/integrations/shopify) | npm package | Product photo generation, background removal, bulk catalog, AI descriptions | Stable |
-| [WooCommerce](/integrations/woocommerce) | WordPress plugin | Media library AI, product photos, bulk generation, gallery management | Stable |
-| [PrestaShop](/integrations/prestashop) | PS Module | Product image AI, bulk catalog processing, admin panel | Stable |
+**Also covered without extra work:** Adobe Commerce Cloud uses the same APIs as Magento Open Source, so the Magento module works there. Shopify Plus uses the same Admin API as standard Shopify.
 
-### CMS & Platforms
+## How it works
 
-| Platform | Type | Features | Status |
-|----------|------|----------|--------|
-| [WordPress](/integrations/wordpress) | Plugin | Media library AI generation, post thumbnails, Gutenberg block | Stable |
-
-### Automation
-
-| Platform | Type | Features | Status |
-|----------|------|----------|--------|
-| [Zapier](/integrations/zapier) | Integration | Triggers & actions for image/video generation | Coming soon |
-| n8n | Node | Custom node for all FOTOhub endpoints | Coming soon |
-| [Make](/integrations/zapier) | Module | Visual automation with AI generation | Coming soon |
-
-## How It Works
-
-All integrations use the FOTOhub API under the hood. They provide a convenient interface tailored to each platform while using the same:
-
-1. **API Key authentication** (`fh_live_...`)
-2. **Credit-based billing** (same balance across all integrations)
-3. **Model catalog** (40+ image models, 10+ video models, 30+ LLMs)
-4. **Webhook notifications** (async job completion)
+Every integration is a thin client over one shared backend, the **Commerce Bridge**. The plugin knows how to read and write its own platform; the bridge owns everything else.
 
 ```
-Your Store/CMS → FOTOhub Integration → FOTOhub API → AI Models → Result
+  Your store admin                Commerce Bridge                FOTOhub core
+┌────────────────────┐        ┌──────────────────────┐        ┌────────────────┐
+│ product picker     │──REST─▶│ queue + fan-out      │──HTTP─▶│ image models   │
+│ preset selector    │        │ per-item retry       │        │ LLM copy       │
+│ progress UI        │◀─poll──│ preset library       │        │ billing        │
+│ draft review       │        │ cost preflight       │        └────────────────┘
+│ write-back         │◀─hook──│ signed callbacks     │
+└────────────────────┘        └──────────────────────┘
 ```
 
-## Getting Started
+That split is why every platform behaves the same way: the same presets, the same credit costs, the same retry semantics. Preset and pricing updates reach every store without a plugin release.
 
-### 1. Get an API Key
+If you are building your own integration, the bridge is a documented public API — see the [Commerce Bridge reference](/integrations/commerce-bridge).
 
-Sign up at [fotohub.app/console](https://fotohub.app/console) and create an API key in the developer console.
+## What every integration gives you
 
-### 2. Install the Integration
+**Bulk with a safety net.** Submit up to 500 products per job. Each product is processed independently, so one bad SKU does not sink the batch. Failed items retry on their own, and **Retry failed only** never charges you twice for products that already succeeded.
 
-Choose your platform from the list above and follow the installation guide.
+**Cost known upfront.** Before a job starts you see *"N products × M images = X credits, you have Y"*. If your balance is short you get a clear refusal instead of a run that dies halfway through your catalog. When credits do run out mid-job, the batch parks itself rather than charging item by item — top up and retry to resume.
 
-### 3. Configure
+**Nothing goes live unreviewed.** Results land as drafts. Images show a before/after comparison, copy shows a word-level diff against the current text. Approve individually or in bulk. Approval is the only write path, so a bad preset costs credits but never damages your catalog.
 
-Enter your API key in the integration's settings panel. Most integrations auto-detect your plan and available credits.
+**Copy that matches the product.** Descriptions are generated from real product data — title, category, attributes, price — in 6 tones and 3 languages (English, Polish, German), covering title, short and long description, SEO meta, alt text, FAQ and JSON-LD.
 
-### 4. Generate
+## Preset library
 
-Use the platform-native interface to generate images, remove backgrounds, or create content. All generations use your FOTOhub credit balance.
+Presets compose along orthogonal axes instead of being a flat list of prompts, so you can recombine looks rather than pick one canned result. All 63 presets ship with both English and Polish names.
 
-## Common Use Cases
+| Category | Count | Examples |
+|----------|-------|----------|
+| Bundles | 8 | `fashion-studio`, `jewelry-luxury`, `food-appetizing` |
+| Backgrounds | 14 | `pure-white`, `marble-surface`, `linen-fabric` |
+| Scenes | 12 | `kitchen-counter`, `outdoor-nature`, `christmas-seasonal` |
+| Lighting | 8 | `soft-studio-softbox`, `golden-hour`, `dramatic-low-key` |
+| Composition | 9 | `hero-three-quarter`, `top-down-flat-lay`, `ghost-mannequin` |
+| Channels | 6 | `amazon-main`, `allegro-pl`, `instagram-feed` |
+| Tones | 6 | `tone-professional`, `tone-luxury`, `tone-technical` |
 
-### Product Photography
+Channel presets carry hard constraints, so output is marketplace-compliant by construction: `amazon-main` enforces 1:1 at 1000 px minimum on pure white with no props or text. Full list in the [bridge reference](/integrations/commerce-bridge#preset-library).
 
-Generate professional product photos from text descriptions. Ideal for:
-- New product listings without a photoshoot
-- Seasonal/promotional variants
-- A/B testing different visual styles
-- Lifestyle shots and context images
+## Models
 
-### Background Removal
+The same catalog is available everywhere:
 
-Automatically remove backgrounds from product images:
-- Clean white backgrounds for marketplaces
-- Transparent PNGs for compositing
-- Batch processing entire catalogs
+| Model | Credits | Best for |
+|-------|---------|----------|
+| `seedream-5-0-260128` | 2 | Default. Strong quality at low cost, up to 4K |
+| `dola-seedream-5-0-pro-260628` | 3 | Highest detail and prompt adherence |
+| `gpt-image-2` | 2 | Text rendering in images |
+| `nano-banana-pro` | 5.3 | Premium photorealism |
+| `nano-banana-fast` | 2 | Fast iteration |
+| `imagen-4-standard` | 3 | Photorealistic product shots |
+| `imagen-4-ultra` | 5 | Native 4K |
+| `imagen-4-fast` | 2 | Budget batches |
 
-### Bulk Catalog Processing
+See the [models catalog](/api/models) for capabilities and the full platform inventory.
 
-Process hundreds of products at once:
-- Generate missing product images
-- Standardize image styles across catalog
-- Upscale low-resolution images
-- Create multiple variants per product
+## Getting started
 
-### AI Product Descriptions
+1. **Get an API key** at [fotohub.app/console](https://fotohub.app/console)
+2. **Install the integration** for your platform from the table above
+3. **Connect** — paste the key, the plugin validates it and shows your balance
+4. **Try a small batch first** — three or four products, so you can judge a preset before committing credits to the whole catalog
+5. **Review the drafts**, approve what works, and scale up
 
-Generate SEO-optimized product descriptions:
-- Multiple languages
-- Adjustable tone (professional, casual, luxury)
-- Feature extraction from images
+::: tip Validate presets on a handful of products
+Presets behave differently across product categories. A ten-product trial costs a few credits and tells you far more than reading preset names.
+:::
 
-## API Key Scopes
+## Roadmap
 
-All integrations use the same API key. Your key has access to:
+These platforms are researched and planned but **not yet available**:
 
-| Capability | Endpoint |
-|------------|----------|
-| Image Generation | `POST /v1/ai/generate/image` |
-| Video Generation | `POST /v1/ai/generate/video` |
-| Background Removal | `POST /v1/ai/remove-background` |
-| Image Upscaling | `POST /v1/ai/upscale` |
-| Chat / LLM | `POST /v1/ai/chat/completions` |
-| Speech Generation | `POST /v1/ai/generate/speech` |
-| Models Catalog | `GET /v1/models` |
-| Billing & Balance | `GET /v1/billing/balance` |
-| Webhooks | `POST /v1/webhooks` |
+| Platform | Note |
+|----------|------|
+| BaseLinker | Multichannel hub — reaches Allegro, Amazon, eBay, Empik and others through one integration |
+| Allegro | Direct marketplace integration with per-locale listing translations |
+| Wix Stores | Catalog V3 |
+| Etsy | Requires Etsy commercial API access |
+| IdoSell | Polish platform |
+| Squarespace Commerce | Requires a Commerce Advanced plan |
+| Shopware 6 | DACH market |
+| Zapier / Make | Webhook-driven automation |
 
-## Building Custom Integrations
+Need one of these sooner, or a platform not listed? The [Commerce Bridge API](/integrations/commerce-bridge) is public and documented — you can build against it today, and headless stacks (Saleor, Medusa, Vendure and similar) can register as a `custom` platform.
 
-Need an integration for a platform we don't support yet? Use our SDKs:
+## Building your own
 
+- **[Commerce Bridge API](/integrations/commerce-bridge)** — bulk jobs, presets, webhooks
 - **[Python SDK](/sdk/python)** — `pip install fotohub`
 - **[TypeScript SDK](/sdk/typescript)** — `npm install fotohub`
 - **[PHP SDK](/sdk/php)** — `composer require fotohub/fotohub-php`
-- **[REST API](/api/getting-started)** — Direct HTTP calls
+- **[REST API](/api/getting-started)** — direct HTTP
 
-See the [API Reference](/api/getting-started) for all available endpoints.
+All integration source is public at [github.com/fotohubapp](https://github.com/fotohubapp).
