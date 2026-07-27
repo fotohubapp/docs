@@ -10,14 +10,22 @@ Connect FOTOhub AI to your store or CMS. Generate product photography, remove an
 | [WooCommerce](/integrations/woocommerce) | WordPress plugin | yes | yes | yes | yes | Stable |
 | [WordPress](/integrations/wordpress) | Plugin | yes | yes | yes | — | Stable |
 | [PrestaShop](/integrations/prestashop) | PS 8 module | yes | yes | yes | yes | Stable |
-| [Shopify](/integrations/shopify) | TS library + embedded app | yes | yes | yes | yes | Beta |
-| [BigCommerce](/integrations/bigcommerce) | Node app | yes | yes | yes | yes | Beta |
-| [Shoper](/integrations/shoper) | Node app | yes | yes | yes | — | Beta |
-| [n8n](/integrations/n8n) | Community node | yes | — | yes | — | Beta |
+| [Shopify](/integrations/shopify) | TS library + embedded app | yes | yes | yes | yes | Stable |
+| [BigCommerce](/integrations/bigcommerce) | Node app | yes | yes | yes | yes | Stable |
+| [Shoper](/integrations/shoper) | Node app | yes | yes | yes | partial | Stable |
+| [n8n](/integrations/n8n) | Community node | yes | — | yes | — | Stable |
 | [MCP](/integrations/mcp) | AI assistants | — | — | yes | — | Stable |
 | [Zapier / Make](/integrations/zapier) | Webhooks | — | — | — | — | Planned |
 
 **Also covered without extra work:** Adobe Commerce Cloud uses the same APIs as Magento Open Source, so the Magento module works there. Shopify Plus uses the same Admin API as standard Shopify.
+
+::: info What Stable means here
+Every integration above is a production-ready **self-hosted** app or plugin that you install and run against your own store. None of them is a marketplace listing yet — Shopify App Store, BigCommerce Marketplace and the Shoper app store each require an OAuth install flow we have not built, so you connect with your own store credentials rather than installing from a storefront.
+
+**Shoper variants** are marked *partial* deliberately: variant option data is read and folded into the generated image's alt text, but Shoper stores images per product rather than per stock row, so a variant does not get its own separate gallery image. Enable it with the variant toggle in the job wizard.
+
+**n8n** covers bulk jobs through its Commerce resource (submit and poll) and generation across image, video, 3D, music, chat, speech and analysis. Draft review lives in the CMS plugins, not in n8n, hence the dash.
+:::
 
 ## How it works
 
