@@ -198,12 +198,12 @@ const resources = [
       <div class="hero-grid-bg"></div>
       <div class="hero-split">
         <div class="hero-left" :class="{ 'is-visible': revealed.has('hero') }">
-          <h1 class="hero-title">Build with the full power of<br>generative AI</h1>
-          <p class="hero-subtitle">Docs and resources to help you build with FOTOhub — images, video, music, 3D, chat, agents. One unified API.</p>
+          <h1 class="hero-title">Build with the full power<br>of generative AI</h1>
+          <p class="hero-subtitle">One unified API for images, video, music, 3D, chat and agents — every modality behind a single key, SDK and bill. The docs, guides and references to ship with FOTOhub, fast.</p>
           <ul class="hero-points">
-            <li><span class="hero-point-check">✓</span>One SDK, 200+ models — no provider juggling</li>
-            <li><span class="hero-point-check">✓</span>Chain image &rarr; video &rarr; audio in a few lines</li>
-            <li><span class="hero-point-check">✓</span>Typed Python &amp; TypeScript, streaming, auto-retry</li>
+            <li><span class="hero-point-check">✓</span>200+ models from every major provider — one SDK, zero juggling</li>
+            <li><span class="hero-point-check">✓</span>Chain image &rarr; video &rarr; audio in just a few lines</li>
+            <li><span class="hero-point-check">✓</span>Typed Python &amp; TypeScript SDKs — streaming and auto-retry built in</li>
           </ul>
         </div>
         <div class="hero-right" :class="{ 'is-visible': revealed.has('hero') }">
