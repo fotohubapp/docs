@@ -546,18 +546,55 @@ POST /v1/ai/generate/speech
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `text` | string | **Yes** | — | Text to synthesize. Max 5000 characters. Supports SSML for advanced control. |
-| `model` | string | No | `"google"` | TTS engine: `"google"` (fast, cost-effective) or `"ida-voice"` (natural, cloned voices). |
-| `voice_id` | string | No | — | Voice preset ID. Google: `"pl-PL-Standard-A"`, `"en-US-Neural2-F"`, etc. IDA Voice: custom voice ID from dashboard. |
+| `model` | string | No | `"google"` | TTS engine: `"google"` (fast, cost-effective), `"ida-voice"` (natural, cloned voices) or `"grok"` (26 multilingual voices, cheapest). |
+| `voice_id` | string | No | — | Voice preset ID. Google: `"pl-PL-Standard-A"`, `"en-US-Neural2-F"`. IDA Voice: custom voice ID from dashboard. Grok: `"eve"`, `"ara"`, `"leo"` and 23 more — see [Grok voices](#grok-voices). |
 | `language` | string | No | `"en"` | Target language: `"pl"`, `"en"`, `"de"`, `"fr"`, `"es"`. |
 | `speed` | number | No | `1.0` | Speech speed multiplier. Range: 0.5–2.0. |
-| `pitch` | number | No | `0` | Pitch adjustment in semitones. Range: -10 to +10. |
+| `pitch` | number | No | `0` | Pitch adjustment in semitones. Range: -10 to +10. Ignored by `"grok"`. |
 
 ### Pricing
 
 | Model | Credits | PLN | Notes |
 |-------|---------|-----|-------|
+| Grok Voice | 0.7 | 0.07 | per 1000 characters, 26 multilingual voices |
 | Google Cloud TTS | 1 | 0.09 | per 1000 characters, fast |
 | IDA Voice Pro | 2 | 0.18 | per 1000 characters, natural voice, cloning |
+
+### Grok voices
+
+All 26 Grok voices are multilingual — one voice speaks any supported language, so
+pick by character rather than by locale.
+
+**Female:** `ara`, `carina`, `celeste`, `eve`, `iris`, `luna`, `lux`
+**Male:** `altair`, `atlas`, `castor`, `cosmo`, `helios`, `helix`, `kepler`, `leo`, `lumen`, `naksh`, `orion`, `perseus`, `rex`, `rigel`, `sal`, `sirius`, `ursa`, `zagan`, `zenith`
+
+```python
+response = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/speech",
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+    json={
+        "text": "Witaj w FOTOhub!",
+        "model": "grok",
+        "voice_id": "eve",
+        "language": "pl",
+        "speed": 1.0,
+    },
+)
+print(response.json()["audio_url"])
+```
+
+Grok responses report the voice used and the billed character count:
+
+```json
+{
+  "model": "grok",
+  "credits_used": 0.7,
+  "audio_url": "https://s1.fotohub.app/storage/v1/object/public/audio/.../grok-tts.mp3",
+  "format": "mp3",
+  "voice": "eve",
+  "characters_processed": 61
+}
+```
 
 ### Response
 
@@ -1059,17 +1096,39 @@ Returns both transcription and summary in a single call (3 credits).
 POST /v1/ai/transcribe
 ```
 
-**Billing:** 1 credit per minute of audio
+**Billing:** 1 credit per minute of audio (`"default"`), 0.3 credits per started minute (`"grok"`)
 
 ### Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `audio_url` | string | **Yes** | — | URL of audio file (MP3, WAV, M4A, FLAC, OGG, WebM). Max 500MB, max 4 hours. |
+| `model` | string | No | `"default"` | `"default"` (diarization, emotion analysis) or `"grok"` (faster, per-word timestamps, 0.3 credits/minute). |
 | `language` | string | No | `"auto"` | Source language or `"auto"` for detection. Options: `"pl"`, `"en"`, `"de"`, `"fr"`, `"es"`. |
-| `mode` | string | No | `"transcribe"` | `"transcribe"` (same language), `"translate"` (to English), or `"dub"` (re-synthesize in target language). |
+| `mode` | string | No | `"transcribe"` | `"transcribe"` (same language), `"translate"` (to English), or `"dub"` (re-synthesize in target language). Not supported by `"grok"`. |
 | `timestamps` | boolean | No | `true` | Include word-level timestamps for subtitle generation. |
-| `diarize` | boolean | No | `false` | Enable speaker diarization (identify different speakers). |
+| `diarize` | boolean | No | `false` | Enable speaker diarization (identify different speakers). Not supported by `"grok"`. |
+
+#### Grok transcription
+
+`model: "grok"` returns a `words` array with a start/end offset for every word —
+useful for subtitles and word-accurate seeking. It bills 0.3 credits per started
+minute and does not do diarization or emotion analysis.
+
+```json
+{
+  "model": "grok",
+  "credits_used": 0.3,
+  "text": "Transkrypcja publicznego API ze znacznikami czasu.",
+  "language": "pl",
+  "duration": 3.7,
+  "words": [
+    { "text": "Transkrypcja", "start": 0.08, "end": 0.88 },
+    { "text": "publicznego", "start": 0.96, "end": 1.59 },
+    { "text": "API", "start": 1.73, "end": 2.11 }
+  ]
+}
+```
 
 ### Response
 
