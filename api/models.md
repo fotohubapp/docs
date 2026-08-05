@@ -228,6 +228,14 @@ Gemini's native multimodal image models — text-to-image, image-to-image, and m
 
 **Recommended:** `seedream-5-0-260128` -- Excellent quality-to-price ratio, the default model in most examples. Supports up to 4K output. `dola-seedream-5-0-pro-260628` for highest detail and prompt adherence.
 
+### BytePlus — Dreamina
+
+| Model ID | Name | Price (PLN) | Unit |
+|----------|------|-------------|------|
+| `dreamina-4-6` | Dreamina 4.6 | 0.19 | per image, flat (not resolution-scaled), up to 14 reference images |
+
+**Use case:** Image-to-image composition with up to 14 reference inputs, flat pricing regardless of output resolution (1K-4K). See the [full request reference](/api/image-generation#byteplus-dreamina-4-6-flat-per-image) — a single call can return a group of images unless `force_single` is set.
+
 ### xAI — Grok Imagine
 
 | Model ID | Name | Price (PLN) | Capabilities |
@@ -312,6 +320,16 @@ Unlike Veo, audio is generated automatically — there's no separate `audio` sur
 | `seedance-2-0-fast` | Seedance 2.0 Fast | 7.5 | |
 | `seedance-1-0-pro-250528` | Seedance 1.0 Pro | 7.5 | |
 | `seedance-2-0-pro` | Seedance 2.0 | 9.4 | highest quality |
+
+### ByteDance — Avatar & Motion Transfer
+
+Two distinct capabilities on a dedicated endpoint pair (not `/v1/ai/generate/video`) — see the [full reference](/api/avatar-motion).
+
+| Model ID | Name | Credits/s | Capability |
+|----------|------|-----------|------------|
+| `dreamactor-m2` | DreamActor M2.0 | 3.1 | motion transfer — image + driving video → performing character, 3-30s input |
+| `omnihuman-1-0` | OmniHuman 1.0 | 7.4 | avatar — image + audio → talking/performing video, no driving video needed, ≤15s |
+| `omnihuman-1-5` | OmniHuman 1.5 | 7.4 | same as 1.0, plus multi-character scene support via subject detection |
 
 ### Alibaba — Wan
 
@@ -499,15 +517,15 @@ See [Document Intelligence](/api/document-intelligence) for full API reference.
 
 | Model ID | Name | Credits | Speed | Modes | Quality |
 |----------|------|---------|-------|-------|---------|
-| `triposr` | FH Lite 3D | 5 | ~3s | image-to-3d | ★★★ |
-| `sf3d` | FH Fast 3D | 5 | <1s | image-to-3d | ★★★★ |
-| `shap-e` | FH Text 3D | 10 | ~15s | text-to-3d | ★★ |
-| `trellis` | FH HD 3D | 15 | ~15s | image-to-3d | ★★★★★ |
-| `hunyuan3d` | FH Pro 3D | 25 | ~30s | both | ★★★★★ |
+| `fh-lite-3d` | FH Lite 3D | 5 | ~3s | image-to-3d | ★★★ |
+| `fh-lite-3d` | FH Fast 3D | 5 | <1s | image-to-3d | ★★★★ |
+| `fh-text-3d` | FH Text 3D | 10 | ~15s | text-to-3d | ★★ |
+| `fh-pro-3d` | FH HD 3D | 15 | ~15s | image-to-3d | ★★★★★ |
+| `fh-pro-3d` | FH Pro 3D | 25 | ~30s | both | ★★★★★ |
 
-**Recommended:** `triposr` — Best speed-to-quality ratio for product photography and e-commerce use cases.
+**Recommended:** `fh-lite-3d` — Best speed-to-quality ratio for product photography and e-commerce use cases.
 
-**Premium pick:** `hunyuan3d` — Highest quality with PBR textures, supports both image and text input. Ideal for production 3D assets.
+**Premium pick:** `fh-pro-3d` — Highest quality with PBR textures, supports both image and text input. Ideal for production 3D assets.
 
 **Output formats:** GLB (web/AR), OBJ (editing), STL (3D printing), USDZ (Apple AR).
 

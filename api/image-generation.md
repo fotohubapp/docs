@@ -179,6 +179,55 @@ Gemini's native multimodal image models — text-to-image, image-to-image, and m
 | `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro (Dola) | 0.60 | 3 | token-based |
 | `seededit-3-0-i2i-250628` | SeedEdit 3.0 (img2img) | 0.24 | 3 | token-based |
 
+### BytePlus Dreamina 4.6 (Flat Per-Image)
+
+Unlike the SeedDream models above, Dreamina 4.6 (`model: "dreamina-4-6"`) is billed **flat per returned image**, not by token/resolution — it accepts up to 14 reference images for image-to-image composition and can output 1K/2K/4K.
+
+| Model ID | Name | Price (PLN) | Credits | Notes |
+|----------|------|-------------|---------|-------|
+| `dreamina-4-6` | Dreamina 4.6 | 0.19 | 2 | up to 14 reference images, force_single by default |
+
+::: warning A single request can return multiple images
+Dreamina 4.6 supports generating a group of up to 9 images from one prompt. This endpoint sends `force_single: true` by default so you are charged for exactly 1 image — pass `"force_single": false` (or `"num_images"` greater than 1) if you want a group, and note that the response is billed for however many images actually come back, not a number you request.
+:::
+
+**Additional request parameters for `dreamina-4-6`:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|--------------|
+| `image_urls` | array of string | — | Up to 14 reference image URLs for image-to-image composition. |
+| `width` / `height` | integer | model default | Both required together to set an explicit output size (1024×1024 up to 4096×4096). |
+| `seed` | integer | random | Fixed seed for reproducible output. |
+| `force_single` | boolean | `true` | Set `false` to allow BytePlus to return a group of images for one prompt. |
+
+```json
+{
+  "prompt": "a red ceramic mug on a marble countertop, studio lighting",
+  "model": "dreamina-4-6",
+  "width": 2048,
+  "height": 2048
+}
+```
+
+Response:
+
+```json
+{
+  "model": "dreamina-4-6",
+  "credits_used": 2,
+  "billing": {
+    "method": "credits",
+    "pln_charged": 0,
+    "breakdown": { "credits_charged": 2, "pricing_type": "per_image_resolution" }
+  },
+  "images": [
+    "https://p16-aiop-sign-sg.ibyteimg.com/tos-alisg-i-e2jboc02s9-sg/....png?..."
+  ]
+}
+```
+
+This call is synchronous — unlike the async job pattern used for [avatar and motion-transfer generation](/api/avatar-motion), Dreamina 4.6 returns the finished image URL(s) directly in the response.
+
 ### xAI (Grok Imagine)
 
 | Model ID | Name | Price (PLN) | Credits | Notes |
