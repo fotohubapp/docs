@@ -174,6 +174,7 @@ export default defineConfig({
             { text: 'Image Generation', link: '/guides/image-generation' },
             { text: 'Video Generation', link: '/guides/video-generation' },
             { text: 'Chat & Streaming', link: '/guides/chat-streaming' },
+            { text: 'Delivery to Your Bucket', link: '/guides/bucket-delivery' },
             { text: 'Webhook Integration', link: '/guides/webhooks' },
             { text: 'Integrations Hub', link: '/guides/integrations-hub' },
             { text: 'Cost Optimization', link: '/guides/cost-optimization' },
