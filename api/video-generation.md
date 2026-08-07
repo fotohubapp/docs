@@ -5,9 +5,9 @@ Generate high-quality AI videos from text prompts or source images. FOTOhub prov
 | | |
 |---|---|
 | **Models** | 30+ models from 6 providers |
-| **Duration** | 2-60 seconds, model-dependent |
+| **Duration** | 2-60 seconds, model-dependent (longest single clip: 30s on `seedance-2-5`) |
 | **Resolution** | 480p, 720p, 1080p, 4K (model-dependent) |
-| **Modes** | Text-to-video, image-to-video, reference-to-video, native audio, lip-sync |
+| **Modes** | Text-to-video, image-to-video, reference-to-video, video-to-video editing, native audio, lip-sync |
 
 ::: warning Canonical model catalog
 The set of `model` IDs accepted below is served dynamically. Always query `GET /v1/models?category=video` for the authoritative, always-current list — see the [full Video Generation Models catalog](/api/models#video-generation-models) for pricing across every provider.
@@ -27,7 +27,7 @@ POST /v1/ai/generate/video
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | string | **Yes** | — | Detailed description of the video to generate. Include subject, action, style, camera movement, and lighting for best results. |
-| `model` | string | No | `"veo-3.1-generate-001"` | Video generation model to use. See [Model Pricing](#model-pricing) below or `GET /v1/models?category=video` for the full, current list. Examples: `"veo-3.1-generate-001"`, `"wan2.6-t2v"`, `"seedance-2-0-pro"`, `"kling-v3"`, `"sora-2"`, `"grok-imagine-video-1.5"`, `"gemini-omni-flash"`. |
+| `model` | string | No | `"veo-3.1-generate-001"` | Video generation model to use. See [Model Pricing](#model-pricing) below or `GET /v1/models?category=video` for the full, current list. Examples: `"veo-3.1-generate-001"`, `"wan2.6-t2v"`, `"seedance-2-5"`, `"seedance-2-0-pro"`, `"kling-v3"`, `"sora-2"`, `"grok-imagine-video-1.5"`, `"gemini-omni-flash"`. |
 | `duration` | integer | No | `5` | Video duration in seconds (capped at 60). Supported values vary by model. |
 | `aspect_ratio` | string | No | `"16:9"` | Output aspect ratio. Options: `"16:9"` (landscape), `"9:16"` (portrait/vertical), `"1:1"` (square). |
 | `image_url` | string | No | — | URL of a source image for image-to-video generation. When provided, the video will animate from this starting frame. Must be a publicly accessible URL or a FOTOhub storage URL. |
@@ -41,17 +41,17 @@ POST /v1/ai/generate/video
 {
   "model": "veo-3.1-generate-001",
   "credits_used": 60,
-  "billing": {
-    "method": "credits",
-    "credits_used": 60,
-    "pln_charged": 12.00
-  },
   "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/videos/vj_abc123.mp4",
   "job_id": "vj_abc123",
   "status": "completed",
   "duration": 5
 }
 ```
+
+This endpoint reports the charge as `credits_used` only -- there is no `billing`
+object on the video response. When your plan allowance is exhausted the same
+credits are drawn from the USD wallet at $0.0536 per credit, so the 60 credits
+above bill $3.22. Use `GET /v1/billing/usage` for the money figure.
 
 ### Processing Response (202)
 
@@ -84,9 +84,10 @@ Per-second pricing for the most commonly used model per provider (see the [full 
 | Gemini Omni Flash | `gemini-omni-flash` | 6 | Google | native audio, T2V+I2V |
 | OpenAI Sora 2 | `sora-2` | 8 | OpenAI | |
 | Grok Video 1.5 | `grok-imagine-video-1.5` | 9 | xAI | lip-sync |
+| **Seedance 2.5** | `seedance-2-5` | **14.5** (720p) / 6.4 (480p) | ByteDance | up to **30s in one clip**, audio at no extra cost |
 
 ::: tip Recommended Model
-**`veo-3.1-generate-001`** offers the best balance of quality, native audio, and features (last-frame + reference images) for most use cases. Use **`wan2.2-t2v-plus`** or **`wan2.2-i2v-plus`** for budget-conscious batch processing, or **`gemini-omni-flash`** when you want native audio without Veo's higher per-second cost.
+**`veo-3.1-generate-001`** offers the best balance of quality, native audio, and features (last-frame + reference images) for most use cases. Use **`wan2.2-t2v-plus`** or **`wan2.2-i2v-plus`** for budget-conscious batch processing, or **`gemini-omni-flash`** when you want native audio without Veo's higher per-second cost. For anything longer than 15 seconds, **`seedance-2-5`** is the only single-request option — see [Seedance 2.5](#seedance-2-5-long-clips-video-editing) below.
 :::
 
 ### Credit Scaling by Duration
@@ -95,9 +96,12 @@ Almost every model bills `credits/s × duration` (MiniMax Hailuo is the exceptio
 
 | Duration | Example (`veo-3.1-generate-001`, 12 cr/s) |
 |----------|---------------------------------------------|
-| 5 seconds | 60 credits (12.00 PLN) |
-| 10 seconds | 120 credits (24.00 PLN) |
-| 15 seconds | 180 credits (36.00 PLN) |
+| 5 seconds | 60 credits ($3.22 from wallet) |
+| 10 seconds | 120 credits ($6.43 from wallet) |
+| 15 seconds | 180 credits ($9.65 from wallet) |
+
+USD figures are the wallet fallback at $0.0536 per credit, charged only after
+your plan's monthly credit allowance is used up.
 
 ::: info Formula
 `total_credits = credits_per_second × duration`
@@ -114,13 +118,16 @@ For example, a 10-second `wan2.2-t2v-plus` video costs: `1.2 × 10 = 12 credits`
 | `wan2.2-t2v-plus` / `-i2v-plus` | Alibaba | 1.2 | 15s | 1080p | none | cheapest, artistic |
 | `kling-v3` | Kuaishou | 5 | 15s | 1080p | optional | realistic motion |
 | `hailuo-o2` | MiniMax | — (flat) | 10s | 1080p | none | first+last frame |
-| `seedance-2-0-pro` | ByteDance | 9.4 | 15s | 1080p | optional | highest Seedance quality |
+| `seedance-2-5` | ByteDance | 14.5 (720p) | **30s** | 720p | native, **included** | longest single clip, video-to-video editing, 30 image + 10 video + 10 audio references |
+| `seedance-2-0-pro` | ByteDance | 9.4 | 15s | 4K | native | highest Seedance resolution |
 | `sora-2` | OpenAI | 8 | 12s | 1080p | native | physics-accurate |
 | `grok-imagine-video-1.5` | xAI | 9 | 15s | 1080p | none | **lip-sync** generation |
 
 ::: tip Choosing a Model
 - **Best overall**: `veo-3.1-generate-001` -- native audio, high quality, competitive price
 - **Maximum quality**: `veo-3.1-generate-001` or `sora-2` -- ultra-quality output, cinematic results
+- **Longest clip / video editing**: `seedance-2-5` -- 4-30s in a single request, audio at no extra cost
+- **Highest Seedance resolution**: `seedance-2-0-pro` -- up to 4K (2.5 tops out at 720p)
 - **Budget batch processing**: `wan2.2-t2v-plus` / `wan2.2-i2v-plus` -- lowest cost per second
 - **Native audio without Veo**: `gemini-omni-flash` -- automatic audio, no surcharge tier
 - **Lip-sync generation**: `grok-imagine-video-1.5` -- portrait + script → talking head
@@ -616,6 +623,260 @@ The output MP4 includes a full AAC audio track. Audio generation adds approximat
 
 ---
 
+## Seedance 2.5 — long clips, video editing
+
+`seedance-2-5` is the only model on the platform that produces a **30-second clip in
+a single request**, and the only one that takes an existing video as input. It is
+also the one Seedance tier where **native audio costs nothing extra** — the
+per-second rate is identical with `generate_audio` on or off.
+
+| | |
+|---|---|
+| **Model ID** | `seedance-2-5` |
+| **Duration** | any integer **4-30** seconds (`3` and `31` are rejected with a 400) |
+| **Resolution** | `480p`, `720p` — **1080p and 4K are not supported** and return a 400 |
+| **Frame rate** | 24 fps |
+| **Price** | **14.5 credits/s** at 720p, **6.4 credits/s** at 480p |
+| **Price with a video reference** | 17.6 credits/s at 720p, 7.8 at 480p (the source frames bill as input) |
+| **Audio** | native, **included in the price** |
+| **References** | up to **30 images**, **10 videos**, **10 audio clips** |
+| **Output container** | `mp4` (default) or `mov` |
+| **Mode** | asynchronous — returns `202` + `job_id`, poll or use a webhook |
+
+A 30-second 720p clip costs `14.5 × 30 = 435 credits`. A 5-second 480p draft of the
+same shot costs `6.4 × 5 = 32` — draft at 480p, finish at 720p.
+
+::: warning 720p ceiling
+2.5 is not a superset of 2.0 Pro. It reaches 30 seconds but stops at 720p, while
+`seedance-2-0-pro` reaches 4K but stops at 15 seconds. Sending `resolution: "1080p"`
+to `seedance-2-5` returns a 400 rather than silently downgrading, because the price
+scales with resolution and a silent downgrade would mean charging for pixels you
+never received.
+:::
+
+### Parameters (Seedance-only)
+
+These are accepted in addition to the [standard parameters](#request-parameters) above.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `generate_audio` | boolean | Native soundtrack. Free on 2.5 — the per-second rate is the same either way. Alias: `audio`. |
+| `image_url` | string | First frame (image-to-video). |
+| `last_frame_url` | string | Final frame. With `image_url` this becomes a first+last frame interpolation. |
+| `reference_images` | array | Up to 30. URLs, or `{"mimeType": "...", "base64": "..."}` objects. |
+| `reference_videos` | array | Up to 10. Attaching one switches the request to reference / editing / extension mode. |
+| `reference_audios` | array | Up to 10. Requires at least one image or video reference. |
+| `asset_ids` | array | Pre-registered `asset://` portrait IDs — see [face consistency](#face-consistency-asset-ids). |
+| `output_format` | string | `"mp4"` (default) or `"mov"`. |
+| `smart_ratio` | boolean | Let the model pick the aspect ratio. Equivalent to `aspect_ratio: "adaptive"`. |
+| `smart_duration` | boolean | Let the model pick the duration. Equivalent to `duration: -1`. |
+| `callback_url` | string | HTTPS URL POSTed once the job reaches a terminal state, with the same body as the poll route. Retried at 1s/2s/4s on a non-2xx, then dropped. Alias: `webhook_url`. |
+| `negative_prompt` | string | Recorded on the job. |
+| `seed` | integer | Recorded on the job. |
+| `aspect_ratio` | string | `16:9`, `9:16`, `1:1`, `4:3`, `3:4`, `21:9`, or `adaptive`. |
+
+`quality` (alias of `resolution`), `image_urls` (`[first]` or `[first, last]`),
+`video_urls` and `audio_urls` are accepted as aliases so an integration written
+against a Seedance reseller's API works by changing only the base URL and key.
+
+### Task types and locked parameters
+
+2.5 infers what you are asking for from the prompt and the attached media, and three
+of the five task types then **fix** `aspect_ratio` (and for editing, `duration`) to
+whatever the input clip has. FOTOhub resolves those locks before billing and returns
+the effective values on the `202`, so you are charged for what is actually rendered.
+
+| Task type | Triggered by | Locked |
+|-----------|--------------|--------|
+| `t2v` | prompt only | — |
+| `reference` | any image / video / `asset_ids` attached | — |
+| `frames` | `image_url` and/or `last_frame_url` | `aspect_ratio` → `adaptive` |
+| `editing` | a reference video + edit wording ("remove the…", "replace the…") | `aspect_ratio` → `adaptive`, `duration` → source length |
+| `extension` | a reference video + extension wording ("extend forward", "continue the video") | `aspect_ratio` → `adaptive` |
+
+The `202` response includes `"task_type"` so you can confirm which one was inferred.
+
+::: tip duration: -1
+Send `duration: -1` (or `smart_duration: true`) to match the source clip's length.
+Because the real length is unknown until the clip is decoded, the request is billed
+at the 30-second ceiling and `duration_requested: -1` is echoed back on the `202`.
+:::
+
+### Generate a 30-second clip
+
+::: code-group
+
+```python [Python]
+from fotohub import FotoHub
+
+client = FotoHub(api_key="fh_live_your_api_key")
+
+video = client.generate_seedance(
+    prompt=(
+        "A chef plates a dish in a warm restaurant kitchen: hands dust herbs over "
+        "seared scallops, steam rises, the camera pushes in slowly. Ambient kitchen "
+        "sounds and a low jazz bed."
+    ),
+    model="seedance-2-5",
+    duration=30,
+    resolution="720p",
+    aspect_ratio="16:9",
+    generate_audio=True,
+)
+
+print(video["video_url"])       # already finished — submit + poll handled for you
+print(video["credits_used"])    # 435
+```
+
+```typescript [TypeScript]
+import { FotoHub } from "fotohub";
+
+const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
+
+const video = await client.generateSeedance({
+  prompt:
+    "A chef plates a dish in a warm restaurant kitchen: hands dust herbs over " +
+    "seared scallops, steam rises, the camera pushes in slowly. Ambient kitchen " +
+    "sounds and a low jazz bed.",
+  model: "seedance-2-5",
+  duration: 30,
+  resolution: "720p",
+  aspect_ratio: "16:9",
+  generate_audio: true,
+});
+
+console.log(video.video_url);    // already finished
+console.log(video.credits_used); // 435
+```
+
+```bash [cURL]
+# Submit — returns 202 with a job_id and poll_url
+curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "A chef plates a dish in a warm restaurant kitchen, steam rising, camera pushes in slowly",
+    "model": "seedance-2-5",
+    "duration": 30,
+    "resolution": "720p",
+    "aspect_ratio": "16:9",
+    "generate_audio": true
+  }'
+
+# Poll until status is "completed"
+curl "https://apis.fotohub.app/v1/ai/generate/video/vj_abc123def456" \
+  -H "Authorization: Bearer fh_live_your_api_key"
+```
+
+:::
+
+Submit response (`202`):
+
+```json
+{
+  "model": "seedance-2-5",
+  "job_id": "8f1c2d3e-4b5a-6c7d-8e9f-0a1b2c3d4e5f",
+  "status": "queued",
+  "credits_used": 435,
+  "billing": {
+    "method": "credits",
+    "breakdown": {
+      "credits_per_second": 14.5,
+      "duration_seconds": 30,
+      "resolution": "720p",
+      "audio": true
+    }
+  },
+  "duration": 30,
+  "resolution": "720p",
+  "aspect_ratio": "16:9",
+  "generate_audio": true,
+  "task_type": "t2v",
+  "estimated_seconds": 240,
+  "poll_url": "https://apis.fotohub.app/v1/ai/generate/video/8f1c2d3e-4b5a-6c7d-8e9f-0a1b2c3d4e5f"
+}
+```
+
+### Edit an existing video
+
+Attach a reference video and describe the change. The output keeps the source
+geometry and length, so `aspect_ratio` and `duration` are resolved for you.
+
+```bash
+curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Replace the grey sky with a clear blue sky and warm afternoon light",
+    "model": "seedance-2-5",
+    "resolution": "720p",
+    "reference_videos": ["https://s1.fotohub.app/storage/v1/object/public/videos/source.mp4"],
+    "duration": -1
+  }'
+```
+
+The response reports `"task_type": "editing"` and `"aspect_ratio": "adaptive"`.
+
+### Extend an existing video
+
+Same shape, extension wording instead:
+
+```bash
+curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Extend forward: the camera continues past the doorway into a sunlit courtyard",
+    "model": "seedance-2-5",
+    "duration": 10,
+    "resolution": "720p",
+    "reference_videos": ["https://s1.fotohub.app/storage/v1/object/public/videos/source.mp4"]
+  }'
+```
+
+::: info A video reference costs more
+The source clip's frames bill as input, so a request with `reference_videos` is
+charged at 17.6 credits/s at 720p (7.8 at 480p) instead of the base rate. Image and
+audio references do not change the rate.
+:::
+
+### Face consistency (asset IDs)
+
+Register a portrait once, then reuse it across generations so the same face appears
+in every clip:
+
+```bash
+# 1. Register (free — returns {asset_id, uri, status})
+curl -X POST "https://apis.fotohub.app/v1/ai/assets/register" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"image_url": "https://s1.fotohub.app/storage/v1/object/public/photos/face.jpg"}'
+
+# 2. Reuse it
+curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "The same woman walks through a night market, neon reflections on wet pavement",
+    "model": "seedance-2-5",
+    "duration": 15,
+    "resolution": "720p",
+    "asset_ids": ["asset://..."]
+  }'
+```
+
+The `image_url` must be an HTTPS URL on a FOTOhub host — upload the file first. Asset
+IDs are scoped to your account and rejected with a 400 if they belong to someone else.
+
+::: warning Two flags are refused, not ignored
+`content_filter: false` and `web_search: true` return a `400`. The upstream provider
+accepts any unknown field with a 200, so neither flag does anything — accepting them
+silently would let you build on a guarantee that does not exist. `content_filter: true`
+is accepted, since standard moderation is what already happens.
+:::
+
+---
+
 ## Asynchronous Jobs
 
 Video generation is computationally intensive and may take 30 seconds to several minutes depending on model, duration, and resolution. When a generation is still in progress, the API returns a `job_id` with status `"processing"`. You can either poll for completion or use webhooks.
@@ -938,27 +1199,40 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
 
 ### Webhook Payload
 
-When the video is ready (or fails), FOTOhub sends a `POST` request to your `webhook_url` with the following payload:
+When the video is ready (or fails), FOTOhub sends a `POST` request to your
+`webhook_url`. The body is the job record itself — there is **no** `event` /
+`timestamp` envelope and **no** `billing` block:
 
 ```json
 {
-  "event": "video.ready",
-  "timestamp": "2026-07-23T14:30:00Z",
-  "data": {
-    "job_id": "vj_abc123def456",
-    "status": "completed",
-    "model": "veo-3.1-generate-001",
-    "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/videos/vj_abc123def456.mp4",
-    "duration": 10,
-    "credits_used": 20,
-    "billing": {
-      "method": "credits",
-      "credits_used": 20,
-      "pln_charged": 1.50
-    }
-  }
+  "job_id": "vj_abc123def456",
+  "status": "completed",
+  "progress": 100,
+  "model": "veo-3.1-generate-001",
+  "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/videos/vj_abc123def456.mp4",
+  "duration": 10,
+  "completed_at": "2026-07-23T14:30:00Z"
 }
 ```
+
+On failure the same shape arrives with `"status": "failed"` and an `error`
+string instead of `video_url`.
+
+::: warning Branch on `status`, not on an event name
+There is no `event` key to switch on. `video.ready` and `video.progress` are
+**not** real events — `POST /v1/webhooks` rejects both with
+`400 Invalid events`. See [Webhook Events](#webhook-events) for the events you
+can actually subscribe to.
+
+Billing figures are not delivered by the callback either. Read them from the
+generation response at submit time, or from `GET /v1/billing/usage`.
+:::
+
+::: tip Only `https` callbacks to public hosts
+The worker refuses any non-`https` callback URL, and any URL resolving to a
+private IP range, so `http://localhost:...` will never be called. Use a tunnel
+(ngrok, Cloudflare Tunnel) when testing locally.
+:::
 
 ### Handling Webhooks
 
@@ -984,14 +1258,13 @@ def handle_webhook():
     if not hmac.compare_digest(signature, expected):
         return jsonify({"error": "Invalid signature"}), 401
 
-    event = request.json
-    if event["event"] == "video.ready":
-        data = event["data"]
-        if data["status"] == "completed":
-            print(f"Video ready: {data['video_url']}")
-            # Process the completed video (download, store, notify user...)
-        else:
-            print(f"Video failed: {data.get('error')}")
+    # The body IS the job record -- no event/data envelope.
+    job = request.json
+    if job["status"] == "completed":
+        print(f"Video ready: {job['video_url']}")
+        # Process the completed video (download, store, notify user...)
+    elif job["status"] == "failed":
+        print(f"Video failed: {job.get('error')}")
 
     return jsonify({"received": True}), 200
 ```
@@ -1014,15 +1287,13 @@ app.post("/webhooks/fotohub", express.raw({ type: "application/json" }), (req, r
     return res.status(401).json({ error: "Invalid signature" });
   }
 
-  const event = JSON.parse(req.body.toString());
-  if (event.event === "video.ready") {
-    const { status, video_url, error } = event.data;
-    if (status === "completed") {
-      console.log(`Video ready: ${video_url}`);
-      // Process the completed video...
-    } else {
-      console.error(`Video failed: ${error}`);
-    }
+  // The body IS the job record -- no event/data envelope.
+  const { status, video_url, error } = JSON.parse(req.body.toString());
+  if (status === "completed") {
+    console.log(`Video ready: ${video_url}`);
+    // Process the completed video...
+  } else if (status === "failed") {
+    console.error(`Video failed: ${error}`);
   }
 
   res.json({ received: true });
@@ -1046,16 +1317,16 @@ import (
 
 const webhookSecret = "whsec_your_webhook_secret"
 
-type WebhookEvent struct {
-	Event     string `json:"event"`
-	Timestamp string `json:"timestamp"`
-	Data      struct {
-		JobID       string  `json:"job_id"`
-		Status      string  `json:"status"`
-		VideoURL    string  `json:"video_url"`
-		CreditsUsed float64 `json:"credits_used"`
-		Error       string  `json:"error"`
-	} `json:"data"`
+// The callback body IS the job record -- no event/data envelope.
+type WebhookJob struct {
+	JobID       string  `json:"job_id"`
+	Status      string  `json:"status"`
+	Progress    int     `json:"progress"`
+	Model       string  `json:"model"`
+	VideoURL    string  `json:"video_url"`
+	Duration    float64 `json:"duration"`
+	CompletedAt string  `json:"completed_at"`
+	Error       string  `json:"error"`
 }
 
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
@@ -1072,16 +1343,15 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var event WebhookEvent
-	json.Unmarshal(body, &event)
+	var job WebhookJob
+	json.Unmarshal(body, &job)
 
-	if event.Event == "video.ready" {
-		if event.Data.Status == "completed" {
-			fmt.Printf("Video ready: %s\n", event.Data.VideoURL)
-			// Process the completed video...
-		} else {
-			fmt.Printf("Video failed: %s\n", event.Data.Error)
-		}
+	switch job.Status {
+	case "completed":
+		fmt.Printf("Video ready: %s\n", job.VideoURL)
+		// Process the completed video...
+	case "failed":
+		fmt.Printf("Video failed: %s\n", job.Error)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1100,15 +1370,13 @@ curl -X POST "http://localhost:3000/webhooks/fotohub" \
   -H "Content-Type: application/json" \
   -H "X-FotoHub-Signature: your_computed_signature" \
   -d '{
-    "event": "video.ready",
-    "timestamp": "2026-07-23T14:30:00Z",
-    "data": {
-      "job_id": "vj_abc123def456",
-      "status": "completed",
-      "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/videos/vj_abc123def456.mp4",
-      "duration": 10,
-      "credits_used": 20
-    }
+    "job_id": "vj_abc123def456",
+    "status": "completed",
+    "progress": 100,
+    "model": "veo-3.1-generate-001",
+    "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/videos/vj_abc123def456.mp4",
+    "duration": 10,
+    "completed_at": "2026-07-23T14:30:00Z"
   }'
 ```
 
@@ -1116,10 +1384,22 @@ curl -X POST "http://localhost:3000/webhooks/fotohub" \
 
 ### Webhook Events
 
+These are the events accepted by `POST /v1/webhooks`. Any other value — including
+`video.ready` and `video.progress`, which older revisions of this page
+documented — is rejected with `400 Invalid events`.
+
 | Event | Description |
 |-------|-------------|
-| `video.ready` | Video generation completed successfully or failed. Check `data.status` for result. |
-| `video.progress` | Optional progress update (sent every 25%). Only if `webhook_progress: true` is set in request. |
+| `generation.completed` | Any generation finished successfully, video included. |
+| `generation.failed` | A generation failed. |
+| `credits.low` | Credit balance crossed the low-water mark. |
+| `credits.depleted` | Credits exhausted; further calls bill the USD wallet. |
+| `billing.charged` | A wallet charge was settled. |
+| `key.used` | An API key was used. |
+| `images.batch.completed` | A batch image job finished. |
+
+There is no progress event for video. Poll `GET /v1/ai/generate/video/{job_id}`
+for intermediate progress.
 
 ::: warning Webhook Security
 - Always verify the `X-FotoHub-Signature` header using HMAC-SHA256 with your webhook secret

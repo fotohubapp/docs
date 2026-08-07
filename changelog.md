@@ -4,6 +4,30 @@ Track new models, features, and improvements to the FOTOhub API.
 
 ---
 
+## August 2026
+
+### Seedance 2.5 <Badge type="tip" text="NEW" />
+
+`seedance-2-5` — the longest single-request clip on the platform, and the first model
+that takes an existing video as input.
+
+- **4-30 seconds in one request** (every integer in range; nothing else reaches past 15s)
+- **Native audio included** — the per-second rate is identical with audio on or off
+- **480p / 720p**, 24 fps, `mp4` or `mov` output
+- **14.5 credits/s at 720p, 6.4 at 480p** — a 30s 720p clip is 435 credits, a 5s 480p draft is 32
+- **Video-to-video editing and extension** — attach a source clip and describe the change
+- **Up to 30 image + 10 video + 10 audio references**, plus reusable `asset_ids` for face consistency
+
+Note: 2.5 is not a superset of `seedance-2-0-pro`. It reaches 30 seconds but stops at
+720p; 2.0 Pro reaches 4K but stops at 15 seconds. Pick per shot.
+
+See the [Seedance 2.5 reference](/api/video-generation#seedance-2-5-long-clips-video-editing)
+for the full parameter set, the task types that lock `aspect_ratio`/`duration`, and
+editing examples. SDK support: `client.generate_seedance()` / `client.generateSeedance()`
+handles submit + poll transparently.
+
+---
+
 ## July 2026
 
 ### IDA Q 1.0 <Badge type="tip" text="NEW" />
@@ -13,7 +37,7 @@ FOTOhub's first proprietary image generation model, self-hosted on our own GPU i
 - **Top-5 worldwide** on the DesignArena Elo benchmark, ahead of Recraft, Krea 2, FLUX.2, Seedream, and Imagen 4 Ultra
 - **Best-in-class text rendering** — clean headlines, labels, and signage
 - **Native multilingual prompts** — automatic translation and scene restructuring for any input language, powered by FOTOhub's own prompt engine
-- **Priced at 1.0 PLN/request** — same as Nano Banana (Gemini Flash Image), about half the price of GPT Image 2
+- **Priced at 0.5 credits/request** (≈ $0.027 if billed from your USD wallet) — the cheapest image model in the catalog
 - **Asynchronous by design** — single-GPU global queue, submit + poll pattern (30s–3.5min depending on resolution)
 - **SDK support**: `client.generate_ida_q()` / `client.generateIdaQ()` in Python & TypeScript — handles submit + poll transparently
 

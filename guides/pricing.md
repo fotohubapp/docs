@@ -21,8 +21,7 @@ Fixed cost per operation. Best for production workloads where you need cost cert
 Per-token billing for chat/LLM operations. Best for high-volume text workloads.
 
 ```
-Input:  from 0.0001 PLN/1K tokens (Gemini Flash)
-Output: from 0.0004 PLN/1K tokens (Gemini Flash)
+from $0.0001 per 1K tokens (Gemini Flash, blended input + output)
 ```
 
 ## Image Generation Costs
@@ -63,9 +62,18 @@ Most video models bill per-second (`credits/s × duration`); MiniMax Hailuo bill
 | Gemini Omni Flash | `gemini-omni-flash` | 6 | Google | native audio, T2V+I2V |
 | OpenAI Sora 2 | `sora-2` | 8 | OpenAI | |
 | Grok Video 1.5 | `grok-imagine-video-1.5` | 9 | xAI | lip-sync |
+| Seedance 2.5 | `seedance-2-5` | 14.5 (720p) / 6.4 (480p) | ByteDance | up to 30s in one clip, audio included |
 
 ::: tip BEST VALUE
 **`wan2.2-t2v-plus`** / **`hailuo-o2`** = lowest cost per second with solid quality for social content. Step up to **`veo-3.1-generate-001`** for cinematic output with native audio, or **`gemini-omni-flash`** for automatic native audio at a lower per-second rate.
+:::
+
+::: info Long clips
+`seedance-2-5` is the only model that reaches 30 seconds in a single request
+(`14.5 × 30 = 435 credits` at 720p). Draft at 480p first — the same shot is 6.4
+credits/s there, so a 5-second test costs 32 credits instead of 435. Native audio
+is included at both resolutions; attaching a source video raises the rate to 17.6
+credits/s at 720p because the input frames bill too.
 :::
 
 ## Chat / LLM Costs
@@ -122,7 +130,7 @@ result = client.generate_image(
 Prevent unexpected bills:
 
 ```python
-client.set_overage_limit(50)  # Max 50 PLN overage per period
+client.set_overage_limit(15)  # Max $15 overage per calendar month
 ```
 
 ### 4. Use Budget Variants for Previews
@@ -142,8 +150,8 @@ final = client.generate_video(prompt="...", model="veo-3.1-generate-001")
 Track spending in real-time:
 
 ```python
-usage = client.get_balance()
-if usage["credits_remaining"] < 10:
+balance = client.get_balance()
+if balance["credits"]["remaining_period"] < 10:
     # Alert or switch to cheaper models
     pass
 ```
@@ -154,9 +162,12 @@ if usage["credits_remaining"] < 10:
 |------|-------|-----------|-----|----------|
 | Free (PAYG) | 0 PLN | 50 | 10 | Testing & prototypes |
 | Developer | 49 PLN | 500 | 60 | Side projects |
-| Startup | 199 PLN | 2500 | 120 | Production apps |
-| Business | 499 PLN | 8000 | 300 | Scale |
+| Startup | 199 PLN | 5000 | 300 | Production apps |
+| Business | 799 PLN | 25000 | 1000 | Scale |
 | Enterprise | Custom | Unlimited | Custom | High-volume |
+
+API subscription plans are billed in PLN. Everything else — the wallet,
+per-request overage billing and top-ups — is USD.
 
 All tiers include wallet + auto-topup for overages.
 
@@ -170,5 +181,5 @@ estimate = client.estimate_cost([
     {"type": "video", "model": "veo-3.1-generate-001", "count": 20},
     {"type": "chat", "model": "gemini-flash", "tokens": 500000},
 ])
-print(f"Estimated: {estimate['total_credits']} credits ({estimate['total_pln']} PLN)")
+print(f"Estimated: {estimate['total_credits']} credits (${estimate['total_usd']})")
 ```

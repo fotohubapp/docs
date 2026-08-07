@@ -38,7 +38,7 @@ result = client.generate_image(
 )
 
 print(f"Image URL: {result['images'][0]}")
-print(f"Cost: {result['billing']['pln_charged']} PLN")
+print(f"Cost: ${result['billing']['usd_charged']}")
 print(f"Credits used: {result['billing']['credits_used']}")
 ```
 
@@ -124,7 +124,7 @@ for i, url in enumerate(result['images']):
 # Billing details
 print(f"Method: {result['billing']['method']}")
 print(f"Credits used: {result['billing']['credits_used']}")
-print(f"Cost: {result['billing']['pln_charged']} PLN")
+print(f"Cost: ${result['billing']['usd_charged']}")
 ```
 
 ### Parameters Reference
@@ -176,10 +176,108 @@ result = client.generate_video(
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `prompt` | `str` | Yes | Text description of the video |
-| `model` | `str` | Yes | Model ID — see `GET /v1/models?category=video` for the full list. Examples: `veo-3.1-generate-001`, `veo-2.0-generate-001`, `kling-v3`, `hailuo-o2`, `seedance-2-0-pro`, `sora-2`, `wan2.2-t2v-plus`, `gemini-omni-flash`, `grok-imagine-video-1.5` |
+| `model` | `str` | Yes | Model ID — see `GET /v1/models?category=video` for the full list. Examples: `veo-3.1-generate-001`, `veo-2.0-generate-001`, `kling-v3`, `hailuo-o2`, `sora-2`, `wan2.2-t2v-plus`, `gemini-omni-flash`, `grok-imagine-video-1.5`. Seedance models are asynchronous — use [`generate_seedance()`](#seedance-long-clips-video-editing) instead |
 | `duration` | `int` | No | Duration in seconds (model-dependent, default: 5) |
 | `aspect_ratio` | `str` | No | Aspect ratio (`16:9`, `9:16`, `1:1`) |
 | `image_url` | `str` | No | Start frame image URL for image-to-video |
+
+## Seedance (long clips, video editing)
+
+Seedance models run asynchronously, so they have their own method:
+`generate_seedance()` submits the job, polls it, and returns the finished result.
+Calling `generate_video()` with a Seedance id would hand you back a job that is
+still queued.
+
+`seedance-2-5` (the default) is the only model that produces a **30-second clip in
+one request**, and the only one that accepts a source video for editing or
+extension. Native audio is **included in its price** — 14.5 credits/s at 720p, 6.4
+at 480p, the same with `generate_audio` on or off.
+
+```python
+video = client.generate_seedance(
+    prompt=(
+        "A chef plates a dish in a warm restaurant kitchen: hands dust herbs over "
+        "seared scallops, steam rises, the camera pushes in slowly."
+    ),
+    duration=30,            # 4-30 on 2.5; nothing else reaches past 15
+    resolution="720p",      # 480p | 720p — 1080p and 4K are a 400 on 2.5
+    aspect_ratio="16:9",
+    generate_audio=True,    # free on 2.5
+)
+
+print(video["video_url"])
+print(video["credits_used"])   # 435
+```
+
+::: warning 720p ceiling
+2.5 is not a superset of `seedance-2-0-pro`. It reaches 30 seconds but stops at
+720p; 2.0 Pro reaches 4K but stops at 15 seconds. Requesting a resolution a model
+does not support returns a 400 rather than downgrading silently, because the price
+scales with resolution.
+:::
+
+### Edit or extend an existing video
+
+Attach a source clip and describe the change. The output keeps the source geometry
+and length, so those parameters are resolved for you and the effective values come
+back on the result.
+
+```python
+edited = client.generate_seedance(
+    prompt="Replace the grey sky with a clear blue sky and warm afternoon light",
+    reference_videos=["https://s1.fotohub.app/storage/v1/object/public/videos/source.mp4"],
+    duration=-1,                    # match the source clip's length
+)
+print(edited["task_type"])          # "editing"
+```
+
+A source video raises the rate to 17.6 credits/s at 720p, because its frames bill
+as input. Image and audio references do not change the rate.
+
+### Face consistency
+
+Register a portrait once (free), then reuse it:
+
+```python
+asset = client.register_video_asset(
+    "https://s1.fotohub.app/storage/v1/object/public/photos/face.jpg"
+)
+
+video = client.generate_seedance(
+    prompt="The same woman walks through a night market, neon on wet pavement",
+    duration=15,
+    asset_ids=[asset["uri"]],
+)
+```
+
+### Seedance parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `prompt` | `str` | Text description of the video |
+| `model` | `str` | Default `seedance-2-5`. Others: `seedance-2-0-pro` / `-fast` / `-mini`, `seedance-1-5-pro-251215`, `seedance-1-0-pro-250528`, `seedance-1-0-pro-fast-251015` |
+| `duration` | `int` | 2.5: 4-30. 2.0: 4-15. 1.x: 5-10. `-1` matches a source clip |
+| `resolution` | `str` | 2.5: `480p`, `720p`. 2.0 Pro also `1080p`, `4K` |
+| `aspect_ratio` | `str` | `16:9`, `9:16`, `1:1`, `4:3`, `3:4`, `21:9`, `adaptive` |
+| `generate_audio` | `bool` | Native soundtrack. Free on 2.5 |
+| `image_url` | `str` | First frame |
+| `last_frame_url` | `str` | Final frame |
+| `reference_images` | `list` | Up to 30 on 2.5 (9 on 2.0). URLs or `{"mimeType", "base64"}` |
+| `reference_videos` | `list` | Up to 10 on 2.5 (3 on 2.0) |
+| `reference_audios` | `list` | Up to 10 on 2.5 (3 on 2.0). Needs ≥1 image or video reference |
+| `asset_ids` | `list` | Pre-registered `asset://` portrait ids |
+| `output_format` | `str` | `mp4` (default) or `mov`. 2.5 only |
+| `negative_prompt` | `str` | Recorded on the job |
+| `seed` | `int` | Recorded on the job |
+| `callback_url` | `str` | HTTPS URL POSTed on a terminal state |
+| `smart_ratio` | `bool` | Let the model pick the aspect ratio |
+| `smart_duration` | `bool` | Let the model pick the duration |
+| `poll_interval` | `float` | Seconds between status checks (default 10.0) |
+| `timeout` | `float` | Max seconds to wait (default 1800.0) |
+
+Raises `TimeoutError` if the job outlives `timeout` (it may still finish — the
+job id is in the message) and `FotoHubError` if the render fails, in which case
+credits are refunded server-side.
 
 ## Music Generation
 
@@ -193,7 +291,7 @@ result = client.generate_music(
 
 print(f"Audio URL: {result['audio_url']}")
 print(f"Duration: {result['duration']}s")
-print(f"Cost: {result['billing']['pln_charged']} PLN")
+print(f"Credits used: {result['credits_used']}")
 ```
 
 ### Sound Effects
@@ -258,7 +356,7 @@ response = client.chat_claude(
 print(response['choices'][0]['message']['content'])
 print(f"Input tokens: {response['usage']['prompt_tokens']}")
 print(f"Output tokens: {response['usage']['completion_tokens']}")
-print(f"Cost: {response['billing']['cost_breakdown']['cost_pln']} PLN")
+print(f"Cost: ${response['billing']['cost_breakdown']['cost_usd']}")
 ```
 
 ### OpenAI-Compatible Drop-in
@@ -325,7 +423,7 @@ with open("product.jpg", "rb") as f:
 
 result = client.generate_3d(
     mode="image-to-3d",
-    model="triposr",
+    model="fh-lite-3d",
     image=image_b64,
     format="glb",
 )
@@ -339,7 +437,7 @@ print(f"Credits: {result['billing']['credits_used']}")
 ```python
 result = client.generate_3d(
     mode="text-to-3d",
-    model="shap-e",
+    model="fh-text-3d",
     prompt="A medieval stone castle with towers",
     quality="high",
     format="glb",
@@ -364,7 +462,7 @@ for m in models:
 async with AsyncFotoHub(api_key="fh_live_your_key") as client:
     result = await client.generate_3d(
         mode="image-to-3d",
-        model="triposr",
+        model="fh-lite-3d",
         image=image_b64,
     )
     completed = await client.wait_for_3d(result["id"])
@@ -404,11 +502,16 @@ print(f"Checkout URL: {result['checkout_url']}")
 ```python
 # Check balance
 wallet = client.get_wallet()
-print(f"Balance: {wallet['balance']} {wallet['currency']}")
+print(f"Balance: ${wallet['balance']['available_usd']}")
+print(f"Spent this month: ${wallet['this_month']['spent_usd']}")
 
-# Top up
+# Top up ($10 minimum, $15,000 maximum)
 result = client.topup_wallet(100)
-print(f"Payment URL: {result['session_url']}")
+print(f"Payment URL: {result['checkout_url']}")
+
+# Polish customers can pay by BLIK/card/bank in PLN while the
+# wallet is still credited the USD amount
+result = client.topup_wallet(100, pay_currency="pln")
 ```
 
 ### Enterprise Application
@@ -528,14 +631,15 @@ async def main():
     for r in results:
         print(r['images'][0])
 
-    # Async streaming
-    async for chunk in client.chat_stream(
+    # Async chat. There is no chat_stream() method, and stream=True does not
+    # work -- /v1/ai/chat/completions never streams, so the iterator finds no
+    # SSE frames and yields nothing while the call is still billed.
+    # For real streaming see the Streaming Guide (/v1/ai/agent/stream).
+    response = await client.chat(
         messages=[{"role": "user", "content": "Tell me a joke"}],
         model="gemini-flash"
-    ):
-        content = chunk['choices'][0]['delta'].get('content', '')
-        if content:
-            print(content, end="", flush=True)
+    )
+    print(response['choices'][0]['message']['content'])
 
     # Always close the client when done
     await client.close()
@@ -648,14 +752,13 @@ async def fotohub_webhook(request: Request):
 balance = client.get_balance()
 
 print(f"Credits available: {balance['credits_available']}")
-print(f"Wallet balance: {balance['wallet_pln']} PLN")
+print(f"Wallet balance: ${balance['wallet']['balance']}")
 print(f"Plan: {balance['plan']}")
 
 # Get usage statistics
 usage = client.get_usage(period="30d")
 
 print(f"Total requests: {usage['total_requests']}")
-print(f"Total spent: {usage['total_pln']} PLN")
 print(f"Images generated: {usage['breakdown']['images']}")
 print(f"Videos generated: {usage['breakdown']['videos']}")
 print(f"Chat messages: {usage['breakdown']['chat']}")
@@ -781,7 +884,7 @@ def main():
         for i, url in enumerate(result['images']):
             print(f"Image {i+1}: {url}")
 
-        print(f"Total cost: {result['billing']['pln_charged']} PLN")
+        print(f"Total cost: ${result['billing']['usd_charged']}")
 
     except InsufficientCreditsError as e:
         print(f"Not enough credits: need {e.required}, have {e.available}")
@@ -914,7 +1017,7 @@ Generate 3D models from images or text. 3D generation is asynchronous — submit
 ```python
 result = client.generate_3d(
     mode="image-to-3d",
-    model="triposr",            # triposr, sf3d, trellis, hunyuan3d
+    model="fh-lite-3d",            # fh-lite-3d, fh-lite-3d, fh-pro-3d, fh-pro-3d
     image_url="https://example.com/object.jpg",
     quality="standard",          # draft, standard, high
     output_format="glb"          # glb, obj, stl, usdz
@@ -934,7 +1037,7 @@ print(f"3D model: {completed['model_url']}")
 ```python
 result = client.generate_3d(
     mode="text-to-3d",
-    model="shap-e",
+    model="fh-text-3d",
     prompt="a medieval sword with ornate handle",
     quality="high",
     output_format="glb"
@@ -963,11 +1066,9 @@ for m in models:
 
 | Model | Mode | Credits | Speed | Quality |
 |-------|------|---------|-------|---------|
-| `triposr` | image-to-3d | 5 | ~3s | Good |
-| `sf3d` | image-to-3d | 5 | <1s | Fast |
-| `shap-e` | text-to-3d | 10 | ~15s | Good |
-| `trellis` | image-to-3d | 15 | ~15s | High |
-| `hunyuan3d` | both | 25 | ~30s | Ultra |
+| `fh-lite-3d` | image-to-3d | 3 | ~3s | Good |
+| `fh-text-3d` | text-to-3d | 5 | ~25s | Good |
+| `fh-pro-3d` | image-to-3d | 15 | ~60s | High |
 
 ## Gabriel AI (Intelligent Routing)
 
@@ -1040,7 +1141,7 @@ for r in recs:
 ```python
 balance = client.get_balance()
 print(f"Credits: {balance['credits_available']}")
-print(f"Wallet: {balance['wallet_pln']} PLN")
+print(f"Wallet: ${balance['wallet']['balance']}")
 print(f"Tier: {balance['tier']}")
 ```
 
@@ -1049,7 +1150,7 @@ print(f"Tier: {balance['tier']}")
 ```python
 pricing = client.get_pricing(category="image_generation")
 for model_id, info in pricing['models'].items():
-    print(f"{model_id}: {info['credits']} credits ({info['price_pln']} PLN)")
+    print(f"{model_id}: {info['credits']} credits (${info['price']})")
 ```
 
 ### Estimate Cost Before Generation
@@ -1059,14 +1160,21 @@ estimate = client.estimate_cost(
     operation="image_generation",
     params={"model": "imagen-4-ultra", "count": 4}
 )
-print(f"Estimated: {estimate['credits']} credits ({estimate['pln']} PLN)")
+print(f"Estimated: {estimate['credits']} credits (${estimate['total_usd']})")
 ```
 
 ### Set Spending Cap
 
 ```python
-client.set_overage_limit(hard_limit_pln=100.0)
-# Generations will fail if they would exceed this monthly cap
+# Account-wide cap. Needs a write- or admin-scoped key (a read-only key gets 403).
+client.set_overage_limit(hard_limit_usd=25.0)
+# Generations will fail with 402 if they would exceed this monthly cap
+
+# Scope it to one project instead — a project cap wins over the account cap.
+client.set_overage_limit(hard_limit_usd=10.0, project_id="YOUR_PROJECT_ID")
+
+# Pass 0 to remove the cap (the wallet balance is then the only limit).
+client.set_overage_limit(hard_limit_usd=0)
 ```
 
 ### Top-Up Credits
@@ -1075,7 +1183,7 @@ client.set_overage_limit(hard_limit_pln=100.0)
 # List packages
 packages = client.get_topup_packages()
 for pkg in packages:
-    print(f"{pkg['amount_pln']} PLN → {pkg['credits']} credits (+{pkg['bonus_pct']}%)")
+    print(f"${pkg['amount_usd']} → {pkg['bonus_credits']} bonus credits (+{pkg['bonus_pct']}%)")
 
 # Purchase
 result = client.create_topup("topup-500")
@@ -1087,7 +1195,7 @@ print(f"Checkout: {result['checkout_url']}")
 ```python
 txns = client.get_transactions(page=1, limit=20)
 for t in txns['items']:
-    print(f"{t['created_at']}: {t['operation']} - {t['credits']} cr ({t['pln']} PLN)")
+    print(f"{t['created_at']}: {t['type']} - ${t['amount_usd']}")
 ```
 
 ## Webhook Management
@@ -1100,7 +1208,9 @@ Programmatically manage webhooks for async event notifications.
 webhook = client.create_webhook(
     name="Video notifications",
     url="https://myapp.com/webhooks/fotohub",
-    events=["generation.completed", "generation.failed", "video.ready"],
+    # Only the events in ALLOWED_EVENTS are accepted; anything else -- including
+    # "video.ready" -- fails the whole call with 400 Invalid events.
+    events=["generation.completed", "generation.failed"],
     headers={"X-Custom": "my-value"}
 )
 print(f"ID: {webhook['id']}")
@@ -1183,7 +1293,8 @@ client = FotoHub(base_url="https://apis.fotohub.app", timeout=120.0, max_retries
 | `veo-2.0-generate-001` | Google Veo 2 |
 | `kling-v3` | Kling v3 |
 | `hailuo-o2` | MiniMax Hailuo O2 |
-| `seedance-2-0-pro` | ByteDance Seedance 2.0 |
+| `seedance-2-5` | ByteDance Seedance 2.5 (4-30s, 720p, audio included, video editing — use `generate_seedance()`) |
+| `seedance-2-0-pro` | ByteDance Seedance 2.0 (4-15s, up to 4K — use `generate_seedance()`) |
 | `sora-2` | OpenAI Sora 2 |
 | `wan2.2-t2v-plus` | Wan 2.2 Plus |
 | `gemini-omni-flash` | Google Gemini Omni Flash (native audio) |

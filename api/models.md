@@ -33,8 +33,8 @@ GET /v1/models
       "pricing_type": "request",
       "input_price_per_1k_tokens": null,
       "output_price_per_1k_tokens": null,
-      "request_price": 0.45,
-      "currency": "PLN",
+      "request_price": 0.1206,
+      "currency": "USD",
       "request_limit_per_minute": 60,
       "token_limit_per_minute": null,
       "context_window": null,
@@ -148,7 +148,7 @@ curl -X GET "https://apis.fotohub.app/v1/models?includeInactive=true" \
 
 ## Pricing Notes
 
-All pricing is shown in PLN (Polish Zloty). Credits are deducted from your monthly plan allowance; wallet charges apply when credits are exhausted.
+All per-request prices are shown in USD. Credits are deducted from your monthly plan allowance first; the USD figure is what the wallet is charged once credits are exhausted (1 credit = $0.0536 for models without their own per-request price).
 
 - Prices marked with **\*** are token-based estimates for a standard 1024x1024 generation (~4096 tokens). Actual cost depends on output resolution.
 - All other prices are fixed per operation.
@@ -158,25 +158,25 @@ All pricing is shown in PLN (Polish Zloty). Credits are deducted from your month
 
 ## Image Generation Models
 
-30+ image-generation models across multiple providers. Prices below are per-request in PLN (or credits, where noted), taken from the live `/v1/models` catalog. Query `GET /v1/models?category=image` for the authoritative, always-current list.
+30+ image-generation models across multiple providers. Prices below are per-request in USD (or credits, where noted), taken from the live `/v1/models` catalog. Query `GET /v1/models?category=image` for the authoritative, always-current list.
 
 ### FOTOhub — IDA Q 1.0
 
-| Model ID | Name | Price (PLN) | Unit |
+| Model ID | Name | Price (USD) | Unit |
 |----------|------|-------------|------|
-| `ida-q-image` | IDA Q 1.0 | 0.10 | per request (0.5 credits, async — see note below) |
+| `ida-q-image` | IDA Q 1.0 | 0.0268 | per request (0.5 credits, async — see note below) |
 
 **IDA Q 1.0** — FOTOhub's proprietary image generation model, self-hosted on our own GPU infrastructure. Best-in-class text rendering, native multilingual prompts, top-5 worldwide on the DesignArena benchmark. Unlike every other model in this catalog, generation is **asynchronous**: submit returns `202` with a `job_id`, then poll `GET /v1/ai/generate/image/ida-q/{job_id}` until it completes (30s–3.5min depending on resolution). See the [full IDA Q 1.0 reference](/api/ida-q) for the polling contract and prompt-engine details.
 
 ### Google — Imagen
 
-| Model ID | Name | Price (PLN) | Unit |
+| Model ID | Name | Price (USD) | Unit |
 |----------|------|-------------|------|
-| `imagen-3-fast` | Imagen 3 Fast | 0.12 | per image, 512px |
-| `imagen-3-standard` | Imagen 3 Standard | 0.24 | per image, 1K |
-| `imagen-3-capability` | Imagen 3 Capability | 0.24 | per image, editing/capability |
-| `imagen-4-standard` | Imagen 4 Standard | 0.45 | per image, 1K-2K |
-| `imagen-4-ultra` | Imagen 4 Ultra | 0.90 | per image, 4K |
+| `imagen-3-fast` | Imagen 3 Fast | 0.0322 | per image, 512px |
+| `imagen-3-standard` | Imagen 3 Standard | 0.0643 | per image, 1K |
+| `imagen-3-capability` | Imagen 3 Capability | 0.0643 | per image, editing/capability |
+| `imagen-4-standard` | Imagen 4 Standard | 0.1206 | per image, 1K-2K |
+| `imagen-4-ultra` | Imagen 4 Ultra | 0.2412 | per image, 4K |
 
 **Recommended:** `imagen-4-standard` -- Best balance of quality and cost for general-purpose photorealistic generation at up to 2K resolution.
 
@@ -198,12 +198,12 @@ Gemini's native multimodal image models — text-to-image, image-to-image, and m
 
 ### OpenAI — DALL-E and GPT Image
 
-| Model ID | Name | Price (PLN) | Unit |
+| Model ID | Name | Price (USD) | Unit |
 |----------|------|-------------|------|
-| `dall-e-3-standard` | DALL-E 3 | 0.24 | per image, 1K |
-| `dall-e-3-hd` | DALL-E 3 HD | 0.48 | per image, 2K |
-| `gpt-image-1` | GPT Image 1 | 0.60 | per image, 1K-2K |
-| `gpt-image-2` | GPT Image 2 | 2.00 | per image, 4K, best text rendering |
+| `dall-e-3-standard` | DALL-E 3 | 0.0643 | per image, 1K |
+| `dall-e-3-hd` | DALL-E 3 HD | 0.1286 | per image, 2K |
+| `gpt-image-1` | GPT Image 1 | 0.1608 | per image, 1K-2K |
+| `gpt-image-2` | GPT Image 2 | 0.1072 | per image, 4K, best text rendering |
 
 **Use case:** Strong text rendering in images, creative illustrations, premium photorealism. `gpt-image-2` for the highest fidelity and 4K output.
 
@@ -218,30 +218,30 @@ Gemini's native multimodal image models — text-to-image, image-to-image, and m
 
 ### BytePlus — SeedDream
 
-| Model ID | Name | Price (PLN) | Unit |
+| Model ID | Name | Price (USD) | Unit |
 |----------|------|-------------|------|
-| `seedream-4-0-250828` | SeedDream 4.0 | 0.18 | per image |
-| `seedream-5-0-260128` | SeedDream 5.0 | 0.21 | per image |
-| `seedream-4-5-251128` | SeedDream 4.5 | 0.24 | per image |
-| `seededit-3-0-i2i-250628` | SeedEdit 3.0 | 0.24 | image-to-image |
-| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro | 0.60 | per image |
+| `seedream-4-0-250828` | SeedDream 4.0 | 0.0482 | per image |
+| `seedream-5-0-260128` | SeedDream 5.0 | 0.0563 | per image |
+| `seedream-4-5-251128` | SeedDream 4.5 | 0.0643 | per image |
+| `seededit-3-0-i2i-250628` | SeedEdit 3.0 | 0.0643 | image-to-image |
+| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro | 0.0723 | per image |
 
 **Recommended:** `seedream-5-0-260128` -- Excellent quality-to-price ratio, the default model in most examples. Supports up to 4K output. `dola-seedream-5-0-pro-260628` for highest detail and prompt adherence.
 
 ### BytePlus — Dreamina
 
-| Model ID | Name | Price (PLN) | Unit |
+| Model ID | Name | Price (USD) | Unit |
 |----------|------|-------------|------|
-| `dreamina-4-6` | Dreamina 4.6 | 0.19 | per image, flat (not resolution-scaled), up to 14 reference images |
+| `dreamina-4-6` | Dreamina 4.6 | 0.1072 | per image, flat (not resolution-scaled), up to 14 reference images |
 
 **Use case:** Image-to-image composition with up to 14 reference inputs, flat pricing regardless of output resolution (1K-4K). See the [full request reference](/api/image-generation#byteplus-dreamina-4-6-flat-per-image) — a single call can return a group of images unless `force_single` is set.
 
 ### xAI — Grok Imagine
 
-| Model ID | Name | Price (PLN) | Capabilities |
+| Model ID | Name | Price (USD) | Capabilities |
 |----------|------|-------------|--------------|
-| `grok-imagine-image` | Grok Imagine | 0.12 | T2I + single-image edit, 1K, multiple aspect ratios |
-| `grok-imagine-image-pro` | Grok Imagine Pro | 0.42 | T2I + multi-image combine + higher fidelity, 2K |
+| `grok-imagine-image` | Grok Imagine | 0.0322 | T2I + single-image edit, 1K, multiple aspect ratios |
+| `grok-imagine-image-pro` | Grok Imagine Pro | 0.1125 | T2I + multi-image combine + higher fidelity, 2K |
 
 **Use cases:** Product photography, e-commerce listings, multi-image combine, social media content.
 
@@ -249,24 +249,24 @@ Gemini's native multimodal image models — text-to-image, image-to-image, and m
 
 FLUX models for text-to-image and context-aware editing. Max resolution: 1440px per side.
 
-| Model ID | Name | Price (PLN) | Unit |
+| Model ID | Name | Price (USD) | Unit |
 |----------|------|-------------|------|
-| `flux-2-klein-4b` | FLUX.2 Klein 4B | 0.084 | per image, budget |
-| `flux-2-klein-9b` | FLUX.2 Klein 9B | 0.09 | per image, budget |
-| `flux-2-pro` | FLUX.2 Pro | 0.18 | per image, up to 1440px |
-| `flux-1.1-pro` | FLUX 1.1 Pro | 0.24 | per image, up to 1440px |
-| `flux-kontext-pro` | FLUX Kontext Pro | 0.24 | per image, context-aware editing |
-| `flux-1.1-pro-ultra` | FLUX 1.1 Pro Ultra | 0.36 | per image, up to 4MP |
-| `flux-2-max` | FLUX.2 Max | 0.42 | per image, max fidelity |
-| `flux-kontext-max` | FLUX Kontext Max | 0.48 | per image, premium editing |
+| `flux-2-klein-4b` | FLUX.2 Klein 4B | 0.0225 | per image, budget |
+| `flux-2-klein-9b` | FLUX.2 Klein 9B | 0.0241 | per image, budget |
+| `flux-2-pro` | FLUX.2 Pro | 0.0482 | per image, up to 1440px |
+| `flux-1.1-pro` | FLUX 1.1 Pro | 0.0643 | per image, up to 1440px |
+| `flux-kontext-pro` | FLUX Kontext Pro | 0.0643 | per image, context-aware editing |
+| `flux-1.1-pro-ultra` | FLUX 1.1 Pro Ultra | 0.0965 | per image, up to 4MP |
+| `flux-2-max` | FLUX.2 Max | 0.1125 | per image, max fidelity |
+| `flux-kontext-max` | FLUX Kontext Max | 0.1286 | per image, premium editing |
 
 **Use case:** `flux-kontext-pro` / `flux-kontext-max` for context-aware editing and style transfer. `flux-2-klein-*` for budget generation. `flux-2-max` for maximum fidelity.
 
 ### MiniMax
 
-| Model ID | Name | Price (PLN) | Unit |
+| Model ID | Name | Price (USD) | Unit |
 |----------|------|-------------|------|
-| `minimax-image-01` | MiniMax Image | 0.021 | per image, 1K |
+| `minimax-image-01` | MiniMax Image | 0.0056 | per image, 1K |
 
 **Use case:** Lowest-cost image generation on the platform.
 
@@ -319,7 +319,12 @@ Unlike Veo, audio is generated automatically — there's no separate `audio` sur
 | `seedance-1-0-pro-fast-251015` | Seedance 1.0 Pro Fast | 3 | |
 | `seedance-2-0-fast` | Seedance 2.0 Fast | 7.5 | |
 | `seedance-1-0-pro-250528` | Seedance 1.0 Pro | 7.5 | |
-| `seedance-2-0-pro` | Seedance 2.0 | 9.4 | highest quality |
+| `seedance-2-0-pro` | Seedance 2.0 | 9.4 | highest resolution — up to 4K, 4-15s |
+| `seedance-2-5` | Seedance 2.5 | 14.5 (720p) / 6.4 (480p) | **longest clip — 4-30s in one request**, 720p ceiling, audio included, video-to-video editing, 30 image + 10 video + 10 audio references |
+
+Seedance runs asynchronously: `POST /v1/ai/generate/video` returns `202` with a
+`job_id` and `poll_url`. See the [Seedance 2.5 reference](/api/video-generation#seedance-2-5-long-clips-video-editing)
+for the full parameter set, task-type constraints, and video-editing examples.
 
 ### ByteDance — Avatar & Motion Transfer
 
@@ -488,12 +493,12 @@ Text-to-SFX generation via `/v1/ai/generate/sfx`. Uses `prompt` field for descri
 
 Image analysis, detection, OCR, and photo intelligence. These are returned under the `image` category in `/v1/models`.
 
-| Model ID | Name | Price (PLN) | Unit |
+| Model ID | Name | Price (USD) | Unit |
 |----------|------|-------------|------|
-| `photo-analysis` | Photo Analysis | 0.06 | per image analyzed |
-| `face-detection` | Face Detection | 0.06 | per image analyzed |
-| `nsfw-detection` | NSFW / Safety Detection | 0.03 | per image analyzed |
-| `ocr` | OCR (text extraction) | 0.09 | per image analyzed |
+| `photo-analysis` | Photo Analysis | 0.0161 | per image analyzed |
+| `face-detection` | Face Detection | 0.0161 | per image analyzed |
+| `nsfw-detection` | NSFW / Safety Detection | 0.0080 | per image analyzed |
+| `ocr` | OCR (text extraction) | 0.0241 | per image analyzed |
 
 **Recommended:** `photo-analysis` -- General-purpose image understanding, captioning, and content classification.
 
@@ -517,11 +522,9 @@ See [Document Intelligence](/api/document-intelligence) for full API reference.
 
 | Model ID | Name | Credits | Speed | Modes | Quality |
 |----------|------|---------|-------|-------|---------|
-| `fh-lite-3d` | FH Lite 3D | 5 | ~3s | image-to-3d | ★★★ |
-| `fh-lite-3d` | FH Fast 3D | 5 | <1s | image-to-3d | ★★★★ |
-| `fh-text-3d` | FH Text 3D | 10 | ~15s | text-to-3d | ★★ |
-| `fh-pro-3d` | FH HD 3D | 15 | ~15s | image-to-3d | ★★★★★ |
-| `fh-pro-3d` | FH Pro 3D | 25 | ~30s | both | ★★★★★ |
+| `fh-lite-3d` | FH Lite 3D | 3 | ~3s | image-to-3d | ★★★ |
+| `fh-text-3d` | FH Text 3D | 5 | ~25s | text-to-3d | ★★ |
+| `fh-pro-3d` | FH Pro 3D | 15 | ~60s | image-to-3d | ★★★★★ |
 
 **Recommended:** `fh-lite-3d` — Best speed-to-quality ratio for product photography and e-commerce use cases.
 
@@ -537,10 +540,10 @@ Resources included with plans. Overage charged from wallet.
 
 | Resource | Included | Overage Rate | Notes |
 |----------|----------|--------------|-------|
-| File Storage | 10 GB | 0.10 PLN/GB/month | Images, videos, audio files |
-| Bandwidth | 50 GB | 0.05 PLN/GB | Download transfers |
-| Agent Compute | 100 minutes | 0.30 PLN/minute | Firecracker microVMs |
-| Batch Processing | 1,000 jobs | 0.01 PLN/job | Async job queue |
+| File Storage | 10 GB | $0.0402/GB/month | Images, videos, audio files (Standard class; Premium SSD $0.1206, Archive $0.0121) |
+| Bandwidth | 50 GB | — | Download transfers. No per-GB overage rate is published in `GET /v1/billing/pricing` |
+| Agent Compute | 100 minutes | — | Firecracker microVMs. No per-minute overage rate is published in `GET /v1/billing/pricing` |
+| Batch Processing | 1,000 jobs | $0.0536/image | Async job queue — billed 1 credit per image, not per job |
 
 ---
 
@@ -557,14 +560,14 @@ Choosing the right model depends on your priorities: quality, speed, cost, or re
 ### Best for Speed
 
 - `imagen-3-fast` -- Optimized pipeline, fast with good quality
-- `flux-2-klein-4b` -- Budget FLUX variant, fast at 0.084 PLN
-- `grok-imagine-image` -- Fast inference at 0.12 PLN per image
+- `flux-2-klein-4b` -- Budget FLUX variant, fast at $0.0225
+- `grok-imagine-image` -- Fast inference at $0.0322 per image
 
 ### Best Value (Cost)
 
-- `minimax-image-01` -- 0.021 PLN per image, cheapest on platform
-- `flux-2-klein-4b` -- FLUX quality at 0.084 PLN
-- `seedream-5-0-260128` -- Latest SeedDream generation at 0.21 PLN
+- `minimax-image-01` -- $0.0056 per image, cheapest on platform
+- `flux-2-klein-4b` -- FLUX quality at $0.0225
+- `seedream-5-0-260128` -- Latest SeedDream generation at $0.0563
 
 ### Best for 4K Output
 
@@ -675,14 +678,21 @@ See [Gabriel AI](/api/gabriel-ai) for full API reference.
 
 FOTOhub exposes all capabilities as MCP (Model Context Protocol) tools, enabling AI assistants like Claude, Cursor, and VS Code Copilot to generate images, videos, music, and more.
 
-| Domain | Tools | Examples |
+| Domain | Tools | Tool names |
 |--------|-------|---------|
-| Image | 8 | generate_image, edit_image, upscale, remove_bg, analyze |
-| Video | 7 | generate_video, check_status, edit_video, generate_shorts |
-| Audio | 6 | generate_music, generate_sfx, tts, transcribe, voice_clone |
-| Chat | 3 | chat, chat_stream, enhance_prompt |
-| Utility | 4 | check_balance, list_models, get_pricing, translate |
-| Training | 2 | fine_tune, check_training_status |
+| Image | 8 | `generate_image`, `edit_image`, `upscale_image`, `remove_background`, `enhance_prompt`, `analyze_image`, `style_transfer`, `inpaint_image` |
+| Video | 7 | `generate_video`, `image_to_video`, `extend_video`, `generate_story`, `generate_shorts`, `get_job_status`, `add_subtitles` |
+| Audio | 6 | `text_to_speech`, `generate_music`, `generate_sfx`, `transcribe_audio`, `voice_clone`, `separate_stems` |
+| Chat | 3 | `chat_completion`, `translate_text`, `gabriel_route` |
+| Utility | 4 | `check_balance`, `list_models`, `list_generations`, `search_photos` |
+| Training | 2 | `create_training_job`, `get_training_status` |
+
+::: tip Names, not paraphrases
+These are the exact tool names the MCP server registers. There is no
+`chat_stream`, `edit_video`, `fine_tune`, `get_pricing` or bare `translate` tool
+— earlier revisions of this table listed shortened labels that do not resolve.
+`enhance_prompt` is registered under the image domain, not chat.
+:::
 
 **Transport:** Streamable HTTP at `https://apis.fotohub.app/mcp/`
 **Auth:** Bearer `fh_live_*` tokens

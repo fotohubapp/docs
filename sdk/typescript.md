@@ -155,7 +155,14 @@ interface GenerateImageOptions {
 interface GenerateVideoOptions {
   /** Text prompt describing the desired video */
   prompt: string;
-  /** Model ID. See GET /v1/models?category=video for the full list. Examples: veo-3.1-generate-001, veo-2.0-generate-001, wan2.2-t2v-plus, kling-v3, hailuo-o2, seedance-2-0-pro, sora-2 */
+  /**
+   * Model ID. See GET /v1/models?category=video for the full list. Examples:
+   * veo-3.1-generate-001, veo-2.0-generate-001, wan2.2-t2v-plus, kling-v3,
+   * hailuo-o2, sora-2.
+   *
+   * Seedance models are asynchronous and are not reachable through this method —
+   * use generateSeedance() instead.
+   */
   model?: string;
   /** Video duration in seconds */
   duration?: number;
@@ -295,6 +302,10 @@ interface BillingInfo {
 
 Video generation is synchronous — the promise resolves once the video is ready and the result carries the finished `video_url`. There is no job to poll.
 
+::: tip Seedance models
+The Seedance family runs asynchronously and is not reachable through `generateVideo()`. Use [`generateSeedance()`](#seedance-long-clips-video-editing), which submits and polls for you.
+:::
+
 ```typescript
 const result = await client.generateVideo({
   prompt: 'A drone flying over a mountain landscape, cinematic',
@@ -337,6 +348,151 @@ interface VideoResult {
   thumbnail_url?: string;
 }
 ```
+
+## Seedance (long clips, video editing)
+
+Seedance models are asynchronous: the API answers 202 with a `job_id` and the
+render runs in a queue. `generateSeedance()` submits, polls, and resolves once the
+job is finished, so the result already contains `video_url`.
+
+`seedance-2-5` (the default) is the only model that produces a **30-second clip in
+one request**, and the only one that accepts a source video for editing or
+extension. Native audio is **included in its price** — 14.5 credits/s at 720p, 6.4
+at 480p, the same with `generate_audio` on or off.
+
+```typescript
+const video = await client.generateSeedance({
+  prompt:
+    'A chef plates a dish in a warm restaurant kitchen: hands dust herbs over ' +
+    'seared scallops, steam rises, the camera pushes in slowly.',
+  duration: 30,          // 4-30 on 2.5; nothing else reaches past 15
+  resolution: '720p',    // 480p | 720p — 1080p and 4K are a 400 on 2.5
+  aspect_ratio: '16:9',
+  generate_audio: true,  // free on 2.5
+  onProgress: (r) => console.log(`${r.status} ${r.progress ?? 0}%`),
+});
+
+console.log(video.video_url);
+console.log(video.credits_used); // 435
+```
+
+::: warning 720p ceiling
+2.5 is not a superset of `seedance-2-0-pro`. It reaches 30 seconds but stops at
+720p; 2.0 Pro reaches 4K but stops at 15 seconds. Requesting a resolution a model
+does not support returns a 400 rather than downgrading silently, because the price
+scales with resolution.
+:::
+
+### Edit or extend an existing video
+
+Attach a source clip and describe the change. The output keeps the source geometry
+and length, so those are resolved for you and the effective values come back on the
+result.
+
+```typescript
+const edited = await client.generateSeedance({
+  prompt: 'Replace the grey sky with a clear blue sky and warm afternoon light',
+  reference_videos: ['https://s1.fotohub.app/storage/v1/object/public/videos/source.mp4'],
+  duration: -1,               // match the source clip's length
+});
+
+console.log(edited.task_type);    // "editing"
+console.log(edited.aspect_ratio); // "adaptive"
+```
+
+A source video raises the rate to 17.6 credits/s at 720p, because its frames bill
+as input. Image and audio references do not change the rate.
+
+### Face consistency
+
+Register a portrait once (free), then reuse it across generations:
+
+```typescript
+const asset = await client.registerVideoAsset(
+  'https://s1.fotohub.app/storage/v1/object/public/photos/face.jpg'
+);
+
+const video = await client.generateSeedance({
+  prompt: 'The same woman walks through a night market, neon on wet pavement',
+  duration: 15,
+  asset_ids: [asset.uri],
+});
+```
+
+### GenerateSeedanceOptions
+
+```typescript
+interface GenerateSeedanceOptions {
+  /** Text prompt describing the video to generate */
+  prompt: string;
+  /** Default 'seedance-2-5'. Others: seedance-2-0-pro / -fast / -mini, seedance-1-5-pro-251215, seedance-1-0-pro-250528, seedance-1-0-pro-fast-251015 */
+  model?: string;
+  /** 2.5: 4-30. 2.0: 4-15. 1.x: 5-10. -1 matches a source clip's length */
+  duration?: number;
+  /** 2.5 accepts only 480p and 720p; seedance-2-0-pro accepts all four */
+  resolution?: '480p' | '720p' | '1080p' | '4K';
+  /** 16:9 | 9:16 | 1:1 | 4:3 | 3:4 | 21:9 | adaptive */
+  aspect_ratio?: string;
+  /** Native soundtrack. Free on 2.5 */
+  generate_audio?: boolean;
+  /** First frame (image-to-video) */
+  image_url?: string;
+  /** Final frame */
+  last_frame_url?: string;
+  /** Up to 30 on 2.5 (9 on 2.0). URLs or { mimeType, base64 } */
+  reference_images?: SeedanceReference[];
+  /** Up to 10 on 2.5 (3 on 2.0). Raises the rate — source frames bill as input */
+  reference_videos?: SeedanceReference[];
+  /** Up to 10 on 2.5 (3 on 2.0). Needs at least one image or video reference */
+  reference_audios?: SeedanceReference[];
+  /** Pre-registered asset:// portrait ids from registerVideoAsset() */
+  asset_ids?: string[];
+  /** Output container. 2.5 only */
+  output_format?: 'mp4' | 'mov';
+  negative_prompt?: string;
+  seed?: number;
+  /** HTTPS URL POSTed once the job reaches a terminal state */
+  callback_url?: string;
+  /** Let the model pick the aspect ratio */
+  smart_ratio?: boolean;
+  /** Let the model pick the duration */
+  smart_duration?: boolean;
+  /** Milliseconds between status checks (default 10 000) */
+  pollInterval?: number;
+  /** Max milliseconds to wait (default 1 800 000) */
+  maxWait?: number;
+  /** Called on every poll with the in-flight job */
+  onProgress?: (result: SeedanceResult) => void;
+}
+```
+
+### SeedanceResult Response Type
+
+```typescript
+interface SeedanceResult extends VideoResult {
+  /** 0-100 while rendering */
+  progress?: number;
+  /** Resolution actually rendered */
+  resolution?: string;
+  /** Aspect ratio actually rendered ('adaptive' for editing/extension) */
+  aspect_ratio?: string;
+  /** Whether a native soundtrack was generated */
+  generate_audio?: boolean;
+  /** Inferred task: t2v | reference | editing | extension | frames */
+  task_type?: string;
+  /** Charge detail — breakdown carries credits_per_second, duration, resolution */
+  billing?: Record<string, unknown>;
+  poll_url?: string;
+  estimated_seconds?: number;
+  created_at?: string;
+  completed_at?: string;
+  error_message?: string;
+}
+```
+
+Throws `JobTimeoutError` if the job outlives `maxWait` (it may still finish — the
+job id is on the error) and `JobFailedError` if the render fails, in which case
+credits are refunded server-side.
 
 ## Music Generation
 
@@ -442,98 +598,181 @@ interface ChatResult {
 }
 ```
 
-## Streaming with Async Iterators
+## Streaming
 
-The SDK provides native streaming support using async iterators. Streaming works with all chat models.
+::: danger `client.chatStream()` yields nothing
+`chatStream()` posts to `/v1/ai/chat/completions`, which **does not stream** — it
+accepts `stream: true` for OpenAI compatibility and returns one complete JSON
+body. The SDK's SSE parser finds no `data:` frames in that body, so the iterator
+completes after **zero chunks and throws no error**, while the request is still
+billed. Do not use it until it is repointed.
+
+The one streaming endpoint is `POST /v1/ai/agent/stream`, which has no SDK
+wrapper yet. Call it with `fetch`, as below. Full reference: the
+[Streaming Guide](/guides/streaming).
+:::
 
 ### Basic Streaming
 
-```typescript
-const stream = await client.chatStream({
-  messages: [{ role: 'user', content: 'Write a story about space exploration' }],
-  model: 'gemini-flash',
-});
+Frames are discriminated by a `type` field (`text_delta`, `tool_use`, `done`,
+`error`), not by `choices[].delta`, and the stream is terminated by
+`data: [DONE]`.
 
-for await (const chunk of stream) {
-  const content = chunk.choices[0]?.delta?.content;
-  if (content) {
-    process.stdout.write(content);
+```typescript
+const response = await fetch('https://apis.fotohub.app/v1/ai/agent/stream', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    model: 'claude-sonnet-4.6',
+    messages: [{ role: 'user', content: 'Write a story about space exploration' }],
+  }),
+});
+// Auth and validation fail before the stream opens, so they are real statuses.
+if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+const reader = response.body!.getReader();
+const decoder = new TextDecoder();
+let buffer = '';
+
+outer: while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  // One read() can end mid-frame — buffer to the blank-line separator.
+  buffer += decoder.decode(value, { stream: true });
+  const frames = buffer.split('\n\n');
+  buffer = frames.pop() ?? '';
+
+  for (const raw of frames) {
+    if (!raw.startsWith('data: ')) continue;
+    const data = raw.slice(6).trim();
+    if (data === '[DONE]') break outer;
+
+    const frame = JSON.parse(data);
+    if (frame.type === 'text_delta') {
+      process.stdout.write(frame.text);
+    } else if (frame.type === 'error') {
+      throw new Error(frame.message);
+    }
   }
 }
 ```
 
 ### Collecting Full Response from Stream
 
+Wrap the loop above in a helper so callers get the text plus the final `done`
+metadata:
+
 ```typescript
-const stream = await client.chatStream({
-  messages: [{ role: 'user', content: 'List 10 programming languages' }],
-  model: 'gemini-flash',
-});
+interface AgentFrame {
+  type: 'text_delta' | 'tool_use' | 'done' | 'error';
+  text?: string;
+  message?: string;
+  usage?: { input_tokens: number; output_tokens: number; total_tokens: number };
+  billing?: { credits_used: number };
+}
 
-let fullContent = '';
-let usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+async function* agentFrames(messages: unknown[], model = 'claude-sonnet-4.6') {
+  const response = await fetch('https://apis.fotohub.app/v1/ai/agent/stream', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model, messages }),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-for await (const chunk of stream) {
-  const content = chunk.choices[0]?.delta?.content;
-  if (content) {
-    fullContent += content;
-  }
-  // Final chunk includes usage stats
-  if (chunk.usage) {
-    usage = chunk.usage;
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split('\n\n');
+    buffer = frames.pop() ?? '';
+    for (const raw of frames) {
+      if (!raw.startsWith('data: ')) continue;
+      const data = raw.slice(6).trim();
+      if (data === '[DONE]') return;
+      yield JSON.parse(data) as AgentFrame;
+    }
   }
 }
 
+let fullContent = '';
+let usage: AgentFrame['usage'] | undefined;
+
+for await (const frame of agentFrames([
+  { role: 'user', content: 'List 10 programming languages' },
+])) {
+  if (frame.type === 'text_delta') fullContent += frame.text;
+  if (frame.type === 'done') usage = frame.usage;
+  if (frame.type === 'error') throw new Error(frame.message);
+}
+
 console.log('Full response:', fullContent);
-console.log('Tokens used:', usage.total_tokens);
+// usage may be undefined: the done frame is skipped when nothing was generated.
+console.log('Tokens used:', usage?.total_tokens ?? 'unknown');
 ```
+
+::: warning `done` is optional, `[DONE]` is not
+The `done` frame is omitted when the turn produced no tokens at all, and replaced
+by an `error` frame when generation succeeded but billing settlement failed. Exit
+on `[DONE]`; treat `done` as optional metadata. A loop that waits for `done` can
+hang.
+:::
 
 ### Streaming to HTTP Response (Server-Sent Events)
 
+Re-emit `text_delta` frames rather than proxying upstream frames verbatim, so
+your own wire format stays under your control:
+
 ```typescript
 // Express.js / Node.js HTTP handler
-import { FotoHub } from 'fotohub';
-
 app.post('/api/chat', async (req, res) => {
-  const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  const stream = await client.chatStream({
-    messages: req.body.messages,
-    model: 'gemini-flash',
-  });
-
-  for await (const chunk of stream) {
-    res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+  try {
+    for await (const frame of agentFrames(req.body.messages)) {
+      if (frame.type === 'text_delta') {
+        res.write(`data: ${JSON.stringify({ text: frame.text })}\n\n`);
+      } else if (frame.type === 'error') {
+        res.write(`data: ${JSON.stringify({ error: frame.message })}\n\n`);
+        break;
+      }
+    }
+  } finally {
+    res.write('data: [DONE]\n\n');
+    res.end();
   }
-
-  res.write('data: [DONE]\n\n');
-  res.end();
 });
 ```
 
 ### ChatStreamChunk Type
 
+This type ships in the SDK and describes the OpenAI chunk shape that
+`chatStream()` expects. **Nothing on the API emits it** — it is kept for the
+signature only. Note there is no `usage` field on it.
+
 ```typescript
 interface ChatStreamChunk {
-  choices: Array<{
-    delta: {
-      role?: 'assistant';
-      content?: string;
-    };
-    finish_reason: 'stop' | 'length' | null;
-    index: number;
-  }>;
-  /** Only present in the final chunk */
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
+  id: string;
+  object: 'chat.completion.chunk';
+  created: number;
   model: string;
+  choices: Array<{
+    index: number;
+    delta: { role?: 'assistant'; content?: string };
+    finish_reason: 'stop' | 'length' | 'content_filter' | null;
+  }>;
 }
 ```
 
@@ -575,30 +814,63 @@ export async function POST(request: Request) {
 
 ### App Router with Streaming
 
+Proxy `/v1/ai/agent/stream` and forward the text. Your API key stays server-side:
+
 ```typescript
 // app/api/chat/route.ts
-import { FotoHub } from 'fotohub';
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
 export async function POST(request: Request) {
   const { messages } = await request.json();
 
-  const stream = await client.chatStream({
-    messages,
-    model: 'gemini-flash',
+  const upstream = await fetch('https://apis.fotohub.app/v1/ai/agent/stream', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model: 'claude-sonnet-4.6', messages }),
   });
 
-  // Convert async iterator to ReadableStream
+  // Pre-stream failures (401, 400, 429) are real statuses — pass them through
+  // instead of opening an empty 200 stream.
+  if (!upstream.ok) {
+    return new Response(await upstream.text(), { status: upstream.status });
+  }
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
   const readableStream = new ReadableStream({
     async start(controller) {
-      const encoder = new TextEncoder();
-      for await (const chunk of stream) {
-        const data = `data: ${JSON.stringify(chunk)}\n\n`;
-        controller.enqueue(encoder.encode(data));
+      const reader = upstream.body!.getReader();
+      let buffer = '';
+      try {
+        outer: while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() ?? '';
+
+          for (const raw of frames) {
+            if (!raw.startsWith('data: ')) continue;
+            const data = raw.slice(6).trim();
+            if (data === '[DONE]') break outer;
+
+            const frame = JSON.parse(data);
+            if (frame.type === 'text_delta') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: frame.text })}\n\n`));
+            } else if (frame.type === 'error') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: frame.message })}\n\n`));
+              break outer;
+            }
+          }
+        }
+      } finally {
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+        reader.releaseLock();
       }
-      controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-      controller.close();
     },
   });
 
@@ -1215,7 +1487,7 @@ const client = new FotoHub({ apiKey: 'fh_live_your_api_key' });
 const imageBase64 = readFileSync('product.jpg').toString('base64');
 const job = await client.generate3D({
   mode: 'image-to-3d',
-  model: 'triposr',
+  model: 'fh-lite-3d',
   image: imageBase64,
   format: 'glb',
   quality: 'standard',
@@ -1235,7 +1507,7 @@ with open("product.jpg", "rb") as f:
 
 job = client.generate_3d(
     mode="image-to-3d",
-    model="triposr",
+    model="fh-lite-3d",
     image=image_b64,
     format="glb",
     quality="standard",
@@ -1261,7 +1533,7 @@ func main() {
 
     job, _ := client.Generate3D(fotohub.Generate3DOptions{
         Mode:    "image-to-3d",
-        Model:   "triposr",
+        Model:   "fh-lite-3d",
         Image:   imageB64,
         Format:  "glb",
         Quality: "standard",
@@ -1276,7 +1548,7 @@ curl -X POST https://apis.fotohub.app/v1/3d/generate \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "image-to-3d",
-    "model": "triposr",
+    "model": "fh-lite-3d",
     "image": "<base64_encoded_image>",
     "format": "glb",
     "quality": "standard"
@@ -1424,11 +1696,9 @@ curl -X GET https://apis.fotohub.app/v1/3d/models \
 
 | Model | Credits | Speed | Modes |
 |-------|---------|-------|-------|
-| `triposr` | 5 | ~3s | image-to-3d |
-| `sf3d` | 5 | <1s | image-to-3d |
-| `shap-e` | 10 | ~15s | text-to-3d |
-| `trellis` | 15 | ~15s | image-to-3d |
-| `hunyuan3d` | 25 | ~30s | both |
+| `fh-lite-3d` | 3 | ~3s | image-to-3d |
+| `fh-text-3d` | 5 | ~25s | text-to-3d |
+| `fh-pro-3d` | 15 | ~60s | image-to-3d |
 
 ## Billing
 
@@ -1440,27 +1710,27 @@ Manage credits, wallet balance, pricing information, transactions, and top-up pa
 getBalance(): Promise<Balance>
 ```
 
-Returns your current credit balance and wallet balance in PLN.
+Returns your current credit balance and wallet balance in USD.
 
 ::: code-group
 ```typescript [TypeScript]
 const balance = await client.getBalance();
 console.log(`Credits: ${balance.credits_available}`);
-console.log(`Wallet: ${balance.wallet_pln} PLN`);
+console.log(`Wallet: $${balance.wallet.balance}`);
 console.log(`Plan: ${balance.plan}`);
 ```
 
 ```python [Python]
 balance = client.get_balance()
 print(f"Credits: {balance.credits_available}")
-print(f"Wallet: {balance.wallet_pln} PLN")
+print(f"Wallet: ${balance['wallet']['balance']}")
 print(f"Plan: {balance.plan}")
 ```
 
 ```go [Go]
 balance, _ := client.GetBalance()
 fmt.Printf("Credits: %d\n", balance.CreditsAvailable)
-fmt.Printf("Wallet: %.2f PLN\n", balance.WalletPLN)
+fmt.Printf("Wallet: $%.2f\n", balance.Wallet.Balance)
 fmt.Printf("Plan: %s\n", balance.Plan)
 ```
 
@@ -1511,26 +1781,28 @@ curl -X GET "https://apis.fotohub.app/v1/billing/pricing?category=image" \
 getPlans(): Promise<Plan[]>
 ```
 
-Returns all available subscription plans with their features and pricing in PLN.
+Returns all available API subscription plans with their features. API subscription
+plans are still priced in PLN (`price_pln`); only the pay-as-you-go wallet and
+per-request billing moved to USD.
 
 ::: code-group
 ```typescript [TypeScript]
 const plans = await client.getPlans();
 for (const plan of plans) {
-  console.log(`${plan.name}: ${plan.price_monthly} PLN/mo — ${plan.credits_monthly} credits`);
+  console.log(`${plan.name}: ${plan.price_pln} PLN/mo — ${plan.credits_monthly} credits`);
 }
 ```
 
 ```python [Python]
 plans = client.get_plans()
 for plan in plans:
-    print(f"{plan.name}: {plan.price_monthly} PLN/mo - {plan.credits_monthly} credits")
+    print(f"{plan['name']}: {plan['price_pln']} PLN/mo - {plan['credits_monthly']} credits")
 ```
 
 ```go [Go]
 plans, _ := client.GetPlans()
 for _, plan := range plans {
-    fmt.Printf("%s: %.0f PLN/mo - %d credits\n", plan.Name, plan.PriceMonthly, plan.CreditsMonthly)
+    fmt.Printf("%s: %.0f PLN/mo - %d credits\n", plan.Name, plan.PricePLN, plan.CreditsMonthly)
 }
 ```
 
@@ -1582,41 +1854,39 @@ curl -X GET https://apis.fotohub.app/v1/billing/credits \
 ### Set Overage Limit
 
 ```typescript
-setOverageLimit(hardLimitPln: number, projectId?: string): Promise<void>
+setOverageLimit(hardLimitUsd: number, projectId?: string): Promise<void>
 ```
 
-Sets a hard spending limit in PLN. Once reached, API calls return `402`. Optionally scope to a specific project.
+Sets a hard spending limit in USD. Once reached, API calls return `402`. Optionally scope to a specific project; a project limit takes precedence over the account-wide one. Pass `0` to disable, which reads back as `hard_limit_usd: null`.
+
+::: warning Requires a write-scoped key
+This is the one billing endpoint that will not accept a read-only key — it
+answers `403`. Use a key created with **write** or **admin** access, or your
+dashboard session JWT. Raising your own spending cap is a privileged action.
+:::
 
 ::: code-group
 ```typescript [TypeScript]
-// Set a global hard limit of 500 PLN
-await client.setOverageLimit(500);
+// Set an account-wide hard limit of $100
+await client.setOverageLimit(100);
 
 // Set a per-project limit
-await client.setOverageLimit(100, 'proj_abc123');
+await client.setOverageLimit(25, 'a1b2c3d4-5e6f-7890-abcd-ef1234567890');
 ```
 
 ```python [Python]
-# Set a global hard limit of 500 PLN
-client.set_overage_limit(500)
+# Set an account-wide hard limit of $100
+client.set_overage_limit(100)
 
 # Set a per-project limit
-client.set_overage_limit(100, project_id="proj_abc123")
-```
-
-```go [Go]
-// Global limit
-client.SetOverageLimit(500, "")
-
-// Per-project limit
-client.SetOverageLimit(100, "proj_abc123")
+client.set_overage_limit(25, project_id="a1b2c3d4-5e6f-7890-abcd-ef1234567890")
 ```
 
 ```bash [cURL]
 curl -X PUT https://apis.fotohub.app/v1/billing/overage-limit \
-  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Authorization: Bearer fh_live_your_write_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"hard_limit_pln": 500, "project_id": "proj_abc123"}'
+  -d '{"hard_limit_usd": 100, "project_id": "YOUR_PROJECT_ID"}'
 ```
 :::
 
@@ -1626,26 +1896,26 @@ curl -X PUT https://apis.fotohub.app/v1/billing/overage-limit \
 getTopupPackages(): Promise<TopupPackage[]>
 ```
 
-Returns available credit top-up packages with pricing in PLN.
+Returns available credit top-up packages with pricing in USD.
 
 ::: code-group
 ```typescript [TypeScript]
 const packages = await client.getTopupPackages();
 for (const pkg of packages) {
-  console.log(`${pkg.slug}: ${pkg.credits} credits for ${pkg.price_pln} PLN`);
+  console.log(`${pkg.slug}: $${pkg.amount_usd} (+${pkg.bonus_credits} bonus credits)`);
 }
 ```
 
 ```python [Python]
 packages = client.get_topup_packages()
 for pkg in packages:
-    print(f"{pkg.slug}: {pkg.credits} credits for {pkg.price_pln} PLN")
+    print(f"{pkg['slug']}: ${pkg['amount_usd']} (+{pkg['bonus_credits']} bonus credits)")
 ```
 
 ```go [Go]
 packages, _ := client.GetTopupPackages()
 for _, pkg := range packages {
-    fmt.Printf("%s: %d credits for %.0f PLN\n", pkg.Slug, pkg.Credits, pkg.PricePLN)
+    fmt.Printf("%s: $%.0f (+%d bonus credits)\n", pkg.Slug, pkg.AmountUSD, pkg.BonusCredits)
 }
 ```
 
@@ -1737,7 +2007,7 @@ const estimate = await client.estimateCost('image_generation', {
   model: 'seedream-5-0-260128',
   num_images: 4,
 });
-console.log(`Estimated: ${estimate.credits} credits (${estimate.pln} PLN)`);
+console.log(`Estimated: ${estimate.total_credits} credits ($${estimate.total_usd})`);
 ```
 
 ```python [Python]
@@ -1745,7 +2015,7 @@ estimate = client.estimate_cost("image_generation", {
     "model": "seedream-5-0-260128",
     "num_images": 4,
 })
-print(f"Estimated: {estimate.credits} credits ({estimate.pln} PLN)")
+print(f"Estimated: {estimate['total_credits']} credits (${estimate['total_usd']})")
 ```
 
 ```go [Go]
@@ -1753,7 +2023,7 @@ estimate, _ := client.EstimateCost("image_generation", map[string]any{
     "model":      "seedream-5-0-260128",
     "num_images": 4,
 })
-fmt.Printf("Estimated: %d credits (%.2f PLN)\n", estimate.Credits, estimate.PLN)
+fmt.Printf("Estimated: %d credits ($%.2f)\n", estimate.TotalCredits, estimate.TotalUSD)
 ```
 
 ```bash [cURL]
@@ -1779,20 +2049,20 @@ Returns all invoices for your account, including download URLs for PDF receipts.
 ```typescript [TypeScript]
 const invoices = await client.getInvoices();
 for (const inv of invoices) {
-  console.log(`${inv.date} | ${inv.amount_pln} PLN | ${inv.status} | ${inv.pdf_url}`);
+  console.log(`${inv.created} | ${(inv.amount_paid / 100).toFixed(2)} ${inv.currency.toUpperCase()} | ${inv.status} | ${inv.invoice_pdf}`);
 }
 ```
 
 ```python [Python]
 invoices = client.get_invoices()
 for inv in invoices:
-    print(f"{inv.date} | {inv.amount_pln} PLN | {inv.status} | {inv.pdf_url}")
+    print(f"{inv['created']} | {inv['amount_paid'] / 100:.2f} {inv['currency'].upper()} | {inv['status']} | {inv['invoice_pdf']}")
 ```
 
 ```go [Go]
 invoices, _ := client.GetInvoices()
 for _, inv := range invoices {
-    fmt.Printf("%s | %.2f PLN | %s | %s\n", inv.Date, inv.AmountPLN, inv.Status, inv.PDFURL)
+    fmt.Printf("%d | %.2f %s | %s | %s\n", inv.Created, float64(inv.AmountPaid)/100, strings.ToUpper(inv.Currency), inv.Status, inv.InvoicePDF)
 }
 ```
 
@@ -1812,7 +2082,10 @@ Manage subscription tiers, compare plans, and handle enterprise applications.
 getTierCatalog(): Promise<TierCatalog>
 ```
 
-Returns all available tiers with features, limits, and pricing in PLN.
+Returns all available tiers with features and limits. Subscription tiers keep
+their monthly price in PLN (`price_monthly`); the response's top-level
+`currency: "USD"` refers to the pay-as-you-go wallet and overage charges,
+not to `price_monthly`.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1969,22 +2242,24 @@ curl -X POST https://apis.fotohub.app/v1/tiers/subscribe \
 getWallet(): Promise<Wallet>
 ```
 
-Returns your wallet balance and currency.
+Returns your wallet balance in USD, this month's spend, and recent transactions.
 
 ::: code-group
 ```typescript [TypeScript]
 const wallet = await client.getWallet();
-console.log(`Balance: ${wallet.balance} ${wallet.currency}`);
+console.log(`Balance: $${wallet.balance.available_usd}`);
+console.log(`Spent this month: $${wallet.this_month.spent_usd}`);
 ```
 
 ```python [Python]
 wallet = client.get_wallet()
-print(f"Balance: {wallet.balance} {wallet.currency}")
+print(f"Balance: ${wallet['balance']['available_usd']}")
+print(f"Spent this month: ${wallet['this_month']['spent_usd']}")
 ```
 
 ```go [Go]
 wallet, _ := client.GetWallet()
-fmt.Printf("Balance: %.2f %s\n", wallet.Balance, wallet.Currency)
+fmt.Printf("Balance: $%.2f\n", wallet.Balance.AvailableUSD)
 ```
 
 ```bash [cURL]
@@ -1996,33 +2271,44 @@ curl -X GET https://apis.fotohub.app/v1/tiers/wallet \
 ### Top Up Wallet
 
 ```typescript
-topupWallet(amount: number): Promise<{ session_url: string }>
+topupWallet(
+  amountUsd: number,
+  payCurrency?: "usd" | "pln"
+): Promise<{
+  checkout_url: string;
+  amount_usd: number;
+  pay_currency: string;
+  bonus_credits: number;
+}>
 ```
 
-Initiates a wallet top-up for the given amount (PLN). Returns a Stripe payment session URL.
+Initiates a wallet top-up for the given amount in USD (minimum $10, maximum $15,000). Returns a Stripe checkout URL. Polish customers can add `pay_currency: 'pln'` to pay by BLIK/card/bank transfer in PLN while the wallet is still credited the USD amount.
 
 ::: code-group
 ```typescript [TypeScript]
-const { session_url } = await client.topupWallet(100);
-console.log(`Pay: ${session_url}`);
-// Redirect user to session_url
+const { checkout_url } = await client.topupWallet(100);
+console.log(`Pay: ${checkout_url}`);
+// Redirect user to checkout_url
+
+// Pay in PLN via BLIK while still crediting $100 to the wallet
+const blik = await client.topupWallet(100, 'pln');
 ```
 
 ```python [Python]
 result = client.topup_wallet(100)
-print(f"Pay: {result.session_url}")
+print(f"Pay: {result['checkout_url']}")
 ```
 
 ```go [Go]
 result, _ := client.TopupWallet(100)
-fmt.Printf("Pay: %s\n", result.SessionURL)
+fmt.Printf("Pay: %s\n", result.CheckoutURL)
 ```
 
 ```bash [cURL]
 curl -X POST https://apis.fotohub.app/v1/tiers/wallet/topup \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"amount": 100}'
+  -d '{"amount_usd": 100}'
 ```
 :::
 
@@ -2125,11 +2411,26 @@ createWebhook(opts: { url: string; events: string[]; description?: string }): Pr
 
 Creates a new webhook endpoint. Returns the webhook object including the signing `secret` (shown only once).
 
+::: warning `events` is validated against a fixed list
+Only these values are accepted; a single unknown entry rejects the whole call
+with `400 Invalid events`:
+
+`generation.completed`, `generation.failed`, `credits.low`, `credits.depleted`,
+`key.used`, `billing.charged`, `images.batch.completed`, `background.removed`,
+`background.replaced`, `background.blurred`, `shadow.added`,
+`commerce.job.completed`, `commerce.job.failed`, `commerce.item.completed`,
+`commerce.job.awaiting_credits`.
+
+There are no media-specific events — video and 3D completions both arrive as
+`generation.completed`. Earlier revisions of this page showed `video.completed`,
+`3d.completed` and `billing.threshold`; none of those exist.
+:::
+
 ::: code-group
 ```typescript [TypeScript]
 const webhook = await client.createWebhook({
   url: 'https://myapp.com/webhooks/fotohub',
-  events: ['video.completed', 'video.failed', '3d.completed'],
+  events: ['generation.completed', 'generation.failed'],
   description: 'Production webhook',
 });
 
@@ -2140,7 +2441,7 @@ console.log(`Secret: ${webhook.secret}`);  // Store securely — shown only once
 ```python [Python]
 webhook = client.create_webhook(
     url="https://myapp.com/webhooks/fotohub",
-    events=["video.completed", "video.failed", "3d.completed"],
+    events=["generation.completed", "generation.failed"],
     description="Production webhook",
 )
 print(f"ID: {webhook.id}")
@@ -2150,7 +2451,7 @@ print(f"Secret: {webhook.secret}")  # Store securely
 ```go [Go]
 webhook, _ := client.CreateWebhook(fotohub.WebhookOptions{
     URL:         "https://myapp.com/webhooks/fotohub",
-    Events:      []string{"video.completed", "video.failed", "3d.completed"},
+    Events:      []string{"generation.completed", "generation.failed"},
     Description: "Production webhook",
 })
 fmt.Printf("ID: %s\n", webhook.ID)
@@ -2163,7 +2464,7 @@ curl -X POST https://apis.fotohub.app/v1/webhooks \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://myapp.com/webhooks/fotohub",
-    "events": ["video.completed", "video.failed", "3d.completed"],
+    "events": ["generation.completed", "generation.failed"],
     "description": "Production webhook"
   }'
 ```
@@ -2180,7 +2481,7 @@ Updates an existing webhook's URL, events, or status.
 ::: code-group
 ```typescript [TypeScript]
 const updated = await client.updateWebhook('wh_abc123', {
-  events: ['video.completed', 'video.failed', '3d.completed', 'billing.threshold'],
+  events: ['generation.completed', 'generation.failed', 'billing.charged'],
   status: 'active',
 });
 console.log(`Updated: ${updated.id}, events: ${updated.events.length}`);
@@ -2188,7 +2489,7 @@ console.log(`Updated: ${updated.id}, events: ${updated.events.length}`);
 
 ```python [Python]
 updated = client.update_webhook("wh_abc123",
-    events=["video.completed", "video.failed", "3d.completed", "billing.threshold"],
+    events=["generation.completed", "generation.failed", "billing.charged"],
     status="active",
 )
 print(f"Updated: {updated.id}, events: {len(updated.events)}")
@@ -2196,7 +2497,7 @@ print(f"Updated: {updated.id}, events: {len(updated.events)}")
 
 ```go [Go]
 updated, _ := client.UpdateWebhook("wh_abc123", fotohub.WebhookUpdateOptions{
-    Events: []string{"video.completed", "video.failed", "3d.completed", "billing.threshold"},
+    Events: []string{"generation.completed", "generation.failed", "billing.charged"},
     Status: "active",
 })
 fmt.Printf("Updated: %s, events: %d\n", updated.ID, len(updated.Events))
@@ -2207,7 +2508,7 @@ curl -X PATCH https://apis.fotohub.app/v1/webhooks/wh_abc123 \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "events": ["video.completed", "video.failed", "3d.completed", "billing.threshold"],
+    "events": ["generation.completed", "generation.failed", "billing.charged"],
     "status": "active"
   }'
 ```
@@ -2333,7 +2634,7 @@ const classification = await client.gabrielClassify(
 );
 
 console.log(`Category: ${classification.category}`);      // 'image_to_3d'
-console.log(`Model: ${classification.recommended_model}`); // 'triposr'
+console.log(`Model: ${classification.recommended_model}`); // 'fh-lite-3d'
 console.log(`Confidence: ${classification.confidence}`);   // 0.95
 console.log(`Parameters:`, classification.suggested_params);
 ```
@@ -2760,12 +3061,11 @@ class ValidationError extends FotohubError {
 // Check account balance
 const balance = await client.getBalance();
 console.log(`Credits: ${balance.credits_available}`);
-console.log(`Wallet: ${balance.wallet_pln} PLN`);
+console.log(`Wallet: $${balance.wallet.balance}`);
 
 // Get usage statistics
 const usage = await client.getUsage({ period: '30d' });
-console.log(`Total requests: ${usage.total_requests}`);
-console.log(`Total spent: ${usage.total_pln} PLN`);
+console.log(`Total requests: ${usage.totals.totalRequests}`);
 ```
 
 ## OpenAI SDK Compatibility
@@ -2787,20 +3087,20 @@ const response = await client.chat.completions.create({
 });
 console.log(response.choices[0].message.content);
 
-// Streaming
-const stream = await client.chat.completions.create({
-  model: 'gemini-flash',
-  messages: [{ role: 'user', content: 'Write a poem' }],
-  stream: true,
-});
-
-for await (const chunk of stream) {
-  process.stdout.write(chunk.choices[0]?.delta?.content || '');
-}
+// Streaming is NOT supported here. `stream: true` is accepted and ignored, and
+// the OpenAI SDK will hang or error waiting for chunks that never arrive.
+// Use /v1/ai/agent/stream with fetch() instead — see the Streaming section above.
 ```
 
-::: info
-All FOTOhub chat models work through the OpenAI-compatible endpoint (Gemini, Claude, GPT, DeepSeek, and more). Image and video generation use FOTOhub-specific endpoints.
+::: warning Four model IDs, and no streaming
+The OpenAI-compatible endpoint accepts exactly `gemini-flash`, `gemini-pro`,
+`gpt-4o` and `claude-sonnet`. Anything else returns `400` with the supported
+list — it is not silently downgraded to a default. `gpt-4o` and `claude-sonnet`
+are stable aliases that route to newer models internally.
+
+`stream: true` is accepted for drop-in compatibility and then ignored; the
+response is always one complete JSON body. Image and video generation use
+FOTOhub-specific endpoints, not this one.
 :::
 
 ## API Reference
@@ -2817,7 +3117,7 @@ All FOTOhub chat models work through the OpenAI-compatible endpoint (Gemini, Cla
 | `transcribe(options)` | Transcribe audio to text | `Promise<TranscriptionResult>` |
 | `chat(options)` | Chat completion (credit-based) | `Promise<ChatResult>` |
 | `chatClaude(options)` | Premium chat completion (token-based) | `Promise<ChatResult>` |
-| `chatStream(options)` | Streaming chat completion | `Promise<ChatStream>` |
+| `chatStream(options)` | ⚠️ Broken — targets the non-streaming endpoint and yields zero chunks while still billing. Use `fetch` on `/v1/ai/agent/stream`. | `Promise<ChatStream>` |
 | `analyzeImage(options)` | Analyze an image with vision models | `Promise<AnalysisResult>` |
 | `enhancePrompt(prompt, style?)` | Improve a prompt with AI | `Promise<string>` |
 | `editImage(options)` | Edit an image | `Promise<EditResult>` |
@@ -2833,7 +3133,7 @@ All FOTOhub chat models work through the OpenAI-compatible endpoint (Gemini, Cla
 | `getPricing(category?)` | Get model pricing | `Promise<PricingCatalog>` |
 | `getPlans()` | Get subscription plans | `Promise<ApiPlan[]>` |
 | `getCredits()` | Get credit details | `Promise<CreditsInfo>` |
-| `setOverageLimit(hardLimitPln, projectId?)` | Set spending limit | `Promise<OverageResult>` |
+| `setOverageLimit(hardLimitUsd, projectId?)` | Set spending limit | `Promise<OverageResult>` |
 | `getTopupPackages()` | Get top-up packages | `Promise<TopupPackage[]>` |
 | `createTopup(packageSlug)` | Create top-up checkout | `Promise<TopupResult>` |
 | `getTransactions(options?)` | Get transaction history | `Promise<TransactionPage>` |
@@ -2844,7 +3144,7 @@ All FOTOhub chat models work through the OpenAI-compatible endpoint (Gemini, Cla
 | `compareTiers()` | Compare all tiers | `Promise<TierComparison>` |
 | `subscribeTier(tierSlug)` | Subscribe to tier | `Promise<{ checkout_url: string }>` |
 | `getWallet()` | Get wallet balance | `Promise<WalletInfo>` |
-| `topupWallet(amount)` | Top up wallet | `Promise<{ checkout_url: string }>` |
+| `topupWallet(amountUsd, payCurrency?)` | Top up wallet | `Promise<{ checkout_url: string }>` |
 | `applyEnterprise(application)` | Apply for enterprise | `Promise<{ id: string; status: string }>` |
 | `listWebhooks()` | List webhooks | `Promise<Webhook[]>` |
 | `createWebhook(options)` | Create webhook | `Promise<Webhook>` |

@@ -210,7 +210,8 @@ curl -s -X POST https://apis.fotohub.app/v1/ai/generate/video \
 | `hailuo-o2` | up to 10s | 1080p | Natural motion, people | 6 (flat) | 45-90s |
 | `veo-2.0-generate-001` | up to 30s | 720p | Fast + high quality, no audio | 155 | 60-120s |
 | `kling-v3` | up to 15s | 1080p | Cinematic, dramatic motion | 25 | 90-180s |
-| `seedance-2-0-pro` | up to 15s | 1080p | High-quality production, motion | 47 | 60-120s |
+| `seedance-2-0-pro` | up to 15s | 4K | High-quality production, motion | 47 | 60-120s |
+| `seedance-2-5` | up to **30s** | 720p | Long single takes, video editing, audio included | 73 | 120-300s |
 | `sora-2` | up to 12s | 1080p | Physics realism, premium | 40 | 120-300s |
 | `veo-3.0-generate-001` | up to 8s | 1080p | Photorealism, synced audio | 60 | 120-300s |
 | `veo-3.1-generate-001` | up to 8s | 4K | Best overall quality + native audio, up to 4K | 60 | 120-300s |
@@ -226,6 +227,8 @@ Need the best overall balance of quality + speed?
   → veo-2.0-generate-001
 Need production quality with strong motion?
   → seedance-2-0-pro or kling-v3
+Need a clip longer than 15 seconds, or need to edit an existing video?
+  → seedance-2-5 (the only model that reaches 30s in one request)
 Need the absolute best quality with native audio and up to 4K?
   → veo-3.1-generate-001
 Need native audio without Veo's per-second cost?
@@ -447,7 +450,8 @@ For detailed batch patterns, see the [Batch Processing Guide](/guides/batch-proc
 | 3-5s | Product shots, loops, GIFs | Most consistent quality |
 | 5-8s | Short scenes, social clips | Sweet spot for most models |
 | 8-10s | Narratives, transitions | Requires premium models |
-| 15-60s | Long-form scenes | Higher cost; `kling-v3` and `seedance-2-0-pro` support up to 15s |
+| 15-30s | Long-form scenes | `seedance-2-5` only — the single-request maximum on the platform (435 credits at 30s/720p) |
+| 30-60s | Multi-shot sequences | No model generates this in one request; stitch several clips |
 
 ---
 
