@@ -442,7 +442,7 @@ const API_KEY = "fh_live_your_api_key";
 
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
-interface FotohubErrorBody {
+interface FotoHubErrorBody {
   error: string;
   message: string;
   details?: Record<string, unknown>;
@@ -455,7 +455,7 @@ class FotohubAPIError extends Error {
   requestId: string;
   details?: Record<string, unknown>;
 
-  constructor(status: number, body: FotohubErrorBody) {
+  constructor(status: number, body: FotoHubErrorBody) {
     super(body.message);
     this.name = "FotohubAPIError";
     this.status = status;
@@ -493,7 +493,7 @@ async function requestWithRetry<T>(
       return response.json() as Promise<T>;
     }
 
-    const errorBody: FotohubErrorBody = await response.json();
+    const errorBody: FotoHubErrorBody = await response.json();
 
     // Non-retryable error
     if (!RETRYABLE_STATUS_CODES.has(response.status)) {

@@ -2862,7 +2862,7 @@ The SDK provides a typed error hierarchy for precise error handling across all m
 
 ```typescript
 import {
-  FotohubError,
+  FotoHubError,
   InsufficientCreditsError,
   RateLimitError,
   AuthenticationError,
@@ -2876,7 +2876,7 @@ import {
 ```typescript [TypeScript]
 import { FotoHub } from 'fotohub';
 import {
-  FotohubError,
+  FotoHubError,
   InsufficientCreditsError,
   RateLimitError,
   AuthenticationError,
@@ -2905,7 +2905,7 @@ try {
   } else if (e instanceof ValidationError) {
     // Invalid request parameters (400)
     console.error(`Invalid param "${e.param}": ${e.message}`);
-  } else if (e instanceof FotohubError) {
+  } else if (e instanceof FotoHubError) {
     // Other API errors (4xx/5xx)
     console.error(`[${e.status}] ${e.code}: ${e.message}`);
     console.error(`Request ID: ${e.requestId}`);
@@ -2918,7 +2918,7 @@ try {
 
 ```python [Python]
 from fotohub import FotoHub
-from fotohub.errors import (
+from fotohub.exceptions import (
     FotoHubError,
     AuthenticationError,
     InsufficientCreditsError,
@@ -2967,7 +2967,7 @@ func main() {
         var creditsErr *fotohub.InsufficientCreditsError
         var rateErr *fotohub.RateLimitError
         var valErr *fotohub.ValidationError
-        var apiErr *fotohub.FotohubError
+        var apiErr *fotohub.FotoHubError
 
         switch {
         case errors.As(err, &authErr):
@@ -3009,7 +3009,7 @@ curl -X POST https://apis.fotohub.app/v1/image/generate \
 ### Error Class Hierarchy
 
 ```typescript
-class FotohubError extends Error {
+class FotoHubError extends Error {
   /** HTTP status code */
   status: number;
   /** Machine-readable error code */
@@ -3020,23 +3020,23 @@ class FotohubError extends Error {
   requestId?: string;
 }
 
-class AuthenticationError extends FotohubError {
+class AuthenticationError extends FotoHubError {
   // status is always 401
 }
 
-class InsufficientCreditsError extends FotohubError {
+class InsufficientCreditsError extends FotoHubError {
   /** Credits required for the operation */
   required: number;
   /** Credits currently available */
   available: number;
 }
 
-class RateLimitError extends FotohubError {
+class RateLimitError extends FotoHubError {
   /** Seconds to wait before retrying */
   retryAfter: number;
 }
 
-class ValidationError extends FotohubError {
+class ValidationError extends FotoHubError {
   /** The parameter that failed validation */
   param: string;
 }

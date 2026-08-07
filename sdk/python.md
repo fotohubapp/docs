@@ -275,9 +275,20 @@ video = client.generate_seedance(
 | `poll_interval` | `float` | Seconds between status checks (default 10.0) |
 | `timeout` | `float` | Max seconds to wait (default 1800.0) |
 
-Raises `TimeoutError` if the job outlives `timeout` (it may still finish — the
-job id is in the message) and `FotoHubError` if the render fails, in which case
-credits are refunded server-side.
+Raises `fotohub.TimeoutError` if the job outlives `timeout` (it may still finish
+— the job id is in the message) and `FotoHubError` if the render fails, in which
+case credits are refunded server-side.
+
+::: warning `fotohub.TimeoutError` shadows the builtin
+It is a `FotoHubError` subclass, **not** Python's built-in `TimeoutError`. If you
+did `from fotohub import *`, a bare `except TimeoutError` catches the SDK class;
+if you did not, it catches the builtin and the SDK error escapes. Import it
+explicitly to be unambiguous:
+
+```python
+from fotohub.exceptions import TimeoutError as FotoHubTimeoutError
+```
+:::
 
 ## Music Generation
 
@@ -532,9 +543,9 @@ The SDK raises typed exceptions for different error conditions:
 
 ```python
 from fotohub import FotoHub
-from fotohub.errors import (
-    FotohubError,
-    AuthenticationError,
+from fotohub.exceptions import (
+    FotoHubError,
+    AuthError,
     InsufficientCreditsError,
     RateLimitError,
     ValidationError,
@@ -557,7 +568,7 @@ except RateLimitError as e:
     # Too many requests
     print(f"Rate limited. Retry after {e.retry_after} seconds")
     # SDK auto-retries by default, this fires only after all retries exhausted
-except AuthenticationError:
+except AuthError:
     # Invalid or expired API key
     print("Invalid API key. Check your credentials at fotohub.app/console")
 except ValidationError as e:
@@ -570,7 +581,7 @@ except ServerError as e:
 except TimeoutError:
     # Request timed out
     print("Request timed out. Try increasing timeout or simplifying the request.")
-except FotohubError as e:
+except FotoHubError as e:
     # Catch-all for any API error
     print(f"API error [{e.status}]: {e.code} - {e.message}")
 ```
@@ -578,13 +589,14 @@ except FotohubError as e:
 ### Exception Hierarchy
 
 ```
-FotohubError (base)
-├── AuthenticationError      (401)
+FotoHubError (base)
+├── AuthError                (401)
 ├── InsufficientCreditsError (402)
 ├── ValidationError          (400, 422)
 ├── RateLimitError           (429)
 ├── ServerError              (500, 502, 503)
-└── TimeoutError             (request timeout)
+├── TimeoutError             (request timeout)
+└── VideoJobTimeoutError     (video job outlived its wait)
 ```
 
 ### Retry Behavior
@@ -767,7 +779,7 @@ print(f"Chat messages: {usage['breakdown']['chat']}")
 ### Check Before Generating
 
 ```python
-from fotohub.errors import InsufficientCreditsError
+from fotohub.exceptions import InsufficientCreditsError
 
 balance = client.get_balance()
 
@@ -851,7 +863,7 @@ A full example combining multiple features:
 ```python
 import os
 from fotohub import FotoHub
-from fotohub.errors import FotohubError, InsufficientCreditsError
+from fotohub.exceptions import FotoHubError, InsufficientCreditsError
 
 def main():
     # Initialize client from environment
@@ -888,7 +900,7 @@ def main():
 
     except InsufficientCreditsError as e:
         print(f"Not enough credits: need {e.required}, have {e.available}")
-    except FotohubError as e:
+    except FotoHubError as e:
         print(f"Error [{e.status}]: {e.message}")
 
     # Chat about the generated images
