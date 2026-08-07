@@ -1149,3 +1149,10 @@ The `credits_max` field acts as a budget cap. Runs fail with `CREDITS_EXHAUSTED`
 - **Use `spec_override` for testing.** Iterate without saving, then commit once working.
 - **Minimize agent steps.** Set `max_steps` on AI agent nodes to the minimum needed.
 - **Write assertion tests.** Use `POST /v1/tests` to validate workflow behavior automatically.
+
+---
+
+## Related APIs
+
+- **[Voice Agents](/api/voice-agents)** — spoken conversational agents with their own persona, voice and function tools. A different product to these DAG workflows: realtime and turn-based, not orchestrated.
+- **[Realtime Voice](/api/realtime-voice)** — integration guide for voice sessions. A voice tool call can trigger a workflow via `POST /v1/runs`, giving a caller spoken access to any DAG you have built here.

@@ -71,7 +71,7 @@ fotohub auth whoami
 # Email:    you@example.com
 # Plan:     Developer
 # Credits:  420 remaining
-# Wallet:   15.00 PLN
+# Wallet:   $15.00 USD
 # Key:      fh_live_abcd...xyz9
 ```
 
@@ -321,7 +321,7 @@ Turn an image (or a text prompt) into a downloadable 3D model.
 fotohub gen 3d --file product-photo.png --output model.glb
 
 # Text-to-3D
-fotohub gen 3d --mode text-to-3d --model shap-e --prompt "a low-poly wooden chair" \
+fotohub gen 3d --mode text-to-3d --model fh-text-3d --prompt "a low-poly wooden chair" \
   --output chair.glb
 
 # Choose format and quality
@@ -333,7 +333,7 @@ fotohub gen 3d --file sculpture.jpg --format obj --quality high --output sculptu
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--mode <mode>` | `image-to-3d` or `text-to-3d` | `image-to-3d` |
-| `-m, --model <id>` | Model ID (currently available: `triposr` for image-to-3d, `shap-e` for text-to-3d) | `triposr` |
+| `-m, --model <id>` | Model ID (currently available: `fh-lite-3d` for image-to-3d, `fh-text-3d` for text-to-3d) | `fh-lite-3d` |
 | `-f, --file <path>` | Input image file (required for `image-to-3d`) | -- |
 | `-p, --prompt <text>` | Text prompt (required for `text-to-3d`) | -- |
 | `--format <fmt>` | Output format (`glb`, `obj`, `stl`, `usdz`) | `glb` |
@@ -343,7 +343,7 @@ fotohub gen 3d --file sculpture.jpg --format obj --quality high --output sculptu
 
 The CLI reads the input image locally and uploads it, then polls until the model is ready.
 
-> **Note:** `sf3d`, `trellis`, and `hunyuan3d` are recognized by the API but not yet enabled. Use `triposr` (image-to-3d) or `shap-e` (text-to-3d) today.
+> **Note:** `fh-lite-3d`, `fh-pro-3d`, and `fh-pro-3d` are recognized by the API but not yet enabled. Use `fh-lite-3d` (image-to-3d) or `fh-text-3d` (text-to-3d) today.
 
 ---
 
@@ -567,9 +567,9 @@ FOTOhub Billing
   Plan:       Developer
   Credits:    420 / 500 remaining (84%)
   Used:       80 credits this period
-  Wallet:     15.00 PLN
+  Wallet:     $15.00 USD
   Resets:     2026-08-01
-  Overage:    50 PLN limit
+  Overage:    $15.00 limit
 ```
 
 ### Usage Breakdown

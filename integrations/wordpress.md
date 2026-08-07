@@ -81,7 +81,7 @@ The plugin also adds action links on the Plugins screen: **Settings** always, an
 | `imagen-4-ultra` | Imagen 4 Ultra | 5.0 |
 | `imagen-4-fast` | Imagen 4 Fast | 2.0 |
 
-Credits are the platform's billing unit. Consult [Billing & Pricing](/api/billing) for the PLN value of a credit on your plan.
+Credits are the platform's billing unit. When your plan credits run out, the same operation is charged to your USD wallet at $0.0536 per credit — see [Billing & Pricing](/api/billing).
 
 ### Complete option key list
 

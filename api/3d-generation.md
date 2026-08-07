@@ -3,7 +3,7 @@
 Generate 3D models from images or text prompts using FOTOhub's unified API. Convert product photos to 3D assets, create 3D models from descriptions, and export in industry-standard formats.
 
 ::: info Overview
-The 3D Generation API supports five models ranging from instant previews (under 1 second) to production-grade assets with PBR materials. All models output industry-standard formats compatible with web viewers, game engines, 3D printers, and AR applications.
+The 3D Generation API offers a fast image-to-3D model, a text-to-3D model, and a production-grade tier for PBR assets. All of them output industry-standard formats compatible with web viewers, game engines, 3D printers, and AR applications.
 :::
 
 ---
@@ -15,67 +15,50 @@ POST /v1/ai/generate/3d
 ```
 
 **Authentication:** Bearer token (API key)
-**Billing:** 5-25 credits per generation (varies by model)
-**Processing:** Synchronous for fast models (triposr, sf3d), asynchronous for others
+**Billing:** 3-15 credits per generation (varies by model)
+**Processing:** Job-based — submit, then poll `GET /v1/ai/generate/3d/{job_id}`
 
 ---
 
 ## Available Models
 
-| Model | Name | Credits | Speed | Modes | Quality |
-|-------|------|---------|-------|-------|---------|
-| `triposr` | FH Lite 3D | 5 | ~3s | image-to-3d | Moderate fidelity, fast iteration |
-| `sf3d` | FH Fast 3D | 5 | <1s | image-to-3d | Good detail, instant results |
-| `shap-e` | FH Text 3D | 10 | ~15s | text-to-3d | Text-based, creative exploration |
-| `trellis` | FH HD 3D | 15 | ~15s | image-to-3d | High detail, clean topology |
-| `hunyuan3d` | FH Pro 3D | 25 | ~30s | both | Production-grade, PBR materials |
+| Model | Name | Credits | Speed | Mode | Status |
+|-------|------|---------|-------|------|--------|
+| `fh-lite-3d` | FH Lite 3D | 3 | ~3s | image-to-3d | Available |
+| `fh-text-3d` | FH Text 3D | 5 | ~25s | text-to-3d | Available |
+| `fh-pro-3d` | FH Pro 3D | 15 | ~60s | image-to-3d | Not yet enabled |
+
+Prefer [`GET /v1/ai/generate/3d/models`](#list-available-models) over hardcoding this table: it returns the same ids with a live `available` flag, so a model being switched on needs no client change.
+
+::: warning `fh-pro-3d` is not callable yet
+It is listed with `available: false`. Requests naming it pass validation but will not produce a model until the service is enabled — build against `fh-lite-3d` and `fh-text-3d`.
+:::
 
 ### Model Details
 
-#### TripoSR (FH Lite 3D)
+#### FH Lite 3D — `fh-lite-3d`
 
-Best for quick previews and rapid prototyping. Processes single images into basic 3D meshes in approximately 3 seconds. Ideal when you need fast feedback during the creative process before committing to higher-quality generation.
+Best for quick previews and rapid prototyping. Turns a single image into a basic 3D mesh in about 3 seconds. Ideal when you want fast feedback before committing to higher-quality generation.
 
 - **Input:** Single image (PNG, JPG, WebP)
 - **Output:** Mesh with basic vertex colors
-- **Polygon count:** 20,000-60,000
-- **Texture:** Basic vertex coloring
+- **Texture:** Vertex coloring
 
-#### SF3D (FH Fast 3D)
+#### FH Text 3D — `fh-text-3d`
 
-The fastest model in the pipeline, delivering results in under 1 second. Uses a feed-forward architecture that produces surprisingly detailed meshes with proper UV mapping and texture maps.
-
-- **Input:** Single image (PNG, JPG, WebP)
-- **Output:** Textured mesh with UV maps
-- **Polygon count:** 30,000-80,000
-- **Texture:** Diffuse map (1024x1024)
-
-#### Shap-E (FH Text 3D)
-
-The only model supporting pure text-to-3D generation without reference images. Best for creative exploration and concept generation from descriptions. Results are lower fidelity but useful for ideation.
+The only model that generates from a description alone, with no reference image. Best for creative exploration and concept work; fidelity is lower than image-to-3D, which is the trade-off for needing no input photo.
 
 - **Input:** Text prompt (up to 500 characters)
 - **Output:** Mesh with vertex colors
-- **Polygon count:** 10,000-40,000
 - **Texture:** Vertex coloring only
 
-#### Trellis (FH HD 3D)
+#### FH Pro 3D — `fh-pro-3d`
 
-High-quality image-to-3D with clean topology suitable for further editing. Produces meshes with proper edge flow and consistent polygon density, making them ideal for import into 3D editing software.
+The production-grade tier: full PBR material sets suitable for game engines and professional 3D workflows. Currently reported as `available: false`.
 
 - **Input:** Single image (PNG, JPG, WebP)
-- **Output:** Clean-topology mesh with textures
-- **Polygon count:** 50,000-120,000
-- **Texture:** Diffuse + Normal maps (2048x2048)
-
-#### Hunyuan3D (FH Pro 3D)
-
-Production-grade model supporting both image-to-3D and text-to-3D. Generates complete PBR material sets (albedo, normal, roughness, metallic) suitable for game engines and professional 3D workflows.
-
-- **Input:** Image OR text prompt
-- **Output:** PBR-ready mesh with full material set
-- **Polygon count:** 60,000-150,000
-- **Texture:** Full PBR set (albedo, normal, roughness, metallic) at 2048x2048
+- **Output:** PBR-ready mesh with a full material set
+- **Texture:** Albedo, normal, roughness and metallic maps
 
 ---
 
@@ -83,7 +66,7 @@ Production-grade model supporting both image-to-3D and text-to-3D. Generates com
 
 ### Image-to-3D
 
-Convert a single photograph or rendered image into a 3D model. The input image should show the object clearly against a simple background. Works with all models except `shap-e`.
+Convert a single photograph or rendered image into a 3D model. The input image should show the object clearly against a simple background. Works with all models except `fh-text-3d`.
 
 **Best practices:**
 - Use images with clean, solid backgrounds (white/gray preferred)
@@ -93,7 +76,7 @@ Convert a single photograph or rendered image into a 3D model. The input image s
 
 ### Text-to-3D
 
-Generate a 3D model from a text description. Currently supported by `shap-e` and `hunyuan3d`.
+Generate a 3D model from a text description. `fh-text-3d` is the only model that supports this mode.
 
 **Best practices:**
 - Be specific about shape, size, and materials
@@ -148,7 +131,7 @@ Generate a 3D model from a text description. Currently supported by `shap-e` and
 | Field | Type | Description |
 |-------|------|-------------|
 | `texture` | boolean | Generate textures (default: true) |
-| `pbr` | boolean | Generate PBR materials (hunyuan3d only) |
+| `pbr` | boolean | Generate PBR materials (fh-pro-3d only) |
 | `simplify` | boolean | Reduce polygon count |
 | `target_polys` | integer | Target polygon count when simplify is true |
 
@@ -161,7 +144,7 @@ Generate a 3D model from a text description. Currently supported by `shap-e` and
   "id": "3d_gen_8f3k2j1m4n5p",
   "url": "https://s3point.fotohub.app/3d/3d_gen_8f3k2j1m4n5p.glb",
   "format": "glb",
-  "model": "triposr",
+  "model": "fh-lite-3d",
   "status": "completed",
   "thumbnail_url": "https://s3point.fotohub.app/3d/3d_gen_8f3k2j1m4n5p_thumb.png",
   "poly_count": 45000,
@@ -211,7 +194,7 @@ Common error codes:
 
 ### Basic Image-to-3D Generation
 
-Generate a 3D model from a product photo using the fast TripoSR model.
+Generate a 3D model from a product photo using the fast FH Lite 3D model.
 
 ::: code-group
 ```python [Python]
@@ -227,7 +210,7 @@ with open("product.jpg", "rb") as f:
 # Generate 3D model
 result = client.generate_3d(
     mode="image-to-3d",
-    model="triposr",
+    model="fh-lite-3d",
     image=image_b64,
     format="glb",
 )
@@ -250,7 +233,7 @@ const imageBase64 = imageBuffer.toString("base64");
 // Generate 3D model
 const result = await client.generate3D({
   mode: "image-to-3d",
-  model: "triposr",
+  model: "fh-lite-3d",
   image: imageBase64,
   format: "glb",
 });
@@ -284,7 +267,7 @@ func main() {
 	// Build request payload
 	payload := map[string]interface{}{
 		"mode":         "image-to-3d",
-		"model":        "triposr",
+		"model":        "fh-lite-3d",
 		"image_base64": imageB64,
 		"format":       "glb",
 	}
@@ -316,7 +299,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "image-to-3d",
-    "model": "triposr",
+    "model": "fh-lite-3d",
     "image_base64": "'$(base64 -w0 product.jpg)'",
     "format": "glb",
     "quality": "standard"
@@ -328,7 +311,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
 
 ### Text-to-3D Generation
 
-Generate a 3D model from a text prompt using Hunyuan3D for maximum quality.
+Generate a 3D model from a text prompt using FH Pro 3D for maximum quality.
 
 ::: code-group
 ```python [Python]
@@ -339,7 +322,7 @@ client = FotoHub(api_key="fh_live_your_api_key")
 # Generate 3D model from text description
 result = client.generate_3d(
     mode="text-to-3d",
-    model="hunyuan3d",
+    model="fh-pro-3d",
     prompt="A medieval stone castle with four towers and a drawbridge",
     quality="high",
     format="glb",
@@ -359,7 +342,7 @@ const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
 // Generate 3D model from text description
 const result = await client.generate3D({
   mode: "text-to-3d",
-  model: "hunyuan3d",
+  model: "fh-pro-3d",
   prompt: "A medieval stone castle with four towers and a drawbridge",
   quality: "high",
   format: "glb",
@@ -385,7 +368,7 @@ import (
 func main() {
 	payload := map[string]interface{}{
 		"mode":    "text-to-3d",
-		"model":   "hunyuan3d",
+		"model":   "fh-pro-3d",
 		"prompt":  "A medieval stone castle with four towers and a drawbridge",
 		"quality": "high",
 		"format":  "glb",
@@ -418,7 +401,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "text-to-3d",
-    "model": "hunyuan3d",
+    "model": "fh-pro-3d",
     "prompt": "A medieval stone castle with four towers and a drawbridge",
     "quality": "high",
     "format": "glb",
@@ -431,7 +414,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
 
 ### Async Generation with Polling
 
-For models like `trellis` and `hunyuan3d` that take 15-30 seconds, use async polling to check job status.
+For models like `fh-pro-3d` and `fh-pro-3d` that take 15-30 seconds, use async polling to check job status.
 
 ::: code-group
 ```python [Python]
@@ -447,7 +430,7 @@ with open("product.jpg", "rb") as f:
 # Submit generation job
 job = client.generate_3d(
     mode="image-to-3d",
-    model="trellis",
+    model="fh-pro-3d",
     image=image_b64,
     quality="high",
     format="glb",
@@ -479,7 +462,7 @@ const imageBase64 = readFileSync("product.jpg").toString("base64");
 // Submit generation job
 const job = await client.generate3D({
   mode: "image-to-3d",
-  model: "trellis",
+  model: "fh-pro-3d",
   image: imageBase64,
   quality: "high",
   format: "glb",
@@ -515,7 +498,7 @@ func main() {
 
 	payload := map[string]interface{}{
 		"mode":         "image-to-3d",
-		"model":        "trellis",
+		"model":        "fh-pro-3d",
 		"image_base64": imageB64,
 		"quality":      "high",
 		"format":       "glb",
@@ -567,7 +550,7 @@ JOB_ID=$(curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "image-to-3d",
-    "model": "trellis",
+    "model": "fh-pro-3d",
     "image_base64": "'$(base64 -w0 product.jpg)'",
     "quality": "high",
     "format": "glb"
@@ -613,7 +596,7 @@ with open("sneaker.png", "rb") as f:
 # Generate high-quality 3D model
 result = client.generate_3d(
     mode="image-to-3d",
-    model="hunyuan3d",
+    model="fh-pro-3d",
     image=image_b64,
     quality="high",
     format="glb",
@@ -640,7 +623,7 @@ const imageBase64 = readFileSync("sneaker.png").toString("base64");
 // Generate high-quality 3D model
 const result = await client.generate3D({
   mode: "image-to-3d",
-  model: "hunyuan3d",
+  model: "fh-pro-3d",
   image: imageBase64,
   quality: "high",
   format: "glb",
@@ -675,7 +658,7 @@ func main() {
 
 	payload := map[string]interface{}{
 		"mode":         "image-to-3d",
-		"model":        "hunyuan3d",
+		"model":        "fh-pro-3d",
 		"image_base64": imageB64,
 		"quality":      "high",
 		"format":       "glb",
@@ -715,7 +698,7 @@ RESULT=$(curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "image-to-3d",
-    "model": "hunyuan3d",
+    "model": "fh-pro-3d",
     "image_base64": "'$(base64 -w0 sneaker.png)'",
     "quality": "high",
     "format": "glb",
@@ -757,7 +740,7 @@ formats = {
 for fmt, use_case in formats.items():
     result = client.generate_3d(
         mode="image-to-3d",
-        model="sf3d",
+        model="fh-lite-3d",
         image=image_b64,
         format=fmt,
     )
@@ -779,7 +762,7 @@ const formats = ["glb", "usdz", "stl", "obj"] as const;
 for (const format of formats) {
   const result = await client.generate3D({
     mode: "image-to-3d",
-    model: "sf3d",
+    model: "fh-lite-3d",
     image: imageBase64,
     format,
   });
@@ -809,7 +792,7 @@ func main() {
 	for _, format := range formats {
 		payload := map[string]interface{}{
 			"mode":         "image-to-3d",
-			"model":        "sf3d",
+			"model":        "fh-lite-3d",
 			"image_base64": imageB64,
 			"format":       format,
 		}
@@ -837,7 +820,7 @@ curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "image-to-3d",
-    "model": "sf3d",
+    "model": "fh-lite-3d",
     "image_base64": "'$(base64 -w0 product.jpg)'",
     "format": "glb"
   }' | jq '{format: .format, url: .url, size_kb: (.file_size / 1024)}'
@@ -848,7 +831,7 @@ curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "image-to-3d",
-    "model": "sf3d",
+    "model": "fh-lite-3d",
     "image_base64": "'$(base64 -w0 product.jpg)'",
     "format": "usdz"
   }' | jq '{format: .format, url: .url, size_kb: (.file_size / 1024)}'
@@ -859,7 +842,7 @@ curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "image-to-3d",
-    "model": "sf3d",
+    "model": "fh-lite-3d",
     "image_base64": "'$(base64 -w0 product.jpg)'",
     "format": "stl"
   }' | jq '{format: .format, url: .url, size_kb: (.file_size / 1024)}'
@@ -894,7 +877,7 @@ for filename in os.listdir(product_dir):
 
     result = client.generate_3d(
         mode="image-to-3d",
-        model="sf3d",  # Fast model for batch processing
+        model="fh-lite-3d",  # Fast model for batch processing
         image=image_b64,
         format="glb",
         quality="standard",
@@ -930,7 +913,7 @@ for (const filename of files) {
 
   const result = await client.generate3D({
     mode: "image-to-3d",
-    model: "sf3d",
+    model: "fh-lite-3d",
     image: imageBase64,
     format: "glb",
     quality: "standard",
@@ -978,7 +961,7 @@ func main() {
 
 		payload := map[string]interface{}{
 			"mode":         "image-to-3d",
-			"model":        "sf3d",
+			"model":        "fh-lite-3d",
 			"image_base64": imageB64,
 			"format":       "glb",
 			"quality":      "standard",
@@ -1011,7 +994,7 @@ for file in product_photos/*.jpg; do
     -H "Content-Type: application/json" \
     -d '{
       "mode": "image-to-3d",
-      "model": "sf3d",
+      "model": "fh-lite-3d",
       "image_base64": "'$(base64 -w0 "$file")'",
       "format": "glb",
       "quality": "standard"
@@ -1039,7 +1022,7 @@ with open("detailed_sculpture.jpg", "rb") as f:
 # Generate with polygon simplification for mobile AR
 result = client.generate_3d(
     mode="image-to-3d",
-    model="trellis",
+    model="fh-pro-3d",
     image=image_b64,
     format="glb",
     quality="high",
@@ -1066,7 +1049,7 @@ const imageBase64 = readFileSync("detailed_sculpture.jpg").toString("base64");
 // Generate with polygon simplification for mobile AR
 const result = await client.generate3D({
   mode: "image-to-3d",
-  model: "trellis",
+  model: "fh-pro-3d",
   image: imageBase64,
   format: "glb",
   quality: "high",
@@ -1100,7 +1083,7 @@ func main() {
 
 	payload := map[string]interface{}{
 		"mode":         "image-to-3d",
-		"model":        "trellis",
+		"model":        "fh-pro-3d",
 		"image_base64": imageB64,
 		"format":       "glb",
 		"quality":      "high",
@@ -1133,7 +1116,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "image-to-3d",
-    "model": "trellis",
+    "model": "fh-pro-3d",
     "image_base64": "'$(base64 -w0 detailed_sculpture.jpg)'",
     "format": "glb",
     "quality": "high",
@@ -1234,17 +1217,16 @@ curl https://apis.fotohub.app/v1/ai/generate/3d/models \
 
 ## Model Comparison
 
-| Feature | triposr | sf3d | shap-e | trellis | hunyuan3d |
-|---------|---------|------|--------|---------|-----------|
-| Image-to-3D | Yes | Yes | No | Yes | Yes |
-| Text-to-3D | No | No | Yes | No | Yes |
-| PBR Materials | No | No | No | No | Yes |
-| Texture Maps | Vertex only | Diffuse | Vertex only | Diffuse+Normal | Full PBR set |
-| Max Polygons | 60K | 80K | 40K | 120K | 150K |
-| Simplification | Yes | Yes | No | Yes | Yes |
-| GLB | Yes | Yes | Yes | Yes | Yes |
-| OBJ | Yes | Yes | Yes | Yes | Yes |
-| STL | Yes | Yes | Yes | Yes | Yes |
+| Feature | `fh-lite-3d` | `fh-text-3d` | `fh-pro-3d` |
+|---------|--------------|--------------|-------------|
+| Image-to-3D | Yes | No | Yes |
+| Text-to-3D | No | Yes | No |
+| PBR Materials | No | No | Yes |
+| Texture Maps | Vertex only | Vertex only | Full PBR set |
+| Simplification | Yes | No | Yes |
+| GLB | Yes | Yes | Yes |
+| OBJ | Yes | Yes | Yes |
+| STL | Yes | Yes | Yes |
 | USDZ | Yes | Yes | No | Yes | Yes |
 | Speed | ~3s | <1s | ~15s | ~15s | ~30s |
 | Credits | 5 | 5 | 10 | 15 | 25 |
@@ -1253,25 +1235,25 @@ curl https://apis.fotohub.app/v1/ai/generate/3d/models \
 
 | Scenario | Recommended Model | Reasoning |
 |----------|-------------------|-----------|
-| Quick product preview | `sf3d` | Instant results, good quality |
-| Rapid prototyping iteration | `triposr` | Fast, low cost per attempt |
-| Text-based concept art | `shap-e` | Only text-to-3D option (budget) |
-| E-commerce product page | `trellis` | Clean topology, HD textures |
-| Game-ready assets | `hunyuan3d` | Full PBR material set |
-| 3D printing | `trellis` | Clean manifold mesh |
-| iOS AR Quick Look | `hunyuan3d` | Best USDZ output with materials |
-| Batch processing (100+ items) | `sf3d` | Fastest, lowest credit cost |
-| Client presentation | `hunyuan3d` | Highest visual quality |
+| Quick product preview | `fh-lite-3d` | Instant results, good quality |
+| Rapid prototyping iteration | `fh-lite-3d` | Fast, low cost per attempt |
+| Text-based concept art | `fh-text-3d` | Only text-to-3D option (budget) |
+| E-commerce product page | `fh-pro-3d` | Clean topology, HD textures |
+| Game-ready assets | `fh-pro-3d` | Full PBR material set |
+| 3D printing | `fh-pro-3d` | Clean manifold mesh |
+| iOS AR Quick Look | `fh-pro-3d` | Best USDZ output with materials |
+| Batch processing (100+ items) | `fh-lite-3d` | Fastest, lowest credit cost |
+| Client presentation | `fh-pro-3d` | Highest visual quality |
 
 ---
 
 ## Performance Tips
 
 - **Image quality matters**: For image-to-3d, use clean product photos with a solid or simple background for best results. Remove background first using the [Image Editing](/api/image-editing) endpoint.
-- **Choose the right model**: Use `sf3d` for instant previews (5 credits, <1s), `trellis` or `hunyuan3d` for production assets.
+- **Choose the right model**: Use `fh-lite-3d` for instant previews (5 credits, <1s), `fh-pro-3d` or `fh-pro-3d` for production assets.
 - **Format selection**: Use GLB for web/AR, STL for 3D printing, USDZ for iOS AR Quick Look.
-- **Polling**: Models like `trellis` and `hunyuan3d` take 15-30s. Use the `waitFor3D` SDK method or poll `/v1/ai/generate/3d/{id}` every 3 seconds.
-- **Batch efficiency**: For large catalogs, use `sf3d` (cheapest, fastest) first, then regenerate hero products with `hunyuan3d`.
+- **Polling**: Models like `fh-pro-3d` and `fh-pro-3d` take 15-30s. Use the `waitFor3D` SDK method or poll `/v1/ai/generate/3d/{id}` every 3 seconds.
+- **Batch efficiency**: For large catalogs, use `fh-lite-3d` (cheapest, fastest) first, then regenerate hero products with `fh-pro-3d`.
 - **Polygon budgets**: Mobile AR typically needs <50,000 polygons. Web viewers work well with <100,000. Use `simplify` + `target_polys` to control output.
 - **File size optimization**: Draft quality produces files 60-70% smaller than high quality. Use draft for thumbnails and previews.
 
@@ -1290,13 +1272,11 @@ curl https://apis.fotohub.app/v1/ai/generate/3d/models \
 
 ## Pricing
 
-| Model | Credits per Generation | Approx. PLN |
-|-------|----------------------|-------------|
-| FH Lite 3D (triposr) | 5 | 0.75 PLN |
-| FH Fast 3D (sf3d) | 5 | 0.75 PLN |
-| FH Text 3D (shap-e) | 10 | 1.50 PLN |
-| FH HD 3D (trellis) | 15 | 2.25 PLN |
-| FH Pro 3D (hunyuan3d) | 25 | 3.75 PLN |
+| Model | Credits per Generation |
+|-------|----------------------|
+| FH Lite 3D (`fh-lite-3d`) | 3 |
+| FH Text 3D (`fh-text-3d`) | 5 |
+| FH Pro 3D (`fh-pro-3d`) | 15 |
 
 ::: info Credit Costs
 Quality settings do not affect credit cost — you pay the same whether using draft, standard, or high quality. Format selection also does not change pricing.

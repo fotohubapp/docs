@@ -261,9 +261,9 @@ POST /v1/ai/generate/music
 
 ### Pricing
 
-| Model | Credits | PLN | Notes |
+| Model | Credits | USD | Notes |
 |-------|---------|-----|-------|
-| MiniMax Music | 5 / 10 / 25 | 0.30/min | ≤30s: 5cr, ≤60s: 10cr, >60s: 25cr |
+| MiniMax Music | 5 / 10 / 25 | $0.0804 | ≤30s: 5cr, ≤60s: 10cr, >60s: 25cr — flat wallet price per generation |
 
 ### Response
 
@@ -274,7 +274,8 @@ POST /v1/ai/generate/music
   "billing": {
     "method": "credits",
     "credits_used": 5,
-    "pln_charged": 1.50
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/generations/audio/mj_xyz789.mp3",
   "duration": 30,
@@ -431,7 +432,8 @@ POST /v1/ai/generate/sfx
   "billing": {
     "method": "credits",
     "credits_used": 3,
-    "pln_charged": 0.225
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/generations/sfx/sfx_r4nd0m.mp3",
   "duration": 5,
@@ -554,11 +556,11 @@ POST /v1/ai/generate/speech
 
 ### Pricing
 
-| Model | Credits | PLN | Notes |
+| Model | Credits | USD | Notes |
 |-------|---------|-----|-------|
-| Grok Voice | 0.7 | 0.07 | per 1000 characters, 26 multilingual voices |
-| Google Cloud TTS | 1 | 0.09 | per 1000 characters, fast |
-| IDA Voice Pro | 2 | 0.18 | per 1000 characters, natural voice, cloning |
+| Grok Voice | 0.7 | $0.0375 | per 1000 characters, 26 multilingual voices |
+| Google Cloud TTS | 1 | $0.0241 | per 1000 characters, fast |
+| IDA Voice Pro | 2 | $0.0482 | per 1000 characters, natural voice, cloning |
 
 ### Grok voices
 
@@ -605,7 +607,8 @@ Grok responses report the voice used and the billed character count:
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "pln_charged": 0.09
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/generations/speech/tts_k8m2n1.mp3",
   "duration": 12.4,
@@ -916,9 +919,9 @@ POST /v1/ai/generate/speech/gpt
 
 ### Pricing
 
-| Model | Credits | PLN | Notes |
+| Model | Credits | USD | Notes |
 |-------|---------|-----|-------|
-| GPT Audio 1.5 | 2 | 0.40 | per request, WAV HD output |
+| GPT Audio 1.5 | 2 | $0.1072 | per request, WAV HD output |
 
 ### Response
 
@@ -1138,7 +1141,8 @@ minute and does not do diarization or emotion analysis.
   "billing": {
     "method": "credits",
     "credits_used": 3,
-    "pln_charged": 0.18
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "text": "Dzien dobry, chcialbym zamowic projekt graficzny dla mojej firmy...",
   "language_detected": "pl",
@@ -1299,7 +1303,8 @@ Set `"mode": "translate"` to translate any spoken audio to English text.
   "billing": {
     "method": "credits",
     "credits_used": 4,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "text": "Good morning, I would like to order a graphic design project for my company...",
   "source_language": "pl",
@@ -1341,7 +1346,8 @@ POST /v1/ai/transcribe
   "billing": {
     "method": "credits",
     "credits_used": 15,
-    "pln_charged": 0.90
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/generations/dubbed/dub_q2w3e4.mp3",
   "source_language": "pl",
@@ -1832,27 +1838,27 @@ When `language` is set to `"auto"` (default for transcription), FOTOhub automati
 
 Quick reference for choosing the right model for your use case.
 
-| Category | Model | Credits | PLN Cost | Best For |
+| Category | Model | Credits | USD Cost | Best For |
 |----------|-------|---------|----------|----------|
-| **Music** | IDA Music (≤3 min) | 2 | 0.15 | Production music, European latency |
-| **Music** | IDA Music (>3 min) | 4 | 0.30 | Long-form compositions, albums |
-| **Music** | MiniMax (≤30s) | 5 | 0.38 | Short jingles, quick drafts |
-| **Music** | MiniMax (≤60s) | 10 | 0.75 | Medium tracks, ads |
-| **Music** | MiniMax (>60s) | 25 | 1.88 | Full tracks via cloud |
-| **Music** | ElevenLabs Music | 10 | 0.75 | Vocal-focused tracks |
-| **Music** | ACE-Step | 3 | 0.23 | Structured compositions with lyrics |
-| **SFX** | ElevenLabs SFX | 3 | 0.23 | Sound effects, foley |
-| **TTS** | Google Cloud TTS | 1 | 0.09 | Budget TTS, per 1K chars |
-| **TTS** | IDA Voice Pro | 2 | 0.18 | Natural voice, cloning, per 1K chars |
-| **TTS** | GPT Audio 1.5 | 2 | 0.40 | Premium quality, voice instructions |
-| **TTS** | Polly (Neural) | 1 per 10K | 0.09 | Bulk narration, 106 voices |
-| **Transcription** | Whisper | 1 | 0.06 | Per minute of audio |
-| **Transcription** | Voxtral Small | 2 | 0.15 | LLM-quality context |
-| **Transcription** | Voxtral Mini | 1 | 0.08 | Fast transcription |
-| **Translation** | Whisper Translate | 2 | 0.12 | Per minute, to English |
-| **Dubbing** | FOTOhub Dub | 5 | 0.30 | Per minute, voice preserved |
-| **Mastering** | FOTOhub Master | 3 | 0.23 | Per track |
-| **Stems** | Demucs | 3 | 0.23 | Per track, 2/4/6 stems |
+| **Music** | IDA Music (≤3 min) | 2 | $0.1072 | Production music, European latency |
+| **Music** | IDA Music (>3 min) | 4 | $0.2144 | Long-form compositions, albums |
+| **Music** | MiniMax (≤30s) | 5 | $0.0804 | Short jingles, quick drafts |
+| **Music** | MiniMax (≤60s) | 10 | $0.0804 | Medium tracks, ads |
+| **Music** | MiniMax (>60s) | 25 | $0.0804 | Full tracks via cloud |
+| **Music** | ElevenLabs Music | 10 | $0.2010 | Vocal-focused tracks |
+| **Music** | ACE-Step | 3 | $0.1608 | Structured compositions with lyrics |
+| **SFX** | ElevenLabs SFX | 3 | $0.0603 | Sound effects, foley |
+| **TTS** | Google Cloud TTS | 1 | $0.0241 | Budget TTS, per 1K chars |
+| **TTS** | IDA Voice Pro | 2 | $0.0482 | Natural voice, cloning, per 1K chars |
+| **TTS** | GPT Audio 1.5 | 2 | $0.1072 | Premium quality, voice instructions |
+| **TTS** | Polly (Neural) | 1 per 10K | $0.0536 | Bulk narration, 106 voices |
+| **Transcription** | Whisper | 1 | $0.0161 | Per minute of audio |
+| **Transcription** | Voxtral Small | 2 | $0.1072 | LLM-quality context |
+| **Transcription** | Voxtral Mini | 1 | $0.0536 | Fast transcription |
+| **Translation** | Whisper Translate | 2 | $0.0322 | Per minute, to English |
+| **Dubbing** | FOTOhub Dub | 5 | $0.1206 | Per minute, voice preserved |
+| **Mastering** | FOTOhub Master | 3 | $0.0402 | Per track |
+| **Stems** | Demucs | 3 | $0.0804 | Per track, 2/4/6 stems |
 | **Analysis** | FOTOhub Analyze | 0 | Free | BPM, key, loudness |
 
 ::: info Choosing a TTS Model
@@ -1868,29 +1874,31 @@ Quick reference for choosing the right model for your use case.
 
 - **[Voice Cloning](/api/voice-cloning)** — create and use cloned voices, emotional TTS, voice forensics
 - **[Shorts & Clips](/api/shorts-clips)** — audio-driven video clips with caption generation
+- **[Voice Agents](/api/voice-agents)** — two-way spoken conversations instead of one-shot TTS: define a persona, voice and tools, then mint browser session tokens
+- **[Realtime Voice](/api/realtime-voice)** — the integration guide for those sessions: WebSocket transport, mic capture, PCM16 playback, tool calls
 
 ---
 
 ## Pricing Summary
 
-| Service | Model | Credits | PLN Cost | Unit |
+| Service | Model | Credits | USD Cost | Unit |
 |---------|-------|---------|----------|------|
-| Music | IDA Music (≤3 min) | 2 | 0.15 | per generation |
-| Music | IDA Music (>3 min) | 4 | 0.30 | per generation |
-| Music | MiniMax | 5–25 | 0.30/min | tiered by duration |
-| Music | ElevenLabs | 10 | 0.75 | per generation |
-| Music | ACE-Step | 3 | 0.23 | per composition |
-| Sound Effects | ElevenLabs SFX | 3 | 0.23 | fixed per generation |
-| TTS | Google Cloud | 1 | 0.09 | per 1000 characters |
-| TTS | IDA Voice Pro | 2 | 0.18 | per 1000 characters |
-| TTS | GPT Audio 1.5 | 2 | 0.40 | per request |
-| TTS | Polly (Neural) | 1 | 0.09 | per 10,000 characters |
-| Transcription | Whisper | 1 | 0.06 | per minute of audio |
-| Transcription | Voxtral Small | 2 | 0.15 | per audio file |
-| Translation | — | 2 | 0.12 | per minute of audio |
-| Dubbing | — | 5 | 0.30 | per minute of audio |
-| Mastering | — | 3 | 0.23 | per track |
-| Stems | Demucs | 3 | 0.23 | per track |
+| Music | IDA Music (≤3 min) | 2 | $0.1072 | per generation |
+| Music | IDA Music (>3 min) | 4 | $0.2144 | per generation |
+| Music | MiniMax | 5–25 | $0.0804 | flat, whatever the duration tier |
+| Music | ElevenLabs | 10 | $0.2010 | per generation |
+| Music | ACE-Step | 3 | $0.1608 | per composition |
+| Sound Effects | ElevenLabs SFX | 3 | $0.0603 | fixed per generation |
+| TTS | Google Cloud | 1 | $0.0241 | per 1000 characters |
+| TTS | IDA Voice Pro | 2 | $0.0482 | per 1000 characters |
+| TTS | GPT Audio 1.5 | 2 | $0.1072 | per request |
+| TTS | Polly (Neural) | 1 | $0.0536 | per 10,000 characters |
+| Transcription | Whisper | 1 | $0.0161 | per minute of audio |
+| Transcription | Voxtral Small | 2 | $0.1072 | per audio file |
+| Translation | — | 2 | $0.0322 | per minute of audio |
+| Dubbing | — | 5 | $0.1206 | per minute of audio |
+| Mastering | — | 3 | $0.0402 | per track |
+| Stems | Demucs | 3 | $0.0804 | per track |
 
 ## Error Responses
 

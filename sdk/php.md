@@ -1,6 +1,6 @@
 # PHP SDK
 
-A PHP client for the FOTOhub API. PSR-4 autoloaded, PHP 8.1+, Guzzle HTTP client, typed models, automatic retries, and streaming support for chat completions.
+A PHP client for the FOTOhub API. PSR-4 autoloaded, PHP 8.1+, Guzzle HTTP client, typed models and automatic retries. Chat completions are not streamable — see [Streaming](#streaming).
 
 ::: info Preview — coming soon
 A first-party PHP package is on the roadmap. The `FotoHub\Client` interface shown below illustrates the intended shape and wraps the public REST API (base URL `https://apis.fotohub.app`). Until it publishes to Packagist you can either call the [REST API](/api/getting-started) directly with Guzzle/cURL or vendor a thin wrapper that mirrors these method signatures. All endpoints and model IDs used here are real and live today.
@@ -198,59 +198,119 @@ echo "Audio: " . $result->audioUrl . "\n";
 
 ### Standard Chat
 
+`chat()` takes the messages array first and everything else in an options array,
+and returns the decoded OpenAI-compatible response as a **plain array** — index
+it, do not use property access.
+
 ```php
 $response = $client->chat(
-    messages: [
+    [
         ['role' => 'user', 'content' => 'Explain quantum computing in simple terms']
     ],
-    model: 'gemini-flash',
-    temperature: 0.7,
-    maxTokens: 1024
+    ['model' => 'gemini-flash']
 );
 
-echo $response->content;           // Assistant's reply
-echo $response->tokensUsed;        // Total tokens
-echo $response->creditsUsed;       // Credits charged
+echo $response['choices'][0]['message']['content'];  // Assistant's reply
+echo $response['credits_used'];                      // Credits charged
 ```
+
+::: warning Four model IDs, and sampling options are ignored
+`/v1/ai/chat/completions` accepts exactly `gemini-flash`, `gemini-pro`, `gpt-4o`
+and `claude-sonnet`. Anything else returns `400` with the supported list.
+
+`temperature` and `max_tokens` are accepted by both the SDK and the endpoint and
+then discarded — passing them is harmless but changes nothing. `credits_used` is
+the authoritative billing field; `usage` is passed through from the upstream
+provider and falls back to `{}`, so read it defensively.
+:::
 
 ### Streaming
 
-```php
-$stream = $client->chatStream(
-    messages: [
-        ['role' => 'user', 'content' => 'Write a story about space']
-    ],
-    model: 'gemini-flash'
-);
+::: danger `streamChat()` throws `ValidationException`
+There is no `chatStream()` method — the SDK's streaming method is
+`streamChat()`, and it posted to `/v1/ai/chat/completions`, which **does not
+stream**. That endpoint accepts `stream: true` for OpenAI compatibility and
+returns one complete JSON body, so `StreamResponse` found no `data:` frames:
+iteration completed after **zero chunks and threw no error** while the request
+was still billed, and `collect()` returned `''`. The SDK now refuses before
+sending, so the call stays free.
+:::
 
-foreach ($stream as $chunk) {
-    echo $chunk;  // Print token by token
-}
+The one streaming endpoint is `POST /v1/ai/agent/stream`, which has no SDK
+wrapper. Call it directly with cURL. Frames carry a `type`
+(`text_delta`, `tool_use`, `done`, `error`) and the stream ends at
+`data: [DONE]`:
+
+```php
+$ch = curl_init('https://apis.fotohub.app/v1/ai/agent/stream');
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_HTTPHEADER => [
+        'Authorization: Bearer ' . getenv('FOTOHUB_API_KEY'),
+        'Content-Type: application/json',
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        'model' => 'claude-sonnet-4.6',   // agent model IDs, not the chat IDs
+        'messages' => [
+            ['role' => 'user', 'content' => 'Write a story about space'],
+        ],
+    ]),
+    // A single write callback can receive a partial frame, so buffer to the
+    // blank-line record separator before parsing.
+    CURLOPT_WRITEFUNCTION => function ($ch, $data) use (&$buffer) {
+        $buffer .= $data;
+        while (($pos = strpos($buffer, "\n\n")) !== false) {
+            $raw = substr($buffer, 0, $pos);
+            $buffer = substr($buffer, $pos + 2);
+
+            if (!str_starts_with($raw, 'data: ')) {
+                continue;
+            }
+            $payload = trim(substr($raw, 6));
+            if ($payload === '[DONE]') {
+                return 0;  // aborts the transfer
+            }
+            $frame = json_decode($payload, true);
+            if (($frame['type'] ?? '') === 'text_delta') {
+                echo $frame['text'];
+                flush();
+            } elseif (($frame['type'] ?? '') === 'error') {
+                fwrite(STDERR, "\nstream error: " . $frame['message'] . "\n");
+                return 0;
+            }
+        }
+        return strlen($data);
+    },
+]);
+$buffer = '';
+curl_exec($ch);
+curl_close($ch);
 ```
+
+::: warning `done` is optional, `[DONE]` is not
+The `done` frame (which carries `usage` and `billing`) is omitted when the turn
+produced no tokens, and replaced by an `error` frame when generation succeeded
+but billing settlement failed. Stop on `[DONE]`.
+:::
 
 ### With System Prompt
 
 ```php
 $response = $client->chat(
-    messages: [
+    [
         ['role' => 'system', 'content' => 'You are a creative copywriter.'],
         ['role' => 'user', 'content' => 'Write ad copy for a fitness app']
     ],
-    model: 'gemini-flash',
-    temperature: 1.2
+    ['model' => 'gemini-flash']
 );
 ```
 
-### ChatMessage
-
-```php
-class ChatMessage {
-    public readonly string $content;
-    public readonly string $role;
-    public readonly int $tokensUsed;
-    public readonly ?int $creditsUsed;
-}
-```
+::: warning The messages array is split, not forwarded whole
+The endpoint treats the **last** message as the prompt and everything before it
+as history, so end your array with the user turn you want answered. A trailing
+assistant message (an OpenAI-style prefill) is dropped, and the user turn before
+it is then sent as both the prompt and the history — asked twice.
+:::
 
 ## Image Processing
 
@@ -298,7 +358,7 @@ $balance = $client->getBalance();
 
 echo "Plan: " . $balance->plan . "\n";
 echo "Credits: " . $balance->creditsRemaining . " / " . $balance->creditsLimit . "\n";
-echo "Wallet: " . $balance->walletBalance . " PLN\n";
+echo "Wallet: $" . $balance->walletBalance . "\n";
 
 if ($balance->hasCredits()) {
     // Proceed with generation
@@ -497,8 +557,8 @@ class BulkGenerate extends Command
 
 ## Symfony Integration
 
-```php
-// config/services.yaml
+```yaml
+# config/services.yaml
 services:
     FotoHub\Client:
         arguments:
@@ -530,20 +590,37 @@ class ImageController extends AbstractController
 
 | Method | Description | Returns |
 |--------|-------------|---------|
-| `generateImage(...)` | Generate images from text | `ImageResult` |
-| `generateVideo(...)` | Start video generation | `VideoJob` |
-| `getVideoStatus($id)` | Check video job status | `VideoJob` |
-| `generateMusic(...)` | Generate music/audio | `array` |
-| `generateSpeech(...)` | Text-to-speech | `array` |
-| `chat(...)` | Chat completion | `ChatMessage` |
-| `chatStream(...)` | Streaming chat | `Generator<string>` |
-| `removeBackground(...)` | Remove image background | `array` |
-| `upscaleImage(...)` | Upscale image resolution | `array` |
-| `listModels(...)` | List available models | `array` |
+| `generateImage(string $prompt, array $options = [])` | Generate images from text | `ImageResult` |
+| `editImage(string $imageUrl, string $prompt, array $options = [])` | Edit an image | `ImageResult` |
+| `generateVideo(string $prompt, array $options = [])` | Start video generation | `VideoJob` |
+| `getVideoJob(string $jobId)` | Check video job status | `VideoJob` |
+| `waitForVideo(string $jobId, int $timeout = 300, int $interval = 5)` | Poll until the video completes | `VideoJob` |
+| `generateMusic(string $prompt, array $options = [])` | Generate music/audio | `array` |
+| `generateSfx(string $prompt, array $options = [])` | Generate sound effects | `array` |
+| `generateSpeech(string $text, array $options = [])` | Text-to-speech | `array` |
+| `transcribe(string $audioUrl, array $options = [])` | Transcribe audio | `TranscriptionResult` |
+| `chat(array $messages, array $options = [])` | Chat completion (credit-based) | `array` |
+| `streamChat(array $messages, array $options = [])` | ⚠️ Broken — targets the non-streaming endpoint, so it yields zero chunks while still billing. Use cURL on `/v1/ai/agent/stream`. | `StreamResponse` |
+| `chatBedrock(array $messages, array $options = [])` | Chat via Bedrock models | `array` |
+| `analyzeImage(string $imageUrl, array $features = [])` | Analyze an image | `AnalysisResult` |
+| `enhancePrompt(string $prompt, array $options = [])` | Improve a prompt with AI | `array` |
+| `stabilityRemoveBackground(string $image, string $outputFormat = 'png')` | Remove image background | `StabilityResult` |
+| `stabilityUpscale(string $image, string $outputFormat = 'png')` | Upscale image resolution | `StabilityResult` |
+| `listStabilityTools()` | List Stability tools | `array` |
+| `getPricing()` | Public price catalogue | `array` |
 | `getBalance()` | Get billing balance | `BillingBalance` |
-| `createWebhook(...)` | Create webhook endpoint | `array` |
-| `listWebhooks()` | List active webhooks | `array` |
-| `batchGenerate(...)` | Batch image generation | `array` |
+| `getWallet()` / `topupWallet(float $amount)` | Wallet balance / top-up checkout | `array` |
+| `estimateCost(array $operations)` | Estimate a batch of operations | `CostEstimate` |
+| `generate3D(array $options)` / `get3DStatus(string $jobId)` / `waitFor3D(...)` | 3D generation | `array` |
+| `listWebhooks()` / `createWebhook(string $name, string $url, array $events, array $headers = [])` | Webhook management | `array` |
+
+::: warning These methods do not exist
+Earlier revisions of this page listed `chatStream()`, `getVideoStatus()`,
+`removeBackground()`, `upscaleImage()`, `listModels()` and `batchGenerate()`.
+None of them are defined on `FotoHub\Client` — the real names are in the table
+above. Note also that every method takes positional arguments plus an
+`$options` array, not PHP named arguments per parameter.
+:::
 
 ## Automatic Retries
 

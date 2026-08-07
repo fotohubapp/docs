@@ -922,7 +922,7 @@ Check your current credit balance and wallet status.
 |-----------|------|----------|---------|-------------|
 | *(none)* | — | — | — | No parameters required |
 
-**Returns:** Tier, remaining credits (4h window and period), wallet balance in PLN.
+**Returns:** Tier, remaining credits (4h window and period), wallet balance in USD.
 
 ---
 

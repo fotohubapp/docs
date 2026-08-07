@@ -131,8 +131,8 @@ response = requests.get(
 )
 
 balance = response.json()
-print(f"Credits remaining: {balance['credits']['remaining']}")
-print(f"Wallet balance: {balance['wallet']['balance']} PLN")
+print(f"Credits remaining: {balance['credits']['remaining_period']}")
+print(f"Wallet balance: ${balance['wallet']['balance']}")
 ```
 
 ```typescript [TypeScript]
@@ -146,8 +146,8 @@ const response = await fetch(
 );
 
 const balance = await response.json();
-console.log(`Credits remaining: ${balance.credits.remaining}`);
-console.log(`Wallet balance: ${balance.wallet.balance} PLN`);
+console.log(`Credits remaining: ${balance.credits.remaining_period}`);
+console.log(`Wallet balance: $${balance.wallet.balance}`);
 ```
 
 ```bash [cURL]
@@ -167,8 +167,8 @@ curl https://apis.fotohub.app/v1/billing/balance \
     "remaining_period": 890
   },
   "wallet": {
-    "balance": 150.00,
-    "currency": "PLN"
+    "balance": 40.00,
+    "currency": "USD"
   }
 }
 ```
@@ -282,7 +282,7 @@ Monthly allowance included with your subscription tier. Credits are consumed fir
 
 ### Wallet (Pay-per-use)
 
-PLN balance that acts as a fallback when credits are exhausted. Top up via card, BLIK, or bank transfer. Charged at per-operation rates.
+USD balance that acts as a fallback when credits are exhausted. Top up via card, BLIK, or bank transfer (a PLN checkout still credits the same USD amount). Charged at per-operation rates: provider cost x 1.5 margin.
 
 ::: tip Billing Priority
 Credits are always deducted first. When your monthly credit allowance is exhausted, the system automatically falls back to your wallet balance. Some models (BytePlus SeedDream image models, premium FOTOhub AI chat models) use token-based billing where cost is calculated per input/output token rather than a fixed credit amount per operation.

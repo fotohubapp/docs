@@ -99,7 +99,7 @@ Full AWS S3 with 70+ API endpoints covering every S3 feature. Auth via JWT.
 
 | Mode | Description |
 |------|-------------|
-| `wallet` | Credits deducted from your FOTOhub wallet. A reservation deposit of approximately 1.5 days of estimated storage cost is held at creation (minimum 0.50 PLN). Hourly reconciliation via billing engine. |
+| `wallet` | Deducted from your FOTOhub USD wallet. A reservation deposit of approximately 1.5 days of full-quota storage cost is held at creation (minimum **$0.15**). Hourly reconciliation via billing engine. |
 | `invoice_monthly` | Billed monthly on your invoice. Available for Pro and Enterprise plans. |
 
 ::: warning
@@ -160,16 +160,26 @@ Creates a real AWS S3 bucket with IAM credentials. Requires wallet balance for t
     "id": "s3_bucket_xyz",
     "aws_bucket_name": "fotohub-customer-abc123-production-media",
     "region": "eu-central-1",
-    "status": "active",
-    "credentials": {
-      "access_key_id": "AKIA...",
-      "secret_access_key": "wJalr...",
-      "endpoint": "https://s3.eu-central-1.amazonaws.com"
-    }
+    "status": "active"
   },
-  "reservation_pln": 0.50
+  "access_key_id": "fhk_live_...",
+  "secret_access_key": "...",
+  "endpoint": "https://s3point.fotohub.app",
+  "region": "eu-central-1",
+  "s3_uri": "s3://fotohub-customer-abc123-production-media/",
+  "example_aws_cli": "aws s3 ls s3://... --endpoint-url https://s3point.fotohub.app",
+  "example_boto3": "boto3.client('s3', endpoint_url='https://s3point.fotohub.app', ...)",
+  "warning": "Save your secret_access_key now — it will NEVER be shown again."
 }
 ```
+
+::: warning Credentials are virtual and endpoint is ours
+The keys returned are FOTOhub virtual keys (`fhk_live_*`) against
+`https://s3point.fotohub.app`, not raw AWS IAM keys against an AWS endpoint —
+raw AWS credentials never leave the server. The wallet reservation is charged
+before provisioning but is **not** echoed in this response; read it from
+`GET /v1/billing/transactions` (`s3_bucket_reservation`).
+:::
 
 #### List Buckets
 
@@ -394,15 +404,46 @@ Estimate monthly costs before provisioning.
 **Response:**
 ```json
 {
-  "storage_usd": 12.25,
-  "requests_usd": 0.95,
-  "egress_usd": 4.50,
-  "retrieval_usd": 0.00,
+  "region": "eu-central-1",
+  "storage_class": "STANDARD",
+  "period_days": 30,
+  "usd_pln_rate": 3.732,
+  "line_items": [
+    {
+      "label": "Storage (STANDARD)",
+      "quantity": 500,
+      "unit": "GB-month",
+      "unit_price_usd": 0.0245,
+      "unit_price_pln": 0.0914,
+      "amount_usd": 12.25,
+      "amount_pln": 45.72
+    },
+    {
+      "label": "Egress (tiered)",
+      "quantity": 50,
+      "unit": "GB",
+      "unit_price_usd": 0.09,
+      "unit_price_pln": 0.3359,
+      "amount_usd": 4.50,
+      "amount_pln": 16.79
+    }
+  ],
+  "subtotal_usd": 17.70,
+  "subtotal_pln": 66.04,
+  "flat_fee_pln": 2.00,
   "total_usd": 17.70,
-  "total_pln": 71.69,
-  "period_days": 30
+  "total_pln": 68.04
 }
 ```
+
+::: info Why this response has both currencies
+AWS quotes storage in USD, so `*_usd` are the authoritative numbers and
+`*_pln` are a convenience conversion at `usd_pln_rate` (live NBP mid). The
+platform's flat per-bucket fee is PLN-denominated, which is why `flat_fee_pln`
+has no USD twin and `total_usd` equals `subtotal_usd` (it excludes that fee).
+There is no `storage_usd` / `requests_usd` / `egress_usd` top-level field —
+per-component amounts live in `line_items[]`.
+:::
 
 #### List Regions
 
@@ -1488,7 +1529,11 @@ Managed storage with simple monthly pricing. No AWS knowledge required.
 GET /v1/storage/packages
 ```
 
-Returns available packages with fixed monthly pricing.
+Returns available packages with fixed monthly pricing. Storage rental is the
+one part of the catalog still priced in **PLN** — `price_pln_monthly` runs
+1.50 / 7.50 / 15 / 50 / 80 PLN for 10 GB / 50 GB / 100 GB / 500 GB / 1 TB
+standard, and 4.50 / 22.50 / 45 PLN for the 10/50/100 GB SSD premium tiers.
+It is not wallet-billed, so the USD cutover did not touch it.
 
 ### Rent Storage
 
@@ -1512,7 +1557,7 @@ POST /v1/storage/rent
     "name": "my-project-assets",
     "size_gb": 50,
     "tier": "standard",
-    "price_monthly_pln": 9.99,
+    "price_monthly_pln": 7.50,
     "region": "eu",
     "status": "active",
     "used_bytes": 0

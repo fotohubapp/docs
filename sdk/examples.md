@@ -28,12 +28,12 @@ async def batch_generate(prompts: list[str], model: str = "seedream-5-0-260128")
         results.append({
             "prompt": prompt,
             "url": result.images[0],
-            "cost": result.billing.cost_pln
+            "cost": result.billing.usd_charged
         })
-        total_cost += result.billing.cost_pln
+        total_cost += result.billing.usd_charged
         print(f"[{i}/{len(prompts)}] Done: {prompt[:50]}...")
 
-    print(f"\nBatch complete: {len(results)} images, total cost: {total_cost:.2f} PLN")
+    print(f"\nBatch complete: {len(results)} images, total cost: ${total_cost:.4f}")
     return results
 
 # Product photography batch
@@ -80,13 +80,13 @@ async function batchGenerate(
     results.push({
       prompt: prompts[i],
       url: result.images[0],
-      cost: result.billing.costPln,
+      cost: result.billing.usd_charged,
     });
-    totalCost += result.billing.costPln;
+    totalCost += result.billing.usd_charged;
     console.log(`[${i + 1}/${prompts.length}] Done: ${prompts[i].slice(0, 50)}...`);
   }
 
-  console.log(`\nBatch complete: ${results.length} images, total: ${totalCost.toFixed(2)} PLN`);
+  console.log(`\nBatch complete: ${results.length} images, total: $${totalCost.toFixed(4)}`);
   return results;
 }
 
@@ -110,37 +110,71 @@ Full chatbot with conversation history and real-time streaming output.
 ::: code-group
 
 ```python [Python]
-from fotohub import FotoHub
+import json
+import os
 
-client = FotoHub()
+import requests
+
+# Streaming does not go through the SDK: the SDK's chat methods target
+# /v1/ai/chat/completions, which never streams. /v1/ai/agent/stream is the only
+# SSE endpoint, so the chatbot below calls it directly.
+API_KEY = os.environ["FOTOHUB_API_KEY"]
+STREAM_URL = "https://apis.fotohub.app/v1/ai/agent/stream"
+
 
 class Chatbot:
-    def __init__(self, system_prompt: str, model: str = "gemini-flash"):
+    def __init__(self, system_prompt: str, model: str = "claude-sonnet-4.6"):
+        # Agent model ids, not the chat ids: claude-sonnet-4.6 /
+        # claude-sonnet-4.5 / claude-sonnet-4 / claude-haiku-4.5.
         self.model = model
-        self.messages = [{"role": "system", "content": system_prompt}]
+        # The system prompt is a top-level field here, not a message.
+        self.system = system_prompt
+        self.messages: list[dict] = []
 
     def stream_reply(self, user_input: str) -> str:
-        """Send a message and stream the response token by token."""
+        """Send a message and stream the response as it is produced."""
         self.messages.append({"role": "user", "content": user_input})
         full_response = ""
 
         print("Assistant: ", end="", flush=True)
-        for chunk in client.chat_stream(
-            messages=self.messages,
-            model=self.model,
-            temperature=0.7,
-            max_tokens=1024
-        ):
-            print(chunk.delta, end="", flush=True)
-            full_response += chunk.delta
+        resp = requests.post(
+            STREAM_URL,
+            headers={"Authorization": f"Bearer {API_KEY}",
+                     "Content-Type": "application/json"},
+            json={
+                "model": self.model,
+                "system": self.system,
+                "messages": self.messages,
+                "temperature": 0.7,
+                "max_tokens": 1024,
+            },
+            stream=True,
+        )
+        resp.raise_for_status()
+
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            payload = line.decode("utf-8")
+            if not payload.startswith("data: "):
+                continue
+            data = payload[6:]
+            if data == "[DONE]":
+                break
+            frame = json.loads(data)
+            if frame["type"] == "text_delta":
+                print(frame["text"], end="", flush=True)
+                full_response += frame["text"]
+            elif frame["type"] == "error":
+                raise RuntimeError(frame["message"])
 
         print()  # newline after stream
         self.messages.append({"role": "assistant", "content": full_response})
         return full_response
 
     def reset(self):
-        """Clear conversation history, keeping the system prompt."""
-        self.messages = [self.messages[0]]
+        """Clear conversation history. The system prompt is kept separately."""
+        self.messages = []
 
 
 # Usage
@@ -164,23 +198,28 @@ while True:
 ```
 
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
 import * as readline from "readline";
 
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
+// client.chatStream() targets /v1/ai/chat/completions, which never streams --
+// it yields zero chunks while still billing. /v1/ai/agent/stream is the only
+// SSE endpoint, so this calls it directly.
+const API_KEY = process.env.FOTOHUB_API_KEY!;
+const STREAM_URL = "https://apis.fotohub.app/v1/ai/agent/stream";
 
 interface Message {
-  role: "system" | "user" | "assistant";
+  role: "user" | "assistant";
   content: string;
 }
 
 class Chatbot {
-  private messages: Message[];
+  private messages: Message[] = [];
   private model: string;
+  private system: string;
 
-  constructor(systemPrompt: string, model = "gemini-flash") {
+  // Agent model ids, not the chat ids.
+  constructor(systemPrompt: string, model = "claude-sonnet-4.6") {
     this.model = model;
-    this.messages = [{ role: "system", content: systemPrompt }];
+    this.system = systemPrompt;
   }
 
   async streamReply(userInput: string): Promise<string> {
@@ -188,16 +227,46 @@ class Chatbot {
     let fullResponse = "";
 
     process.stdout.write("Assistant: ");
-    const stream = await client.chatStream({
-      messages: this.messages,
-      model: this.model,
-      temperature: 0.7,
-      maxTokens: 1024,
+    const response = await fetch(STREAM_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: this.model,
+        system: this.system,
+        messages: this.messages,
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
     });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    for await (const chunk of stream) {
-      process.stdout.write(chunk.delta);
-      fullResponse += chunk.delta;
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    // One read() can end mid-frame, so buffer to the blank-line separator.
+    let buffer = "";
+
+    outer: while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
+
+      for (const raw of frames) {
+        if (!raw.startsWith("data: ")) continue;
+        const data = raw.slice(6).trim();
+        if (data === "[DONE]") break outer;
+        const frame = JSON.parse(data);
+        if (frame.type === "text_delta") {
+          process.stdout.write(frame.text);
+          fullResponse += frame.text;
+        } else if (frame.type === "error") {
+          throw new Error(frame.message);
+        }
+      }
     }
 
     console.log();
@@ -206,7 +275,8 @@ class Chatbot {
   }
 
   reset(): void {
-    this.messages = [this.messages[0]];
+    // The system prompt lives outside the message list, so this clears all.
+    this.messages = [];
   }
 }
 
@@ -274,7 +344,7 @@ while job.status == "processing":
 
 if job.status == "completed":
     print(f"Video URL: {job.result.video_url}")
-    print(f"Cost: {job.billing.cost_pln} PLN")
+    print(f"Credits used: {job.credits_used}")
 else:
     print(f"Failed: {job.error}")
 ```
@@ -308,8 +378,8 @@ async function generateVideo() {
   }
 
   if (current.status === "completed") {
-    console.log(`Video URL: ${current.result.videoUrl}`);
-    console.log(`Cost: ${current.billing.costPln} PLN`);
+    console.log(`Video URL: ${current.result.video_url}`);
+    console.log(`Credits used: ${current.credits_used}`);
   } else {
     console.log(`Failed: ${current.error}`);
   }
@@ -342,8 +412,8 @@ result = client.generate_music(
 )
 
 print(f"Audio URL: {result.audio_url}")
-print(f"Duration: {result.duration_seconds}s")
-print(f"Cost: {result.billing.cost_pln} PLN")
+print(f"Duration: {result.duration}s")
+print(f"Credits used: {result.credits_used}")
 
 # Download the file
 import urllib.request
@@ -380,8 +450,8 @@ async function generatePodcastIntro() {
   });
 
   console.log(`Audio URL: ${result.audioUrl}`);
-  console.log(`Duration: ${result.durationSeconds}s`);
-  console.log(`Cost: ${result.billing.costPln} PLN`);
+  console.log(`Duration: ${result.duration}s`);
+  console.log(`Credits used: ${result.credits_used}`);
 
   // Generate style variations
   const styles = ["warm acoustic guitar", "lo-fi chill beats", "orchestral cinematic"];
@@ -440,14 +510,16 @@ upscaled = client.upscale_image(
 )
 print(f"  Upscaled image: {upscaled.images[0]}")
 
-# Cost summary
-total_cost = (
-    base.billing.cost_pln +
-    edited.billing.cost_pln +
-    upscaled.billing.cost_pln
+# Cost summary. Only the generate call reports money (`billing.usd_charged`);
+# the edit and upscale routes report credits only.
+total_credits = (
+    base.billing.credits_used +
+    edited.credits_used +
+    upscaled.credits_used
 )
 print(f"\nPipeline complete!")
-print(f"  Total cost: {total_cost:.2f} PLN")
+print(f"  Base image charge: ${base.billing.usd_charged}")
+print(f"  Total credits: {total_credits}")
 print(f"  Final image: {upscaled.images[0]}")
 ```
 
@@ -488,9 +560,9 @@ async function imageEditingPipeline() {
   });
   console.log(`  Upscaled image: ${upscaled.images[0]}`);
 
-  const totalCost =
-    base.billing.costPln + edited.billing.costPln + upscaled.billing.costPln;
-  console.log(`\nPipeline complete! Total cost: ${totalCost.toFixed(2)} PLN`);
+  const totalCredits =
+    base.billing.credits_used + edited.credits_used + upscaled.credits_used;
+  console.log(`\nPipeline complete! Base charge: $${base.billing.usd_charged}, total credits: ${totalCredits}`);
   console.log(`  Final image: ${upscaled.images[0]}`);
 }
 
@@ -519,7 +591,7 @@ def safe_generate(prompt: str, min_credits: int = 10, **kwargs):
         print(f"WARNING: Only {remaining} credits left (minimum: {min_credits})")
         print(f"  Tier: {balance.tier}")
         print(f"  Period resets: {balance.credits.reset_date}")
-        print(f"  Wallet balance: {balance.wallet.balance} PLN")
+        print(f"  Wallet balance: ${balance.wallet.balance}")
         raise InsufficientCreditsError(
             f"Credits too low: {remaining} < {min_credits}"
         )
@@ -542,7 +614,7 @@ def print_usage_report():
     print(f"  Tier: {balance.tier}")
     print(f"  Credits: {credits.remaining_period}/{credits.limit_period} "
           f"({usage_pct:.1f}% used)")
-    print(f"  Wallet: {balance.wallet.balance} PLN")
+    print(f"  Wallet: ${balance.wallet.balance}")
     print(f"  Resets: {credits.reset_date}")
 
     if usage_pct > 80:
@@ -594,7 +666,7 @@ async function printUsageReport() {
   console.log("=== FOTOhub Usage Report ===");
   console.log(`  Tier: ${balance.tier}`);
   console.log(`  Credits: ${remainingPeriod}/${limitPeriod} (${usagePct.toFixed(1)}% used)`);
-  console.log(`  Wallet: ${balance.wallet.balance} PLN`);
+  console.log(`  Wallet: $${balance.wallet.balance}`);
   console.log(`  Resets: ${resetDate}`);
   console.log(`  Status: ${usagePct > 80 ? "HIGH USAGE" : "Healthy"}`);
 }
@@ -744,7 +816,7 @@ def handle_webhook():
         print(f"Completed: {data['type']} via {data['model']}")
         print(f"  Job ID: {data['job_id']}")
         print(f"  Result: {data['result_url']}")
-        print(f"  Cost: {data['cost_pln']} PLN")
+        print(f"  Cost: ${data['cost_usd']}")
         # Store result in your database
         # db.save_result(data["job_id"], data["result_url"])
 
@@ -875,10 +947,10 @@ def image_to_video_pipeline(
         print(f"  Progress: {video_job.progress}%")
 
     if video_job.status == "completed":
-        total_cost = image_result.billing.cost_pln + video_job.billing.cost_pln
         print(f"\nPipeline complete!")
         print(f"  Video: {video_job.result.video_url}")
-        print(f"  Total cost: {total_cost:.2f} PLN")
+        print(f"  Image charge: ${image_result.billing.usd_charged}")
+        print(f"  Video credits: {video_job.credits_used}")
         return video_job.result.video_url
     else:
         print(f"Video generation failed: {video_job.error}")
@@ -934,10 +1006,10 @@ async function imageToVideoPipeline(
   }
 
   if (videoJob.status === "completed") {
-    const totalCost = imageResult.billing.costPln + videoJob.billing.costPln;
     console.log(`\nPipeline complete!`);
-    console.log(`  Video: ${videoJob.result.videoUrl}`);
-    console.log(`  Total cost: ${totalCost.toFixed(2)} PLN`);
+    console.log(`  Video: ${videoJob.result.video_url}`);
+    console.log(`  Image charge: $${imageResult.billing.usd_charged}`);
+    console.log(`  Video credits: ${videoJob.credits_used}`);
     return videoJob.result.videoUrl;
   }
 
@@ -993,7 +1065,7 @@ def resilient_generate(prompt: str, **kwargs) -> dict | None:
                 return {
                     "url": result.images[0],
                     "model": model,
-                    "cost": result.billing.cost_pln
+                    "cost": result.billing.usd_charged
                 }
 
             except RateLimitError as e:
@@ -1076,7 +1148,7 @@ async function resilientGenerate(
         return {
           url: result.images[0],
           model,
-          cost: result.billing.costPln,
+          cost: result.billing.usd_charged,
         };
       } catch (e) {
         if (e instanceof RateLimitError) {
@@ -1153,7 +1225,8 @@ nobg = client.remove_background(image_url=image.images[0])
 enhanced = client.enhance_image(image_url=nobg.images[0], preset="product")
 
 print(f"Final: {enhanced.images[0]}")
-print(f"Cost: {image.billing.cost_pln + nobg.billing.cost_pln + enhanced.billing.cost_pln:.2f} PLN")
+print(f"Image charge: ${image.billing.usd_charged}")
+print(f"Credits: {image.billing.credits_used + nobg.credits_used + enhanced.credits_used}")
 ```
 
 ```typescript [TypeScript]
@@ -1172,8 +1245,10 @@ async function productPhoto() {
   const enhanced = await client.enhanceImage({ imageUrl: nobg.images[0], preset: "product" });
 
   console.log(`Final: ${enhanced.images[0]}`);
-  const total = image.billing.costPln + nobg.billing.costPln + enhanced.billing.costPln;
-  console.log(`Cost: ${total.toFixed(2)} PLN`);
+  const totalCredits =
+    image.billing.credits_used + nobg.credits_used + enhanced.credits_used;
+  console.log(`Image charge: $${image.billing.usd_charged}`);
+  console.log(`Credits: ${totalCredits}`);
 }
 
 productPhoto();
@@ -1252,7 +1327,7 @@ messages = [
 
 response = client.chat(messages=messages, model="gemini-flash", max_tokens=1024)
 print(response.content)
-print(f"Tokens: {response.usage.total_tokens}, Cost: {response.billing.cost_pln} PLN")
+print(f"Tokens: {response.usage.total_tokens}, Credits: {response.credits_used}")
 ```
 
 ```typescript [TypeScript]
@@ -1270,7 +1345,7 @@ async function multiTurnChat() {
 
   const response = await client.chat({ messages, model: "gemini-flash", maxTokens: 1024 });
   console.log(response.content);
-  console.log(`Tokens: ${response.usage.totalTokens}, Cost: ${response.billing.costPln} PLN`);
+  console.log(`Tokens: ${response.usage.total_tokens}, Credits: ${response.credits_used}`);
 }
 
 multiTurnChat();
@@ -1299,7 +1374,7 @@ func main() {
 	})
 
 	fmt.Println(resp.Content)
-	fmt.Printf("Tokens: %d, Cost: %.2f PLN\n", resp.Usage.TotalTokens, resp.Billing.CostPLN)
+	fmt.Printf("Tokens: %d, Credits: %d\n", resp.Usage.TotalTokens, resp.CreditsUsed)
 }
 ```
 
@@ -1955,40 +2030,95 @@ curl -X POST http://localhost:3000/webhook/fotohub \
 
 Real-time server-sent events (SSE) streaming for responsive chat interfaces.
 
+`POST /v1/ai/agent/stream` is the only streaming endpoint. The chat endpoints
+(`/v1/ai/chat/completions`, `/v1/ai/chat/claude`) accept `stream: true` and
+ignore it, returning one complete JSON body — and neither SDK's stream helper
+works against them, so these examples use plain HTTP. Frames carry a `type`
+field: `text_delta`, `tool_use`, `done`, `error`. See the
+[Streaming Guide](/guides/streaming).
+
 ::: code-group
 
 ```python [Python]
-from fotohub import FotoHub
+import json
+import os
 
-client = FotoHub()
+import requests
 
-messages = [{"role": "user", "content": "Write a short poem about code."}]
+resp = requests.post(
+    "https://apis.fotohub.app/v1/ai/agent/stream",
+    headers={"Authorization": f"Bearer {os.environ['FOTOHUB_API_KEY']}",
+             "Content-Type": "application/json"},
+    json={
+        "model": "claude-sonnet-4.6",
+        "max_tokens": 512,
+        "messages": [{"role": "user", "content": "Write a short poem about code."}],
+    },
+    stream=True,
+)
+resp.raise_for_status()
+
 full_text = ""
-
-for chunk in client.chat_stream(messages=messages, model="gemini-flash", max_tokens=512):
-    print(chunk.delta, end="", flush=True)
-    full_text += chunk.delta
-
-print(f"\n\nTotal tokens: {chunk.usage.total_tokens}")
-print(f"Cost: {chunk.billing.cost_pln} PLN")
+for line in resp.iter_lines():
+    if not line:
+        continue
+    payload = line.decode("utf-8")
+    if not payload.startswith("data: "):
+        continue
+    data = payload[6:]
+    if data == "[DONE]":
+        break
+    frame = json.loads(data)
+    if frame["type"] == "text_delta":
+        print(frame["text"], end="", flush=True)
+        full_text += frame["text"]
+    elif frame["type"] == "done":
+        print(f"\n\nTotal tokens: {frame['usage']['total_tokens']}")
+    elif frame["type"] == "error":
+        raise RuntimeError(frame["message"])
 ```
 
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
 async function streamChat() {
-  const stream = await client.chatStream({
-    messages: [{ role: "user", content: "Write a short poem about code." }],
-    model: "gemini-flash",
-    maxTokens: 512,
+  const response = await fetch("https://apis.fotohub.app/v1/ai/agent/stream", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4.6",
+      max_tokens: 512,
+      messages: [{ role: "user", content: "Write a short poem about code." }],
+    }),
   });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
   let fullText = "";
-  for await (const chunk of stream) {
-    process.stdout.write(chunk.delta);
-    fullText += chunk.delta;
+  // One read() can end mid-frame, so buffer to the blank-line separator.
+  let buffer = "";
+
+  outer: while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() ?? "";
+
+    for (const raw of frames) {
+      if (!raw.startsWith("data: ")) continue;
+      const data = raw.slice(6).trim();
+      if (data === "[DONE]") break outer;
+      const frame = JSON.parse(data);
+      if (frame.type === "text_delta") {
+        process.stdout.write(frame.text);
+        fullText += frame.text;
+      } else if (frame.type === "error") {
+        throw new Error(frame.message);
+      }
+    }
   }
   console.log(`\n\nTotal length: ${fullText.length} chars`);
 }
@@ -2004,13 +2134,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 )
 
 func main() {
-	body := `{"model":"gemini-flash","stream":true,"max_tokens":512,"messages":[{"role":"user","content":"Write a short poem about code."}]}`
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/chat/completions", strings.NewReader(body))
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
+	body := `{"model":"claude-sonnet-4.6","max_tokens":512,"messages":[{"role":"user","content":"Write a short poem about code."}]}`
+	req, _ := http.NewRequest("POST",
+		"https://apis.fotohub.app/v1/ai/agent/stream", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, _ := http.DefaultClient.Do(req)
@@ -2026,12 +2158,13 @@ func main() {
 		if data == "[DONE]" {
 			break
 		}
-		var chunk struct {
-			Choices []struct{ Delta struct{ Content string } }
+		var frame struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
 		}
-		json.Unmarshal([]byte(data), &chunk)
-		if len(chunk.Choices) > 0 {
-			fmt.Print(chunk.Choices[0].Delta.Content)
+		json.Unmarshal([]byte(data), &frame)
+		if frame.Type == "text_delta" {
+			fmt.Print(frame.Text)
 		}
 	}
 	fmt.Println()
@@ -2039,12 +2172,11 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -N -X POST https://apis.fotohub.app/v1/chat/completions \
+curl -N -X POST https://apis.fotohub.app/v1/ai/agent/stream \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-flash",
-    "stream": true,
+    "model": "claude-sonnet-4.6",
     "max_tokens": 512,
     "messages": [{"role": "user", "content": "Write a short poem about code."}]
   }'
@@ -2178,7 +2310,7 @@ def cost_monitor(alert_threshold: int = 50):
     usage_pct = (1 - remaining / limit) * 100
 
     print(f"Credits: {remaining}/{limit} ({usage_pct:.1f}% used)")
-    print(f"Wallet: {balance.wallet.balance} PLN")
+    print(f"Wallet: ${balance.wallet.balance}")
     print(f"Resets: {balance.credits.reset_date}")
 
     # Estimate cost of planned operations
@@ -2186,7 +2318,7 @@ def cost_monitor(alert_threshold: int = 50):
         {"type": "image_generate", "model": "seedream-5-0-260128", "count": 20},
         {"type": "video_generate", "model": "kling-v3", "count": 5},
     ])
-    print(f"\nPlanned cost estimate: {estimate.total_credits} credits ({estimate.total_pln} PLN)")
+    print(f"\nPlanned cost estimate: {estimate.total_credits} credits (${estimate.total_usd})")
 
     if remaining < alert_threshold:
         print(f"\nALERT: Only {remaining} credits left! Consider upgrading.")
@@ -2210,7 +2342,7 @@ async function costMonitor(alertThreshold = 50) {
   const usagePct = (1 - remainingPeriod / limitPeriod) * 100;
 
   console.log(`Credits: ${remainingPeriod}/${limitPeriod} (${usagePct.toFixed(1)}% used)`);
-  console.log(`Wallet: ${balance.wallet.balance} PLN`);
+  console.log(`Wallet: $${balance.wallet.balance}`);
   console.log(`Resets: ${resetDate}`);
 
   const estimate = await client.estimateCost({
@@ -2219,7 +2351,7 @@ async function costMonitor(alertThreshold = 50) {
       { type: "video_generate", model: "kling-v3", count: 5 },
     ],
   });
-  console.log(`\nPlanned cost: ${estimate.totalCredits} credits (${estimate.totalPln} PLN)`);
+  console.log(`\nPlanned cost: ${estimate.total_credits} credits ($${estimate.total_usd})`);
 
   if (remainingPeriod < alertThreshold) {
     console.warn(`\nALERT: Only ${remainingPeriod} credits left!`);
@@ -2248,7 +2380,7 @@ func main() {
 	usagePct := (1 - float64(remaining)/float64(limit)) * 100
 
 	fmt.Printf("Credits: %d/%d (%.1f%% used)\n", remaining, limit, usagePct)
-	fmt.Printf("Wallet: %.2f PLN\n", balance.Wallet.Balance)
+	fmt.Printf("Wallet: $%.2f\n", balance.Wallet.Balance)
 
 	estimate, _ := client.EstimateCost(&fotohub.EstimateCostParams{
 		Operations: []fotohub.Operation{
@@ -2256,7 +2388,7 @@ func main() {
 			{Type: "video_generate", Model: "kling-v3", Count: 5},
 		},
 	})
-	fmt.Printf("Planned cost: %d credits (%.2f PLN)\n", estimate.TotalCredits, estimate.TotalPLN)
+	fmt.Printf("Planned cost: %d credits ($%.4f)\n", estimate.TotalCredits, estimate.TotalUSD)
 
 	if remaining < 50 {
 		fmt.Println("\nALERT: Low credits!")
@@ -2270,7 +2402,7 @@ curl -s https://apis.fotohub.app/v1/billing/balance \
   -H "Authorization: Bearer fh_live_your_api_key" | jq '{
     credits_remaining: .credits.remaining_period,
     credits_limit: .credits.limit_period,
-    wallet_pln: .wallet.balance,
+    wallet_usd: .wallet.balance,
     resets: .credits.reset_date
   }'
 
@@ -2283,7 +2415,7 @@ curl -s -X POST https://apis.fotohub.app/v1/billing/estimate \
       {"type": "image_generate", "model": "seedream-5-0-260128", "count": 20},
       {"type": "video_generate", "model": "kling-v3", "count": 5}
     ]
-  }' | jq '{total_credits, total_pln}'
+  }' | jq '{total_credits, total_usd}'
 ```
 
 :::

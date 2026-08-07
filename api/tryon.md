@@ -4,10 +4,11 @@ The Try-On API dresses a photo of a person in a photo of a garment. You supply o
 
 ::: info Capabilities
 - **One garment per call** — a top, a bottom, or a one-piece dress/suit
+- **Outfits** — send a top *and* a bottom in one call and the API chains the passes
 - **1–4 renders per request**, billed per output image
 - **Flat-lay packshots or on-model references** both work, and you tell the API which one you sent
 - **Reproducible output** via `seed`
-- **Garment catalogue** — reference a stored garment by `garment_id` instead of re-uploading it
+- **Garment catalogue** — 188 shared garments referenced by `garment_id`, plus your own
 - **Person photos are not kept** — an upload is purged within 24 h; only the render is stored permanently
 :::
 
@@ -62,7 +63,7 @@ Holding an HTTP connection open for ten-plus seconds is a bad deal for everyone:
 └───────────┘ └────────┘
 ```
 
-Billing happens at submit time, before the job row is created — so the credits are spent whether or not you ever poll. If the job cannot be queued, the charge is reversed automatically (credits refunded, or PLN returned to the wallet if the request was billed as overage).
+Billing happens at submit time, before the job row is created — so the credits are spent whether or not you ever poll. If the job cannot be queued, the charge is reversed automatically (credits refunded, or USD returned to the wallet if the request was billed as overage).
 
 ---
 
@@ -79,8 +80,9 @@ Submit a try-on job.
 | `garment_id` | uuid | Conditional | — | A garment from the catalogue. Used only when `garment_image_url` is absent. Supplies the garment image, and overrides `category` and `garment_photo_type`. |
 | `category` | string | No | `"tops"` | `"tops"`, `"bottoms"` or `"one-pieces"`. Any other value is rejected with `400`. |
 | `garment_photo_type` | string | No | `"flat-lay"` | How the garment reference was shot: `"flat-lay"`, `"model"` or `"auto"`. |
-| `num_images` | integer | No | `1` | Renders to produce, 1–4. Values outside the range are clamped, not rejected. Credits are charged per image. |
+| `num_images` | integer | No | `1` | Renders to produce, 1–4. Values outside the range are clamped, not rejected. Credits are charged per image. Forced to `1` for an outfit. |
 | `seed` | integer | No | random | Fixed seed for reproducible output. Same inputs plus same seed give the same render. |
+| `garments` | array | No | — | Two garments to apply in one job — a top and a bottom. See [Outfits](#outfits-a-top-and-a-bottom-in-one-call). When present with more than one entry, the single-garment fields above are ignored. |
 
 Only `person_image_url` plus one of `garment_image_url` / `garment_id` are strictly required. Everything else has a working default — but `category` and `garment_photo_type` are the two fields that most affect output quality, so set them deliberately.
 
@@ -95,6 +97,7 @@ Only `person_image_url` plus one of `garment_image_url` / `garment_id` are stric
   "credits_used": 2,
   "billing": {
     "method": "credits",
+    "usd_charged": 0,
     "pln_charged": 0
   },
   "estimated_seconds": 8,
@@ -104,7 +107,7 @@ Only `person_image_url` plus one of `garment_image_url` / `garment_id` are stric
 
 `category` is echoed back because a `garment_id` may have changed it. Use the returned value, not the one you sent.
 
-`billing.method` is `"credits"` when the cost came out of your credit balance, or `"wallet"` when credits were exhausted and the request was billed as PLN overage — in which case `pln_charged` is non-zero.
+`billing.method` is `"credits"` when the cost came out of your credit balance, or `"wallet"` when credits were exhausted and the request was billed as USD overage — in which case `usd_charged` is non-zero. `pln_charged` is a legacy mirror of the same charge; read `usd_charged`.
 
 ### Response — 402 Payment Required
 
@@ -112,7 +115,7 @@ Credits are checked and charged before the job is created, so a short balance fa
 
 ```json
 {
-  "detail": "Insufficient wallet balance. Need 0.36 PLN. Credits exhausted, wallet empty. Top up to continue."
+  "detail": "Insufficient wallet balance. Need $0.10. Credits exhausted, wallet empty. Top up to continue."
 }
 ```
 
@@ -120,9 +123,83 @@ The same status is returned when a monthly overage limit is in the way:
 
 ```json
 {
-  "detail": "Monthly overage limit reached (50.00/50.00 PLN). Top up your wallet or increase the limit."
+  "detail": "Monthly overage limit reached ($50.00/$50.00). Top up your wallet or increase the limit."
 }
 ```
+
+---
+
+## Outfits: a top and a bottom in one call
+
+The underlying model transfers exactly one garment per pass. An outfit is therefore two passes: the top goes on first, and the render that comes out of that pass becomes the input to the bottom pass. Send `garments[]` with two entries and the API runs both for you, returning a single job.
+
+```bash
+curl -X POST https://apis.fotohub.app/v1/ai/tryon \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "person_image_url": "https://example.com/person.jpg",
+    "garments": [
+      { "garment_image_url": "https://example.com/tshirt.png", "category": "tops" },
+      { "garment_image_url": "https://example.com/jeans.png", "category": "bottoms" }
+    ]
+  }'
+```
+
+Each entry takes the same fields as a single-garment call: `garment_image_url` **or** `garment_id`, plus optional `category` and `garment_photo_type`. Order in the array does not matter — the API always applies the top before the bottom, because that is the direction verified end to end.
+
+### Rules
+
+| Rule | Detail |
+|------|--------|
+| Exactly two garments | One `tops` and one `bottoms`. Anything else — two tops, three entries, a `one-pieces` in the array — is rejected with `400`. |
+| One-pieces cannot combine | A dress or jumpsuit already covers the body. Send it as a normal single-garment call. |
+| `num_images` is forced to `1` | Two chained passes with four renders each would multiply cost and latency for a result nobody asked for. |
+| Cost is 3 credits, not 4 | Two passes for less than two separate calls. Registered as `tryon_outfit_virtual-try-on-001`. |
+| `estimated_seconds` doubles | 16 instead of 8, because there are two provider round-trips. Measured end to end: about 20 s. |
+
+A single entry in `garments[]` is treated as an ordinary single-garment request and billed at the normal 2 credits — the outfit price applies only when there are genuinely two.
+
+### Response
+
+Identical in shape to a single-garment submit, with the outfit's cost and estimate:
+
+```json
+{
+  "model": "virtual-try-on-001",
+  "job_id": "381e0971-c3e9-499c-b927-4bced6103160",
+  "status": "queued",
+  "category": "tops",
+  "credits_used": 3.0,
+  "billing": { "method": "credits", "usd_charged": 0, "pln_charged": 0 },
+  "estimated_seconds": 16,
+  "poll_url": "https://apis.fotohub.app/v1/ai/tryon/381e0971-c3e9-499c-b927-4bced6103160"
+}
+```
+
+Poll it exactly like any other job. `progress` moves through both passes — roughly 30 after the first, 55 mid-chain, 100 on completion — and `images` contains **one** URL: the finished outfit. The intermediate render, the person wearing the new top but their own original trousers, is never returned and never lands in your library.
+
+### If the second pass fails
+
+The first pass is real, paid-for work, so a failure in the second one does not throw it away. The job completes rather than failing: you get the top-only render, and **one credit of the three is refunded** — so a half-finished outfit costs you the same 2 credits as the single try-on you effectively received.
+
+Check `metadata.partial_failure` on the job to detect this:
+
+```json
+{
+  "status": "completed",
+  "images": ["https://.../top-only-render.png"],
+  "metadata": {
+    "partial_failure": { "slot": "bottom", "reason": "..." }
+  }
+}
+```
+
+`slot` tells you which half is missing. Treat its presence as "this is not the outfit I asked for" — show the render, but do not present it as the complete look.
+
+::: warning No accessories
+`tops`, `bottoms` and `one-pieces` are the only categories the model understands. Hats and shoes were tested and do **not** work: a cap passed as `tops` lands on the head but recolours the whole outfit, and sneakers passed as `bottoms` are ignored outright — and both return `200`, so only looking at the image reveals it. Do not build a footwear or headwear feature on this endpoint.
+:::
 
 ---
 
@@ -193,11 +270,13 @@ A catalogue garment also **overrides the `category` you sent, and supplies `garm
 
 An unknown `garment_id` returns `404 Garment not found`. `garment_image_url` takes precedence: if you pass both, the URL is used and the ID is ignored.
 
-::: tip Catalogue is opt-in, URLs are the default path
-No shared garments are published yet, so unless you have created your own catalogue entries, use `garment_image_url`. Every example on this page does.
+::: tip 188 shared garments are ready to use
+The shared catalogue is populated and readable by every account, so `garment_id` works without creating anything first. Examples on this page use `garment_image_url` because a URL is self-contained and needs no lookup to read.
 :::
 
-Garments are stored per account, with an optional shared library of system garments readable by everyone. Each entry carries a name, a category, a photo type, an image URL and an optional thumbnail — so a picker UI can render the catalogue without touching the try-on API at all.
+Garments are stored per account on top of the shared library of system garments readable by everyone. Each entry carries a name, a category, a photo type, an image URL and an optional thumbnail — so a picker UI can render the catalogue without touching the try-on API at all.
+
+System garments also carry a `vertical` (`fashion`, `streetwear`, `business`, `sports`, `outerwear`, `outdoor`, `loungewear`, `occasion`). It is a merchandising label, not an API parameter — the try-on call never takes it, but it is what a catalogue UI groups by.
 
 ---
 
@@ -211,7 +290,7 @@ Garments are stored per account, with an optional shared library of system garme
 | `bottoms` | Trousers, jeans, skirts, shorts | Needs the waistline visible in the person photo |
 | `one-pieces` | Dresses, jumpsuits, overalls, suits worn as one garment | Use this rather than `tops` for anything covering torso and legs |
 
-There is no "both" — a top and a bottom are two calls on two garments. Chain them by feeding the first render back in as the `person_image_url` of the second call.
+A single garment field dresses one garment. To put on a top **and** a bottom, send both in `garments[]` and the API chains the passes for you — see [Outfits](#outfits-a-top-and-a-bottom-in-one-call). Chaining by hand still works, but there is no longer a reason to.
 
 ### Photo type
 
@@ -242,7 +321,7 @@ There is no "both" — a top and a bottom are two calls on two garments. Chain t
 | One output image | **2** | `virtual-try-on-001` |
 | A request with `num_images: 4` | **8** | 2 credits × 4 images |
 
-When your credit balance is exhausted, the request falls through to PLN wallet billing at **0.36 PLN per output image**. Credits are the cheaper path — see [Billing](/api/billing) for balance, top-ups and overage limits.
+When your credit balance is exhausted, the request falls through to USD wallet billing at **$0.0965 per output image** (an outfit job is priced as `virtual-try-on-001-outfit`, $0.1929). Credits are the cheaper path — see [Billing](/api/billing) for balance, top-ups and overage limits.
 
 Credits are charged at submit, not at completion. A job that fails after being queued is **not** automatically refunded — check the `status` on your poll and treat a `failed` job as a support case if it was not your input's fault.
 

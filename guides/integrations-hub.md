@@ -382,8 +382,8 @@ for i, url in enumerate(result.images):
 
 # Check credit usage
 balance = client.billing.get_balance()
-print(f"Credits remaining: {balance.credits.remaining}/{balance.credits.limit}")
-print(f"Wallet: {balance.wallet.available_pln} PLN")
+print(f"Credits remaining: {balance.credits.remaining_period}/{balance.credits.limit_period}")
+print(f"Wallet: ${balance.wallet.balance} {balance.wallet.currency}")
 ```
 
 ### TypeScript: Webhook Handler
@@ -405,8 +405,9 @@ app.post("/webhook", (req, res) => {
     .update(req.body)
     .digest("hex");
 
+  // Raw hex digest — FOTOhub does NOT send a `sha256=` prefix
   if (!crypto.timingSafeEqual(
-    Buffer.from(`sha256=${expected}`),
+    Buffer.from(expected),
     Buffer.from(signature)
   )) {
     return res.status(401).send("Invalid signature");
@@ -414,13 +415,13 @@ app.post("/webhook", (req, res) => {
 
   const event = JSON.parse(req.body.toString());
 
-  switch (event.type) {
+  switch (event.event) {
     case "generation.completed":
       console.log(`Generation done: ${event.data.output_url}`);
       // Process the generated asset
       break;
     case "credits.low":
-      console.log(`Low credits: ${event.data.credits_remaining}`);
+      console.log(`Credits exhausted on ${event.data.operation}: ${event.data.message}`);
       // Alert your team or auto-topup
       break;
   }

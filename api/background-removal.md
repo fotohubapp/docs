@@ -43,12 +43,21 @@ Automatically detects and segments the main subject, removing the background and
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "size_bytes": 1548290,
   "processing_time_ms": 2340
 }
 ```
+
+::: info Reading the billing block
+`method` is `credits` while your plan's monthly allowance covers the request, and
+`usd_charged` is `0` because no money moved. Once the allowance is exhausted the
+same call returns `"method": "wallet"` with the USD amount in `usd_charged` (see
+[Pricing](#pricing)). `pln_charged` is a legacy mirror of the same charge -- read
+`usd_charged`.
+:::
 
 ### Code Examples
 
@@ -145,7 +154,8 @@ Each point in the `points` array specifies a location and whether it belongs to 
   "billing": {
     "method": "credits",
     "credits_used": 4,
-    "pln_charged": 0.48
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "size_bytes": 2105384,
   "processing_time_ms": 3120,
@@ -267,7 +277,8 @@ Removes the background and replaces it with a new one in a single API call. Supp
   "billing": {
     "method": "credits",
     "credits_used": 4,
-    "pln_charged": 0.48
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "processing_time_ms": 4200
 }
@@ -385,7 +396,8 @@ Keeps the main subject in sharp focus while applying Gaussian blur to the backgr
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "blur_radius": 15,
   "processing_time_ms": 2800
@@ -477,7 +489,8 @@ Adds a realistic shadow to a transparent PNG image. Supports natural (AI-detecte
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "shadow_type": "natural",
   "processing_time_ms": 1850
@@ -554,19 +567,19 @@ curl -X POST "https://apis.fotohub.app/v1/images/add-shadow" \
 
 ## Pricing
 
-| Endpoint | Credits | PLN |
+| Endpoint | Credits | USD |
 |----------|---------|-----|
-| Remove Background (auto) | 2 | 0.24 |
-| Remove Background (advanced) | 4 | 0.48 |
-| Replace Background | 4 | 0.48 |
-| Blur Background | 2 | 0.24 |
-| Add Shadow | 2 | 0.24 |
+| Remove Background (auto) | 2 | $0.1072 |
+| Remove Background (advanced) | 4 | $0.2144 |
+| Replace Background | 4 | $0.2144 |
+| Blur Background | 2 | $0.1072 |
+| Add Shadow | 2 | $0.1072 |
 
 **Billing notes:**
-- 1 credit = 0.12 PLN
+- 1 credit = $0.0536
 - Credits are deducted before processing. If processing fails, credits are refunded automatically.
 - All operations are single-image (no batch endpoint). For batch processing, call the endpoint multiple times.
-- Wallet (PLN) billing is used when credits are exhausted, up to your overage limit.
+- USD wallet billing is used when credits are exhausted, up to your overage limit.
 
 ## Rate Limits
 
@@ -594,17 +607,17 @@ Rate limits depend on your subscription tier:
 
 ### Overage Pricing
 
-When monthly credits are exhausted, operations are billed from your PLN wallet:
+When monthly credits are exhausted, operations are billed from your USD wallet:
 
-| Operation | Credit Cost | PLN Cost | USD Equivalent |
-|-----------|-------------|----------|----------------|
-| Remove Background (auto) | 2 kr | 0.24 PLN | ~$0.06 |
-| Remove Background (advanced) | 4 kr | 0.48 PLN | ~$0.12 |
-| Replace Background | 4 kr | 0.48 PLN | ~$0.12 |
-| Blur Background | 2 kr | 0.24 PLN | ~$0.06 |
-| Add Shadow | 2 kr | 0.24 PLN | ~$0.06 |
+| Operation | Credit Cost | USD Cost |
+|-----------|-------------|----------|
+| Remove Background (auto) | 2 cr | $0.1072 |
+| Remove Background (advanced) | 4 cr | $0.2144 |
+| Replace Background | 4 cr | $0.2144 |
+| Blur Background | 2 cr | $0.1072 |
+| Add Shadow | 2 cr | $0.1072 |
 
-**1 credit = 0.12 PLN (~$0.03 USD)**
+**1 credit = $0.0536**
 
 ### Burst Limits
 

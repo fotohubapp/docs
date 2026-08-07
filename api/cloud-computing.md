@@ -52,50 +52,52 @@ User → Compute Engine → AWS EC2 API → Instance
 List available instance types with GPU specs, pricing, and availability.
 
 **Response:**
+The endpoint returns `gpu_catalog` rows verbatim, so the field names are the
+table's own. Rates are **PLN per hour** — see the warning under
+[Estimate Cost](#estimate-cost).
+
 ```json
 {
   "catalog": [
     {
-      "id": "gpu-a10g-xlarge",
-      "name": "GPU A10G XLarge",
-      "category": "gpu",
-      "instance_type": "g5.xlarge",
-      "vcpus": 4,
-      "memory_gb": 16,
-      "gpu": "NVIDIA A10G",
-      "gpu_memory_gb": 24,
-      "storage_gb": 250,
-      "price_per_hour_usd": 1.006,
-      "price_per_hour_pln": 4.07,
-      "spot_discount_pct": 60,
-      "regions": ["eu-central-1", "us-east-1"],
-      "available": true
+      "id": "g5.4xlarge",
+      "name": "NVIDIA A10G 24GB (g5.4xlarge)",
+      "vram": "24GB GDDR6",
+      "hourly_rate_kr": 6.53,
+      "spot_price_kr": 2.44,
+      "is_active": true,
+      "sort_order": 1
     },
     {
-      "id": "gpu-a100-xlarge",
-      "name": "GPU A100 80GB",
-      "category": "gpu",
-      "instance_type": "p4d.24xlarge",
-      "vcpus": 96,
-      "memory_gb": 1152,
-      "gpu": "NVIDIA A100 80GB x8",
-      "gpu_memory_gb": 640,
-      "price_per_hour_usd": 32.77,
-      "available": true
+      "id": "g5.xlarge",
+      "name": "NVIDIA A10G 24GB (g5.xlarge)",
+      "vram": "24GB GDDR6",
+      "hourly_rate_kr": 4.10,
+      "spot_price_kr": 1.55,
+      "is_active": true,
+      "sort_order": 3
     },
     {
-      "id": "cpu-compute-large",
-      "name": "Compute Optimized Large",
-      "category": "cpu",
-      "instance_type": "c6i.2xlarge",
-      "vcpus": 8,
-      "memory_gb": 16,
-      "price_per_hour_usd": 0.34,
-      "available": true
+      "id": "g4dn.xlarge",
+      "name": "NVIDIA T4 16GB (g4dn.xlarge)",
+      "vram": "16GB GDDR6",
+      "hourly_rate_kr": 2.14,
+      "spot_price_kr": 0.80,
+      "is_active": true,
+      "sort_order": 4
     }
   ]
 }
 ```
+
+::: warning `hourly_rate_kr` is whole PLN per hour
+Despite the `_kr` suffix — a legacy artefact of the original schema — this
+column is **PLN/hour**, not a minor unit. Do not divide by 100. `6.53` means
+6.53 PLN per hour. Use `spot_price_kr` when provisioning with
+`spot_instance: true`; SKUs without one fall back to the on-demand rate.
+:::
+
+Only T4 and A10G accelerators are offered. There is no A100 or H100 tier.
 
 ---
 
@@ -211,19 +213,26 @@ Get a cost estimate before provisioning.
 ```json
 {
   "estimate": {
-    "instance_cost_usd": 9.65,
-    "instance_cost_pln": 39.08,
-    "storage_cost_usd": 0.48,
-    "storage_cost_pln": 1.94,
-    "total_usd": 10.13,
-    "total_pln": 41.02,
-    "per_hour_usd": 0.42,
-    "per_hour_pln": 1.71,
-    "savings_vs_ondemand_pct": 60,
-    "note": "Spot pricing, may be interrupted"
+    "machine_per_hour": 1.6512,
+    "ebs_per_hour": 0.2663,
+    "network_per_hour": 0.0,
+    "total_per_hour": 1.9175,
+    "total_per_day": 46.02,
+    "total_per_month": 1399.78,
+    "estimated_session": 46.02,
+    "spot_discount_pct": 60,
+    "currency": "PLN"
   }
 }
 ```
+
+::: warning Cloud compute is billed in PLN
+Every other endpoint on this API bills your wallet in USD. GPU instances are
+the exception: the compute engine quotes and charges in **PLN**, and the
+`currency` field in the response says so. Read that field rather than assuming
+a currency — do not convert these figures yourself, and do not compare them
+directly against the USD prices elsewhere in this reference.
+:::
 
 ---
 
@@ -328,6 +337,10 @@ GET /instances/:id/volumes
 
 ## Billing
 
+- **Currency**: **PLN**, unlike the rest of this API. Instance hours come from
+  `gpu_catalog.hourly_rate_kr` (PLN/h) and EBS storage is converted from its USD
+  list price into PLN before being added to the total. Every cost response
+  carries a `currency` field — read it rather than assuming.
 - **On-demand**: Billed per hour, deducted from wallet
 - **Spot**: Up to 60% cheaper, may be interrupted with 2-min warning
 - **Storage**: EBS volumes billed per GB-month even when instance is stopped

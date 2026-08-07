@@ -44,6 +44,7 @@ Submit an IDA Q 1.0 generation request. Billing happens at submit time — the c
   "credits_used": 0.5,
   "billing": {
     "method": "credits",
+    "usd_charged": 0,
     "pln_charged": 0
   },
   "estimated_seconds": 30,
@@ -197,12 +198,12 @@ The practical takeaway: you don't need to write JSON or think about backgrounds/
 
 | Model | Price | Notes |
 |---|---|---|
-| **IDA Q 1.0** | **0.10 PLN / request** (0.5 credits) | Self-hosted, FOTOhub proprietary |
-| Nano Banana (Gemini 2.5 Flash Image) | 0.40 PLN / request | Third-party, for comparison |
-| GPT Image 2 | 2.00 PLN / request | Third-party, for comparison |
+| **IDA Q 1.0** | **$0.0268 / request** (0.5 credits) | Self-hosted, FOTOhub proprietary |
+| Nano Banana (Gemini 2.5 Flash Image) | $0.1072 / request (2 credits) | Third-party, for comparison |
+| GPT Image 2 | $0.1072 / request (2 credits) | Third-party, for comparison |
 
 ::: tip Cost Advantage
-IDA Q 1.0 costs a fraction of Google's Nano Banana (Gemini Flash Image) and 20x less than GPT Image 2 — because it runs on FOTOhub's own infrastructure with no third-party licensing fee to pass through. `num_images: 2` charges 2x the base rate.
+IDA Q 1.0 costs a quarter of what Google's Nano Banana (Gemini Flash Image) or GPT Image 2 cost on this API — half a credit against two — because it runs on FOTOhub's own infrastructure with no third-party licensing fee to pass through. `num_images: 2` charges 2x the base rate. USD figures are the wallet price once included credits are exhausted, at $0.0536 per credit.
 :::
 
 ---

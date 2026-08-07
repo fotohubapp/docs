@@ -21,13 +21,13 @@ Returns a full analytics snapshot for the authenticated user covering the last 3
     "current_period_start": "2026-07-01T00:00:00Z",
     "current_period_end": "2026-07-31T23:59:59Z",
     "api_plans": {
-      "slug": "pro",
-      "name": "Pro",
-      "monthly_price": 99,
+      "slug": "api-startup",
+      "name": "API Startup",
+      "monthly_price": 199,
       "currency": "PLN",
       "included_tokens": 5000000,
       "included_requests": 10000,
-      "rate_limit_per_minute": 120,
+      "rate_limit_per_minute": 300,
       "features": ["priority_queue", "dedicated_support"]
     }
   },
@@ -53,8 +53,7 @@ Returns a full analytics snapshot for the authenticated user covering the last 3
     "totalRequests": 4521,
     "totalTokens": 2340000,
     "currency": [
-      { "currency": "PLN", "amount": 142.50 },
-      { "currency": "USD", "amount": 35.18 }
+      { "currency": "USD", "amount": 38.20 }
     ]
   },
   "daily": [
@@ -62,18 +61,18 @@ Returns a full analytics snapshot for the authenticated user covering the last 3
       "date": "2026-07-17",
       "requests": 156,
       "totalTokens": 78000,
-      "costByCurrency": { "PLN": 4.75 }
+      "costByCurrency": { "USD": 1.27 }
     },
     {
       "date": "2026-07-18",
       "requests": 89,
       "totalTokens": 45200,
-      "costByCurrency": { "PLN": 2.80 }
+      "costByCurrency": { "USD": 0.75 }
     }
   ],
   "topEndpoints": [
     { "endpoint": "/v1/ai/generate/image", "count": 2100 },
-    { "endpoint": "/v1/ai/chat", "count": 1200 },
+    { "endpoint": "/v1/ai/chat/completions", "count": 1200 },
     { "endpoint": "/v1/ai/generate/video", "count": 450 },
     { "endpoint": "/v1/ai/generate/music", "count": 320 },
     { "endpoint": "/v1/ai/translate", "count": 251 }
@@ -91,9 +90,9 @@ Returns a full analytics snapshot for the authenticated user covering the last 3
       "endpoint": "/v1/ai/generate/image",
       "model_id": "seedream-5-0-260128",
       "request_tokens": 150,
-      "response_tokens": 0,
-      "cost": 0.25,
-      "currency": "PLN",
+      "response_tokens": 16384,
+      "cost": 0.049152,
+      "currency": "USD",
       "status": "success"
     }
   ]
@@ -106,11 +105,19 @@ Returns a full analytics snapshot for the authenticated user covering the last 3
 |-------|-------------|
 | `subscription` | Active plan details including limits and features |
 | `keys` | All API keys with usage stats per key |
-| `totals` | 30-day aggregate: requests, tokens, cost |
+| `totals` | 30-day aggregate: requests, tokens, cost. `currency` is an array because the account may hold rows in more than one currency. |
 | `daily` | Day-by-day breakdown for charts |
 | `topEndpoints` | Top 5 most-used endpoints |
 | `topModels` | Top 5 most-used AI models |
 | `latestEvents` | Last 20 API calls with full detail |
+
+::: info Currency
+Usage events logged since the 2026-08-05 wallet cutover carry
+`"currency": "USD"`. Older rows were written with `"currency": "PLN"` and are
+kept as-is, so `totals.currency[]` and `daily[].costByCurrency` can contain
+both keys on an account that was active before the cutover. Always read the
+currency alongside the amount instead of assuming a single one.
+:::
 
 ---
 
@@ -129,11 +136,11 @@ response = httpx.get(
 data = response.json()
 
 # Monthly spend
-total_pln = next(
-    (c["amount"] for c in data["totals"]["currency"] if c["currency"] == "PLN"),
+total_usd = next(
+    (c["amount"] for c in data["totals"]["currency"] if c["currency"] == "USD"),
     0
 )
-print(f"This month: {data['totals']['totalRequests']} requests, {total_pln:.2f} PLN")
+print(f"This month: {data['totals']['totalRequests']} requests, ${total_usd:.2f}")
 
 # Most used model
 top_model = data["topModels"][0]
@@ -155,7 +162,7 @@ const data = await response.json();
 const chartData = data.daily.map(d => ({
   date: d.date,
   requests: d.requests,
-  cost: d.costByCurrency?.PLN ?? 0
+  cost: d.costByCurrency?.USD ?? 0
 }));
 
 // Check if approaching limits
@@ -189,7 +196,7 @@ Each API call generates a usage event with:
 | `request_tokens` | integer | Input tokens consumed |
 | `response_tokens` | integer | Output tokens generated |
 | `cost` | float | Cost of this call |
-| `currency` | string | Cost currency (PLN/USD) |
+| `currency` | string | Cost currency — `USD` for everything logged since 2026-08-05 |
 | `status` | string | `success` \| `error` \| `timeout` |
 | `latency_ms` | integer | Response time |
 

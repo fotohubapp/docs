@@ -3,7 +3,7 @@
 The Image Editing API provides AI-powered image manipulation including inpainting, outpainting, background replacement, object removal, upscaling, and style transfer. All operations use a single endpoint with the `mode` parameter to select the editing operation.
 
 ::: info Overview
-Powered by Google Imagen 3 for photorealistic results. All edit modes cost a fixed **2 credits** (0.24 PLN) per operation, regardless of image size or complexity. Additionally, 13 specialized tools from Stability AI are available for advanced editing workflows.
+Powered by Google Imagen 3 for photorealistic results. All edit modes cost a fixed **2 credits** ($0.0643 from the wallet once your plan allowance is used up) per operation, regardless of image size or complexity. Additionally, 13 specialized tools from Stability AI are available for advanced editing workflows.
 :::
 
 ---
@@ -15,7 +15,7 @@ POST /v1/ai/edit/image
 ```
 
 **Authentication:** Bearer token (API key)  
-**Billing:** 2 credits (0.24 PLN) per request
+**Billing:** 2 credits per request ($0.0643 from the wallet once your plan allowance is used up)
 
 ## Parameters
 
@@ -72,35 +72,23 @@ Upscales the image by 2x or 4x using AI-powered super-resolution. Unlike simple 
 ```json
 {
   "mode": "inpaint",
-  "model": "imagen-3-capability",
   "credits_used": 2,
-  "billing": {
-    "method": "credits",
-    "credits_used": 2,
-    "pln_charged": 0.24
-  },
   "images": [
     "https://s1.fotohub.app/storage/v1/object/public/generations/edit-abc123-0.png"
-  ],
-  "metadata": {
-    "input_size": "1024x1024",
-    "output_size": "1024x1024",
-    "processing_time_ms": 4250
-  }
+  ]
 }
 ```
 
 | Field | Description |
 |-------|-------------|
 | `mode` | The editing mode that was used |
-| `model` | The model that processed the request |
 | `credits_used` | Number of credits consumed (always 2) |
-| `billing.method` | Billing method used (`credits`) |
-| `billing.pln_charged` | PLN amount charged |
 | `images` | Array of output image URLs (1-4 depending on `num_outputs`) |
-| `metadata.input_size` | Dimensions of the input image |
-| `metadata.output_size` | Dimensions of the output image |
-| `metadata.processing_time_ms` | Server-side processing time in milliseconds |
+
+This endpoint reports the charge as `credits_used` only -- it returns no `billing`
+object. The 2 credits come from your plan allowance first; once that is exhausted
+the same request bills **$0.0643** from the USD wallet. Use
+`GET /v1/billing/usage` for the money figure.
 
 ## Code Examples
 
@@ -654,7 +642,7 @@ curl -X POST "https://apis.fotohub.app/stability/style-transfer" \
 
 | Detail | Value |
 |--------|-------|
-| Cost per request | 2 credits (0.24 PLN) |
+| Cost per request | 2 credits ($0.0643 from wallet) |
 | Multiple outputs | Same cost regardless of `num_outputs` (1-4) |
 | All modes | Same flat price |
 | Batch discount | None — flat rate per request |

@@ -58,7 +58,7 @@ func main() {
         URL     string `json:"url"`
         Billing struct {
             CreditsUsed int     `json:"credits_used"`
-            PLNCharged  float64 `json:"pln_charged"`
+            USDCharged  float64 `json:"usd_charged"`
         } `json:"billing"`
     }
 
@@ -68,7 +68,7 @@ func main() {
     }
     json.Unmarshal(resp, &result)
     fmt.Printf("Image URL: %s\n", result.URL)
-    fmt.Printf("Cost: %.2f PLN\n", result.Billing.PLNCharged)
+    fmt.Printf("Cost: $%.4f\n", result.Billing.USDCharged)
 }
 ```
 
@@ -284,7 +284,7 @@ client = FotoHub(api_key="fh_live_your_api_key")
 try:
     result = client.images.generate(prompt="test", model="seedream-5-0-260128")
 except InsufficientCreditsError as e:
-    print(f"Need more credits. Balance: {e.balance} PLN")
+    print(f"Need more credits. Credits available: {e.credits_available}")
 except RateLimitError as e:
     print(f"Rate limited. Retry after {e.retry_after}s")
 except FotoHubError as e:
@@ -305,7 +305,7 @@ try {
   if (err instanceof FotoHubError) {
     switch (err.code) {
       case "insufficient_credits":
-        console.log(`Need more credits. Balance: ${err.balance} PLN`);
+        console.log(`Need more credits. Credits available: ${err.creditsAvailable}`);
         break;
       case "rate_limited":
         console.log(`Retry after ${err.retryAfter}s`);
@@ -426,42 +426,106 @@ curl -s -w "\nHTTP %{http_code}\n" \
 
 ## Chat Streaming (SSE)
 
-Parse Server-Sent Events using `bufio.Scanner`. The API sends `data:` prefixed JSON lines, terminated by `data: [DONE]`. Set `"stream": true` in the request body and `Accept: text/event-stream` header.
+Parse Server-Sent Events using `bufio.Scanner`. The API sends `data:` prefixed
+JSON frames, terminated by `data: [DONE]`.
+
+::: warning Stream from `/v1/ai/agent/stream`
+That is the only streaming endpoint. `/v1/ai/chat/completions` accepts
+`stream: true` and ignores it, returning one complete JSON body; `POST
+/v1/ai/chat` does not exist at all (`404`).
+
+Frames are discriminated by a `type` field — `text_delta`, `tool_use`, `done`,
+`error` — not by `choices[].delta`. `stream: true` is not needed in the body: the
+endpoint always streams. Model IDs here are `claude-sonnet-4.6` (default),
+`claude-sonnet-4.5`, `claude-sonnet-4` and `claude-haiku-4.5`; the chat IDs
+(`gemini-flash`, `claude-sonnet`, …) are not accepted. See the
+[Streaming Guide](/guides/streaming).
+:::
 
 ::: code-group
 
 ```python [Python]
-from fotohub import FotoHub
+import json
+import os
 
-client = FotoHub(api_key="fh_live_your_api_key")
+import requests
 
-stream = client.chat_stream(
-    message="Explain quantum computing in simple terms",
-    model="gabriel",
+# The Python SDK has no streaming method for this endpoint (chat_stream() does
+# not exist, and chat(stream=True) targets the non-streaming chat route).
+resp = requests.post(
+    "https://apis.fotohub.app/v1/ai/agent/stream",
+    headers={"Authorization": f"Bearer {os.environ['FOTOHUB_API_KEY']}",
+             "Content-Type": "application/json"},
+    json={
+        "model": "claude-sonnet-4.6",
+        "messages": [{"role": "user",
+                      "content": "Explain quantum computing in simple terms"}],
+    },
+    stream=True,
 )
+resp.raise_for_status()
 
-for chunk in stream:
-    if chunk.type == "content":
-        print(chunk.delta.text, end="", flush=True)
-    elif chunk.type == "usage":
-        print(f"\n[Tokens: {chunk.usage.input_tokens} in, {chunk.usage.output_tokens} out]")
+for line in resp.iter_lines():
+    if not line:
+        continue
+    payload = line.decode("utf-8")
+    if not payload.startswith("data: "):
+        continue
+    data = payload[6:]
+    if data == "[DONE]":
+        break
+    frame = json.loads(data)
+    if frame["type"] == "text_delta":
+        print(frame["text"], end="", flush=True)
+    elif frame["type"] == "done":
+        u = frame["usage"]
+        print(f"\n[Tokens: {u['input_tokens']} in, {u['output_tokens']} out]")
+    elif frame["type"] == "error":
+        raise RuntimeError(frame["message"])
 ```
 
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-
-const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
-
-const stream = await client.chatStream({
-  message: "Explain quantum computing in simple terms",
-  model: "gabriel",
+// client.chatStream() targets the non-streaming chat route and yields nothing,
+// so call the agent endpoint directly.
+const response = await fetch("https://apis.fotohub.app/v1/ai/agent/stream", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "claude-sonnet-4.6",
+    messages: [
+      { role: "user", content: "Explain quantum computing in simple terms" },
+    ],
+  }),
 });
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-for await (const chunk of stream) {
-  if (chunk.type === "content") {
-    process.stdout.write(chunk.delta.text);
-  } else if (chunk.type === "usage") {
-    console.log(`\n[Tokens: ${chunk.usage.inputTokens} in, ${chunk.usage.outputTokens} out]`);
+const reader = response.body!.getReader();
+const decoder = new TextDecoder();
+// One read() can end mid-frame, so buffer to the blank-line separator.
+let buffer = "";
+
+outer: while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  buffer += decoder.decode(value, { stream: true });
+  const frames = buffer.split("\n\n");
+  buffer = frames.pop() ?? "";
+
+  for (const raw of frames) {
+    if (!raw.startsWith("data: ")) continue;
+    const data = raw.slice(6).trim();
+    if (data === "[DONE]") break outer;
+    const frame = JSON.parse(data);
+    if (frame.type === "text_delta") {
+      process.stdout.write(frame.text);
+    } else if (frame.type === "done") {
+      console.log(`\n[Tokens: ${frame.usage.total_tokens}]`, frame.billing);
+    } else if (frame.type === "error") {
+      throw new Error(frame.message);
+    }
   }
 }
 ```
@@ -479,17 +543,18 @@ import (
     "strings"
 )
 
-// StreamChunk represents one SSE event from the chat endpoint.
-type StreamChunk struct {
-    ID   string `json:"id"`
-    Type string `json:"type"`
-    Delta struct {
-        Text string `json:"text"`
-    } `json:"delta"`
+// StreamFrame represents one SSE frame from the agent endpoint. The frames are
+// a union discriminated by Type, so the fields are flattened here: Text is set
+// on text_delta, Usage on done, Message on error.
+type StreamFrame struct {
+    Type  string `json:"type"`
+    Text  string `json:"text"`
     Usage struct {
         InputTokens  int `json:"input_tokens"`
         OutputTokens int `json:"output_tokens"`
+        TotalTokens  int `json:"total_tokens"`
     } `json:"usage"`
+    Message string `json:"message"`
 }
 
 func main() {
@@ -498,15 +563,16 @@ func main() {
         apiKey = "fh_live_your_api_key"
     }
 
-    // Build the streaming request
+    // Build the streaming request. No "stream" flag: this route always streams.
     payload, _ := json.Marshal(map[string]interface{}{
-        "message": "Explain quantum computing in simple terms",
-        "model":   "gabriel",
-        "stream":  true,
+        "model": "claude-sonnet-4.6",
+        "messages": []map[string]string{
+            {"role": "user", "content": "Explain quantum computing in simple terms"},
+        },
     })
 
     req, err := http.NewRequest("POST",
-        "https://apis.fotohub.app/v1/ai/chat",
+        "https://apis.fotohub.app/v1/ai/agent/stream",
         bytes.NewReader(payload))
     if err != nil {
         fmt.Fprintf(os.Stderr, "Failed to create request: %v\n", err)
@@ -548,18 +614,23 @@ func main() {
             break
         }
 
-        // Parse the JSON chunk
-        var chunk StreamChunk
-        if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+        // Parse the JSON frame
+        var frame StreamFrame
+        if err := json.Unmarshal([]byte(data), &frame); err != nil {
             continue
         }
 
-        switch chunk.Type {
-        case "content":
-            fmt.Print(chunk.Delta.Text)
-        case "usage":
+        switch frame.Type {
+        case "text_delta":
+            fmt.Print(frame.Text)
+        case "tool_use":
+            fmt.Print("\n[tool call]\n")
+        case "done":
             fmt.Printf("\n[Tokens: %d in, %d out]\n",
-                chunk.Usage.InputTokens, chunk.Usage.OutputTokens)
+                frame.Usage.InputTokens, frame.Usage.OutputTokens)
+        case "error":
+            fmt.Fprintf(os.Stderr, "\nstream error: %s\n", frame.Message)
+            os.Exit(1)
         }
     }
 
@@ -572,14 +643,15 @@ func main() {
 
 ```bash [cURL]
 # Stream with cURL — tokens appear in real time
-curl -N -X POST https://apis.fotohub.app/v1/ai/chat \
+curl -N -X POST https://apis.fotohub.app/v1/ai/agent/stream \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
   -d '{
-    "message": "Explain quantum computing in simple terms",
-    "model": "gabriel",
-    "stream": true
+    "model": "claude-sonnet-4.6",
+    "messages": [
+      {"role": "user", "content": "Explain quantum computing in simple terms"}
+    ]
   }'
 ```
 
@@ -587,14 +659,27 @@ curl -N -X POST https://apis.fotohub.app/v1/ai/chat \
 
 ### SSE Event Format
 
-Each event is a single line prefixed with `data: ` followed by JSON:
+Frames are separated by a blank line and each `data:` payload is JSON:
 
 ```
-data: {"id":"msg_abc","type":"content","delta":{"text":"Hello"}}
-data: {"id":"msg_abc","type":"content","delta":{"text":" world"}}
-data: {"id":"msg_abc","type":"usage","usage":{"input_tokens":12,"output_tokens":45}}
+data: {"type":"text_delta","text":"Hello"}
+
+data: {"type":"text_delta","text":" world"}
+
+data: {"type":"done","usage":{"input_tokens":12,"output_tokens":45,"total_tokens":57},"billing":{"credits_used":2}}
+
 data: [DONE]
 ```
+
+::: warning `done` is optional, `[DONE]` is not
+The `done` frame is skipped when the turn produced no tokens at all, and replaced
+by an `error` frame when generation succeeded but billing settlement failed.
+Break on `[DONE]` — a client that waits for `done` can hang.
+
+`bufio.Scanner` above works because this endpoint puts one `data:` payload per
+line, but if you buffer bytes yourself, split on the `\n\n` record separator
+rather than assuming one read is one frame.
+:::
 
 ---
 
@@ -622,7 +707,7 @@ print(f"Job started: {job.job_id}")
 # Poll until complete (SDK handles this internally with wait())
 result = client.jobs.wait(job.job_id, timeout=600, poll_interval=5)
 print(f"Video URL: {result.video_url}")
-print(f"Cost: {result.billing.pln_charged} PLN")
+print(f"Credits used: {result.credits_used}")
 ```
 
 ```typescript [TypeScript]
@@ -676,7 +761,7 @@ type VideoStatus struct {
     Error    string  `json:"error"`
     Billing  struct {
         CreditsUsed int     `json:"credits_used"`
-        PLNCharged  float64 `json:"pln_charged"`
+        USDCharged  float64 `json:"usd_charged"`
     } `json:"billing"`
 }
 
@@ -759,8 +844,8 @@ func main() {
     switch result.Status {
     case "completed":
         fmt.Printf("Video URL: %s\n", result.VideoURL)
-        fmt.Printf("Credits used: %d (%.2f PLN)\n",
-            result.Billing.CreditsUsed, result.Billing.PLNCharged)
+        fmt.Printf("Credits used: %d ($%.4f)\n",
+            result.Billing.CreditsUsed, result.Billing.USDCharged)
     case "failed":
         log.Fatalf("Video generation failed: %s", result.Error)
     case "timeout":
@@ -863,7 +948,7 @@ type UploadResult struct {
     URL     string `json:"url"`
     Billing struct {
         CreditsUsed int     `json:"credits_used"`
-        PLNCharged  float64 `json:"pln_charged"`
+        USDCharged  float64 `json:"usd_charged"`
     } `json:"billing"`
 }
 
@@ -944,8 +1029,8 @@ func main() {
     }
 
     fmt.Printf("Result URL: %s\n", result.URL)
-    fmt.Printf("Credits used: %d (%.2f PLN)\n",
-        result.Billing.CreditsUsed, result.Billing.PLNCharged)
+    fmt.Printf("Credits used: %d ($%.4f)\n",
+        result.Billing.CreditsUsed, result.Billing.USDCharged)
 }
 ```
 
@@ -1158,12 +1243,13 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 
     case "billing.charged":
         var data struct {
-            AmountPLN float64 `json:"amount_pln"`
+            Operation string  `json:"operation"`
+            AmountUSD float64 `json:"amount_usd"`
             Method    string  `json:"method"`
         }
         json.Unmarshal(event.Data, &data)
-        fmt.Printf("[WEBHOOK] Charged: %.2f PLN via %s\n",
-            data.AmountPLN, data.Method)
+        fmt.Printf("[WEBHOOK] Charged: $%.4f for %s via %s\n",
+            data.AmountUSD, data.Operation, data.Method)
 
     default:
         fmt.Printf("[WEBHOOK] Unknown event: %s\n", event.Event)
@@ -1426,7 +1512,7 @@ client = FotoHub(api_key="fh_live_your_api_key")
 # Check balance
 balance = client.billing.balance()
 print(f"Credits: {balance.credits.remaining}")
-print(f"Wallet: {balance.wallet.balance} PLN")
+print(f"Wallet: ${balance.wallet.balance}")
 
 # Generate image
 img = client.images.generate(
@@ -1444,7 +1530,7 @@ job = client.videos.generate(
 )
 result = client.jobs.wait(job.job_id, timeout=600)
 print(f"Video: {result.video_url}")
-print(f"Total cost: {result.billing.pln_charged} PLN")
+print(f"Credits used: {result.credits_used}")
 ```
 
 ```typescript [TypeScript]
@@ -1455,7 +1541,7 @@ const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
 // Check balance
 const balance = await client.billing.balance();
 console.log(`Credits: ${balance.credits.remaining}`);
-console.log(`Wallet: ${balance.wallet.balance} PLN`);
+console.log(`Wallet: $${balance.wallet.balance}`);
 
 // Generate image
 const img = await client.images.generate({
@@ -1473,7 +1559,7 @@ const job = await client.videos.generate({
 });
 const result = await client.jobs.wait(job.jobId, { timeout: 600_000 });
 console.log(`Video: ${result.videoUrl}`);
-console.log(`Total cost: ${result.billing.plnCharged} PLN`);
+console.log(`Credits used: ${result.creditsUsed}`);
 ```
 
 ```go [Go]
@@ -1522,7 +1608,7 @@ func main() {
         URL     string `json:"url"`
         Billing struct {
             CreditsUsed int     `json:"credits_used"`
-            PLNCharged  float64 `json:"pln_charged"`
+            USDCharged  float64 `json:"usd_charged"`
         } `json:"billing"`
     }
     json.Unmarshal(imgBody, &img)
@@ -1550,7 +1636,7 @@ func main() {
 
     if result.Status == "completed" {
         fmt.Printf("Video: %s\n", result.VideoURL)
-        fmt.Printf("Total cost: %.2f PLN\n", result.Billing.PLNCharged)
+        fmt.Printf("Total cost: $%.4f\n", result.Billing.USDCharged)
     } else {
         log.Fatalf("Video failed: %s", result.Error)
     }

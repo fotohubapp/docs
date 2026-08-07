@@ -28,20 +28,30 @@ Standard chat completions endpoint compatible with OpenAI SDKs. Supports Google 
 |-----------|------|----------|---------|-------------|
 | `model` | string | No | `gemini-flash` | Model ID to use for completion. See pricing table below for available models. |
 | `messages` | array | **Yes** | -- | Array of message objects. Each message has a `role` (system, user, or assistant) and `content` (string or array for vision). System messages set behavior, user messages are inputs, assistant messages are for multi-turn context. |
-| `temperature` | number | No | `0.7` | Controls randomness/creativity of the output. Range 0-2. Lower values (0.1-0.3) produce focused, deterministic output. Higher values (1.0-2.0) produce more creative, varied responses. |
-| `max_tokens` | integer | No | `2048` | Maximum number of tokens to generate in the response. Limits output length. Does not guarantee exact length -- model may stop earlier at a natural completion point. |
-| `stream` | boolean | No | `false` | Enable Server-Sent Events streaming. When true, partial message deltas are sent as they become available. See Streaming section below for parsing details. |
+| `temperature` | number | No | -- | **Accepted but ignored.** See the compatibility note below. |
+| `max_tokens` | integer | No | -- | **Accepted but ignored.** See the compatibility note below. |
+| `stream` | boolean | No | -- | **Accepted but ignored.** This endpoint does not stream; see [Streaming](#streaming). |
+
+::: warning Only `model` and `messages` are read
+This endpoint exists for drop-in OpenAI SDK compatibility, so it accepts the full
+OpenAI request body without erroring — but it only acts on `model` and
+`messages`. `temperature`, `max_tokens`, `stream`, `top_p`,
+`frequency_penalty` and `presence_penalty` are discarded silently: sending them
+is harmless, but they will not change the output. If you need sampling control
+or streaming, use the premium endpoint (`/v1/ai/chat/claude`) or the agent
+endpoint (`/v1/ai/agent/stream`) instead.
+:::
 
 ### Pricing Table -- Standard Models (Credit-Based)
 
-All standard models use simple credit-based billing. 1 credit = 0.0375 PLN.
+All standard models use simple credit-based billing: a flat credit charge per request, independent of token count. When your included credits are exhausted the request is billed from your USD wallet instead, where 1 credit is worth **$0.0536**.
 
-| Model | ID | Credits/req | ~PLN/1K tokens | Best for |
+| Model | ID | Credits/req | ~USD/1K tokens | Best for |
 |-------|-----|:-----------:|:--------------:|----------|
-| Gemini Flash | `gemini-flash` | 1 | 0.00045 | Fast responses, bulk tasks |
-| Gemini Pro | `gemini-pro` | 2 | 0.0075 | Balanced quality, general use |
-| GPT-4o | `gpt-4o` | 2 | 0.015 | Multimodal, vision, creative |
-| Claude Sonnet | `claude-sonnet` | 2 | 0.018 | Code, analysis, reasoning |
+| Gemini Flash | `gemini-flash` | 1 | 0.0001 | Fast responses, bulk tasks |
+| Gemini Pro | `gemini-pro` | 2 | 0.0020 | Balanced quality, general use |
+| GPT-4o | `gpt-4o` | 2 | 0.0040 | Multimodal, vision, creative |
+| Claude Sonnet | `claude-sonnet` | 2 | 0.0048 | Code, analysis, reasoning |
 
 ::: tip Token-Based Billing
 For per-token billing with precise cost control, use the [Premium Chat endpoint](#premium-chat-token-based-billing) (`/v1/ai/chat/claude`). The OpenAI-compatible endpoint documented here always bills flat credits (1 for `gemini-flash`, 2 otherwise).
@@ -107,11 +117,6 @@ Passing an unrecognized `model` value does not error — the request is served b
   "created": 1719849600,
   "model": "gemini-flash",
   "credits_used": 1,
-  "billing": {
-    "method": "credits",
-    "credits_used": 1,
-    "pln_charged": 0.0375
-  },
   "choices": [
     {
       "index": 0,
@@ -153,12 +158,15 @@ Access to FOTOhub's premium chat models — the Claude-class and Nova-class fami
 | `system` | string | No | -- | System prompt that defines the assistant's behavior and persona. Passed separately from messages. Supports multi-paragraph instructions. |
 
 ::: info Streaming
-The premium endpoint returns a single complete response (no SSE streaming). For token-by-token streaming, use the [OpenAI-compatible endpoint](#openai-compatible-chat-completions) with `stream: true`.
+The premium endpoint returns a single complete response (no SSE streaming). For
+token-by-token streaming use [`POST /v1/ai/agent/stream`](#post-v1-ai-agent-stream)
+— it serves the same premium models. The OpenAI-compatible endpoint does **not**
+stream either, regardless of `stream: true`.
 :::
 
 ### Premium Models (Token-Based Pricing)
 
-All models below use per-token PLN billing. Prices are the underlying per-1M-token rates; the final PLN charge is computed from your actual input/output token counts.
+All models below are billed natively in USD, per token. The figures below are the base per-1M-token USD rates; the amount charged is computed from your actual input/output token counts plus the platform margin and returned as `cost_usd`. Because the calculation never leaves USD it does not move with the PLN exchange rate, and this endpoint's `billing` object carries no PLN field at all.
 
 #### Claude
 
@@ -184,7 +192,12 @@ Premium model IDs use dots (`claude-sonnet-4.6`), unlike the credit-based endpoi
 :::
 
 ::: warning Token-Based Billing
-Premium models use token-based billing, meaning costs are calculated per-token after generation completes. The `billing.cost_breakdown` field in the response provides exact input/output token counts and the resulting PLN charge. A minimum of 1 credit-equivalent is deducted per request.
+Premium models use token-based billing, meaning costs are calculated per-token after generation completes. The `billing.cost_breakdown` field in the response provides exact input/output token counts and the resulting USD charge in `cost_usd`. A minimum of 1 credit-equivalent is deducted per request.
+
+`usd_charged` is what actually left your **wallet**: it is `0` while the request is covered by
+included credits (`method: "credits"`) and equals the operation price once credits run out
+(`method: "wallet"`). `cost_breakdown.cost_usd` is the token cost either way — read that one to
+attribute spend per request.
 :::
 
 ### Response
@@ -198,12 +211,12 @@ Premium models use token-based billing, meaning costs are calculated per-token a
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.0945,
+    "usd_charged": 0,
     "cost_breakdown": {
       "input_tokens": 150,
       "output_tokens": 500,
       "total_tokens": 650,
-      "cost_pln": 0.0945
+      "cost_usd": 0.011925
     }
   },
   "choices": [
@@ -228,25 +241,67 @@ Premium models use token-based billing, meaning costs are calculated per-token a
 
 ## Streaming
 
-The **OpenAI-compatible** endpoint (`/v1/ai/chat/completions`) supports streaming via Server-Sent Events (SSE). Set `stream: true` in your request to receive partial responses as they are generated. Each chunk contains a delta with the new content fragment. The stream ends with a `[DONE]` message. The premium endpoint (`/v1/ai/chat/claude`) returns a single complete response and does not stream.
+::: danger The chat endpoints do not stream
+Neither `/v1/ai/chat/completions` nor `/v1/ai/chat/claude` streams. Both return
+one complete JSON body. `stream: true` on the OpenAI-compatible endpoint is
+accepted and then ignored — you will receive an ordinary `chat.completion`
+response, **not** an SSE stream, and there is no `chat.completion.chunk` object
+anywhere in this API.
 
-::: info SSE Format
-Each event is prefixed with `data: ` followed by a JSON object. The final event is `data: [DONE]`. Events are separated by two newlines. The `billing` field is included only in the final chunk before [DONE].
+The only streaming endpoint is **`POST /v1/ai/agent/stream`**, documented below.
 :::
 
-### Stream Chunk Format
+### POST /v1/ai/agent/stream
+
+The streaming twin of `POST /v1/ai/agent`. Same request contract, same billing,
+same single-turn semantics — the caller still drives each round of tool use. The
+difference is that the assistant turn arrives as SSE frames instead of one JSON
+body, so a CLI can render text as it is produced.
+
+**Models** (a subset of the premium catalog — only models supporting tool-use):
+`claude-sonnet-4.6` (default), `claude-sonnet-4.5`, `claude-sonnet-4`,
+`claude-haiku-4.5`. An unlisted ID returns `400`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `messages` | array | **Yes** | Conversation so far. Empty or missing returns `400`. |
+| `model` | string | No | One of the four IDs above. Default `claude-sonnet-4.6`. |
+| `tools` | array | No | Tool definitions. Must be a list if present, else `400`. |
+
+Authentication is checked **before** the stream opens, so an invalid key is a
+plain `401` rather than an error frame you have to parse.
+
+### Frame Format
+
+Each frame is `data: ` followed by one JSON object, separated by two newlines.
+The stream terminates with `data: [DONE]`. Note this is **not** the OpenAI chunk
+format — frames are discriminated by a `type` field, not by `choices[].delta`.
+
+| `type` | Payload |
+|--------|---------|
+| `text_delta` | `text` — the next fragment of assistant text |
+| `tool_use` | `id`, `name`, `input` — emitted once the tool call is fully accumulated, never partially |
+| `done` | `stop_reason`, `usage`, `billing` — always the last frame before `[DONE]` |
+| `error` | `message` — terminal; `[DONE]` still follows |
 
 ```
-data: {"id":"chatcmpl-fh-abc123","object":"chat.completion.chunk","model":"gemini-flash","choices":[{"index":0,"delta":{"role":"assistant","content":"The"},"finish_reason":null}]}
+data: {"type":"text_delta","text":"Let me check"}
 
-data: {"id":"chatcmpl-fh-abc123","object":"chat.completion.chunk","model":"gemini-flash","choices":[{"index":0,"delta":{"content":" Eiffel"},"finish_reason":null}]}
+data: {"type":"text_delta","text":" the weather."}
 
-data: {"id":"chatcmpl-fh-abc123","object":"chat.completion.chunk","model":"gemini-flash","choices":[{"index":0,"delta":{"content":" Tower"},"finish_reason":null}]}
+data: {"type":"tool_use","id":"toolu_01A","name":"get_weather","input":{"city":"Warsaw"}}
 
-data: {"id":"chatcmpl-fh-abc123","object":"chat.completion.chunk","model":"gemini-flash","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"billing":{"method":"credits","credits_used":1,"pln_charged":0.0375},"usage":{"prompt_tokens":25,"completion_tokens":48,"total_tokens":73}}
+data: {"type":"done","stop_reason":"tool_use","usage":{"input_tokens":150,"output_tokens":48,"total_tokens":198},"billing":{"method":"credits","credits_used":2,"usd_charged":0}}
 
 data: [DONE]
 ```
+
+::: warning Disconnecting early does not avoid the charge
+Billing runs exactly once, on completion, from the accumulated token usage. If
+your client disconnects mid-stream the turn is still billed for what the model
+produced — those tokens were generated and charged upstream either way. This is
+the same behaviour as the blocking route.
+:::
 
 ### Streaming Example -- SSE Parsing
 
@@ -256,73 +311,86 @@ data: [DONE]
 import requests
 import json
 
-url = "https://apis.fotohub.app/v1/ai/chat/completions"
+url = "https://apis.fotohub.app/v1/ai/agent/stream"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
 }
 payload = {
-    "model": "gemini-flash",
+    "model": "claude-sonnet-4.6",
     "messages": [{"role": "user", "content": "Explain quantum computing"}],
-    "stream": True
 }
 
 response = requests.post(url, json=payload, headers=headers, stream=True)
 
 full_content = ""
 for line in response.iter_lines():
-    if line:
-        line = line.decode("utf-8")
-        if line.startswith("data: "):
-            data = line[6:]  # Remove "data: " prefix
-            if data == "[DONE]":
-                break
-            chunk = json.loads(data)
-            delta = chunk["choices"][0]["delta"]
-            if "content" in delta:
-                full_content += delta["content"]
-                print(delta["content"], end="", flush=True)
+    if not line:
+        continue
+    line = line.decode("utf-8")
+    if not line.startswith("data: "):
+        continue
+    data = line[6:]  # Remove "data: " prefix
+    if data == "[DONE]":
+        break
 
-print()  # Final newline
-print(f"Total: {full_content}")
+    frame = json.loads(data)
+    if frame["type"] == "text_delta":
+        full_content += frame["text"]
+        print(frame["text"], end="", flush=True)
+    elif frame["type"] == "tool_use":
+        print(f"\n[tool] {frame['name']}({frame['input']})")
+    elif frame["type"] == "done":
+        print(f"\nstop_reason={frame['stop_reason']} "
+              f"credits={frame['billing']['credits_used']} "
+              f"usd={frame['billing']['usd_charged']}")
+    elif frame["type"] == "error":
+        raise RuntimeError(frame["message"])
 ```
 
 ```typescript [TypeScript]
-const response = await fetch("https://apis.fotohub.app/v1/ai/chat/completions", {
+const response = await fetch("https://apis.fotohub.app/v1/ai/agent/stream", {
   method: "POST",
   headers: {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    model: "gemini-flash",
+    model: "claude-sonnet-4.6",
     messages: [{ role: "user", content: "Explain quantum computing" }],
-    stream: true,
   }),
 });
 
 const reader = response.body!.getReader();
 const decoder = new TextDecoder();
 let fullContent = "";
+// Frames are split by a blank line, and a single read() can end mid-frame --
+// buffer until a separator is seen rather than parsing each chunk directly.
+let buffer = "";
 
-while (true) {
+outer: while (true) {
   const { done, value } = await reader.read();
   if (done) break;
 
-  const text = decoder.decode(value, { stream: true });
-  const lines = text.split("\n");
+  buffer += decoder.decode(value, { stream: true });
+  const frames = buffer.split("\n\n");
+  buffer = frames.pop() ?? "";
 
-  for (const line of lines) {
-    if (line.startsWith("data: ")) {
-      const data = line.slice(6);
-      if (data === "[DONE]") break;
+  for (const raw of frames) {
+    if (!raw.startsWith("data: ")) continue;
+    const data = raw.slice(6).trim();
+    if (data === "[DONE]") break outer;
 
-      const chunk = JSON.parse(data);
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        fullContent += content;
-        process.stdout.write(content);
-      }
+    const frame = JSON.parse(data);
+    if (frame.type === "text_delta") {
+      fullContent += frame.text;
+      process.stdout.write(frame.text);
+    } else if (frame.type === "tool_use") {
+      console.log(`\n[tool] ${frame.name}`, frame.input);
+    } else if (frame.type === "done") {
+      console.log(`\nstop_reason=${frame.stop_reason}`, frame.billing);
+    } else if (frame.type === "error") {
+      throw new Error(frame.message);
     }
   }
 }
@@ -342,13 +410,12 @@ import (
 
 func main() {
 	payload := map[string]interface{}{
-		"model":    "gemini-flash",
+		"model":    "claude-sonnet-4.6",
 		"messages": []map[string]string{{"role": "user", "content": "Explain quantum computing"}},
-		"stream":   true,
 	}
 	body, _ := json.Marshal(payload)
 
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/chat/completions", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/agent/stream", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
 
@@ -371,16 +438,22 @@ func main() {
 			break
 		}
 
-		var chunk map[string]interface{}
-		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+		var frame map[string]interface{}
+		if err := json.Unmarshal([]byte(data), &frame); err != nil {
 			continue
 		}
 
-		choices := chunk["choices"].([]interface{})
-		delta := choices[0].(map[string]interface{})["delta"].(map[string]interface{})
-		if content, ok := delta["content"].(string); ok {
-			fullContent += content
-			fmt.Print(content)
+		switch frame["type"] {
+		case "text_delta":
+			text, _ := frame["text"].(string)
+			fullContent += text
+			fmt.Print(text)
+		case "tool_use":
+			fmt.Printf("\n[tool] %v %v\n", frame["name"], frame["input"])
+		case "done":
+			fmt.Printf("\nstop_reason=%v billing=%v\n", frame["stop_reason"], frame["billing"])
+		case "error":
+			panic(frame["message"])
 		}
 	}
 	fmt.Println()
@@ -389,16 +462,15 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/ai/chat/completions" \
+curl -X POST "https://apis.fotohub.app/v1/ai/agent/stream" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -N \
   -d '{
-    "model": "gemini-flash",
+    "model": "claude-sonnet-4.6",
     "messages": [
       {"role": "user", "content": "Explain quantum computing"}
-    ],
-    "stream": true
+    ]
   }'
 ```
 
@@ -413,7 +485,7 @@ Tokens are the fundamental unit of text processing for LLMs. A token is approxim
 ### Credit-Based (OpenAI-Compatible Endpoint)
 
 - Fixed credit cost per request (1-2 credits)
-- PLN charge calculated from total tokens used
+- Wallet charge, once credits are exhausted, is a flat per-request USD amount — not derived from token counts
 - Credits deducted immediately on request start
 - If generation fails, credits are refunded
 - Token counts included in response for transparency
@@ -427,7 +499,7 @@ Tokens are the fundamental unit of text processing for LLMs. A token is approxim
 - Cost = (input_tokens x input_rate) + (output_tokens x output_rate)
 
 ::: tip Estimating Costs
-A typical conversational exchange (100-word prompt, 200-word response) uses approximately 75 input tokens + 150 output tokens = 225 total tokens. With gemini-flash, this costs approximately 0.0001 PLN. With premium `claude-sonnet-4.6`, approximately 0.012 PLN.
+A typical conversational exchange (100-word prompt, 200-word response) uses approximately 75 input tokens + 150 output tokens = 225 total tokens. With gemini-flash that is roughly $0.00002 of token value. With premium `claude-sonnet-4.6`, roughly $0.0037.
 :::
 
 ---
@@ -772,7 +844,8 @@ print(f"\n--- Billing ---")
 print(f"Method: {billing['method']}")
 print(f"Input tokens: {billing['cost_breakdown']['input_tokens']}")
 print(f"Output tokens: {billing['cost_breakdown']['output_tokens']}")
-print(f"Total cost: {billing['pln_charged']} PLN")
+print(f"Token cost: {billing['cost_breakdown']['cost_usd']} USD")
+print(f"Wallet charge: {billing['usd_charged']} USD")  # 0 while covered by credits
 ```
 
 ```typescript [TypeScript]
@@ -804,7 +877,8 @@ console.log("\n--- Billing ---");
 console.log(`Method: ${billing.method}`);
 console.log(`Input tokens: ${billing.cost_breakdown.input_tokens}`);
 console.log(`Output tokens: ${billing.cost_breakdown.output_tokens}`);
-console.log(`Total cost: ${billing.pln_charged} PLN`);
+console.log(`Token cost: ${billing.cost_breakdown.cost_usd} USD`);
+console.log(`Wallet charge: ${billing.usd_charged} USD`); // 0 while covered by credits
 ```
 
 ```go [Go]
@@ -855,7 +929,8 @@ func main() {
 	breakdown := billing["cost_breakdown"].(map[string]interface{})
 	fmt.Printf("Input tokens: %.0f\n", breakdown["input_tokens"])
 	fmt.Printf("Output tokens: %.0f\n", breakdown["output_tokens"])
-	fmt.Printf("Total cost: %v PLN\n", billing["pln_charged"])
+	fmt.Printf("Token cost: %v USD\n", breakdown["cost_usd"])
+	fmt.Printf("Wallet charge: %v USD\n", billing["usd_charged"]) // 0 while covered by credits
 }
 ```
 
@@ -1039,7 +1114,7 @@ headers = {
 }
 
 # Nova Micro — ultra-budget option for simple tasks
-# At 0.000525 PLN/1K tokens, process 1M tokens for ~0.53 PLN
+# With margin: $0.0525 per 1M input tokens, $0.21 per 1M output tokens
 response = requests.post(url, json={
     "model": "nova-micro",
     "messages": [
@@ -1051,11 +1126,11 @@ response = requests.post(url, json={
 
 data = response.json()
 print(data["choices"][0]["message"]["content"])  # "positive"
-print(f"Cost: {data['billing']['pln_charged']} PLN")  # ~0.000005 PLN
+print(f"Cost: {data['billing']['cost_breakdown']['cost_usd']} USD")  # ~$0.000002
 ```
 
 ```typescript [TypeScript]
-// Nova Micro — ultra-budget for classification, extraction, simple tasks
+// Nova Micro — ultra-budget: $0.0525 per 1M input tokens, $0.21 per 1M output (incl. margin)
 const response = await fetch("https://apis.fotohub.app/v1/ai/chat/claude", {
   method: "POST",
   headers: {
@@ -1074,7 +1149,7 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/chat/claude", {
 
 const data = await response.json();
 console.log(data.choices[0].message.content); // "positive"
-console.log(`Cost: ${data.billing.pln_charged} PLN`);
+console.log(`Cost: ${data.billing.cost_breakdown.cost_usd} USD`);
 ```
 
 ```go [Go]
@@ -1119,7 +1194,8 @@ func main() {
 	fmt.Println(message["content"]) // "positive"
 
 	billing := data["billing"].(map[string]interface{})
-	fmt.Printf("Cost: %v PLN\n", billing["pln_charged"])
+	breakdown := billing["cost_breakdown"].(map[string]interface{})
+	fmt.Printf("Cost: %v USD\n", breakdown["cost_usd"])
 }
 ```
 
@@ -1266,7 +1342,12 @@ To migrate existing OpenAI integrations to FOTOhub:
 2. Replace your OpenAI API key with your FOTOhub key (`fh_live_...`)
 3. Optionally change the `model` parameter to a FOTOhub model ID (or keep `gpt-4o` -- it works)
 
-All standard OpenAI parameters are supported: `messages`, `temperature`, `max_tokens`, `stream`, `top_p`, `frequency_penalty`, `presence_penalty`.
+All standard OpenAI parameters are **accepted** — your existing request bodies
+will not error. Only `model` and `messages` change the result, however:
+`temperature`, `max_tokens`, `stream`, `top_p`, `frequency_penalty` and
+`presence_penalty` are ignored. If your integration depends on sampling
+parameters or on streaming, migrate to `/v1/ai/chat/claude` or
+`/v1/ai/agent/stream` rather than the compatibility shim.
 :::
 
 ---

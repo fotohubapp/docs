@@ -1,6 +1,20 @@
 # Streaming Guide
 
-Receive AI chat responses token-by-token using Server-Sent Events (SSE). Streaming provides real-time output for chat interfaces without waiting for the full response to complete.
+Receive AI responses token-by-token using Server-Sent Events (SSE). Streaming provides real-time output for chat interfaces without waiting for the full response to complete.
+
+::: warning One endpoint streams: `/v1/ai/agent/stream`
+`POST /v1/ai/agent/stream` is the **only** streaming endpoint in the FOTOhub API.
+
+The chat endpoints do **not** stream:
+
+- `/v1/ai/chat/completions` accepts `stream: true` for drop-in OpenAI SDK
+  compatibility and then ignores it — you get one ordinary JSON body back.
+- `/v1/ai/chat/claude` always returns a single complete response.
+
+There is no `chat.completion.chunk` object anywhere in this API. An earlier
+revision of this guide documented a `POST /v1/ai/chat` endpoint and a
+`chat_stream()` SDK method; neither exists — that path returns `404`.
+:::
 
 ::: info When to Use Streaming
 Use streaming when building chat interfaces, live previews, or any UX where users benefit from seeing partial results immediately. For batch/background processing, use the standard synchronous API instead.
@@ -10,59 +24,155 @@ Use streaming when building chat interfaces, live previews, or any UX where user
 
 ## How Streaming Works
 
-1. Client opens an SSE connection to the chat endpoint
-2. Server sends tokens as `data:` events as they are generated
-3. A final `data: [DONE]` event signals completion
-4. Client closes the connection
+1. Client `POST`s to `/v1/ai/agent/stream`. Your key is checked **before** the
+   stream opens, so a bad key is a plain `401` rather than a frame you have to
+   parse to discover you were rejected.
+2. Server sends `data:` frames as the model produces them.
+3. A `done` frame carries `stop_reason`, `usage` and `billing`.
+4. A final `data: [DONE]` closes the stream.
 
-Each SSE event contains a JSON chunk:
+Frames are discriminated by a **`type`** field — not by `choices[].delta` as in
+the OpenAI wire format:
+
+| `type` | Payload | Notes |
+|--------|---------|-------|
+| `text_delta` | `text` | The next fragment of assistant text. Empty fragments are not sent. |
+| `tool_use` | `id`, `name`, `input` | Emitted once the call is fully accumulated — never partial JSON. |
+| `done` | `stop_reason`, `usage`, `billing` | Last frame before `[DONE]`. See the caveat below. |
+| `error` | `message` | Terminal. `[DONE]` still follows it. |
 
 ```
-data: {"id":"msg_abc","type":"content","delta":{"text":"Hello"}}
-data: {"id":"msg_abc","type":"content","delta":{"text":" world"}}
-data: {"id":"msg_abc","type":"usage","usage":{"input_tokens":12,"output_tokens":5}}
+data: {"type":"text_delta","text":"Quantum"}
+
+data: {"type":"text_delta","text":" computing"}
+
+data: {"type":"done","stop_reason":"end_turn","usage":{"input_tokens":12,"output_tokens":5,"total_tokens":17},"billing":{"method":"credits","credits_used":2,"usd_charged":0}}
+
 data: [DONE]
 ```
+
+::: warning `done` is not guaranteed
+`[DONE]` always terminates the stream, but `done` does not always precede it. It
+is omitted when the turn produced no tokens at all (an upstream failure before
+generation started), and replaced by an `error` frame when generation succeeded
+but settlement did not. **Treat `[DONE]` as the end of the stream and `done` as
+optional metadata** — a client that blocks waiting for `done` can hang.
+:::
+
+### Request body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `messages` | array | **Yes** | The conversation so far. Empty or missing returns `400`. |
+| `model` | string | No | `claude-sonnet-4.6` (default), `claude-sonnet-4.5`, `claude-sonnet-4`, `claude-haiku-4.5`. Any other value returns `400` listing the valid ones. |
+| `system` | string | No | System prompt. Pass it here, not as a `system` role in `messages`. |
+| `tools` | array | No | Tool definitions. Must be a list if present, else `400`. |
+| `max_tokens` | integer | No | Default `4096`. |
+| `temperature` | number | No | Default `0.7`. |
+
+This route is the streaming twin of `POST /v1/ai/agent`: same contract, same
+billing, same single-turn semantics. Only tool-capable models are accepted, which
+is why the Nova models offered on `/v1/ai/chat/claude` are absent here.
 
 ---
 
 ## Basic Streaming
 
+Neither SDK ships a working streaming helper for this endpoint yet, so these
+examples use plain HTTP.
+
 ::: code-group
 ```python [Python]
-from fotohub import FotoHub
+import json
+import requests
 
-client = FotoHub()
-
-# Stream chat response
-stream = client.chat_stream(
-    message="Explain quantum computing in simple terms",
-    model="gabriel",  # Or any chat model
+resp = requests.post(
+    "https://apis.fotohub.app/v1/ai/agent/stream",
+    headers={
+        "Authorization": "Bearer fh_live_your_api_key",
+        "Content-Type": "application/json",
+    },
+    json={
+        "model": "claude-sonnet-4.6",
+        "messages": [
+            {"role": "user", "content": "Explain quantum computing in simple terms"}
+        ],
+    },
+    stream=True,
 )
+resp.raise_for_status()   # 401 / 400 surface here, before any frame
 
-for chunk in stream:
-    if chunk.type == "content":
-        print(chunk.delta.text, end="", flush=True)
-    elif chunk.type == "usage":
-        print(f"\n\n[Tokens: {chunk.usage.input_tokens} in, {chunk.usage.output_tokens} out]")
+full_text = ""
+for line in resp.iter_lines():
+    if not line:
+        continue
+    line = line.decode("utf-8")
+    if not line.startswith("data: "):
+        continue
+    data = line[6:]
+    if data == "[DONE]":
+        break
 
-print()  # Final newline
+    frame = json.loads(data)
+    if frame["type"] == "text_delta":
+        full_text += frame["text"]
+        print(frame["text"], end="", flush=True)
+    elif frame["type"] == "done":
+        usage = frame["usage"]
+        print(f"\n\n[Tokens: {usage['input_tokens']} in, "
+              f"{usage['output_tokens']} out]")
+        print(f"[Billed: {frame['billing']['credits_used']} credits, "
+              f"${frame['billing']['usd_charged']}]")
+    elif frame["type"] == "error":
+        raise RuntimeError(frame["message"])
+
+print()
 ```
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
-const stream = await client.chatStream({
-  message: "Explain quantum computing in simple terms",
-  model: "gabriel",
+const response = await fetch("https://apis.fotohub.app/v1/ai/agent/stream", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "claude-sonnet-4.6",
+    messages: [
+      { role: "user", content: "Explain quantum computing in simple terms" },
+    ],
+  }),
 });
 
-for await (const chunk of stream) {
-  if (chunk.type === "content") {
-    process.stdout.write(chunk.delta.text);
-  } else if (chunk.type === "usage") {
-    console.log(`\n\n[Tokens: ${chunk.usage.inputTokens} in, ${chunk.usage.outputTokens} out]`);
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+const reader = response.body!.getReader();
+const decoder = new TextDecoder();
+let fullText = "";
+// A single read() can end mid-frame, so buffer until the blank-line separator.
+let buffer = "";
+
+outer: while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  buffer += decoder.decode(value, { stream: true });
+  const frames = buffer.split("\n\n");
+  buffer = frames.pop() ?? "";
+
+  for (const raw of frames) {
+    if (!raw.startsWith("data: ")) continue;
+    const data = raw.slice(6).trim();
+    if (data === "[DONE]") break outer;
+
+    const frame = JSON.parse(data);
+    if (frame.type === "text_delta") {
+      fullText += frame.text;
+      process.stdout.write(frame.text);
+    } else if (frame.type === "done") {
+      console.log(`\n\n[Tokens: ${frame.usage.total_tokens}]`, frame.billing);
+    } else if (frame.type === "error") {
+      throw new Error(frame.message);
+    }
   }
 }
 ```
@@ -74,36 +184,49 @@ import (
     "bytes"
     "encoding/json"
     "fmt"
+    "io"
     "net/http"
     "os"
     "strings"
 )
 
-type StreamChunk struct {
-    ID    string `json:"id"`
-    Type  string `json:"type"`
-    Delta struct {
-        Text string `json:"text"`
-    } `json:"delta"`
-    Usage struct {
+type StreamFrame struct {
+    Type string `json:"type"`
+    // text_delta
+    Text string `json:"text"`
+    // tool_use
+    ID    string                 `json:"id"`
+    Name  string                 `json:"name"`
+    Input map[string]interface{} `json:"input"`
+    // done
+    StopReason string `json:"stop_reason"`
+    Usage      struct {
         InputTokens  int `json:"input_tokens"`
         OutputTokens int `json:"output_tokens"`
+        TotalTokens  int `json:"total_tokens"`
     } `json:"usage"`
+    Billing struct {
+        Method      string  `json:"method"`
+        CreditsUsed int     `json:"credits_used"`
+        USDCharged  float64 `json:"usd_charged"`
+    } `json:"billing"`
+    // error
+    Message string `json:"message"`
 }
 
 func main() {
     payload, _ := json.Marshal(map[string]interface{}{
-        "message": "Explain quantum computing in simple terms",
-        "model":   "gabriel",
-        "stream":  true,
+        "model": "claude-sonnet-4.6",
+        "messages": []map[string]string{
+            {"role": "user", "content": "Explain quantum computing in simple terms"},
+        },
     })
 
     req, _ := http.NewRequest("POST",
-        "https://apis.fotohub.app/v1/ai/chat",
+        "https://apis.fotohub.app/v1/ai/agent/stream",
         bytes.NewBuffer(payload))
     req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
     req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("Accept", "text/event-stream")
 
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
@@ -112,6 +235,12 @@ func main() {
     }
     defer resp.Body.Close()
 
+    if resp.StatusCode >= 400 {
+        body, _ := io.ReadAll(resp.Body)
+        fmt.Fprintf(os.Stderr, "HTTP %d: %s\n", resp.StatusCode, body)
+        os.Exit(1)
+    }
+
     scanner := bufio.NewScanner(resp.Body)
     for scanner.Scan() {
         line := scanner.Text()
@@ -123,31 +252,37 @@ func main() {
             break
         }
 
-        var chunk StreamChunk
-        if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+        var frame StreamFrame
+        if err := json.Unmarshal([]byte(data), &frame); err != nil {
             continue
         }
 
-        if chunk.Type == "content" {
-            fmt.Print(chunk.Delta.Text)
-        } else if chunk.Type == "usage" {
-            fmt.Printf("\n\n[Tokens: %d in, %d out]\n",
-                chunk.Usage.InputTokens, chunk.Usage.OutputTokens)
+        switch frame.Type {
+        case "text_delta":
+            fmt.Print(frame.Text)
+        case "tool_use":
+            fmt.Printf("\n[tool_use %s %s %v]\n", frame.ID, frame.Name, frame.Input)
+        case "done":
+            fmt.Printf("\n\n[Tokens: %d in, %d out] [Credits: %d]\n",
+                frame.Usage.InputTokens, frame.Usage.OutputTokens,
+                frame.Billing.CreditsUsed)
+        case "error":
+            fmt.Fprintf(os.Stderr, "\nStream error: %s\n", frame.Message)
         }
     }
     fmt.Println()
 }
 ```
 ```bash [cURL]
-# Stream with cURL — see tokens appear in real time
-curl -N -X POST https://apis.fotohub.app/v1/ai/chat \
+# -N disables curl's own buffering, so frames print as they arrive.
+curl -N -X POST https://apis.fotohub.app/v1/ai/agent/stream \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
   -d '{
-    "message": "Explain quantum computing in simple terms",
-    "model": "gabriel",
-    "stream": true
+    "model": "claude-sonnet-4.6",
+    "messages": [
+      {"role": "user", "content": "Explain quantum computing in simple terms"}
+    ]
   }'
 ```
 :::
@@ -156,171 +291,231 @@ curl -N -X POST https://apis.fotohub.app/v1/ai/chat \
 
 ## Streaming with Conversation History
 
-Maintain multi-turn conversations while streaming:
+The endpoint is stateless — it keeps no conversation for you. Send the whole
+history on every call and append the assistant's previous reply yourself. Note
+that the system prompt goes in the top-level `system` field, not in `messages`.
 
 ::: code-group
 ```python [Python]
-from fotohub import FotoHub
+import json
+import requests
 
-client = FotoHub()
+URL = "https://apis.fotohub.app/v1/ai/agent/stream"
+HEADERS = {
+    "Authorization": "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json",
+}
+SYSTEM = "You are a helpful coding assistant."
 
-messages = [
-    {"role": "system", "content": "You are a helpful coding assistant."},
-    {"role": "user", "content": "What is a closure in JavaScript?"},
-]
 
-# First turn
-full_response = ""
-stream = client.chat_stream(messages=messages)
-for chunk in stream:
-    if chunk.type == "content":
-        full_response += chunk.delta.text
-        print(chunk.delta.text, end="", flush=True)
+def stream_turn(messages: list[dict]) -> str:
+    """Stream one assistant turn and return its full text."""
+    resp = requests.post(
+        URL, headers=HEADERS,
+        json={"model": "claude-sonnet-4.6", "system": SYSTEM, "messages": messages},
+        stream=True,
+    )
+    resp.raise_for_status()
 
-# Add assistant response to history
-messages.append({"role": "assistant", "content": full_response})
+    text = ""
+    for line in resp.iter_lines():
+        if not line:
+            continue
+        payload = line.decode("utf-8")
+        if not payload.startswith("data: "):
+            continue
+        data = payload[6:]
+        if data == "[DONE]":
+            break
+        frame = json.loads(data)
+        if frame["type"] == "text_delta":
+            text += frame["text"]
+            print(frame["text"], end="", flush=True)
+        elif frame["type"] == "error":
+            raise RuntimeError(frame["message"])
+    return text
+
+
+messages = [{"role": "user", "content": "What is a closure in JavaScript?"}]
+reply = stream_turn(messages)
+
+# Append the assistant turn before asking a follow-up.
+messages.append({"role": "assistant", "content": reply})
 messages.append({"role": "user", "content": "Show me an example"})
 
-# Second turn — continues the conversation
 print("\n\n---\n")
-stream = client.chat_stream(messages=messages)
-for chunk in stream:
-    if chunk.type == "content":
-        print(chunk.delta.text, end="", flush=True)
+stream_turn(messages)
 ```
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
+type Msg = { role: "user" | "assistant"; content: string };
 
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
+const SYSTEM = "You are a helpful coding assistant.";
 
-const messages = [
-  { role: "system" as const, content: "You are a helpful coding assistant." },
-  { role: "user" as const, content: "What is a closure in JavaScript?" },
-];
+async function streamTurn(messages: Msg[]): Promise<string> {
+  const response = await fetch("https://apis.fotohub.app/v1/ai/agent/stream", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: "claude-sonnet-4.6", system: SYSTEM, messages }),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-// First turn
-let fullResponse = "";
-const stream1 = await client.chatStream({ messages });
-for await (const chunk of stream1) {
-  if (chunk.type === "content") {
-    fullResponse += chunk.delta.text;
-    process.stdout.write(chunk.delta.text);
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let buffer = "";
+
+  outer: while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() ?? "";
+
+    for (const raw of frames) {
+      if (!raw.startsWith("data: ")) continue;
+      const data = raw.slice(6).trim();
+      if (data === "[DONE]") break outer;
+      const frame = JSON.parse(data);
+      if (frame.type === "text_delta") {
+        text += frame.text;
+        process.stdout.write(frame.text);
+      } else if (frame.type === "error") {
+        throw new Error(frame.message);
+      }
+    }
   }
+  return text;
 }
 
-// Continue conversation
-messages.push({ role: "assistant", content: fullResponse });
+const messages: Msg[] = [
+  { role: "user", content: "What is a closure in JavaScript?" },
+];
+const reply = await streamTurn(messages);
+
+messages.push({ role: "assistant", content: reply });
 messages.push({ role: "user", content: "Show me an example" });
 
 console.log("\n\n---\n");
-const stream2 = await client.chatStream({ messages });
-for await (const chunk of stream2) {
-  if (chunk.type === "content") {
-    process.stdout.write(chunk.delta.text);
-  }
-}
-```
-```go [Go]
-package main
-
-import (
-    "bufio"
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "os"
-    "strings"
-)
-
-type Message struct {
-    Role    string `json:"role"`
-    Content string `json:"content"`
-}
-
-func streamChat(messages []Message) (string, error) {
-    payload, _ := json.Marshal(map[string]interface{}{
-        "messages": messages,
-        "stream":   true,
-    })
-
-    req, _ := http.NewRequest("POST",
-        "https://apis.fotohub.app/v1/ai/chat",
-        bytes.NewBuffer(payload))
-    req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
-    req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("Accept", "text/event-stream")
-
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return "", err
-    }
-    defer resp.Body.Close()
-
-    var fullText strings.Builder
-    scanner := bufio.NewScanner(resp.Body)
-    for scanner.Scan() {
-        line := scanner.Text()
-        if !strings.HasPrefix(line, "data: ") {
-            continue
-        }
-        data := strings.TrimPrefix(line, "data: ")
-        if data == "[DONE]" {
-            break
-        }
-        var chunk struct {
-            Type  string `json:"type"`
-            Delta struct {
-                Text string `json:"text"`
-            } `json:"delta"`
-        }
-        json.Unmarshal([]byte(data), &chunk)
-        if chunk.Type == "content" {
-            fmt.Print(chunk.Delta.Text)
-            fullText.WriteString(chunk.Delta.Text)
-        }
-    }
-    fmt.Println()
-    return fullText.String(), nil
-}
-
-func main() {
-    messages := []Message{
-        {Role: "system", Content: "You are a helpful coding assistant."},
-        {Role: "user", Content: "What is a closure in JavaScript?"},
-    }
-
-    response, _ := streamChat(messages)
-    messages = append(messages, Message{Role: "assistant", Content: response})
-    messages = append(messages, Message{Role: "user", Content: "Show me an example"})
-
-    fmt.Println("\n---")
-    streamChat(messages)
-}
+await streamTurn(messages);
 ```
 ```bash [cURL]
-# Multi-turn conversation with streaming
-curl -N -X POST https://apis.fotohub.app/v1/ai/chat \
+# Multi-turn: the whole history goes in every request.
+curl -N -X POST https://apis.fotohub.app/v1/ai/agent/stream \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
   -d '{
+    "model": "claude-sonnet-4.6",
+    "system": "You are a helpful coding assistant.",
     "messages": [
-      {"role": "system", "content": "You are a helpful coding assistant."},
       {"role": "user", "content": "What is a closure in JavaScript?"},
       {"role": "assistant", "content": "A closure is a function that..."},
       {"role": "user", "content": "Show me an example"}
-    ],
-    "stream": true
+    ]
   }'
 ```
 :::
 
 ---
 
-## React Streaming Component
+## Tool Use While Streaming
 
-A production-ready React component for streaming chat:
+`tool_use` frames arrive only once the call is fully accumulated, so you never
+have to reassemble partial JSON. The server never executes tools — a `done`
+frame with `stop_reason: "tool_use"` is your cue to run the tool locally and
+send a follow-up request with the result appended.
+
+```python
+import json
+import requests
+
+
+def one_round(messages, tools):
+    """Stream one turn. Returns (assistant_blocks, stop_reason)."""
+    resp = requests.post(
+        "https://apis.fotohub.app/v1/ai/agent/stream",
+        headers={"Authorization": "Bearer fh_live_your_api_key",
+                 "Content-Type": "application/json"},
+        json={"model": "claude-sonnet-4.6", "messages": messages, "tools": tools},
+        stream=True,
+    )
+    resp.raise_for_status()
+
+    blocks, text, stop_reason = [], "", "end_turn"
+    for line in resp.iter_lines():
+        if not line:
+            continue
+        payload = line.decode("utf-8")
+        if not payload.startswith("data: "):
+            continue
+        data = payload[6:]
+        if data == "[DONE]":
+            break
+        frame = json.loads(data)
+
+        if frame["type"] == "text_delta":
+            text += frame["text"]
+            print(frame["text"], end="", flush=True)
+        elif frame["type"] == "tool_use":
+            if text:
+                blocks.append({"type": "text", "text": text})
+                text = ""
+            blocks.append({
+                "type": "tool_use",
+                "id": frame["id"],
+                "name": frame["name"],
+                "input": frame["input"],
+            })
+        elif frame["type"] == "done":
+            stop_reason = frame["stop_reason"]
+        elif frame["type"] == "error":
+            raise RuntimeError(frame["message"])
+
+    if text:
+        blocks.append({"type": "text", "text": text})
+    return blocks, stop_reason
+
+
+tools = [{
+    "name": "get_weather",
+    "description": "Current weather for a city",
+    "input_schema": {
+        "type": "object",
+        "properties": {"city": {"type": "string"}},
+        "required": ["city"],
+    },
+}]
+messages = [{"role": "user", "content": "What's the weather in Warsaw?"}]
+
+while True:
+    blocks, stop_reason = one_round(messages, tools)
+    messages.append({"role": "assistant", "content": blocks})
+    if stop_reason != "tool_use":
+        break
+
+    # Run each requested tool locally and feed the results back as a user turn.
+    results = []
+    for block in blocks:
+        if block["type"] == "tool_use":
+            output = my_tool_registry[block["name"]](**block["input"])
+            results.append({
+                "type": "tool_result",
+                "tool_use_id": block["id"],
+                "content": json.dumps(output),
+            })
+    messages.append({"role": "user", "content": results})
+```
+
+::: warning Every round is billed
+Each call to this endpoint is one billed turn. A tool loop that takes four rounds
+is charged four times — see [Cost Optimization](/guides/cost-optimization).
+:::
+
+---
+
+## React Streaming Component
 
 ```typescript
 // components/StreamingChat.tsx
@@ -346,65 +541,62 @@ export function StreamingChat() {
     setInput("");
     setIsStreaming(true);
 
-    // Create abort controller for cancellation
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
-      const response = await fetch("https://apis.fotohub.app/v1/ai/chat", {
+      // Call YOUR backend, which proxies to /v1/ai/agent/stream and forwards
+      // the frames unchanged. An fh_live_* key must never reach the browser.
+      const response = await fetch("/api/chat/stream", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_FOTOHUB_API_KEY}`,
-          "Content-Type": "application/json",
-          Accept: "text/event-stream",
-        },
-        body: JSON.stringify({
-          messages: updatedMessages,
-          stream: true,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: updatedMessages }),
         signal: controller.signal,
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       let assistantText = "";
+      let buffer = "";
 
-      // Add empty assistant message
+      // Add an empty assistant message to append into.
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
-      while (true) {
+      outer: while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
+        // Split on the SSE record separator, not on "\n" — a single read()
+        // can end mid-frame, and JSON.parse of half a frame throws.
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") break;
+        for (const raw of frames) {
+          if (!raw.startsWith("data: ")) continue;
+          const data = raw.slice(6).trim();
+          if (data === "[DONE]") break outer;
 
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === "content") {
-              assistantText += parsed.delta.text;
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: "assistant",
-                  content: assistantText,
-                };
-                return updated;
-              });
-            }
-          } catch {
-            // Skip malformed chunks
+          const frame = JSON.parse(data);
+          if (frame.type === "text_delta") {
+            assistantText += frame.text;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                role: "assistant",
+                content: assistantText,
+              };
+              return updated;
+            });
+          } else if (frame.type === "error") {
+            throw new Error(frame.message);
           }
         }
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        // User cancelled — keep partial response
+        // User cancelled — the partial response stays on screen.
         console.log("Stream cancelled by user");
       } else {
         console.error("Stream error:", err);
@@ -462,133 +654,121 @@ export function StreamingChat() {
 }
 ```
 
+::: danger Never stream directly from the browser
+`fh_live_*` keys are server-side credentials. Put a route of your own in front of
+`/v1/ai/agent/stream` and forward the frames, as above.
+:::
+
 ---
 
 ## Stream Cancellation
 
-Cancel an in-progress stream to stop token generation (saves credits):
+Abort the HTTP request to stop receiving frames — `resp.close()` in `requests`,
+`AbortController` in the browser, `context` cancellation in Go.
+
+::: warning Cancelling does not save credits
+Billing runs exactly once, from the accumulated token usage, and it **still runs
+when the client disconnects mid-stream** — settlement is handed to a background
+task precisely so an interrupted turn is not free. Those tokens were generated
+and charged upstream either way.
+
+Cancel to save **time and bandwidth**, not money. The one thing cancelling does
+reduce is further generation, so an early abort on a very long answer can lower
+the final `output_tokens` — but you are always billed for what was produced
+before you hung up.
+:::
 
 ::: code-group
 ```python [Python]
-import signal
-from fotohub import FotoHub
+import json
+import requests
 
-client = FotoHub()
+resp = requests.post(
+    "https://apis.fotohub.app/v1/ai/agent/stream",
+    headers={"Authorization": "Bearer fh_live_your_api_key",
+             "Content-Type": "application/json"},
+    json={"model": "claude-sonnet-4.6",
+          "messages": [{"role": "user", "content": "Write a long essay about space"}]},
+    stream=True,
+)
+resp.raise_for_status()
 
-# Cancel after receiving 100 tokens
-token_count = 0
-stream = client.chat_stream(message="Write a long essay about space")
-
-for chunk in stream:
-    if chunk.type == "content":
-        print(chunk.delta.text, end="", flush=True)
-        token_count += 1
-        if token_count >= 100:
-            stream.close()  # Cancels generation, stops billing
-            print("\n[Cancelled after 100 tokens]")
+fragments = 0
+for line in resp.iter_lines():
+    if not line:
+        continue
+    payload = line.decode("utf-8")
+    if not payload.startswith("data: "):
+        continue
+    data = payload[6:]
+    if data == "[DONE]":
+        break
+    frame = json.loads(data)
+    if frame["type"] == "text_delta":
+        print(frame["text"], end="", flush=True)
+        fragments += 1
+        if fragments >= 100:
+            resp.close()   # stop reading; the turn is still billed
+            print("\n[Cancelled after 100 fragments]")
             break
 ```
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
 const controller = new AbortController();
-let tokenCount = 0;
 
-const stream = await client.chatStream(
-  { message: "Write a long essay about space" },
-  { signal: controller.signal }
-);
+const response = await fetch("https://apis.fotohub.app/v1/ai/agent/stream", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "claude-sonnet-4.6",
+    messages: [{ role: "user", content: "Write a long essay about space" }],
+  }),
+  signal: controller.signal,
+});
+
+const reader = response.body!.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
+let fragments = 0;
 
 try {
-  for await (const chunk of stream) {
-    if (chunk.type === "content") {
-      process.stdout.write(chunk.delta.text);
-      tokenCount++;
-      if (tokenCount >= 100) {
-        controller.abort(); // Cancels generation
-        console.log("\n[Cancelled after 100 tokens]");
-        break;
+  outer: while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() ?? "";
+
+    for (const raw of frames) {
+      if (!raw.startsWith("data: ")) continue;
+      const data = raw.slice(6).trim();
+      if (data === "[DONE]") break outer;
+      const frame = JSON.parse(data);
+      if (frame.type === "text_delta") {
+        process.stdout.write(frame.text);
+        if (++fragments >= 100) {
+          controller.abort();
+          console.log("\n[Cancelled after 100 fragments]");
+          break outer;
+        }
       }
     }
   }
 } catch (e) {
-  if (e instanceof Error && e.name === "AbortError") {
-    // Expected when we cancel
-  } else {
-    throw e;
-  }
-}
-```
-```go [Go]
-package main
-
-import (
-    "bufio"
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "os"
-    "strings"
-)
-
-func main() {
-    ctx, cancel := context.WithCancel(context.Background())
-    defer cancel()
-
-    payload, _ := json.Marshal(map[string]interface{}{
-        "message": "Write a long essay about space",
-        "stream":  true,
-    })
-
-    req, _ := http.NewRequestWithContext(ctx, "POST",
-        "https://apis.fotohub.app/v1/ai/chat",
-        bytes.NewBuffer(payload))
-    req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
-    req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("Accept", "text/event-stream")
-
-    resp, _ := http.DefaultClient.Do(req)
-    defer resp.Body.Close()
-
-    tokenCount := 0
-    scanner := bufio.NewScanner(resp.Body)
-    for scanner.Scan() {
-        line := scanner.Text()
-        if !strings.HasPrefix(line, "data: ") {
-            continue
-        }
-        data := strings.TrimPrefix(line, "data: ")
-        if data == "[DONE]" {
-            break
-        }
-        var chunk struct {
-            Type  string `json:"type"`
-            Delta struct{ Text string `json:"text"` } `json:"delta"`
-        }
-        json.Unmarshal([]byte(data), &chunk)
-        if chunk.Type == "content" {
-            fmt.Print(chunk.Delta.Text)
-            tokenCount++
-            if tokenCount >= 100 {
-                cancel() // Cancel context, stop generation
-                fmt.Println("\n[Cancelled after 100 tokens]")
-                break
-            }
-        }
-    }
+  if (!(e instanceof Error && e.name === "AbortError")) throw e;
 }
 ```
 ```bash [cURL]
-# Cancel with timeout (stops after 5 seconds of streaming)
-timeout 5 curl -N -X POST https://apis.fotohub.app/v1/ai/chat \
+# Hang up after 5 seconds. The turn is still billed for what was produced.
+timeout 5 curl -N -X POST https://apis.fotohub.app/v1/ai/agent/stream \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{"message": "Write a long essay about space", "stream": true}'
+  -d '{
+    "model": "claude-sonnet-4.6",
+    "messages": [{"role": "user", "content": "Write a long essay about space"}]
+  }'
 ```
 :::
 
@@ -596,10 +776,10 @@ timeout 5 curl -N -X POST https://apis.fotohub.app/v1/ai/chat \
 
 ## Token-by-Token Rendering
 
-For smooth UI rendering, buffer tokens and render with a typing effect:
+For smooth UI rendering, buffer fragments and render with `requestAnimationFrame`:
 
 ```typescript
-// Smooth token rendering with requestAnimationFrame
+// Smooth rendering with requestAnimationFrame
 class TokenRenderer {
   private queue: string[] = [];
   private isRendering = false;
@@ -623,7 +803,7 @@ class TokenRenderer {
         this.isRendering = false;
         return;
       }
-      // Render up to 3 tokens per frame for smoothness
+      // Render up to 3 fragments per frame for smoothness
       const batch = this.queue.splice(0, 3).join("");
       this.element.textContent += batch;
       requestAnimationFrame(renderFrame);
@@ -632,123 +812,169 @@ class TokenRenderer {
   }
 }
 
-// Usage with streaming
+// Usage: feed it every text_delta as it arrives.
 const renderer = new TokenRenderer(document.getElementById("output")!);
-const stream = await client.chatStream({ message: "Hello" });
-for await (const chunk of stream) {
-  if (chunk.type === "content") {
-    renderer.push(chunk.delta.text);
-  }
-}
+
+// ...inside the frame loop from the examples above:
+//   if (frame.type === "text_delta") renderer.push(frame.text);
 ```
+
+A `text_delta` is a fragment of text, not necessarily one token — do not use the
+number of frames as a token count. The authoritative counts are in the `done`
+frame's `usage`.
 
 ---
 
 ## Error Handling in Streams
 
+Two failure modes need separate handling.
+
+**Before the stream opens** — an ordinary HTTP status you can check on the
+response:
+
+| Status | Cause |
+|--------|-------|
+| `401` | Missing or invalid API key. Deliberately checked before the first frame. |
+| `400` | Empty/missing `messages`, an unknown `model`, or a `tools` value that is not a list. |
+
+**Mid-stream** — an `error` frame. `[DONE]` still follows it, so a loop that only
+watches for `[DONE]` exits silently having produced partial text. Always branch
+on `type === "error"`.
+
+::: warning Insufficient credits arrive as a frame, not a 402
+This route does not pre-authorise. It generates first and settles afterwards, so
+an exhausted balance produces an `error` frame **after** the text — never an HTTP
+`402`. Do not assume a `2xx` response means the turn was paid for; confirm via
+the `done` frame's `billing`.
+:::
+
 ::: code-group
 ```python [Python]
-from fotohub import FotoHub
-from fotohub.exceptions import FotoHubError, RateLimitError
+import json
 import time
+import requests
 
-client = FotoHub()
 
-def stream_with_retry(message: str, max_retries: int = 3):
+def stream_with_retry(messages: list[dict], max_retries: int = 3) -> str:
     for attempt in range(max_retries):
         try:
-            stream = client.chat_stream(message=message)
+            resp = requests.post(
+                "https://apis.fotohub.app/v1/ai/agent/stream",
+                headers={"Authorization": "Bearer fh_live_your_api_key",
+                         "Content-Type": "application/json"},
+                json={"model": "claude-sonnet-4.6", "messages": messages},
+                stream=True,
+                # (connect, read) -- a stalled stream must not hang forever.
+                timeout=(10, 60),
+            )
+            resp.raise_for_status()   # 401 / 400 / 429 land here
+
             full_text = ""
-            for chunk in stream:
-                if chunk.type == "content":
-                    full_text += chunk.delta.text
-                    print(chunk.delta.text, end="", flush=True)
-                elif chunk.type == "error":
-                    raise FotoHubError(chunk.error.message)
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+                payload = line.decode("utf-8")
+                if not payload.startswith("data: "):
+                    continue
+                data = payload[6:]
+                if data == "[DONE]":
+                    break
+                frame = json.loads(data)
+                if frame["type"] == "text_delta":
+                    full_text += frame["text"]
+                    print(frame["text"], end="", flush=True)
+                elif frame["type"] == "error":
+                    # Terminal. Tokens already produced are still billed, so
+                    # blind retries cost real money -- keep max_retries small.
+                    raise RuntimeError(frame["message"])
             return full_text
-        except RateLimitError as e:
-            time.sleep(e.retry_after)
-        except FotoHubError as e:
+
+        except requests.HTTPError as e:
+            status = e.response.status_code
+            if status in (400, 401):
+                raise            # never retry a bad request or a bad key
+            if status == 429:
+                time.sleep(int(e.response.headers.get("Retry-After", 2 ** attempt)))
+                continue
             if attempt == max_retries - 1:
                 raise
             time.sleep(2 ** attempt)
-    raise Exception("Max retries exceeded")
+
+    raise RuntimeError("Max retries exceeded")
 ```
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-import { RateLimitError, FotoHubError } from "fotohub/errors";
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
-async function streamWithRetry(message: string, maxRetries = 3): Promise<string> {
+async function streamWithRetry(
+  messages: { role: string; content: string }[],
+  maxRetries = 3,
+): Promise<string> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const stream = await client.chatStream({ message });
-      let fullText = "";
-      for await (const chunk of stream) {
-        if (chunk.type === "content") {
-          fullText += chunk.delta.text;
-          process.stdout.write(chunk.delta.text);
+    const response = await fetch("https://apis.fotohub.app/v1/ai/agent/stream", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model: "claude-sonnet-4.6", messages }),
+    });
+
+    if (response.status === 400 || response.status === 401) {
+      throw new Error(`Not retryable: HTTP ${response.status}`);
+    }
+    if (!response.ok) {
+      if (attempt === maxRetries - 1) throw new Error(`HTTP ${response.status}`);
+      const retryAfter = Number(response.headers.get("Retry-After") ?? 2 ** attempt);
+      await new Promise((r) => setTimeout(r, retryAfter * 1000));
+      continue;
+    }
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+    let buffer = "";
+
+    outer: while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
+
+      for (const raw of frames) {
+        if (!raw.startsWith("data: ")) continue;
+        const data = raw.slice(6).trim();
+        if (data === "[DONE]") break outer;
+        const frame = JSON.parse(data);
+        if (frame.type === "text_delta") {
+          fullText += frame.text;
+          process.stdout.write(frame.text);
+        } else if (frame.type === "error") {
+          throw new Error(frame.message);
         }
       }
-      return fullText;
-    } catch (e) {
-      if (e instanceof RateLimitError) {
-        await new Promise((r) => setTimeout(r, (e.retryAfter ?? 1) * 1000));
-      } else if (attempt === maxRetries - 1) {
-        throw e;
-      } else {
-        await new Promise((r) => setTimeout(r, 2 ** attempt * 1000));
-      }
     }
+    return fullText;
   }
   throw new Error("Max retries exceeded");
 }
 ```
-```go [Go]
-package main
-
-import (
-    "fmt"
-    "time"
-)
-
-func streamWithRetry(message string, maxRetries int) error {
-    for attempt := 0; attempt < maxRetries; attempt++ {
-        err := doStream(message) // implementation from earlier examples
-        if err == nil {
-            return nil
-        }
-        wait := time.Duration(1<<uint(attempt)) * time.Second
-        fmt.Printf("Retry %d/%d in %v\n", attempt+1, maxRetries, wait)
-        time.Sleep(wait)
-    }
-    return fmt.Errorf("max retries exceeded")
-}
-
-func doStream(message string) error {
-    // Full streaming implementation (see basic example above)
-    return nil
-}
-
-func main() {
-    if err := streamWithRetry("Hello", 3); err != nil {
-        fmt.Printf("Error: %v\n", err)
-    }
-}
-```
 ```bash [cURL]
-# Stream with error checking
-RESPONSE=$(curl -s -w "\n%{http_code}" -N -X POST \
-  https://apis.fotohub.app/v1/ai/chat \
+# Separate the HTTP status from the stream body: a 401 has no frames at all.
+STATUS=$(curl -s -o /tmp/stream.txt -w "%{http_code}" -N -X POST \
+  https://apis.fotohub.app/v1/ai/agent/stream \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{"message": "Hello", "stream": true}')
+  -d '{"model":"claude-sonnet-4.6","messages":[{"role":"user","content":"Hello"}]}')
 
-HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-if [ "$HTTP_CODE" -ge 400 ]; then
-  echo "Error $HTTP_CODE — retrying..." >&2
+if [ "$STATUS" -ge 400 ]; then
+  echo "Rejected before streaming: HTTP $STATUS" >&2
+  cat /tmp/stream.txt >&2
+  exit 1
+fi
+
+# A mid-stream failure is a frame, not a status code.
+if grep -q '"type":"error"' /tmp/stream.txt; then
+  echo "Stream failed mid-flight:" >&2
+  grep '"type":"error"' /tmp/stream.txt >&2
 fi
 ```
 :::
@@ -757,11 +983,12 @@ fi
 
 ## Performance Tips
 
-1. **Keep connections alive** — Reuse the HTTP client/session across streams
-2. **Buffer rendering** — Don't update DOM on every single token; batch with requestAnimationFrame
-3. **Cancel early** — If the user navigates away, abort the stream to save credits
-4. **Use Gabriel routing** — Streaming latency varies by model; Gabriel picks fast models for simple queries
-5. **Set timeouts** — Streams that stall for >30s should be cancelled and retried
+1. **Keep connections alive** — reuse the HTTP client/session across streams
+2. **Buffer rendering** — don't update the DOM on every fragment; batch with `requestAnimationFrame`
+3. **Buffer parsing** — split on `\n\n`; never assume one `read()` is one frame
+4. **Pick the right model** — `claude-haiku-4.5` is the fastest and cheapest of the four
+5. **Set timeouts** — a stream stalled for >30 s should be cancelled and retried
+6. **Don't expect cancellation to save credits** — see [Stream Cancellation](#stream-cancellation)
 
 ---
 
@@ -770,4 +997,4 @@ fi
 - [Chat API Reference](/api/chat-llm)
 - [Error Handling Guide](/guides/error-handling)
 - [SDK Setup](/guides/sdk-setup)
-- [Cost Optimization](/guides/cost-optimization) — Cancellation saves credits
+- [Cost Optimization](/guides/cost-optimization)

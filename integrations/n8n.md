@@ -51,8 +51,16 @@ Webhook-based trigger node that fires on FOTOhub events:
 | `generation.completed` | An AI generation job completed successfully |
 | `generation.failed` | A generation job failed |
 | `credits.low` | Account credits dropped below threshold |
-| `video.ready` | A video generation completed |
-| `3d.ready` | A 3D model generation completed |
+| `credits.depleted` | Credits exhausted; further calls bill the USD wallet |
+| `billing.charged` | A wallet charge was settled |
+| `key.used` | An API key was used |
+| `images.batch.completed` | A batch image job completed |
+
+::: warning There are no media-specific events
+Video and 3D completions arrive as `generation.completed` — inspect the payload
+to tell them apart. `video.ready` and `3d.ready` do **not** exist; subscribing to
+either returns `400 Invalid events`.
+:::
 
 ## Example Workflows
 
@@ -84,7 +92,7 @@ Convert product photos to 3D models:
 2. **FOTOhub (Image)**: Remove background
 3. **FOTOhub (3D)**: Convert to 3D model (GLB format)
 4. **Google Drive**: Save 3D file
-5. **FOTOhub Trigger**: Wait for `3d.ready`
+5. **FOTOhub Trigger**: Wait for `generation.completed`
 6. **Slack**: Notify team
 
 ## Configuration

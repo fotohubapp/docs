@@ -568,17 +568,20 @@ POST /v1/story/regenerate/frame
 
 ## Pricing
 
-| Endpoint | Credits | PLN Equivalent |
+| Endpoint | Credits | USD Equivalent |
 |----------|---------|----------------|
-| Full pipeline (`/v1/story/generate`) | 30 | 4.50 zl |
-| Step 1: Concept | 3 | 0.45 zl |
-| Step 2: Characters | 5 | 0.75 zl |
-| Step 3: Frames | 5 | 0.75 zl |
-| Step 4: Videos | 10 | 1.50 zl |
-| Step 5: Voice-Over | 3 | 0.45 zl |
-| Step 6: Final Composition | 4 | 0.60 zl |
-| Regenerate Character | 3 | 0.45 zl |
-| Regenerate Frame | 3 | 0.45 zl |
+| Full pipeline (`/v1/story/generate`) | 30 | $1.61 |
+| Step 1: Concept | 3 | $0.1608 |
+| Step 2: Characters | 5 | $0.2680 |
+| Step 3: Frames | 5 | $0.2680 |
+| Step 4: Videos | 10 | $0.5359 |
+| Step 5: Voice-Over | 3 | $0.1608 |
+| Step 6: Final Composition | 4 | $0.2144 |
+| Regenerate Character | 3 | $0.1608 |
+| Regenerate Frame | 3 | $0.1608 |
+
+The USD column is the wallet price charged once your included credits are exhausted, at $0.0536
+per credit. While credits cover the call, `billing.usd_charged` is `0`.
 
 ::: tip Cost Optimization
 Running steps individually costs the same total (30 credits) as the full pipeline. The advantage is creative control — you can review and adjust between steps without paying extra.

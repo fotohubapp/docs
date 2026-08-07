@@ -100,10 +100,11 @@ curl -X POST https://apis.fotohub.app/v1/ai/gabriel \
   }'
 ```
 
-## Translation (No Auth Required)
+## Translation
 
 ```bash
 curl -X POST https://apis.fotohub.app/v1/ai/translate \
+  -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"text": "The quick brown fox", "target_language": "pl"}'
 ```

@@ -40,12 +40,12 @@ Use `aspect_ratio` instead of manual width/height for most use cases. The API au
 
 ```json
 {
-  "model": "seedream-5-0-260128",
-  "credits_used": 2,
+  "model": "imagen-4-standard",
+  "credits_used": 3,
   "billing": {
     "method": "credits",
-    "credits_used": 2,
-    "pln_charged": 0.21
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "images": [
     "https://s1.fotohub.app/storage/v1/object/public/generations/img_abc123.png"
@@ -54,26 +54,31 @@ Use `aspect_ratio` instead of manual width/height for most use cases. The API au
     "width": 1024,
     "height": 1024,
     "seed": 42,
-    "model": "seedream-5-0-260128",
+    "model": "imagen-4-standard",
     "generation_time_ms": 3200
   }
 }
 ```
+
+`method` is `credits` while your plan allowance covers the request, and both money
+fields are `0` because nothing was charged. Once the allowance is exhausted the
+same request returns `"method": "wallet"` with `"usd_charged": 0.1206` -- the
+model's per-request USD price. Read `usd_charged`; `pln_charged` is a legacy
+mirror of the same charge and will be removed.
 
 ### Token-Based Response (BytePlus SeedDream Models)
 
 ```json
 {
   "model": "seedream-5-0-260128",
-  "credits_used": 2,
+  "credits_used": 1,
   "billing": {
     "method": "token",
-    "credits_used": 2,
-    "pln_charged": 0.049,
+    "credits_used": 1,
+    "usd_charged": 0.0563,
     "cost_breakdown": {
       "output_tokens": 4096,
-      "cost_usd": 0.008192,
-      "cost_pln": 0.049152,
+      "cost_usd": 0.012288,
       "rate_per_1m_tokens_usd": 2.00
     }
   },
@@ -93,6 +98,14 @@ Use `aspect_ratio` instead of manual width/height for most use cases. The API au
 }
 ```
 
+::: warning Two USD figures, two meanings
+`cost_breakdown.cost_usd` is what the generation cost at the token rate (see
+[Token Calculation Formula](#token-calculation-formula)). `usd_charged` is what
+was actually taken from your wallet, which uses the model's flat per-request
+price -- `$0.0563` for `seedream-5-0-260128`. It is `0` while your plan's credit
+allowance still covers the request. Reconcile invoices against `usd_charged`.
+:::
+
 ## Token-Based Billing (BytePlus Models)
 
 BytePlus SeedDream models use per-token billing where cost scales with output resolution. Generating a 4K image costs 16x more than a 1K image.
@@ -105,19 +118,22 @@ Unlike credit-based models where a 4K image costs the same as a 1K image, token-
 
 ```
 output_tokens = (width × height) / 256
-cost_usd = (output_tokens / 1,000,000) × rate_per_1m_usd
-cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
+raw_cost_usd  = (output_tokens / 1,000,000) × rate_per_1m_usd
+cost_usd      = raw_cost_usd × 1.5          # margin
 ```
+
+BytePlus bills in USD, so there is no currency conversion in this path.
+`cost_usd` in `billing.cost_breakdown` is the margin-inclusive figure.
 
 ### Resolution to Token Examples
 
-| Resolution | Output Tokens | Cost (USD) @ $2/1M | Cost (PLN) |
-|-----------|---------------|---------------------|------------|
-| 1024 × 1024 | 4,096 | $0.0082 | 0.049 PLN |
-| 1536 × 1536 | 9,216 | $0.0184 | 0.111 PLN |
-| 2048 × 2048 | 16,384 | $0.0328 | 0.197 PLN |
-| 3072 × 3072 | 36,864 | $0.0737 | 0.442 PLN |
-| 4096 × 4096 | 65,536 | $0.1311 | 0.786 PLN |
+| Resolution | Output Tokens | Raw @ $2/1M | `cost_usd` (with margin) |
+|-----------|---------------|-------------|--------------------------|
+| 1024 × 1024 | 4,096 | $0.008192 | $0.012288 |
+| 1536 × 1536 | 9,216 | $0.018432 | $0.027648 |
+| 2048 × 2048 | 16,384 | $0.032768 | $0.049152 |
+| 3072 × 3072 | 36,864 | $0.073728 | $0.110592 |
+| 4096 × 4096 | 65,536 | $0.131072 | $0.196608 |
 
 ### Token-Based Model Rates
 
@@ -126,66 +142,66 @@ cost_pln = cost_usd × 4.0 (USD→PLN) × 1.5 (margin)
 | `seedream-5-0-260128` | $2.00 | 2 |
 | `seedream-4-5-251128` | $2.50 | 3 |
 | `seedream-4-0-250828` | $2.00 | 2 |
-| `dola-seedream-5-0-pro-260628` | $3.50 | 3 (0.60 PLN) |
+| `dola-seedream-5-0-pro-260628` | $3.50 | 3 |
 | `seededit-3-0-i2i-250628` | $2.50 | 3 |
 
 ## All Models — Complete Pricing
 
 ### Google Vertex AI (Imagen)
 
-| Model ID | Name | Price (PLN) | Credits | Notes |
+| Model ID | Name | Price (USD) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `imagen-3-fast` | Imagen 3 Fast | 0.12 | 1 | 512px fast |
-| `imagen-3-standard` | Imagen 3 Standard | 0.24 | 2 | 1K |
-| `imagen-3-capability` | Imagen 3 Capability | 0.24 | 2 | editing/customization |
-| `imagen-4-standard` | Imagen 4 Standard | 0.45 | 3 | High quality |
-| `imagen-4-ultra` | Imagen 4 Ultra | 0.90 | 5 | 4K |
+| `imagen-3-fast` | Imagen 3 Fast | 0.0322 | 1 | 512px fast |
+| `imagen-3-standard` | Imagen 3 Standard | 0.0643 | 2 | 1K |
+| `imagen-3-capability` | Imagen 3 Capability | 0.0643 | 2 | editing/customization |
+| `imagen-4-standard` | Imagen 4 Standard | 0.1206 | 3 | High quality |
+| `imagen-4-ultra` | Imagen 4 Ultra | 0.2412 | 5 | 4K |
 
 ### Google — Gemini (Nano Banana family)
 
 Gemini's native multimodal image models — text-to-image, image-to-image, and multi-image composition (up to 10 reference images) in one model.
 
-| Model ID | Name | Price (PLN) | Credits | Notes |
+| Model ID | Name | Price (USD) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `gemini-3.1-flash-lite-image` | Nano Banana 2 Lite | 0.20 | 1 | cheapest Gemini image model |
-| `gemini-2.5-flash-image` | Nano Banana | 0.40 | 2 | up to 10 reference images |
-| `gemini-3.1-flash-image` | Nano Banana 2 | 0.60 | 3 | GA |
-| `gemini-3.1-flash-image-preview` | Nano Banana 2 (Preview) | 0.60 | 3 | preview channel |
-| `gemini-3-pro-image` | Nano Banana Pro | 1.20 | 6 | **Recommended for quality** — 1K/2K/4K, advanced reasoning, precise text rendering |
+| `gemini-3.1-flash-lite-image` | Nano Banana 2 Lite | 0.0536 | 1 | cheapest Gemini image model |
+| `gemini-2.5-flash-image` | Nano Banana | 0.1072 | 2 | up to 10 reference images |
+| `gemini-3.1-flash-image` | Nano Banana 2 | 0.1608 | 3 | GA |
+| `gemini-3.1-flash-image-preview` | Nano Banana 2 (Preview) | 0.1608 | 3 | preview channel |
+| `gemini-3-pro-image` | Nano Banana Pro | 0.2841 | 6 | **Recommended for quality** — 1K/2K/4K, advanced reasoning, precise text rendering |
 
 ### OpenAI
 
-| Model ID | Name | Price (PLN) | Credits | Notes |
+| Model ID | Name | Price (USD) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `dall-e-3-standard` | DALL-E 3 | 0.24 | 2 | — |
-| `dall-e-3-hd` | DALL-E 3 HD | 0.48 | 4 | — |
-| `gpt-image-1` | GPT Image 1 | 0.60 | 4 | high fidelity |
-| `gpt-image-2` | GPT Image 2 | 2.00 | 10 | **Recommended** — highest fidelity, 4K, best text rendering |
+| `dall-e-3-standard` | DALL-E 3 | 0.0643 | 2 | — |
+| `dall-e-3-hd` | DALL-E 3 HD | 0.1286 | 4 | — |
+| `gpt-image-1` | GPT Image 1 | 0.1608 | 4 | high fidelity |
+| `gpt-image-2` | GPT Image 2 | 0.1072 | 10 | **Recommended** — highest fidelity, 4K, best text rendering |
 
 ### Microsoft — MAI-Image
 
-| Model ID | Name | Price (PLN) | Credits | Notes |
+| Model ID | Name | Price (USD) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `mai-image-2.5-flash` | MAI-Image 2.5 Flash | 0.20 | 1 | budget/fast |
-| `mai-image-2.5` | MAI-Image 2.5 | 0.20 | 1 | up to 1024x1024 |
+| `mai-image-2.5-flash` | MAI-Image 2.5 Flash | 0.0536 | 1 | budget/fast |
+| `mai-image-2.5` | MAI-Image 2.5 | 0.0536 | 1 | up to 1024x1024 |
 
 ### BytePlus SeedDream (Token-Based)
 
-| Model ID | Name | ~PLN @1K | Credits | Notes |
+| Model ID | Name | ~USD @1K | Credits | Notes |
 |----------|------|----------|---------|-------|
-| `seedream-4-0-250828` | SeedDream 4.0 | 0.18 | 2 | token-based |
-| `seedream-5-0-260128` | SeedDream 5.0 Lite | 0.21 | 2 | **Recommended**, best value |
-| `seedream-4-5-251128` | SeedDream 4.5 | 0.24 | 3 | token-based |
-| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro (Dola) | 0.60 | 3 | token-based |
-| `seededit-3-0-i2i-250628` | SeedEdit 3.0 (img2img) | 0.24 | 3 | token-based |
+| `seedream-4-0-250828` | SeedDream 4.0 | 0.0482 | 2 | token-based |
+| `seedream-5-0-260128` | SeedDream 5.0 Lite | 0.0563 | 2 | **Recommended**, best value |
+| `seedream-4-5-251128` | SeedDream 4.5 | 0.0643 | 3 | token-based |
+| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro (Dola) | 0.0723 | 3 | token-based |
+| `seededit-3-0-i2i-250628` | SeedEdit 3.0 (img2img) | 0.0643 | 3 | token-based |
 
 ### BytePlus Dreamina 4.6 (Flat Per-Image)
 
 Unlike the SeedDream models above, Dreamina 4.6 (`model: "dreamina-4-6"`) is billed **flat per returned image**, not by token/resolution — it accepts up to 14 reference images for image-to-image composition and can output 1K/2K/4K.
 
-| Model ID | Name | Price (PLN) | Credits | Notes |
+| Model ID | Name | Price (USD) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `dreamina-4-6` | Dreamina 4.6 | 0.19 | 2 | up to 14 reference images, force_single by default |
+| `dreamina-4-6` | Dreamina 4.6 | 0.1072 | 2 | up to 14 reference images, force_single by default |
 
 ::: warning A single request can return multiple images
 Dreamina 4.6 supports generating a group of up to 9 images from one prompt. This endpoint sends `force_single: true` by default so you are charged for exactly 1 image — pass `"force_single": false` (or `"num_images"` greater than 1) if you want a group, and note that the response is billed for however many images actually come back, not a number you request.
@@ -217,6 +233,7 @@ Response:
   "credits_used": 2,
   "billing": {
     "method": "credits",
+    "usd_charged": 0,
     "pln_charged": 0,
     "breakdown": { "credits_charged": 2, "pricing_type": "per_image_resolution" }
   },
@@ -230,10 +247,10 @@ This call is synchronous — unlike the async job pattern used for [avatar and m
 
 ### xAI (Grok Imagine)
 
-| Model ID | Name | Price (PLN) | Credits | Notes |
+| Model ID | Name | Price (USD) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `grok-imagine-image` | Grok Imagine | 0.12 | 1 | 1K, single-image edit |
-| `grok-imagine-image-pro` | Grok Imagine Pro | 0.42 | 3 | **2K**, multi-image combine (up to 3 refs), virtual try-on |
+| `grok-imagine-image` | Grok Imagine | 0.0322 | 1 | 1K, single-image edit |
+| `grok-imagine-image-pro` | Grok Imagine Pro | 0.1125 | 3 | **2K**, multi-image combine (up to 3 refs), virtual try-on |
 
 #### xAI Grok Image — Capabilities
 
@@ -257,16 +274,16 @@ Grok Imagine Pro is ideal for e-commerce: multi-image product listings, virtual 
 
 FLUX models cover the full range from ultra-fast lightweight generation to maximum-fidelity output and context-aware editing.
 
-| Model ID | Name | Price (PLN) | Credits | Notes |
+| Model ID | Name | Price (USD) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `flux-2-klein-4b` | FLUX.2 Klein 4B | 0.084 | 1 | ultra-fast, lightweight 4B model |
-| `flux-2-klein-9b` | FLUX.2 Klein 9B | 0.09 | 1 | fast, lightweight 9B model |
-| `flux-2-pro` | FLUX.2 Pro | 0.18 | 2 | balanced, versatile |
-| `flux-1.1-pro` | FLUX 1.1 Pro | 0.24 | 2 | high quality, creative |
-| `flux-kontext-pro` | FLUX Kontext Pro | 0.24 | 2 | context-aware editing, style transfer |
-| `flux-1.1-pro-ultra` | FLUX 1.1 Pro Ultra | 0.36 | 3 | ultra detail, large canvas |
-| `flux-2-max` | FLUX.2 Max | 0.42 | 4 | highest FLUX quality |
-| `flux-kontext-max` | FLUX Kontext Max | 0.48 | 4 | maximum context fidelity |
+| `flux-2-klein-4b` | FLUX.2 Klein 4B | 0.0225 | 1 | ultra-fast, lightweight 4B model |
+| `flux-2-klein-9b` | FLUX.2 Klein 9B | 0.0241 | 1 | fast, lightweight 9B model |
+| `flux-2-pro` | FLUX.2 Pro | 0.0482 | 2 | balanced, versatile |
+| `flux-1.1-pro` | FLUX 1.1 Pro | 0.0643 | 2 | high quality, creative |
+| `flux-kontext-pro` | FLUX Kontext Pro | 0.0643 | 2 | context-aware editing, style transfer |
+| `flux-1.1-pro-ultra` | FLUX 1.1 Pro Ultra | 0.0965 | 3 | ultra detail, large canvas |
+| `flux-2-max` | FLUX.2 Max | 0.1125 | 4 | highest FLUX quality |
+| `flux-kontext-max` | FLUX Kontext Max | 0.1286 | 4 | maximum context fidelity |
 
 ::: tip FLUX Model Range
 The Klein models are optimized for speed and cost, while Pro, Ultra, and Max deliver progressively higher fidelity. Kontext models specialize in context-aware editing and style transfer.
@@ -274,17 +291,17 @@ The Klein models are optimized for speed and cost, while Pro, Ultra, and Max del
 
 ### MiniMax
 
-| Model ID | Name | Price (PLN) | Credits | Notes |
+| Model ID | Name | Price (USD) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `minimax-image-01` | MiniMax Image 01 | 0.021 | 1 | lowest-cost budget option |
+| `minimax-image-01` | MiniMax Image 01 | 0.0056 | 1 | lowest-cost budget option |
 
 ### Kling
 
-| Model ID | Name | Price (PLN) | Credits | Notes |
+| Model ID | Name | Price (USD) | Credits | Notes |
 |----------|------|-------------|---------|-------|
-| `kling-v2-1` | Kling V2.1 | 0.24 | 2 | balanced quality |
-| `kling-v3` | Kling V3 | 0.60 | 5 | high quality |
-| `kling-v3-omni` | Kling V3 Omni | 0.90 | 8 | premium, highest fidelity, all modes |
+| `kling-v2-1` | Kling V2.1 | 0.0643 | 2 | balanced quality |
+| `kling-v3` | Kling V3 | 0.1608 | 5 | high quality |
+| `kling-v3-omni` | Kling V3 Omni | 0.2412 | 8 | premium, highest fidelity, all modes |
 
 ## Code Examples
 
@@ -409,8 +426,8 @@ response = requests.post(
 data = response.json()
 print(f"Image URL: {data['images'][0]}")
 print(f"Output tokens: {data['usage']['output_tokens']}")
-print(f"Cost (PLN): {data['billing']['cost_breakdown']['cost_pln']}")
-# At 2048x2048: 16,384 tokens → ~0.197 PLN
+print(f"Cost (USD): {data['billing']['cost_breakdown']['cost_usd']}")
+# At 2048x2048: 16,384 tokens → ~$0.0492
 ```
 
 ```typescript [TypeScript]
@@ -432,8 +449,8 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 const data = await response.json();
 console.log("Image URL:", data.images[0]);
 console.log("Output tokens:", data.usage.output_tokens);
-console.log("Cost (PLN):", data.billing.cost_breakdown.cost_pln);
-// At 2048x2048: 16,384 tokens → ~0.197 PLN
+console.log("Cost (USD):", data.billing.cost_breakdown.cost_usd);
+// At 2048x2048: 16,384 tokens → ~$0.0492
 ```
 
 ```go [Go]
@@ -477,8 +494,8 @@ func main() {
 
 	fmt.Println("Image URL:", images[0])
 	fmt.Println("Output tokens:", usage["output_tokens"])
-	fmt.Println("Cost (PLN):", breakdown["cost_pln"])
-	// At 2048x2048: 16,384 tokens -> ~0.197 PLN
+	fmt.Println("Cost (USD):", breakdown["cost_usd"])
+	// At 2048x2048: 16,384 tokens -> ~$0.0492
 }
 ```
 
@@ -2165,9 +2182,9 @@ For BytePlus SeedDream models, cost scales linearly with pixel count. A 4K image
 :::
 
 **Cost-effective resolution workflow:**
-1. **Draft at 1024x1024** -- validate composition and style (4,096 tokens, ~0.049 PLN)
-2. **Refine at 2048x2048** -- check details before committing (16,384 tokens, ~0.197 PLN)
-3. **Final at 4096x4096** -- only for approved compositions (65,536 tokens, ~0.786 PLN)
+1. **Draft at 1024x1024** -- validate composition and style (4,096 tokens, ~$0.0123)
+2. **Refine at 2048x2048** -- check details before committing (16,384 tokens, ~$0.0492)
+3. **Final at 4096x4096** -- only for approved compositions (65,536 tokens, ~$0.1966)
 
 For credit-based models (Imagen, DALL-E, FLUX), resolution does not affect price -- always generate at maximum supported resolution.
 

@@ -710,13 +710,12 @@ Webhook payload for batch progress:
 {
   "event": "generation.completed",
   "timestamp": "2026-07-22T10:30:00Z",
+  "attempt": 1,
   "data": {
-    "job_id": "job_abc123",
     "type": "video",
     "model": "seedance-2-0-pro",
-    "video_url": "https://storage.fotohub.app/videos/abc123.mp4",
-    "duration_s": 5,
-    "cost_pln": 0.50
+    "credits": 5,
+    "duration": 5
   }
 }
 ```

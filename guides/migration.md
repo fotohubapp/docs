@@ -37,7 +37,8 @@ url = result["images"][0]
 
 ### Chat Completions
 
-FOTOhub is **OpenAI-compatible** — same message format, same streaming behavior:
+FOTOhub is **OpenAI-compatible in message format**, but not in streaming — see
+the warning below.
 
 ::: code-group
 
@@ -48,26 +49,38 @@ client = OpenAI(api_key="sk-...")
 response = client.chat.completions.create(
     model="gpt-4o",
     messages=[{"role": "user", "content": "Hello!"}],
-    stream=True
 )
-for chunk in response:
-    print(chunk.choices[0].delta.content, end="")
+print(response.choices[0].message.content)
 ```
 
 ```python [FOTOhub (after)]
 from fotohub import FotoHub
 client = FotoHub(api_key="fh_live_...")
 
-# Same message format, same streaming pattern
-stream = client.chat(
+# Same message format. chat() returns a plain dict -- index it.
+response = client.chat(
     messages=[{"role": "user", "content": "Hello!"}],
-    model="gemini-flash",  # or "claude-sonnet-4.6", "gpt-4o"
-    stream=True
+    model="gemini-flash",  # or "gemini-pro", "gpt-4o", "claude-sonnet"
 )
-for chunk in stream:
-    print(chunk["choices"][0]["delta"].get("content", ""), end="")
+print(response["choices"][0]["message"]["content"])
+print(response["credits_used"])
 ```
 
+:::
+
+::: warning Streaming does not carry over
+`/v1/ai/chat/completions` accepts `stream=True` for drop-in compatibility and
+then **ignores it** — you always get one complete JSON body, never
+`chat.completion.chunk` frames. An OpenAI-style `for chunk in stream:` loop over
+it yields nothing.
+
+The model list is also narrower than the catalogue: exactly `gemini-flash`,
+`gemini-pro`, `gpt-4o` and `claude-sonnet`. Anything else (including
+`claude-sonnet-4.6`) returns `400`.
+
+To actually stream, switch to `POST /v1/ai/agent/stream`, which uses its own
+`type`-keyed frames and its own model IDs. See the
+[Streaming Guide](/guides/streaming).
 :::
 
 ## From Stability AI
@@ -149,11 +162,22 @@ print(result["audio_url"])
 | Feature | Other Providers | FOTOhub |
 |---------|----------------|---------|
 | Billing | Per-provider accounts | Single wallet, credits or tokens |
-| Models | 1 provider = 1 SDK | 50+ models, 1 SDK |
-| Failover | Manual | Automatic (model chain) |
+| Models | 1 provider = 1 SDK | 100+ models across 10+ providers, 1 SDK |
+| Failover | Manual | Manual — pick another model ID and retry |
 | Rate limits | Per-model | Tier-based, shared across all |
 | Video polling | Custom implementation | Built-in `wait_for_video()` |
-| Model selection | You decide | Gabriel AI recommends optimal |
+| Model selection | You decide | You decide, or ask `POST /v1/ai/gabriel` for a recommendation |
+
+::: warning There is no automatic failover
+Earlier revisions of this table promised an automatic model chain. The public API
+does not retry a failed generation against a different model — a provider outage
+surfaces as an error on that request. Build retry/fallback into your own client
+if you need it.
+
+Gabriel returns a routing *decision* (which model to use); it does not run the
+generation. See [Cost Optimization](/guides/cost-optimization) for the real
+request shape.
+:::
 
 ## Migration Checklist
 

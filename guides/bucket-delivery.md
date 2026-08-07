@@ -44,7 +44,7 @@ curl -X POST https://apis.fotohub.app/v1/storage/s3/buy \
   -H "Content-Type: application/json" \
   -d '{
     "display_name": "Acme production output",
-    "region": "eu-central-1",
+    "region": "us-west-2",
     "default_storage_class": "STANDARD",
     "quota_gb": 500,
     "versioning_enabled": false,
@@ -58,7 +58,7 @@ curl -X POST https://apis.fotohub.app/v1/storage/s3/buy \
   "id": "9a1f7c30-4b2e-4d81-9f65-c2e08d7a1b34",
   "display_name": "Acme production output",
   "aws_bucket_name": "fh-cust-9a1f7c30",
-  "region": "eu-central-1",
+  "region": "us-west-2",
   "status": "active",
   "quota_gb": 500,
   "billing_state": "current"
@@ -72,6 +72,32 @@ back and a wallet reservation is refunded; you never end up owning half a
 bucket.
 
 Keep `id`. Every call below takes it.
+
+### Choosing a region
+
+`region` is where the bytes physically sit, and it is fixed for the life of the
+bucket — there is no move operation. Pick for the latency your users see and for
+the compliance story you have to tell:
+
+| `region` | Location | GDPR-suitable |
+|---|---|---|
+| `eu-central-1` | Frankfurt, Germany | yes |
+| `eu-west-1` | Dublin, Ireland | yes |
+| `us-west-2` | Oregon, USA | no — data leaves the EEA |
+
+`GET /v1/storage/s3/regions` returns this list live, with an `available` flag.
+Treat that endpoint as authoritative rather than hardcoding the table: a region
+is offerable only while we can also *price* it, so the set can narrow.
+
+A US bucket is a first-class choice, not a fallback — if your traffic is in
+North America, `us-west-2` is the right answer and delivery works identically.
+The examples below use `us-west-2` for exactly that reason.
+
+::: warning A US region is a transfer out of the EEA
+`us-west-2` is outside the EEA. If the generations contain personal data (faces,
+customer photos, anything identifying), that transfer is yours to justify under
+GDPR — we cannot do it for you. Where you have any doubt, use `eu-central-1`.
+:::
 
 ::: tip Billing modes
 `wallet` reserves roughly 1.5 days of full-quota storage cost up front and
@@ -296,20 +322,90 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/video \
   }'
 ```
 
-The response is unchanged: a signed FOTOhub URL, so existing code keeps working.
-Delivery to your bucket happens alongside it, and the object appears at
-`private/2026/08/<job_id>.mp4`.
+The `url` is unchanged — still a signed FOTOhub URL, so existing code keeps
+working. Your bucket is an *additional* destination, not a redirect. What is new
+is a `delivery` block, present only when routing resolved to a destination:
 
+```json
+{
+  "model": "seedance-2-0-mini",
+  "url": "https://s1.fotohub.app/storage/v1/object/sign/api-generations/...",
+  "credits_used": 84,
+  "delivery": {
+    "kind": "console_bucket",
+    "routed_by": "rule",
+    "destination_id": "376ec105-06bc-4011-8b9e-20cc4e253ea8",
+    "bucket": "fh-cust-9a1f7c30-acme-prod-a1b2c3d4e5-wxyz",
+    "region": "us-west-2",
+    "keys": ["private/2026/08/8f21c4de.mp4"],
+    "status": "pending"
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `kind` | `console_bucket` for a bucket we provisioned, `s3` for your own |
+| `routed_by` | Which precedence level chose this: `request`, `rule`, `default` |
+| `bucket` | The real AWS bucket name receiving the object |
+| `region` | Where it lands — worth asserting in a compliance-sensitive pipeline |
+| `keys` | The exact object keys that will be written |
+| `status` | Always `pending` (see below) |
+
+`keys` is the useful part: key layout is deterministic, so we can tell you the
+destination key before the transfer finishes. **This is what you poll on** — a
+`HEAD` on that key, not a blind `LIST` of the prefix.
+
+`routed_by` answers "why did my file go *there*", which is otherwise
+unanswerable without reading the key's rules and the request side by side.
+
+::: warning `status` is always `pending`, and that is not a hedge
 Delivery is deliberately detached from the response. If your bucket is slow or
 briefly unavailable, your generation still returns — it does not wait, and it
-does not fail. The consequence is the honest one: **the response returning does
-not prove the object arrived.** If your pipeline depends on the object being
-there, check for it, or list the prefix. Per-destination write counts, byte
-totals, the last write time and the last error are on the destination row.
+does not fail. So **the response returning does not prove the object arrived**,
+and a `delivery` block is a statement of intent, not a receipt. If your pipeline
+depends on the object being there, wait on `keys`.
+:::
+
+`GET /v1/destinations` is the after-the-fact view. Each row carries
+`writes_total`, `bytes_written`, `last_write_at` and `last_error`, so you can see
+whether deliveries are landing without inspecting your bucket:
+
+```bash
+curl -s https://apis.fotohub.app/v1/destinations \
+  -H "Authorization: Bearer $FH_JWT" \
+  | jq '.destinations[] | {name, writes_total, bytes_written, last_write_at, last_error}'
+```
+
+Counters are advisory: they are updated after the object is written, so a
+successful delivery whose counter update failed is still a successful delivery.
+`last_error` is the field to alert on.
+
+Absence of `delivery` is meaningful too: it means nothing matched, and the output
+stayed in FOTOhub storage. If you expected a delivery, that is the signal that a
+rule pattern does not match the model id you actually sent.
 
 `keepLocalCopy` on the key (default `true`) controls whether the FOTOhub copy
 survives until retention expires. Set it to `false` once you trust the delivery
-and want to stop paying for two copies.
+and want to stop paying for two copies. It does not change the response — the
+signed URL keeps working until retention elapses either way.
+
+### Waiting for the object
+
+```bash
+KEY=$(curl -s -X POST https://apis.fotohub.app/v1/ai/generate/video \
+  -H "Authorization: Bearer $SECRET" -H "Content-Type: application/json" \
+  -d '{"model":"seedance-2-0-mini","prompt":"...","duration":5}' \
+  | jq -r '.delivery.keys[0]')
+
+# Poll your own bucket for that exact key rather than listing the prefix.
+until aws s3api head-object --bucket "$MY_BUCKET" --key "$KEY" >/dev/null 2>&1; do
+  sleep 2
+done
+```
+
+If you published the prefix (step 2), the same wait works with no credentials at
+all — `curl -sfI "https://acme.s3point.fotohub.app/$KEY"`.
 
 ## Precedence
 
@@ -340,6 +436,101 @@ patching a key. Applies to every model with no matching rule.
 
 With none of the three, output stays in FOTOhub storage and behaves exactly as
 it always has.
+
+## Worked example: two models, one private US bucket
+
+The common shape: an application generating video with `seedance-2-0-mini` and
+stills with `dola-seedream-5-0-pro-260628`, both landing in a private bucket in
+Oregon, nothing published. Copy-paste runnable — it is the same sequence our own
+end-to-end test performs against production.
+
+```bash
+export FH_JWT="<your console session JWT>"
+API=https://apis.fotohub.app
+
+# 1. A private bucket in the US. No alias is created, so nothing is reachable
+#    anonymously and there is no public hostname to leak.
+BUCKET=$(curl -sX POST "$API/v1/storage/s3/buy" \
+  -H "Authorization: Bearer $FH_JWT" -H "Content-Type: application/json" \
+  -d '{"display_name":"Acme private output","region":"us-west-2",
+       "quota_gb":100,"encryption_type":"SSE-S3","billing_mode":"wallet"}')
+BUCKET_ID=$(echo "$BUCKET" | jq -r .id)
+
+# 2. Register it as a destination. No credentials: we hold the bucket's IAM user.
+DEST_ID=$(curl -sX POST "$API/v1/destinations" \
+  -H "Authorization: Bearer $FH_JWT" -H "Content-Type: application/json" \
+  -d "{\"name\":\"acme-private\",\"kind\":\"console_bucket\",
+       \"bucketId\":\"$BUCKET_ID\",\"pathPrefix\":\"incoming\"}" | jq -r .id)
+
+# 3. One key, two rules — each model gets its own folder layout.
+KEY=$(curl -sX POST "$API/v1/auth/keys" \
+  -H "Authorization: Bearer $FH_JWT" -H "Content-Type: application/json" \
+  -d '{"name":"acme-app","keyType":"write","scopes":["video","images"],
+       "keepLocalCopy":false}')
+KEY_ID=$(echo "$KEY" | jq -r .meta.id)
+SECRET=$(echo "$KEY" | jq -r .apiKey)      # shown once
+
+for RULE in \
+  '{"modelPattern":"seedance-2-0-mini","pathTemplate":"video/{YYYY}/{MM}/{job_id}.{ext}"}' \
+  '{"modelPattern":"dola-seedream-5-0-pro-260628","pathTemplate":"stills/{date}/{job_id}.{ext}"}'
+do
+  curl -sX POST "$API/v1/auth/keys/$KEY_ID/output-rules" \
+    -H "Authorization: Bearer $FH_JWT" -H "Content-Type: application/json" \
+    -d "$(echo "$RULE" | jq --arg d "$DEST_ID" '. + {destinationId:$d, priority:10}')" >/dev/null
+done
+
+# 4. Generate. The delivery block tells you the destination key up front.
+curl -sX POST "$API/v1/ai/generate/image" \
+  -H "Authorization: Bearer $SECRET" -H "Content-Type: application/json" \
+  -d '{"model":"dola-seedream-5-0-pro-260628",
+       "prompt":"studio packshot of a brushed steel water bottle",
+       "size":"1024x1024"}' | jq '.delivery'
+```
+
+```json
+{
+  "kind": "console_bucket",
+  "routed_by": "rule",
+  "destination_id": "f935771d-3384-4d0b-b62f-fa3504cba196",
+  "bucket": "fh-cust-3c685a01-acme-private-07zp",
+  "region": "us-west-2",
+  "keys": ["incoming/stills/2026-08-07/9c1f4ade.png"],
+  "status": "pending"
+}
+```
+
+Note `pathPrefix` on the destination and `pathTemplate` on the rule compose —
+prefix first — so one bucket can serve several applications without their key
+layouts colliding.
+
+Video is the async shape: `POST /v1/ai/generate/video` returns `202` with a
+`job_id`, and the `delivery` block appears on the poll response that reports
+`completed`, since that is when the object exists to deliver.
+
+```bash
+JOB=$(curl -sX POST "$API/v1/ai/generate/video" \
+  -H "Authorization: Bearer $SECRET" -H "Content-Type: application/json" \
+  -d '{"model":"seedance-2-0-mini","prompt":"slow dolly across a workshop bench",
+       "duration":5}' | jq -r .job_id)
+
+until [ "$(curl -s "$API/v1/ai/generate/video/$JOB" \
+            -H "Authorization: Bearer $SECRET" | jq -r .status)" = "completed" ]; do
+  sleep 10
+done
+```
+
+Poll on a 10-second interval or slower. A 5-second `seedance-2-0-mini` render
+takes roughly 60–150 seconds end to end.
+
+::: tip Reading back from a private bucket
+With no alias there is no public URL, and that is the point. Fetch through
+`POST /v1/storage/s3/buckets/{id}/objects/presign-download`, which returns a
+short-lived signed URL, or list with
+`POST /v1/storage/s3/buckets/{id}/objects/list`. Pass `"delimiter": ""` when
+listing if your keys are nested — the default `/` groups everything below the
+prefix into `common_prefixes` and returns an empty `objects` array, which looks
+exactly like an empty bucket.
+:::
 
 ## Security notes
 

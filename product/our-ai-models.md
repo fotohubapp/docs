@@ -98,9 +98,9 @@ Every prompt passes through FOTOhub's own prompt engine before generation — au
 
 ### Pricing
 
-| Model | Price | Unit |
-|-------|-------|------|
-| IDA Q 1.0 | 0.10 | PLN / request |
+| Model | Credits | USD (wallet fallback) | Unit |
+|-------|---------|-----------------------|------|
+| IDA Q 1.0 | 0.5 | $0.027 | per request |
 
 ::: tip Cost Advantage
 IDA Q 1.0 costs a fraction of Google's Nano Banana (Gemini Flash Image) and roughly 20x less than GPT Image 2 — a direct result of running on our own infrastructure with zero third-party licensing cost to pass through.
@@ -179,13 +179,14 @@ IDA Music supports detailed structural tags for professional music production:
 
 ### Pricing
 
-| Duration | Credits | PLN |
-|----------|---------|-----|
-| ≤ 3 minutes | 2 | 0.15 |
-| > 3 minutes | 4 | 0.30 |
+| Duration | Credits | USD (wallet fallback) |
+|----------|---------|-----------------------|
+| ≤ 30 seconds | 5 | $0.27 |
+| 31–60 seconds | 10 | $0.54 |
+| > 60 seconds | 25 | $1.34 |
 
 ::: tip Cost Advantage
-IDA Music costs 2–4 credits per generation. Comparable cloud services charge 5–25 credits for similar output. Running on our own infrastructure means: lower latency for European users, no external rate limits, and full control over output quality.
+Running on our own infrastructure means: lower latency for European users, no external rate limits, and full control over output quality.
 :::
 
 ### API Access

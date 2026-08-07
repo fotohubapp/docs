@@ -121,7 +121,8 @@ POST /v1/video/lip-sync
   "billing": {
     "method": "credits",
     "credits_used": 15,
-    "pln_charged": 2.25
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "output": {
     "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/lipsync_7f3a9b2c4e1d.mp4",
@@ -1241,7 +1242,7 @@ Use `facefusion` for production-grade output suitable for broadcast, advertising
 | **4K Upscale** | No | No | Yes (built-in) |
 | **Output Formats** | MP4, WebM | MP4, WebM | MP4, WebM |
 | **Credits** | 8 | 15 | 20 |
-| **Approx. PLN** | 1.20 PLN | 2.25 PLN | 3.00 PLN |
+| **Approx. USD** | $0.4287 | $0.8039 | $1.07 |
 
 ### Choosing by Use Case
 
@@ -1260,14 +1261,14 @@ Use `facefusion` for production-grade output suitable for broadcast, advertising
 
 ## Pricing
 
-| Engine | Credits | Approx. PLN | Best For |
+| Engine | Credits | Approx. USD | Best For |
 |--------|---------|-------------|----------|
-| `musetalk` | 8 | 1.20 PLN | Quick previews, social media, drafts |
-| `latentsync` | 15 | 2.25 PLN | HD content, professional presentations |
-| `facefusion` | 20 | 3.00 PLN | 4K production, broadcast, film |
+| `musetalk` | 8 | $0.4287 | Quick previews, social media, drafts |
+| `latentsync` | 15 | $0.8039 | HD content, professional presentations |
+| `facefusion` | 20 | $1.07 | 4K production, broadcast, film |
 
 ::: info Credit Costs
-All lip-sync engines use flat credit pricing per job regardless of video duration (within model limits). A 5-second clip costs the same as a 60-second clip on `musetalk`.
+All lip-sync engines use flat credit pricing per job regardless of video duration (within model limits). A 5-second clip costs the same as a 60-second clip on `musetalk`. The USD column is what a job costs from your wallet once the included credits run out, at $0.0536 per credit.
 :::
 
 ---

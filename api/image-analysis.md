@@ -5,7 +5,7 @@ Extract structured information from images using AI-powered analysis. Detect obj
 | | |
 |---|---|
 | **Features** | 6 analysis types: labels, faces, nsfw, ocr, colors, objects |
-| **Cost** | 1 credit (0.06 PLN) per analysis |
+| **Cost** | 1 credit per analysis ($0.0161 from the wallet once credits are exhausted) |
 | **Latency** | 2-8 seconds depending on features selected |
 
 ---
@@ -32,7 +32,7 @@ POST /v1/ai/analyze/image
 | `min_confidence` | number | No | `0.5` | Minimum confidence threshold (0.0-1.0) for returned results. Lower values return more results but may include less accurate detections. |
 
 ::: tip Fixed Cost
-Image analysis costs a flat **1 credit (0.06 PLN)** per request, regardless of how many features you select. Analyzing all 6 features in a single request is more cost-effective than making 6 separate calls.
+Image analysis costs a flat **1 credit** per request ($0.0161 billed from your USD wallet once included credits are exhausted), regardless of how many features you select. Analyzing all 6 features in a single request is more cost-effective than making 6 separate calls.
 :::
 
 ---
@@ -49,7 +49,8 @@ The response includes only the features you requested. Each feature returns its 
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "pln_charged": 0.06
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/photo.jpg",
   "features_analyzed": ["labels", "faces", "nsfw", "ocr", "colors", "objects"],
@@ -153,11 +154,11 @@ Returns high-level semantic labels describing the image content. Labels are rank
 
 ### Faces — Face Detection
 
-Detects faces in the image and returns bounding boxes with estimated attributes including age, gender, emotion, and accessories (glasses, beard). Supports up to 20 faces per image.
+Detects faces in the image and returns a detection confidence together with an estimate of the facial expression. Age, gender and accessory attributes are not returned.
 
-- **Returns:** Array of face objects with `bounding_box`, `confidence`, and `attributes`.
-- **Emotions:** happy, sad, angry, surprised, neutral, fearful, disgusted.
-- **Note:** Face detection does not perform identification or recognition. No biometric data is stored.
+- **Returns:** Array of face objects with `confidence` and expression likelihoods.
+- **Expressions:** joy, sorrow, anger, surprise.
+- **Note:** Face detection does not perform identification or recognition, and no face templates are created. The expression estimate is stored with the photo and is deleted together with it. Under the EU AI Act this is an emotion-recognition feature, so inform the people in your images that you use it.
 
 ### NSFW — Content Safety
 
@@ -465,7 +466,8 @@ POST /v1/ai/enhance-prompt
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "pln_charged": 0.06
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "original_prompt": "a cat on a roof",
   "enhanced_prompt": "A sleek tabby cat perched on the edge of a terracotta rooftop at golden hour, silhouetted against a warm sunset sky with streaks of orange and purple. The cat gazes into the distance with alert, luminous eyes. Shallow depth of field with the background city skyline softly blurred. Shot from a low angle, cinematic composition with natural warm lighting.",
@@ -635,10 +637,13 @@ Use the `faces` feature to detect face positions before cropping or resizing ima
 
 ## Pricing
 
-| Operation | Cost |
-|-----------|------|
-| Image analysis (any combination of features) | 1 credit (0.06 PLN) |
-| Prompt enhancement | 1 credit (0.06 PLN) |
+| Operation | Credits | Wallet price |
+|-----------|---------|--------------|
+| Image analysis (any combination of features) | 1 | $0.0161 |
+| Prompt enhancement | 1 | $0.0001 |
+
+The wallet price applies only once your included credits are exhausted; while credits cover the
+request, `billing.usd_charged` is `0`.
 
 ::: tip Batch Analysis
 For analyzing multiple images, send them as separate parallel requests rather than sequentially. The API supports up to 60 concurrent analysis requests per minute, so you can process a batch of images efficiently. Use the `X-Idempotency-Key` header to safely retry failed requests without double-charging.

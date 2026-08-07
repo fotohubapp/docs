@@ -15,7 +15,7 @@ FOTOhub has two billing layers:
 | Layer | How it works | Best for |
 |-------|-------------|----------|
 | **Credits** | Fixed cost per operation (e.g., 1 credit = 1 image) | Predictable budgets, included in plans |
-| **Wallet (PLN)** | Token-level billing after credits are exhausted | Pay-as-you-go, high-volume usage |
+| **Wallet (USD)** | Token-level billing after credits are exhausted | Pay-as-you-go, high-volume usage |
 
 Credits are consumed first. When depleted, the system falls back to wallet billing automatically — no interruption.
 
@@ -31,15 +31,18 @@ Credits are consumed first. When depleted, the system falls back to wallet billi
 
 ### Wallet (Token-Based) Pricing
 
-When credits are exhausted, each operation is billed per token in PLN:
+When credits are exhausted, each operation is billed from your USD wallet:
 
-| Model tier | Input (PLN/1M tokens) | Output (PLN/1M tokens) |
+| Model tier | Input (USD/1M tokens) | Output (USD/1M tokens) |
 |-----------|----------------------|----------------------|
-| Economy (Haiku-class) | 1.00 | 5.00 |
-| Standard (Sonnet-class) | 12.00 | 60.00 |
-| Premium (Opus-class) | 60.00 | 300.00 |
-| Image models | — | 0.20 - 1.50 per image |
-| Video models | — | 0.50 - 5.00 per second |
+| Economy (Haiku-class) | $1.20 | $6.00 |
+| Standard (Sonnet-class) | $4.50 | $22.50 |
+| Premium (Opus-class) | $22.50 | $112.50 |
+| Image models | — | $0.02 – $0.24 per image |
+| Video models | — | $0.06 – $0.64 per second |
+
+Rates include the platform margin. Per-model prices are returned live by
+`GET /v1/models` and `GET /v1/billing/pricing`, both in USD.
 
 ---
 
@@ -92,9 +95,13 @@ Bulk summarization?
 
 ---
 
-## Gabriel Auto-Routing (Recommended)
+## Gabriel Model Selection
 
-Gabriel is FOTOhub's AI router. Instead of choosing a model yourself, describe your intent and Gabriel picks the optimal model for cost/quality.
+Gabriel is FOTOhub's model router. It does **not** run the generation for you —
+`POST /v1/ai/gabriel` classifies your intent and returns a routing *decision*
+(which endpoint and model to use, plus a credit estimate). You then call that
+endpoint yourself. Ask Gabriel first when you don't know which model is cheapest
+for a task; skip it when you already do, since the extra round trip buys nothing.
 
 ::: code-group
 ```python [Python]
@@ -102,28 +109,28 @@ from fotohub import FotoHub
 
 client = FotoHub()
 
-# Gabriel picks the best model for the task
-response = client.chat(
-    message="Summarize this article in 3 bullet points: ...",
-    routing="auto",  # Gabriel decides
+decision = client.gabriel_classify(
+    "Summarize this article in 3 bullet points: ...",
+    language="en",
 )
 
-# Check which model was selected
-print(f"Model used: {response.model}")
-print(f"Cost: {response.usage.cost_pln} PLN")
+print(decision["action"])            # "route" | "answer" | "workflow" | "error"
+print(decision.get("target"))        # e.g. "/generate/new"
+print(decision.get("model_selected"))
+print(decision.get("credits_estimated"))
 ```
 ```typescript [TypeScript]
 import { FotoHub } from "fotohub";
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
 
-const response = await client.chat({
-  message: "Summarize this article in 3 bullet points: ...",
-  routing: "auto",
+const decision = await client.gabrielClassify({
+  prompt: "Summarize this article in 3 bullet points: ...",
+  language: "en",
 });
 
-console.log(`Model: ${response.model}`);
-console.log(`Cost: ${response.usage.costPln} PLN`);
+console.log(decision.action, decision.target);
+console.log(decision.model_selected, decision.credits_estimated);
 ```
 ```go [Go]
 package main
@@ -138,12 +145,12 @@ import (
 
 func main() {
     payload := map[string]interface{}{
-        "message": "Summarize this article in 3 bullet points: ...",
-        "routing": "auto",
+        "prompt":   "Summarize this article in 3 bullet points: ...",
+        "language": "en",
     }
     body, _ := json.Marshal(payload)
 
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/chat", bytes.NewBuffer(body))
+    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/gabriel", bytes.NewBuffer(body))
     req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
     req.Header.Set("Content-Type", "application/json")
 
@@ -152,28 +159,40 @@ func main() {
 
     var result map[string]interface{}
     json.NewDecoder(resp.Body).Decode(&result)
-    fmt.Printf("Model: %s\n", result["model"])
+    fmt.Printf("action=%v model=%v credits=%v\n",
+        result["action"], result["model_selected"], result["credits_estimated"])
 }
 ```
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ai/chat \
+curl -X POST https://apis.fotohub.app/v1/ai/gabriel \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "Summarize this article in 3 bullet points: ...",
-    "routing": "auto"
+    "prompt": "Summarize this article in 3 bullet points: ...",
+    "language": "en"
   }'
 ```
 :::
 
-### Routing Modes
+::: warning There are no routing modes
+Earlier revisions of this page documented a `routing` parameter with `auto` /
+`economy` / `quality` / `balanced` modes and quoted savings percentages for each.
+No such parameter exists on any endpoint. The request body is `prompt`,
+`language`, `context` and `enhance_prompt` — nothing else. Cost control comes
+from picking a cheaper model ID yourself (see the tables above), not from a
+routing mode.
 
-| Mode | Behavior | Typical savings |
-|------|----------|----------------|
-| `auto` | Gabriel picks best model for task | 40-60% vs always using premium |
-| `economy` | Force cheapest capable model | 70-80% savings |
-| `quality` | Force highest quality model | 0% (premium pricing) |
-| `balanced` | Middle ground | 20-30% savings |
+Related endpoints: `POST /v1/ai/gabriel/stream` (same decision, streamed as SSE),
+`POST /v1/ai/gabriel/suggest` (autocomplete, unauthenticated) and
+`POST /v1/ai/gabriel/recommend`.
+:::
+
+::: tip Gabriel is currently free
+`/v1/ai/gabriel` enforces tier access but contains no billing call, so
+classification does not consume credits today. The public catalogue lists
+`gabriel_classify` at 1 credit, so treat free calls as subject to change and do
+not build a cost model that depends on it.
+:::
 
 ---
 
@@ -186,21 +205,20 @@ Processing multiple items together reduces overhead and enables bulk discounts.
 ::: code-group
 ```python [Python]
 import asyncio
-from fotohub import FotoHub
+from fotohub import AsyncFotoHub
 
-client = FotoHub()
-
+# Concurrency needs the async client. There is no async_generate_image() method
+# on the sync FotoHub class -- AsyncFotoHub.generate_image() is awaitable.
 async def batch_generate(prompts: list[str]):
-    """Generate images concurrently — 40% faster than sequential."""
-    tasks = [
-        client.async_generate_image(
-            prompt=p,
-            model="seedream-5-0-260128",
-        )
-        for p in prompts
-    ]
-    results = await asyncio.gather(*tasks)
-    return results
+    """Generate images concurrently — the calls overlap instead of queueing."""
+    async with AsyncFotoHub() as client:
+        tasks = [
+            client.generate_image(prompt=p, model="seedream-5-0-260128")
+            for p in prompts
+        ]
+        # return_exceptions keeps one content-policy rejection from
+        # discarding the images that did succeed (and were billed).
+        return await asyncio.gather(*tasks, return_exceptions=True)
 
 prompts = [
     "Product photo: wireless headphones, white background",
@@ -293,30 +311,37 @@ phone case" | xargs -P 4 -I {} curl -s -X POST \
 ```
 :::
 
-### Batch Pricing Tiers
+### Volume Savings
 
-| Monthly volume (PLN) | Discount |
-|---------------------|----------|
-| 0 - 100 | Standard pricing |
-| 100 - 500 | 5% discount |
-| 500 - 2,000 | 10% discount |
-| 2,000+ | 15% discount (contact sales) |
+There is no automatic monthly-volume discount. Volume savings come from two
+places instead: larger top-up packages carry more bonus credits (see below),
+and Enterprise contracts are priced individually — [contact sales](mailto:sales@fotohub.app).
 
 ---
 
 ## Top-Up Bonuses
 
-Wallet top-ups include bonus credits:
+Wallet top-ups add USD to your balance **and** grant bonus credits on top:
 
-| Top-up amount | Bonus | Effective rate |
-|--------------|-------|---------------|
-| 50 PLN | +5 PLN | 10% bonus |
-| 100 PLN | +15 PLN | 15% bonus |
-| 200 PLN | +40 PLN | 20% bonus |
-| 500 PLN | +125 PLN | 25% bonus |
+| Package slug | Amount | Bonus credits | Bonus % |
+|-------------|--------|---------------|---------|
+| `topup-50` | $15 | +100 | 0% |
+| `topup-100` | $25 | +250 | 5% |
+| `topup-250` | $60 | +700 | 10% |
+| `topup-500` | $120 | +1,500 | 15% |
+| `topup-1000` | $225 | +3,500 | 20% |
+| `topup-5000` | $1,000 | +20,000 | 25% |
+
+::: warning Slug names are historical
+The slugs still read `topup-50` … `topup-5000` from the pre-USD pricing and no
+longer match the amount. Always send the **slug**, and read the amount from
+`GET /v1/billing/topup/packages` (`amount_usd`) rather than parsing it out of
+the slug.
+:::
 
 ::: tip
-The 500 PLN tier gives 625 PLN effective balance — the best per-unit rate. If you expect to spend more than 200 PLN/month, top up in larger amounts.
+`topup-5000` carries the best bonus rate. `topup-500` ($120) also unlocks the
+Pay-As-You-Go Premium tier, which raises your rate limit to 500 req/min.
 :::
 
 ---
@@ -333,25 +358,48 @@ Check current spend at [fotohub.app/billing/usage](https://fotohub.app/billing/u
 
 ### Programmatic Usage Check
 
+::: warning `GET /v1/usage`, no SDK helper, no `period` parameter
+The endpoint is `GET /v1/usage` — `/v1/billing/usage` does not exist (`404`).
+Neither SDK wraps it: there is no `get_usage()` in Python nor `getUsage()` in
+TypeScript, so call it over plain HTTP.
+
+It always returns a fixed **last-30-days** window; `period` is not read. The
+response is `{subscription, keys, totals, daily, topEndpoints, topModels,
+latestEvents}`, where `totals.currency` is a list of `{currency, amount}` pairs
+because rows written before the USD cutover are still stored in PLN.
+:::
+
 ::: code-group
 ```python [Python]
-from fotohub import FotoHub
+import os
 
-client = FotoHub()
+import requests
 
-usage = client.get_usage(period="current_month")
-print(f"Credits used: {usage.credits_used}/{usage.credits_total}")
-print(f"Wallet spent: {usage.wallet_spent_pln} PLN")
-print(f"Top model: {usage.top_models[0].name} ({usage.top_models[0].cost_pln} PLN)")
+usage = requests.get(
+    "https://apis.fotohub.app/v1/usage",
+    headers={"Authorization": f"Bearer {os.environ['FOTOHUB_API_KEY']}"},
+    timeout=30,
+).json()
+
+print(f"Requests (30d): {usage['totals']['totalRequests']}")
+print(f"Tokens (30d): {usage['totals']['totalTokens']}")
+for row in usage["totals"]["currency"]:
+    print(f"Spent: {row['amount']} {row['currency']}")
+if usage["topModels"]:
+    top = usage["topModels"][0]
+    print(f"Top model: {top['modelId']} ({top['count']} calls)")
 ```
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
+const res = await fetch("https://apis.fotohub.app/v1/usage", {
+  headers: { Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}` },
+});
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const usage = await res.json();
 
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
-const usage = await client.getUsage({ period: "current_month" });
-console.log(`Credits: ${usage.creditsUsed}/${usage.creditsTotal}`);
-console.log(`Wallet: ${usage.walletSpentPln} PLN`);
+console.log(`Requests (30d): ${usage.totals.totalRequests}`);
+for (const row of usage.totals.currency) {
+  console.log(`Spent: ${row.amount} ${row.currency}`);
+}
 ```
 ```go [Go]
 package main
@@ -364,19 +412,20 @@ import (
 )
 
 func main() {
-    req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/billing/usage?period=current_month", nil)
+    req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/usage", nil)
     req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
     resp, _ := http.DefaultClient.Do(req)
     defer resp.Body.Close()
 
     var usage map[string]interface{}
     json.NewDecoder(resp.Body).Decode(&usage)
-    fmt.Printf("Credits used: %v\n", usage["credits_used"])
-    fmt.Printf("Wallet spent: %v PLN\n", usage["wallet_spent_pln"])
+    totals := usage["totals"].(map[string]interface{})
+    fmt.Printf("Requests: %v\n", totals["totalRequests"])
+    fmt.Printf("Spend by currency: %v\n", totals["currency"])
 }
 ```
 ```bash [cURL]
-curl -s https://apis.fotohub.app/v1/billing/usage?period=current_month \
+curl -s https://apis.fotohub.app/v1/usage \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" | jq .
 ```
 :::
@@ -386,15 +435,13 @@ curl -s https://apis.fotohub.app/v1/billing/usage?period=current_month \
 Set up automatic alerts when spending thresholds are reached:
 
 ```python
-# Configure in console or via API
-client.set_budget_alert(
-    threshold_pln=100,
-    action="webhook",
-    webhook_url="https://your-app.com/alerts/budget",
-)
+# Cap monthly wallet overage (USD). Charges beyond this return HTTP 402.
+client.set_overage_limit(25)  # $25 per calendar month
 ```
 
-Events emitted: `credits.low`, `credits.depleted`, `budget.threshold_reached`
+Events emitted: `credits.low` (credits exhausted, falling back to the wallet),
+`credits.depleted` (wallet could not cover the charge) and `billing.charged`
+(a wallet charge succeeded, with `amount_usd`).
 
 See the [Webhooks Guide](/guides/webhooks) for full integration details.
 

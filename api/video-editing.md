@@ -52,7 +52,8 @@ Convert a video to a different format, codec, resolution, or bitrate. Supports a
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "pln_charged": 0.12
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "duration_seconds": 42.5,
   "file_size_bytes": 15728640,
@@ -182,7 +183,8 @@ Merge multiple video clips into a single video. Clips are concatenated in the or
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "duration_seconds": 128.4,
   "clips_merged": 4,
@@ -325,7 +327,8 @@ Change video playback speed or create slow-motion effects. Supports speed factor
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "original_duration_seconds": 10.0,
   "output_duration_seconds": 40.0,
@@ -463,7 +466,8 @@ AI-powered video stabilization that removes camera shake and jitter. Uses deep l
   "billing": {
     "method": "credits",
     "credits_used": 3,
-    "pln_charged": 0.36
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "stability_score": {
     "before": 0.32,
@@ -600,7 +604,8 @@ Automatically transcribes speech in the video using AI speech recognition and em
   "billing": {
     "method": "credits",
     "credits_used": 3,
-    "pln_charged": 0.36
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "language_detected": "en",
   "segments": 47,
@@ -768,7 +773,8 @@ Each effect in the array is an object with `type` and effect-specific parameters
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "effects_applied": ["color_grade", "vignette", "letterbox", "film_grain"],
   "duration_seconds": 60.0,
@@ -909,7 +915,8 @@ Add a text or image watermark to a video. Supports positioning, opacity, scaling
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "watermark_type": "image",
   "position": "bottom_right",
@@ -1069,7 +1076,8 @@ AI-powered video upscaling using deep learning super-resolution. Increases resol
   "billing": {
     "method": "credits",
     "credits_used": 4,
-    "pln_charged": 0.48
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "input_resolution": "960x540",
   "output_resolution": "3840x2160",
@@ -1219,7 +1227,8 @@ AI analyzes your video content and automatically creates a polished edit. The AI
   "billing": {
     "method": "credits",
     "credits_used": 5,
-    "pln_charged": 0.60
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "edit_summary": "Created a 45-second cinematic edit from 3 clips. Applied teal-orange color grade, added crossfade transitions at beat drops, trimmed dead air segments.",
   "scenes_used": 8,
@@ -1356,41 +1365,41 @@ curl -X POST "https://apis.fotohub.app/v1/video/ai-director" \
 
 ## Pricing
 
-| Endpoint | Credits | PLN |
+| Endpoint | Credits | USD |
 |----------|---------|-----|
-| Transcode | 1 | 0.12 |
-| Merge Videos | 2 | 0.24 |
-| Change Speed | 2 | 0.24 |
-| AI Stabilization | 3 | 0.36 |
-| Generate Subtitles | 3 | 0.36 |
-| Apply Effects | 2 | 0.24 |
-| Add Watermark | 2 | 0.24 |
-| AI Upscale | 4 | 0.48 |
-| AI Director | 5 | 0.60 |
+| Transcode | 1 | $0.0536 |
+| Merge Videos | 2 | $0.1072 |
+| Change Speed | 2 | $0.1072 |
+| AI Stabilization | 3 | $0.1608 |
+| Generate Subtitles | 3 | $0.1608 |
+| Apply Effects | 2 | $0.1072 |
+| Add Watermark | 2 | $0.1072 |
+| AI Upscale | 4 | $0.2144 |
+| AI Director | 5 | $0.2680 |
 
 **Billing notes:**
-- 1 credit = 0.12 PLN
+- 1 credit = $0.0536 when billed from the wallet
 - Credits are deducted before processing. If processing fails, credits are refunded automatically.
 - Video duration does not affect credit cost — flat rate per operation.
-- Wallet (PLN) billing is used when credits are exhausted, up to your overage limit.
+- Wallet (USD) billing is used when credits are exhausted, up to your overage limit.
 
 ### Overage Pricing
 
-When monthly credits are exhausted, operations are billed from your PLN wallet:
+When monthly credits are exhausted, operations are billed from your USD wallet:
 
-| Operation | Credit Cost | PLN Cost | USD Equivalent |
-|-----------|-------------|----------|----------------|
-| Transcode | 1 kr | 0.12 PLN | ~$0.03 |
-| Merge Videos | 2 kr | 0.24 PLN | ~$0.06 |
-| Change Speed | 2 kr | 0.24 PLN | ~$0.06 |
-| AI Stabilization | 3 kr | 0.36 PLN | ~$0.09 |
-| Generate Subtitles | 3 kr | 0.36 PLN | ~$0.09 |
-| Apply Effects | 2 kr | 0.24 PLN | ~$0.06 |
-| Add Watermark | 2 kr | 0.24 PLN | ~$0.06 |
-| AI Upscale | 4 kr | 0.48 PLN | ~$0.12 |
-| AI Director | 5 kr | 0.60 PLN | ~$0.15 |
+| Operation | Credit Cost | USD Cost |
+|-----------|-------------|----------|
+| Transcode | 1 cr | $0.0536 |
+| Merge Videos | 2 cr | $0.1072 |
+| Change Speed | 2 cr | $0.1072 |
+| AI Stabilization | 3 cr | $0.1608 |
+| Generate Subtitles | 3 cr | $0.1608 |
+| Apply Effects | 2 cr | $0.1072 |
+| Add Watermark | 2 cr | $0.1072 |
+| AI Upscale | 4 cr | $0.2144 |
+| AI Director | 5 cr | $0.2680 |
 
-**1 credit = 0.12 PLN (~$0.03 USD)**
+**1 credit = $0.0536 USD**
 
 ---
 

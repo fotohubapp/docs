@@ -15,14 +15,20 @@ Your rate limit is determined by your tier. Limits are measured in requests per 
 | Tier | Requirements | Requests / Minute | Daily Quota |
 |------|-------------|-------------------|-------------|
 | PAYG Basic | Fund wallet | 30 | 200 |
-| PAYG Standard | 100 PLN balance or 200 PLN lifetime spend | 120 | 2,000 |
-| PAYG Premium | 500 PLN balance or 2,000 PLN lifetime spend | 500 | 10,000 |
+| PAYG Standard | $25 wallet balance or $50 lifetime spend | 120 | 2,000 |
+| PAYG Premium | $120 wallet balance or $500 lifetime spend | 500 | 10,000 |
 
 ### Subscription Tiers
 
+::: info Wallet thresholds are USD, subscription prices are PLN
+PAYG tiers unlock on your **USD** wallet balance and lifetime spend. API
+subscription plans below are still billed in PLN — that part of the catalog was
+not converted.
+:::
+
 | Tier | Price | Requests / Minute | Daily Quota | Monthly Credits |
 |------|-------|-------------------|-------------|-----------------|
-| Free | 0 PLN/mo | 10 | 50 | 50 |
+| Free | 0 PLN/mo | 10 | 100 | 50 |
 | Developer | 49 PLN/mo | 60 | 500 | 500 |
 | Startup | 199 PLN/mo | 300 | 5,000 | 5,000 |
 | Business | 799 PLN/mo | 1,000 | 50,000 | 25,000 |

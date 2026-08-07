@@ -63,6 +63,7 @@ Billing scales with this value, clamped to the model's own 0-15s range. A 3-seco
   "credits_used": 60,
   "billing": {
     "method": "credits",
+    "usd_charged": 0,
     "pln_charged": 0,
     "breakdown": {
       "rate_per_second": 7.4,
@@ -167,6 +168,7 @@ DreamActor transfers the motion from a driving video onto a static character ima
   "credits_used": 19,
   "billing": {
     "method": "credits",
+    "usd_charged": 0,
     "pln_charged": 0,
     "breakdown": {
       "rate_per_second": 3.1,

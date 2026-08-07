@@ -67,7 +67,8 @@ Apply professional color grading to any image. Choose from cinematic presets use
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "pln_charged": 0.12
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "applied": {
     "preset": "cinematic",
@@ -76,6 +77,14 @@ Apply professional color grading to any image. Choose from cinematic presets use
   "processing_time_ms": 890
 }
 ```
+
+::: info Reading the billing block
+`method` is `credits` while your plan's monthly allowance covers the request, and
+`usd_charged` is `0` because no money moved. Once the allowance is exhausted the
+same call returns `"method": "wallet"` with the USD amount in `usd_charged` (see
+[Pricing](#pricing) for the per-operation figures). `pln_charged` is a legacy
+mirror of the same charge -- read `usd_charged`.
+:::
 
 ### Code Examples
 
@@ -181,7 +190,8 @@ Automatic AI-powered enhancement that intelligently adjusts exposure, white bala
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "pln_charged": 0.12
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "adjustments_applied": {
     "exposure": 0.15,
@@ -267,7 +277,8 @@ Advanced AI noise reduction that removes grain, compression artifacts, and senso
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "pln_charged": 0.12
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "noise_level_detected": "high",
   "processing_time_ms": 1680
@@ -347,7 +358,8 @@ Automatically colorize black and white or grayscale images using deep learning. 
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "processing_time_ms": 3450
 }
@@ -432,7 +444,8 @@ Restore degraded, blurry, or low-resolution faces using state-of-the-art face re
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "faces_detected": 3,
   "faces_restored": 3,
@@ -530,7 +543,8 @@ Generate monocular depth maps from single images using state-of-the-art depth es
   "billing": {
     "method": "credits",
     "credits_used": 2,
-    "pln_charged": 0.24
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "model_used": "midas",
   "depth_range": {
@@ -632,7 +646,8 @@ Automatically tag images with descriptive labels using OpenAI's CLIP model. Retu
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "pln_charged": 0.12
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "processing_time_ms": 520
 }
@@ -727,7 +742,8 @@ Generate dense vector embeddings from images using CLIP. Returns a 512 or 768-di
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "pln_charged": 0.12
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "processing_time_ms": 380
 }
@@ -862,7 +878,8 @@ Available operation types: `color-grade`, `enhance`, `denoise`, `colorize`, `fac
   "billing": {
     "method": "credits",
     "credits_used": 4,
-    "pln_charged": 0.48
+    "usd_charged": 0,
+    "pln_charged": 0
   },
   "total_processing_time_ms": 4890
 }
@@ -955,17 +972,20 @@ curl -X POST https://apis.fotohub.app/v1/images/batch \
 
 ## Pricing
 
-| Operation | Credits | PLN Cost | Description |
+| Operation | Credits | USD Cost | Description |
 |-----------|---------|----------|-------------|
-| Color Grade | 1 | 0.12 PLN | Preset or manual color grading |
-| Enhance | 1 | 0.12 PLN | AI auto-enhancement |
-| Denoise | 1 | 0.12 PLN | AI noise reduction |
-| Colorize | 2 | 0.24 PLN | B&W to color |
-| Face Restore | 2 | 0.24 PLN | CodeFormer/GFPGAN face restoration |
-| Depth Map | 2 | 0.24 PLN | Monocular depth estimation |
-| CLIP Tag | 1 | 0.12 PLN | Auto-tagging with confidence scores |
-| CLIP Embed | 1 | 0.12 PLN | Vector embedding generation |
-| Batch | 1/image | 0.12 PLN/image | Per-image cost, operations do not multiply cost |
+| Color Grade | 1 | $0.0536 | Preset or manual color grading |
+| Enhance | 1 | $0.0536 | AI auto-enhancement |
+| Denoise | 1 | $0.0536 | AI noise reduction |
+| Colorize | 2 | $0.1072 | B&W to color |
+| Face Restore | 2 | $0.1072 | CodeFormer/GFPGAN face restoration |
+| Depth Map | 2 | $0.1072 | Monocular depth estimation |
+| CLIP Tag | 1 | $0.0536 | Auto-tagging with confidence scores |
+| CLIP Embed | 1 | $0.0536 | Vector embedding generation |
+| Batch | 1/image | $0.0536/image | Per-image cost, operations do not multiply cost |
+
+USD amounts are the wallet fallback at **$0.0536 per credit**, billed only after
+your plan's monthly credit allowance is used up.
 
 ::: info Batch Pricing
 Batch processing charges **1 credit per image** regardless of how many operations are in the pipeline. A batch of 10 images with 3 operations each costs 10 credits total, not 30.

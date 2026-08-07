@@ -58,7 +58,7 @@ result = client.generate_image(
     model="seedream-5-0-260128"
 )
 print(f"Image: {result.images[0]}")
-print(f"Cost: {result.billing.cost_pln} PLN")
+print(f"Cost: ${result.billing.usd_charged}")
 
 # Check balance
 balance = client.get_balance()

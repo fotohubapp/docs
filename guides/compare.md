@@ -27,28 +27,28 @@ Generating a single 1024x1024 image:
 
 | Provider | Model | Cost | Speed |
 |----------|-------|------|-------|
-| **FOTOhub** | Seedream 5.0 | ~0.15 PLN (1 cr) | ~2s |
-| **FOTOhub** | FLUX 2 Pro | ~0.23 PLN (1.5 cr) | ~4s |
-| Replicate | FLUX Pro | ~$0.055 (~0.22 PLN) | ~5s |
-| Stability | SD3 Medium | $0.035 (~0.14 PLN) | ~3s |
-| OpenAI | DALL-E 3 | $0.040 (~0.16 PLN) | ~8s |
-| fal.ai | FLUX Pro | $0.050 (~0.20 PLN) | ~4s |
+| **FOTOhub** | Seedream 5.0 | ~$0.049 (2 cr) | ~2s |
+| **FOTOhub** | FLUX 2 Pro | ~$0.048 (1 cr) | ~4s |
+| Replicate | FLUX Pro | ~$0.055 | ~5s |
+| Stability | SD3 Medium | $0.035 | ~3s |
+| OpenAI | DALL-E 3 | $0.040 | ~8s |
+| fal.ai | FLUX Pro | $0.050 | ~4s |
 
 ::: info
-FOTOhub is competitive on price and often faster due to EU-local inference. Seedream models offer the best quality-per-PLN.
+FOTOhub is competitive on price and often faster due to EU-local inference. Seedream models offer the best quality per dollar.
 :::
 
 ## Video Generation (5s clip)
 
 | Provider | Model | Cost | Quality |
 |----------|-------|------|---------|
-| **FOTOhub** | Seedance 2.0 Fast | ~0.15 PLN (1 cr) | Great |
-| **FOTOhub** | Veo 3.1 | ~12.00 PLN (60 cr) | Premium, native audio, up to 4K |
-| **FOTOhub** | Gemini Omni Flash | ~6.00 PLN (30 cr) | Native audio automatically, no surcharge |
-| **FOTOhub** | Grok Video 1.5 | ~9.00 PLN (45 cr) | Only generative model with built-in lip-sync |
-| Replicate | Kling | ~$0.30 (~1.20 PLN) | Good |
-| Runway | Gen-3 | ~$0.50 (~2.00 PLN) | Premium |
-| Luma | Dream Machine | ~$0.30 (~1.20 PLN) | Good |
+| **FOTOhub** | Wan 2.2 Plus | ~$0.32 (6 cr) | Great |
+| **FOTOhub** | Veo 3.1 | ~$3.22 (60 cr) | Premium, native audio, up to 4K |
+| **FOTOhub** | Gemini Omni Flash | ~$1.61 (30 cr) | Native audio automatically, no surcharge |
+| **FOTOhub** | Grok Video 1.5 | ~$2.41 (45 cr) | Only generative model with built-in lip-sync |
+| Replicate | Kling | ~$0.30 | Good |
+| Runway | Gen-3 | ~$0.50 | Premium |
+| Luma | Dream Machine | ~$0.30 | Good |
 
 ## Why Choose FOTOhub
 
