@@ -451,7 +451,40 @@ per-component amounts live in `line_items[]`.
 GET /v1/storage/s3/regions
 ```
 
-Returns available AWS regions for bucket creation.
+Regions open for bucket creation, in the order the console offers them (EU
+first). This is the authoritative list: a region absent from it, or present with
+`"available": false`, will be rejected by `POST /v1/storage/s3/buckets`.
+
+**Response:**
+```json
+[
+  {
+    "region": "eu-central-1",
+    "available": true,
+    "display_name": "Frankfurt",
+    "city": "Frankfurt",
+    "country_code": "DE",
+    "continent": "Europe",
+    "gdpr_compliant": true
+  },
+  {
+    "region": "us-west-2",
+    "available": true,
+    "display_name": "Oregon",
+    "city": "Boardman",
+    "country_code": "US",
+    "continent": "North America",
+    "gdpr_compliant": false
+  }
+]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `region` | string | AWS region code — pass this as `region` when creating a bucket |
+| `available` | boolean | `false` means temporarily closed to new buckets |
+| `continent` | string | `Europe`, `North America`, `Asia Pacific`, `South America` |
+| `gdpr_compliant` | boolean | `true` only for EEA regions (see [Available Regions](#available-regions)) |
 
 ---
 
@@ -1818,16 +1851,39 @@ await fetch(`${API}/buckets/${bucketId}/intelligent-tiering`, {
 
 ## Available Regions
 
-| Region | Code | S3 | CDN |
-|--------|------|----|----|
-| Frankfurt | `eu-central-1` | Yes | Yes |
-| Ireland | `eu-west-1` | Yes | Yes |
-| Virginia | `us-east-1` | Yes | Yes |
-| Oregon | `us-west-2` | Yes | Yes |
-| Singapore | `ap-southeast-1` | Yes | Yes |
+16 AWS regions across 4 continents. `GET /v1/storage/s3/regions` is the
+authoritative list — it returns only regions currently open for new buckets, so
+prefer it over this table if you build a region picker.
 
-::: tip
-Choose the region closest to your users for lowest latency. Pair with Transfer Acceleration or CDN for global distribution.
+| Region | Code | Continent | EEA |
+|--------|------|-----------|-----|
+| Frankfurt | `eu-central-1` | Europe | Yes |
+| Ireland | `eu-west-1` | Europe | Yes |
+| Paris | `eu-west-3` | Europe | Yes |
+| Stockholm | `eu-north-1` | Europe | Yes |
+| London | `eu-west-2` | Europe | No |
+| N. Virginia | `us-east-1` | North America | No |
+| Ohio | `us-east-2` | North America | No |
+| N. California | `us-west-1` | North America | No |
+| Oregon | `us-west-2` | North America | No |
+| Canada (Central) | `ca-central-1` | North America | No |
+| Tokyo | `ap-northeast-1` | Asia Pacific | No |
+| Seoul | `ap-northeast-2` | Asia Pacific | No |
+| Singapore | `ap-southeast-1` | Asia Pacific | No |
+| Sydney | `ap-southeast-2` | Asia Pacific | No |
+| Mumbai | `ap-south-1` | Asia Pacific | No |
+| São Paulo | `sa-east-1` | South America | No |
+
+The **EEA** column is about where personal data legally rests, not where the
+servers are: London is in Europe but the UK is a third country post-Brexit, so
+transfers there rely on an adequacy decision rather than being intra-EEA.
+
+::: tip Choosing a region
+Pick the region closest to the application that will **read** the files. Storage,
+request and egress prices are per-region and differ substantially — Frankfurt
+storage is $0.0245/GB against Oregon's $0.023, and São Paulo egress is $0.15/GB
+against Europe's $0.09. Call `POST /v1/storage/s3/estimate` with a candidate
+region for the exact figures before you provision.
 :::
 
 ---

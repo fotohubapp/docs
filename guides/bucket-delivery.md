@@ -79,15 +79,35 @@ Keep `id`. Every call below takes it.
 bucket — there is no move operation. Pick for the latency your users see and for
 the compliance story you have to tell:
 
+16 regions across 4 continents:
+
 | `region` | Location | GDPR-suitable |
 |---|---|---|
 | `eu-central-1` | Frankfurt, Germany | yes |
 | `eu-west-1` | Dublin, Ireland | yes |
+| `eu-west-3` | Paris, France | yes |
+| `eu-north-1` | Stockholm, Sweden | yes |
+| `eu-west-2` | London, UK | no — third country post-Brexit |
+| `us-east-1` | N. Virginia, USA | no — data leaves the EEA |
+| `us-east-2` | Ohio, USA | no — data leaves the EEA |
+| `us-west-1` | N. California, USA | no — data leaves the EEA |
 | `us-west-2` | Oregon, USA | no — data leaves the EEA |
+| `ca-central-1` | Canada (Central) | no — data leaves the EEA |
+| `ap-northeast-1` | Tokyo, Japan | no — data leaves the EEA |
+| `ap-northeast-2` | Seoul, South Korea | no — data leaves the EEA |
+| `ap-southeast-1` | Singapore | no — data leaves the EEA |
+| `ap-southeast-2` | Sydney, Australia | no — data leaves the EEA |
+| `ap-south-1` | Mumbai, India | no — data leaves the EEA |
+| `sa-east-1` | São Paulo, Brazil | no — data leaves the EEA |
 
 `GET /v1/storage/s3/regions` returns this list live, with an `available` flag.
 Treat that endpoint as authoritative rather than hardcoding the table: a region
 is offerable only while we can also *price* it, so the set can narrow.
+
+Price follows region. Storage runs from $0.023/GB (Oregon, Ireland, Ohio) to
+$0.0405 (São Paulo); egress from $0.09/GB in Europe and North America to
+$0.15 in São Paulo. `POST /v1/storage/s3/estimate` gives the exact figures for a
+candidate region before you commit.
 
 A US bucket is a first-class choice, not a fallback — if your traffic is in
 North America, `us-west-2` is the right answer and delivery works identically.
