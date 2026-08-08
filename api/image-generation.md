@@ -83,7 +83,12 @@ mirror of the same charge and will be removed.
     }
   },
   "usage": {
-    "output_tokens": 4096
+    "output_tokens": 4096,
+    "total_tokens": 4096,
+    "generated_images": 1,
+    "resolution": "1024x1024",
+    "generation_ms": 2100,
+    "transfer_ms": 310
   },
   "images": [
     "https://s1.fotohub.app/storage/v1/object/public/generations/img_def456.png"
@@ -104,6 +109,36 @@ mirror of the same charge and will be removed.
 was actually taken from your wallet, which uses the model's flat per-request
 price -- `$0.0563` for `seedream-5-0-260128`. It is `0` while your plan's credit
 allowance still covers the request. Reconcile invoices against `usd_charged`.
+:::
+
+### Your Latency Budget
+
+`usage` reports where the wall-clock time went, so a slow call points at a fix
+rather than at a shrug.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `output_tokens` | integer | Tokens billed for this render — scales with pixel count |
+| `total_tokens` | integer | Same figure with any input tokens included |
+| `generated_images` | integer | Images actually produced (a partly-failed batch reports fewer than requested) |
+| `resolution` | string | The size that was actually rendered, `WxH`. What you asked for is echoed in `metadata` |
+| `generation_ms` | integer | Time the model spent rendering |
+| `transfer_ms` | integer | Time spent fetching the finished file and storing it. `0` when nothing had to be moved |
+
+::: tip Render time and transfer time are different problems
+A large `generation_ms` is the model: choose a faster one, or a smaller
+resolution. A large `transfer_ms` is file movement, dominated by file size and
+by the distance to where the file is stored — a 4K image is roughly 16x the bytes
+of a 1K one, and a [bucket delivery](/guides/bucket-delivery) destination on
+another continent adds a round trip per file.
+
+The two do not have to add up to your own measured request time. The remainder is
+FOTOhub's orchestration: auth, quota and price lookup, billing, delivery routing.
+`generation_ms` and `transfer_ms` are absent on paths that report a single
+elapsed number instead of a split, so treat a missing field as "not measured",
+never as `0`. Both are recorded per request in
+[`GET /v1/console/logs`](/api/console-api#request-logs), which also rolls them up
+per model.
 :::
 
 ## Token-Based Billing (BytePlus Models)

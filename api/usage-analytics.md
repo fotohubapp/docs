@@ -198,7 +198,14 @@ Each API call generates a usage event with:
 | `cost` | float | Cost of this call |
 | `currency` | string | Cost currency — `USD` for everything logged since 2026-08-05 |
 | `status` | string | `success` \| `error` \| `timeout` |
-| `latency_ms` | integer | Response time |
+| `latency_ms` | integer | Total response time, end to end |
+
+::: info Need the split, not just the total?
+`latency_ms` here is one number for the whole request. To see how much of it was
+the model rendering versus the finished file being fetched and stored, read
+[`GET /v1/console/logs`](/api/console-api#request-logs), which reports
+`generation_ms` and `transfer_ms` per request and rolls them up per model.
+:::
 
 ---
 

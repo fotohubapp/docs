@@ -13,7 +13,7 @@ Authorization is **per endpoint**, not per scope:
 | Endpoints | Accepts |
 |-----------|---------|
 | `/console/stats`, `/traffic`, `/spend-chart`, `/projects` (all), `/billing/*`, `/usage/realtime`, `/fraud/status` | **Supabase session JWT only.** An `fh_live_` API key returns 401 |
-| `/console/logs`, `/console/system/status`, `/console/webhooks` (read), `GET /v1/auth/keys` | JWT **or** API key |
+| `/console/logs`, `/console/logs/summary`, `/console/system/status`, `/console/webhooks` (read), `GET /v1/auth/keys` | JWT **or** API key |
 | `POST`/`PATCH`/`DELETE /console/webhooks/*` | JWT, or an API key whose `key_type` is `write` or `admin` (a read-only key gets 403) |
 | `POST`/`PATCH`/`DELETE /v1/auth/keys/*` | **JWT only** — no API key can mint or reconfigure keys |
 
@@ -225,6 +225,194 @@ test, take all of them from the same tier or the response will not match.
 
 ::: tip Polling Frequency
 For realtime dashboards, poll this endpoint every 10-30 seconds. Avoid polling more frequently than once per 5 seconds to stay within rate limits.
+:::
+
+---
+
+## Request Logs
+
+Per-request log lines for your account: one row per metered API call, newest
+first. This is the same data the **Logs** tab of the console renders, and it is
+the only place that answers "which model was slow, and where did the time go".
+
+```
+GET /v1/console/logs
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | `100` | Rows per page, max `500` |
+| `offset` | integer | `0` | Rows to skip, for paging |
+| `hours` | integer | `24` | Look-back window in hours, max `720` (30 days) |
+| `status` | string | — | `all` \| `success` \| `error`. Filters on the HTTP class (`< 400` / `>= 400`), not an exact code |
+| `endpoint` | string | — | Case-insensitive substring match on the endpoint path |
+| `model` | string | — | **Exact** model id, e.g. `seedream-5-0-260128`. Not a substring match — a partial id returns zero rows |
+
+**Response (200 OK):**
+
+```json
+{
+  "logs": [
+    {
+      "id": "1f0e9d2c-8a41-4c7b-9f2e-6b3d0a5c7e11",
+      "created_at": "2026-08-08T09:15:02.418Z",
+      "endpoint": "/v1/ai/generate/image",
+      "method": "POST",
+      "status_code": 200,
+      "latency_ms": 18026,
+      "generation_ms": 15675,
+      "transfer_ms": 1981,
+      "tokens_used": 0,
+      "model": "seedream-5-0-260128",
+      "provider": "byteplus",
+      "provider_request_id": "0217861782914105d6d8f07cf2a752c74db4b42ef6a643ec8759d",
+      "meta": {
+        "num_images": 1,
+        "resolution": "2048x2048",
+        "credits": 3,
+        "cost_usd": 0.049152
+      }
+    }
+  ],
+  "limit": 100,
+  "offset": 0,
+  "has_more": false
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | uuid | Log row id. Quote it in support tickets |
+| `created_at` | timestamp | When the request was recorded, UTC — the exact server-side time of the generation |
+| `endpoint` | string | API path called |
+| `method` | string | HTTP method |
+| `status_code` | integer | HTTP status returned to you |
+| `latency_ms` | integer | **Total** wall-clock time for the request, end to end. Unchanged meaning — the traffic chart and the dashboard's average latency are computed from this field |
+| `generation_ms` | integer \| null | Time the provider spent rendering. `null` when the path did not measure it |
+| `transfer_ms` | integer \| null | Time spent fetching the produced file from the provider and storing it. `null` when not measured |
+| `tokens_used` | integer | Tokens billed on this call (`0` for image paths that bill per request) |
+| `model` | string \| null | Model id that served the request. `null` on rows where the failure happened before a model was resolved, and on rows written before 2026-08-08 |
+| `provider` | string \| null | Internal routing label for the upstream that served it (`byteplus`, `vertex`, `bfl`, …). Diagnostic only — the set of values is not a stable API and may change as routing changes |
+| `provider_request_id` | string \| null | The upstream's own handle for the render, truncated to 200 chars. This is the value provider support asks for when disputing a bad or failed generation. `null` when the provider returned none |
+| `meta` | object \| null | Aggregatable per-request detail. Present only when there was something to record. Keys: `num_images`, `resolution`, `credits`, `cost_usd` |
+
+::: warning `null` means "not measured", never "instant"
+`generation_ms` and `transfer_ms` are nullable on purpose. A `0` would claim a
+render finished in no time; `null` says the path did not time its phases. Two
+cases produce it: rows created before 2026-08-08, when the columns did not exist,
+and paths where only one elapsed number is observable — for example models whose
+output stays on the provider's URLs, so there is no transfer phase to time.
+Chart the split only over rows that reported it, and say how many did.
+:::
+
+::: info `generation_ms + transfer_ms <= latency_ms`
+The two phases do not have to add up to the total, and normally do not. The
+remainder is FOTOhub's own orchestration: auth, quota and price lookup, billing,
+delivery routing. On the sample row above that is `18026 - 15675 - 1981 = 370 ms`.
+Derive the remainder by subtraction rather than expecting a field for it — that
+way it can never disagree with the parts.
+:::
+
+::: tip Which knob does a slow request point at?
+A high `generation_ms` is the model's render time: pick a faster model or a
+smaller resolution. A high `transfer_ms` is file movement between the provider
+and storage: it is dominated by file size and region distance, and is what a
+[bucket delivery](/guides/bucket-delivery) destination in a far-away region shows
+up in. They point at different fixes, which is why they are separate fields.
+:::
+
+---
+
+### Get Log Summary
+
+Roll the same rows up per model, so latency and spend can be attributed without
+paging through the log.
+
+```
+GET /v1/console/logs/summary
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `hours` | integer | `24` | Look-back window in hours, max `720` |
+| `endpoint` | string | — | Case-insensitive substring match on the endpoint path |
+
+**Response (200 OK):**
+
+```json
+{
+  "hours": 24,
+  "rows_scanned": 128,
+  "truncated": false,
+  "models": [
+    {
+      "model": "seedream-5-0-260128",
+      "provider": "byteplus",
+      "requests": 42,
+      "errors": 1,
+      "images": 44,
+      "credits": 126,
+      "cost_usd": 2.064384,
+      "avg_latency_ms": 17280,
+      "p95_latency_ms": 20844,
+      "avg_generation_ms": 15102,
+      "avg_transfer_ms": 1804,
+      "measured": { "generation": 42, "transfer": 42 }
+    },
+    {
+      "model": null,
+      "provider": null,
+      "requests": 86,
+      "errors": 0,
+      "images": 0,
+      "credits": 0,
+      "cost_usd": 0,
+      "avg_latency_ms": 88,
+      "p95_latency_ms": 140,
+      "avg_generation_ms": null,
+      "avg_transfer_ms": null,
+      "measured": { "generation": 0, "transfer": 0 }
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `hours` | integer | The window that was aggregated, echoed back |
+| `rows_scanned` | integer | How many log rows went into this rollup |
+| `truncated` | boolean | `true` when the window held more than 5,000 rows and only the newest 5,000 were counted. Narrow `hours` and add the results yourself |
+| `models[].model` | string \| null | Model id, or `null` for the bucket holding rows with no model (see below) |
+| `models[].provider` | string \| null | Internal routing label seen on those rows |
+| `models[].requests` | integer | Requests in the window |
+| `models[].errors` | integer | How many returned `>= 400` |
+| `models[].images` | integer | Sum of `meta.num_images` |
+| `models[].credits` | float | Credits consumed, 4 dp |
+| `models[].cost_usd` | float | USD cost, 6 dp |
+| `models[].avg_latency_ms` | integer \| null | Mean total latency |
+| `models[].p95_latency_ms` | integer \| null | Nearest-rank p95 of total latency. With fewer than 20 samples this is the maximum, which is the honest answer for a sample that small |
+| `models[].avg_generation_ms` | integer \| null | Mean render time, over the measured rows only |
+| `models[].avg_transfer_ms` | integer \| null | Mean transfer time, over the measured rows only |
+| `models[].measured.generation` | integer | How many of `requests` reported `generation_ms` |
+| `models[].measured.transfer` | integer | How many reported `transfer_ms` |
+
+::: warning Read `measured` before trusting an average
+Averages are taken over the rows that actually reported the phase, not over
+`requests` — dividing by every request would drag a partly-instrumented model
+toward zero and make it look faster than it is. The cost of that choice is that
+`avg_generation_ms` can be backed by far fewer samples than `requests`, so
+`measured` is what tells "fast" from "barely sampled".
+:::
+
+::: info The `null` model bucket is real traffic
+Requests that never resolved a model — non-generation console and auth calls, and
+failures that stopped before model selection — are grouped under `model: null`
+rather than dropped, so `sum(requests)` matches what `GET /v1/console/logs`
+lists for the same window.
 :::
 
 ---
@@ -987,9 +1175,9 @@ are not valid event types (see the webhook event list above).
 `/stats`, `/traffic`, `/spend-chart` and `/usage/realtime` are gated on
 `verify_jwt` — sending `Authorization: Bearer fh_live_...` returns
 `401 {"detail":"Invalid or expired token"}`. Substitute a Supabase session
-access token for the `fh_live_your_key_here` placeholders below. `/logs` and
-`/system/status` are the only endpoints on this page that accept an API key
-for reads.
+access token for the `fh_live_your_key_here` placeholders below. `/logs`,
+`/logs/summary` and `/system/status` are the only endpoints on this page that
+accept an API key for reads.
 :::
 
 ### Dashboard Stats and Traffic
@@ -1122,6 +1310,95 @@ curl https://apis.fotohub.app/v1/console/usage/realtime \
 # System status
 curl https://apis.fotohub.app/v1/console/system/status \
   -H "Authorization: Bearer fh_live_your_key_here"
+```
+
+:::
+
+### Where Did the Latency Go?
+
+Both of these accept an API key, so they work without a session token.
+
+::: code-group
+
+```python [Python]
+import requests
+
+API = "https://apis.fotohub.app"
+headers = {"Authorization": "Bearer fh_live_your_key_here"}
+
+# One model's calls over the last 24h, split into render vs. transfer
+logs = requests.get(
+    f"{API}/v1/console/logs",
+    headers=headers,
+    params={"model": "seedream-5-0-260128", "hours": 24, "limit": 50},
+).json()["logs"]
+
+for row in logs:
+    gen, xfer = row.get("generation_ms"), row.get("transfer_ms")
+    # None means the phase was not measured -- do not print it as 0.
+    parts = f"render {gen}ms + transfer {xfer}ms" if gen is not None else "not split"
+    overhead = row["latency_ms"] - (gen or 0) - (xfer or 0)
+    print(f"{row['created_at']}  total {row['latency_ms']}ms  ({parts}, ours {overhead}ms)")
+    if row.get("provider_request_id"):
+        print(f"  upstream id: {row['provider_request_id']}")
+
+# Same window rolled up per model
+for m in requests.get(
+    f"{API}/v1/console/logs/summary", headers=headers, params={"hours": 24}
+).json()["models"]:
+    seen = m["measured"]["generation"]
+    print(
+        f"{m['model'] or '(no model)'}: {m['requests']} req, "
+        f"avg {m['avg_latency_ms']}ms, p95 {m['p95_latency_ms']}ms, "
+        f"render {m['avg_generation_ms']}ms over {seen} measured, "
+        f"${m['cost_usd']:.4f}"
+    )
+```
+
+```typescript [TypeScript]
+const API = 'https://apis.fotohub.app';
+const headers = { Authorization: 'Bearer fh_live_your_key_here' };
+
+const q = (p: Record<string, string>) => new URLSearchParams(p).toString();
+
+const { logs } = await fetch(
+  `${API}/v1/console/logs?${q({ model: 'seedream-5-0-260128', hours: '24', limit: '50' })}`,
+  { headers },
+).then((r) => r.json());
+
+for (const row of logs) {
+  const { generation_ms: gen, transfer_ms: xfer } = row;
+  // null means the phase was not measured -- do not render it as 0.
+  const parts = gen === null ? 'not split' : `render ${gen}ms + transfer ${xfer}ms`;
+  const overhead = row.latency_ms - (gen ?? 0) - (xfer ?? 0);
+  console.log(`${row.created_at}  total ${row.latency_ms}ms  (${parts}, ours ${overhead}ms)`);
+}
+
+const { models } = await fetch(`${API}/v1/console/logs/summary?${q({ hours: '24' })}`, {
+  headers,
+}).then((r) => r.json());
+
+for (const m of models) {
+  console.log(
+    `${m.model ?? '(no model)'}: ${m.requests} req, avg ${m.avg_latency_ms}ms, ` +
+      `p95 ${m.p95_latency_ms}ms, render ${m.avg_generation_ms}ms ` +
+      `over ${m.measured.generation} measured, $${m.cost_usd}`,
+  );
+}
+```
+
+```bash [cURL]
+# Slowest calls for one model, with the split
+curl -s "https://apis.fotohub.app/v1/console/logs?model=seedream-5-0-260128&hours=24&limit=50" \
+  -H "Authorization: Bearer fh_live_your_key_here" \
+| jq '.logs | sort_by(-.latency_ms) | .[:5]
+      | map({created_at, latency_ms, generation_ms, transfer_ms, provider_request_id})'
+
+# Per-model rollup
+curl -s "https://apis.fotohub.app/v1/console/logs/summary?hours=24" \
+  -H "Authorization: Bearer fh_live_your_key_here" \
+| jq '.models | map({model, requests, avg_latency_ms, p95_latency_ms,
+                     avg_generation_ms, avg_transfer_ms, measured, cost_usd})'
 ```
 
 :::
