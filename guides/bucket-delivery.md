@@ -292,10 +292,13 @@ wins, which lets a broad rule and a specific one coexist:
 | Token | Expands to |
 |---|---|
 | `{model}` | the model id |
-| `{job_id}` | the generation's job id |
+| `{job_id}` | the generation's job id — unique per request |
 | `{user_id}` | your account id |
 | `{date}` | `2026-08-07` |
 | `{YYYY}` `{MM}` `{DD}` | date parts |
+| `{HH}` `{mm}` `{ss}` | UTC time parts, zero-padded |
+| `{name}` | the source filename without its extension |
+| `{index}` | position in the response, from `0` |
 | `{ext}` | the file extension, without the dot |
 
 A template ending in `/` is treated as a prefix and the original filename is
@@ -306,6 +309,69 @@ segments and unknown tokens are all refused.
 
 Anything substituted into a key is sanitised to `[A-Za-z0-9._-]`, so a model id
 or job id cannot introduce a path separator.
+
+::: warning A template that renders one key per response overwrites itself
+An S3 `PUT` to a key that already exists returns `200` and replaces the object.
+Nothing fails, nothing logs, and the generation you paid for is gone. So a
+template must distinguish the files a single response can contain.
+
+`public/{date}/{model}.{ext}` does not: ask for four images and it renders the
+same key four times. Add `{index}` (or `{job_id}`, or `{HH}{mm}{ss}`):
+
+```
+public/{date}/{model}-{job_id}-{index}.{ext}
+```
+
+As a floor under templates that do collide, keys within one response are made
+distinct before anything is written — the first keeps the rendered key, the rest
+get `-2`, `-3`, … inserted before the extension (`hero.png`, `hero-2.png`).
+`{index}` is for when you want to control that numbering yourself.
+
+This only protects one response from itself. Two *separate* calls on a template
+with no `{job_id}`, `{index}` or time token still resolve to the same key, and
+the second one wins. If your keys must be stable and unique across calls, put
+`{job_id}` in the template.
+:::
+
+### Which URL do I read the file from?
+
+Two different hostnames, and they are not interchangeable:
+
+| Hostname | Auth | Where it comes from |
+|---|---|---|
+| `<alias>.s3point.fotohub.app/<key>` | none, if the prefix is published | you create it in step 2 |
+| `<bucket>.s3.<region>.amazonaws.com/<key>?X-Amz-…` | the signature in the query string | `presign-download` returns it |
+
+The `s3point` host is the one to publish, put in HTML, or hand to a CDN. It is
+stable, it carries no credentials, and revoking access is one `PATCH` on the
+alias.
+
+The raw `amazonaws.com` URL that `presign-download` returns is a *temporary*
+capability, not an address. It expires (`expires_in`, one hour by default), and
+the signature in it grants read access to that one object to whoever holds the
+link — so it does not belong in a page, a cache, or a log. Strip the query string
+and it becomes a plain `403`: a private bucket has no anonymous URL at all, which
+is the point of buying one.
+
+### Getting the bucket id out of an AWS URL
+
+Presigned URLs and `delivery.bucket` both give you the *AWS bucket name*
+(`fh-cust-3c685a01-moje-generacje-hvrx`), while every endpoint in this guide
+takes the bucket's **id** (a UUID). The name embeds the first 8 hex characters of
+your account id, a slug of the display name, and a random suffix — it is not
+reversible into the UUID. Look it up instead:
+
+```bash
+# AWS bucket name → bucket id
+curl -s https://apis.fotohub.app/v1/storage/s3/buckets \
+  -H "Authorization: Bearer $FH_JWT" \
+  | jq -r '.[] | select(.aws_bucket_name=="fh-cust-3c685a01-moje-generacje-hvrx") | .id'
+```
+
+The same listing answers "how full is it": each row carries
+`current_size_bytes` and `current_object_count`, read from the bucket at request
+time rather than from a daily snapshot, so an object delivered a minute ago is
+already counted.
 
 ## 5. Generate
 
