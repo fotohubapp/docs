@@ -12,7 +12,7 @@ Authorization is **per endpoint**, not per scope:
 
 | Endpoints | Accepts |
 |-----------|---------|
-| `/console/stats`, `/traffic`, `/spend-chart`, `/projects` (all), `/billing/*`, `/usage/realtime`, `/fraud/status` | **Supabase session JWT only.** An `fh_live_` API key returns 401 |
+| `/console/overview`, `/console/stats`, `/traffic`, `/spend-chart`, `/projects` (all), `/billing/*`, `/usage/realtime`, `/fraud/status` | **Supabase session JWT only.** An `fh_live_` API key returns 401 |
 | `/console/logs`, `/console/logs/summary`, `/console/system/status`, `/console/webhooks` (read), `GET /v1/auth/keys` | JWT **or** API key |
 | `POST`/`PATCH`/`DELETE /console/webhooks/*` | JWT, or an API key whose `key_type` is `write` or `admin` (a read-only key gets 403) |
 | `POST`/`PATCH`/`DELETE /v1/auth/keys/*` | **JWT only** — no API key can mint or reconfigure keys |
@@ -37,6 +37,191 @@ https://apis.fotohub.app/v1/console
 ---
 
 ## Dashboard Statistics
+
+### Get Account Overview
+
+One call returning everything the console's Dashboard and Usage pages render for a
+single window: volume, latency percentiles, spend, per-model and per-endpoint
+breakdowns, plan utilisation, and the error detail. Prefer this over
+`/console/stats` + `/console/traffic` + client-side aggregation — every figure in
+the response is computed from one scan, so the parts always add up to the totals.
+
+```
+GET /v1/console/overview
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `hours` | integer | `24` | Window in hours. Range `1`–`8760`; outside it returns `422`. The console uses `24`, `168` and `720`. |
+
+The window applies to **every** figure in the response, including the money —
+unlike `/console/stats`, which is pinned to 30 days.
+
+**Response (200 OK)** — abridged:
+
+```json
+{
+  "hours": 24,
+  "since": "2026-08-07T13:14:23.935549+00:00",
+  "totals": {
+    "requests": 109, "errors": 82, "error_rate": 75.23,
+    "tokens": 102400, "images": 2, "credits": 12.0,
+    "avg_latency_ms": 6564, "p50_latency_ms": 187,
+    "p95_latency_ms": 28648, "p99_latency_ms": 115857,
+    "avg_generation_ms": 17280, "avg_transfer_ms": 1804,
+    "measured_generation": 2, "measured_transfer": 2,
+    "models_seen": 2, "endpoints_seen": 20,
+    "first_seen": "2026-08-07T14:58:39.26158+00:00",
+    "last_seen": "2026-08-08T13:00:24.426986+00:00"
+  },
+  "spend": {
+    "usd": 5.155438, "usd_rows": 97,
+    "attributed_usd": 3.327638, "unattributed_usd": 1.8278,
+    "legacy_pln_rows": 0, "legacy_pln_amount": 0.0
+  },
+  "series": [
+    { "t": "2026-08-07T14:00:00+00:00", "label": "14:00", "requests": 1,
+      "errors": 0, "tokens": 0, "images": 0, "cost_usd": 0.0,
+      "avg_latency_ms": 412, "p95_latency_ms": 412,
+      "generation_ms": null, "transfer_ms": null }
+  ],
+  "models": [
+    { "model": "seedream-5-0-260128", "provider": "byteplus",
+      "requests": 2, "errors": 0, "billed_calls": 5, "cost_usd": 0.24576,
+      "images": 2, "credits": 6.0,
+      "avg_latency_ms": 19435, "p95_latency_ms": 20703,
+      "avg_generation_ms": 17280, "avg_transfer_ms": 1804,
+      "measured_generation": 2, "measured_transfer": 2,
+      "last_seen": "2026-08-08T12:41:02.118Z" }
+  ],
+  "endpoints": [
+    { "endpoint": "/v1/ai/generate/image", "requests": 2, "errors": 0,
+      "tokens": 32768, "avg_latency_ms": 19435, "p95_latency_ms": 20703,
+      "last_seen": "2026-08-08T12:41:02.118Z" }
+  ],
+  "categories": [
+    { "category": "ai_video", "cost_usd": 2.974358, "rows": 8, "quantity": 8.0 }
+  ],
+  "status_classes": { "success": 27, "redirect": 0, "client_error": 80, "server_error": 2 },
+  "latency_histogram": [ { "label": "<100ms", "lo": 0, "hi": 100, "requests": 18 } ],
+  "top_errors": [
+    { "endpoint": "/v1/storage/s3/buckets/…/objects/list",
+      "status_code": 410, "requests": 58, "last_seen": "2026-08-08T05:45:16.062136+00:00" }
+  ],
+  "utilization": {
+    "peak_rpm": 13, "peak_rpm_at": "2026-08-07T19:35:00+00:00", "peak_tpm": 16384,
+    "avg_rpm_active": 2.53, "active_minutes": 43,
+    "requests_last_60m": 1, "tokens_last_60m": 0,
+    "requests_today": 53, "tokens_today": 90112,
+    "tier": "sub-business",
+    "limit_rpm": 1000, "limit_tpm": 2000000, "limit_daily_quota": 50000,
+    "pct_rpm": 1.3, "pct_tpm": 0.82, "pct_daily_quota": 0.11
+  }
+}
+```
+
+#### `totals`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `requests` / `errors` | integer | Requests in the window, and how many returned >= 400 |
+| `error_rate` | float | Percent (0-100), 2 decimals |
+| `tokens` / `images` / `credits` | integer / integer / float | Output produced and credits consumed |
+| `avg_latency_ms` | integer \| null | Mean end-to-end duration |
+| `p50_latency_ms`, `p95_latency_ms`, `p99_latency_ms` | integer \| null | Percentiles, computed in SQL |
+| `avg_generation_ms` | integer \| null | Mean provider inference time, over the calls that measured it |
+| `avg_transfer_ms` | integer \| null | Mean time fetching and storing the produced file |
+| `measured_generation`, `measured_transfer` | integer | How many requests reported each phase — the denominators for the two averages above |
+| `models_seen`, `endpoints_seen` | integer | Distinct values in the window |
+| `first_seen`, `last_seen` | string \| null | ISO 8601 |
+
+::: warning Durations are `null`, not `0`, when there is nothing to measure
+An account with no traffic in the window gets `null` for every duration and `0`
+for every count. Zero requests is a measurement; "0 ms" would be a claim that the
+API responded instantly. Format `null` as an em dash, not as a number.
+
+`avg_generation_ms` and `avg_transfer_ms` are also `null` whenever no request in
+the window reported the split — most non-BytePlus image paths do not. Check
+`measured_generation` before drawing a chart from it: an average over 2 of 109
+requests is not the account's average.
+:::
+
+::: tip There is no `totals.cost_usd`
+Spend lives on `spend`, and only there. A `totals.cost_usd` existed briefly and
+summed a per-request field that only a couple of call paths write — on a live
+account it read $0.098 against a real $4.63. If you need the account's spend for
+the window, it is `spend.usd`.
+:::
+
+#### `spend`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `usd` | float | **The** spend figure for the window. Everything charged, from every source |
+| `usd_rows` | integer | Ledger rows behind it |
+| `attributed_usd` | float | The part of `usd` that a row in `models[]` can claim |
+| `unattributed_usd` | float | The remainder: storage, per-call fees, and charges whose model the log did not record |
+| `legacy_pln_rows`, `legacy_pln_amount` | integer, float | Pre-cutover PLN rows, reported separately so they are never summed into a USD total |
+
+`attributed_usd + unattributed_usd == usd`. If you render the `models[]` cost
+column with a total, that total is `attributed_usd` — a footer showing `spend.usd`
+would not equal the column above it.
+
+#### `models` and `endpoints`
+
+::: danger Never divide `cost_usd` by `requests`
+`cost_usd` is the ledger's figure and `billed_calls` is the ledger's own row
+count. `requests` comes from the request log, which counts a **different set of
+calls** — `model` has only been recorded on it since 2026-08-08, so a model with 7
+charges and 1 logged request would compute as a $2.72 render that actually cost
+$0.39.
+
+The per-call cost is `cost_usd / billed_calls`. Both are `null` together when the
+ledger has no rows for that model, which means "not billed here", not "free".
+:::
+
+`endpoints[]` carries **no cost column at all**, by design: the ledger records
+which model was generated, never which HTTP path asked for it. Attribute cost by
+model, or by `categories[].category` for the coarse split (`ai_image`, `ai_video`,
+`storage_s3`, …).
+
+The first row of `models[]` normally has `model: null` — that is the bucket for
+console, auth and storage calls, which run no model. It carries real `requests`
+and `errors` but `null` cost.
+
+#### `series`
+
+One row per bucket, for charting. `t` is a real ISO 8601 timestamp and `label` is
+the pre-formatted display string; bucket width follows `hours` the same way
+`/console/traffic` does. `sum(series[].requests)` is guaranteed to equal
+`totals.requests`.
+
+#### `utilization`
+
+Observed usage next to the ceilings your plan actually enforces. `limit_*` come
+from the same table as the rate limiter, so the console cannot quote a limit that
+is not applied.
+
+| Field | Description |
+|-------|-------------|
+| `peak_rpm`, `peak_rpm_at` | Highest request count in any single minute, and when. A rate limit is enforced per minute, so an average would hide the minute that got throttled |
+| `avg_rpm_active`, `active_minutes` | Mean rate across the minutes that had traffic, and how many those were |
+| `requests_today`, `tokens_today` | Since midnight UTC — **not** the selected window, because a daily quota does not reset when you switch to `hours=720` |
+| `pct_rpm`, `pct_tpm`, `pct_daily_quota` | Observed as a percent of the limit, or `null` |
+
+::: warning `null` percentage means unmetered, and >100 is not clamped
+`pct_*` is `null` when the dimension has no ceiling — enterprise plans carry `-1`
+(unlimited) for tpm and daily quota. Render that as "unlimited", not as 0% or
+100%: both of those state something specific about your headroom.
+
+Values above 100 are returned as-is. "You burst to double your plan" is the most
+important thing the figure can say, so it is never rounded down to a comfortable
+100.
+:::
+
+---
 
 ### Get Dashboard Stats
 
@@ -68,6 +253,14 @@ GET /v1/console/stats
 The field is `avg_latency`, not `avg_latency_ms`, and `error_rate` is a percent
 value (0-100) — not a 0.0-1.0 ratio. On an account with no traffic in the window
 the endpoint returns zeros for all four.
+:::
+
+::: tip Prefer `/console/overview`
+This endpoint is kept for existing callers. Its window is fixed at 30 days, and
+`avg_latency` is the mean — which is not the figure you want for a latency SLO,
+since a handful of long video renders drag it far above the typical request (on a
+live account: a 6 564 ms mean against a p50 of 187 ms). `/console/overview` honours
+your window and returns p50, p95 and p99 separately.
 :::
 
 ---
