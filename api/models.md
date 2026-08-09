@@ -42,13 +42,41 @@ GET /v1/models
       "supports_batch": false,
       "is_active": true,
       "features": {},
-      "metadata": {}
+      "metadata": {},
+      "price_unit": "request",
+      "request_price_per": "one request"
     }
   ]
 }
 ```
 
 The response is a flat `{ "models": [...] }` array. Each model exposes `pricing_type` (`request` for per-call pricing, or `token` for per-token models), the relevant price field (`request_price`, or `input_price_per_1k_tokens` / `output_price_per_1k_tokens`), plus rate-limit and capability fields. Use `?category=` to filter; the catalog currently returns models across the `image`, `video`, `text`, and `audio` categories.
+
+### Read `price_unit`, not `pricing_type`, to know what a price buys
+
+`pricing_type` only separates token billing from everything else. It says `request` on all 56 video models — but their `request_price` is **per second of output**, so multiplying by the clip length is the difference between quoting a 5s clip correctly and quoting it at a fifth of its price.
+
+Every row therefore carries `price_unit` (machine-readable) alongside `request_price_per` (the same thing in words):
+
+| `price_unit` | `request_price` buys | Applies to |
+|--------------|----------------------|------------|
+| `request` | one request | image generation, editing, analysis |
+| `second` | one second of output video | every video model |
+| `minute` | one minute of audio — **output** for music, **input** for `transcription`, `audio-translation`, `audio-mastering`, `audio-stems` | audio |
+| `1k_characters` | 1000 input characters | text-to-speech |
+| `1k_tokens` | 1000 tokens; read `input_price_per_1k_tokens` / `output_price_per_1k_tokens` instead, since `request_price` is `null` here | chat/LLM |
+
+```python
+price = model["request_price"]
+if model["price_unit"] == "second":
+    price *= duration_seconds      # a 5s video costs 5x request_price
+```
+
+All prices are USD. `currency` is always `"USD"` on this endpoint.
+
+::: warning Catalog prices are indicative
+`GET /v1/models` is a catalog, not a quote. The authoritative charge for a call comes back on the call itself (`credits_used`, and the `billing` object where the endpoint returns one) — see [Billing](/api/billing).
+:::
 
 ### Code Example
 

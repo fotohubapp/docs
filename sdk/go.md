@@ -785,7 +785,7 @@ func PollVideoJob(ctx context.Context, client *FotoHubClient, jobID string, inte
                 }
                 return
             case <-ticker.C:
-                body, err := client.Get(fmt.Sprintf("/v1/ai/jobs/%s", jobID))
+                body, err := client.Get(fmt.Sprintf("/v1/ai/generate/video/%s", jobID))
                 if err != nil {
                     continue // retry on next tick
                 }
@@ -870,7 +870,7 @@ echo "Job started: $JOB_ID"
 
 # Step 2: Poll until complete
 while true; do
-  STATUS=$(curl -s https://apis.fotohub.app/v1/ai/jobs/$JOB_ID \
+  STATUS=$(curl -s https://apis.fotohub.app/v1/ai/generate/video/$JOB_ID \
     -H "Authorization: Bearer fh_live_your_api_key")
   
   STATE=$(echo "$STATUS" | jq -r '.status')
@@ -1663,7 +1663,7 @@ JOB=$(curl -s -X POST https://apis.fotohub.app/v1/ai/generate/video \
   | jq -r '.job_id')
 
 while true; do
-  S=$(curl -s "https://apis.fotohub.app/v1/ai/jobs/$JOB" \
+  S=$(curl -s "https://apis.fotohub.app/v1/ai/generate/video/$JOB" \
     -H "Authorization: Bearer fh_live_your_api_key")
   [ "$(echo $S | jq -r .status)" = "completed" ] && echo $S | jq . && break
   sleep 5

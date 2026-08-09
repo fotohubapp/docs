@@ -28,7 +28,7 @@ POST /v1/ai/generate/video
 |-----------|------|----------|---------|-------------|
 | `prompt` | string | **Yes** | — | Detailed description of the video to generate. Include subject, action, style, camera movement, and lighting for best results. |
 | `model` | string | No | `"veo-3.1-generate-001"` | Video generation model to use. See [Model Pricing](#model-pricing) below or `GET /v1/models?category=video` for the full, current list. Examples: `"veo-3.1-generate-001"`, `"wan2.6-t2v"`, `"seedance-2-5"`, `"seedance-2-0-pro"`, `"kling-v3"`, `"sora-2"`, `"grok-imagine-video-1.5"`, `"gemini-omni-flash"`. |
-| `duration` | integer | No | `5` | Video duration in seconds (capped at 60). Supported values vary by model. |
+| `duration` | integer | No | `5` | Whole seconds. Providers each accept their own set of lengths, so this is snapped to the nearest one they will render — and you are billed for the snapped value, never for what you asked. See [Duration is snapped before it is billed](#duration-is-snapped-before-it-is-billed). |
 | `aspect_ratio` | string | No | `"16:9"` | Output aspect ratio. Options: `"16:9"` (landscape), `"9:16"` (portrait/vertical), `"1:1"` (square). |
 | `image_url` | string | No | — | URL of a source image for image-to-video generation. When provided, the video will animate from this starting frame. Must be a publicly accessible URL or a FOTOhub storage URL. |
 | `resolution` | string | No | `"1080p"` | Output video resolution. Options: `"720p"`, `"1080p"`, `"4k"` — availability depends on model (e.g. `veo-2.0-generate-001` is 720p-only; `gemini-omni-flash` is fixed at 720p). |
@@ -61,7 +61,7 @@ above bill $3.22. Use `GET /v1/billing/usage` for the money figure.
   "status": "processing",
   "model": "veo-3.1-generate-001",
   "estimated_seconds": 120,
-  "poll_url": "https://apis.fotohub.app/v1/ai/jobs/vj_abc123def456",
+  "poll_url": "https://apis.fotohub.app/v1/ai/generate/video/vj_abc123def456",
   "webhook_supported": true
 }
 ```
@@ -108,6 +108,32 @@ your plan's monthly credit allowance is used up.
 
 For example, a 10-second `wan2.2-t2v-plus` video costs: `1.2 × 10 = 12 credits`
 :::
+
+### Duration is snapped before it is billed
+
+No provider renders an arbitrary length. Each accepts its own set, so `duration` is snapped to the nearest value the model will actually produce, and the charge is computed from the **snapped** number. A tie goes to the shorter option, so an ambiguous request is never rounded up into a bigger bill.
+
+| Model family | Accepts | A request for 5s becomes |
+|--------------|---------|--------------------------|
+| Veo (all) | 4, 6, 8 | **4s** — billed 4s |
+| Kling (all) | 5, 10 | 5s |
+| Sora 2 | up to 12 (`sora-2-pro`: 25) | 5s |
+| Grok | up to 15 | 5s |
+| Wan (all) | up to 10 | 5s |
+| Hailuo | 6, 10 | 6s — but the price is flat per clip, so it costs the same |
+| Seedance | 2.0: 4–15, 1.x: 5–10, `seedance-2-5`: up to 30 | 5s |
+
+The `duration` field in the response is always the length that was rendered and billed, so reconcile against that rather than against your request. Asking Veo for 5 seconds returns `"duration": 4`, and a 4-second file.
+
+### Failures do not cost credits
+
+Credits are taken when the job is submitted and given back automatically if the generation does not produce a file:
+
+- **Rejected at submit** (bad parameters, provider out of capacity) — the error response says `no credits were charged for this request`, and nothing was.
+- **Failed after submit** — the failure appears on the next poll with `"refunded": true`. Typically within seconds of the provider giving up.
+- **Never finished** — a job still `processing` 20 minutes after submit is declared failed on your next poll and refunded then.
+
+The refund happens once per job. Polling a failed job repeatedly returns `"refunded": false` on every call after the first; that means "already refunded", not "not refunded". If a refund could not be completed the message says so explicitly rather than implying a reversal that did not happen — contact support with the `job_id` in that case.
 
 ## Model Comparison
 
@@ -268,7 +294,7 @@ response = requests.post(
 result = response.json()
 if result["status"] == "processing":
     print(f"Job queued: {result['job_id']}")
-    print("Poll GET /v1/ai/jobs/{job_id} for completion")
+    print("Poll GET /v1/ai/generate/video/{job_id} for completion")
 else:
     print(f"Video ready: {result['video_url']}")
 ```
@@ -296,7 +322,7 @@ const response = await fetch(
 const result = await response.json();
 if (result.status === "processing") {
   console.log(`Job queued: ${result.job_id}`);
-  console.log("Poll GET /v1/ai/jobs/{job_id} for completion");
+  console.log("Poll GET /v1/ai/generate/video/{job_id} for completion");
 } else {
   console.log(`Video ready: ${result.video_url}`);
 }
@@ -337,7 +363,7 @@ func main() {
 
 	if result["status"] == "processing" {
 		fmt.Printf("Job queued: %s\n", result["job_id"])
-		fmt.Println("Poll GET /v1/ai/jobs/{job_id} for completion")
+		fmt.Println("Poll GET /v1/ai/generate/video/{job_id} for completion")
 	} else {
 		fmt.Printf("Video ready: %s\n", result["video_url"])
 	}
@@ -884,8 +910,24 @@ Video generation is computationally intensive and may take 30 seconds to several
 ### Poll Endpoint
 
 ```
-GET /v1/ai/jobs/{job_id}
+GET /v1/ai/generate/video/{job_id}
 ```
+
+`status` is one of `processing`, `completed`, or `failed` — the same three values for every provider, so you do not have to know which backend rendered your clip.
+
+A `failed` response also carries `refunded`:
+
+```json
+{
+  "job_id": "1218d1a9-19ea-48cd-ba2c-f60568d41a50",
+  "model": "wan2.2-i2v-flash",
+  "status": "failed",
+  "error": "Image height or width is too small than 240",
+  "refunded": true
+}
+```
+
+`"refunded": true` means the credits for this job are back on your balance. On every later poll of the same job it reads `false`, because the reversal already happened — see [Failures do not cost credits](#failures-do-not-cost-credits).
 
 ### Submit and Poll Pattern
 
@@ -920,7 +962,7 @@ print(f"Job submitted: {job_id}")
 # Step 2: Poll for completion
 while True:
     status_response = requests.get(
-        f"https://apis.fotohub.app/v1/ai/jobs/{job_id}",
+        f"https://apis.fotohub.app/v1/ai/generate/video/{job_id}",
         headers={"Authorization": "Bearer fh_live_your_api_key"}
     )
     job = status_response.json()
@@ -964,7 +1006,7 @@ console.log(`Job submitted: ${jobId}`);
 async function pollJob(id: string): Promise<string> {
   while (true) {
     const res = await fetch(
-      `https://apis.fotohub.app/v1/ai/jobs/${id}`,
+      `https://apis.fotohub.app/v1/ai/generate/video/${id}`,
       { headers: { "Authorization": "Bearer fh_live_your_api_key" } }
     );
     const job = await res.json();
@@ -1037,7 +1079,7 @@ func main() {
 
 		for range ticker.C {
 			pollReq, _ := http.NewRequest("GET",
-				fmt.Sprintf("https://apis.fotohub.app/v1/ai/jobs/%s", submitResult.JobID), nil)
+				fmt.Sprintf("https://apis.fotohub.app/v1/ai/generate/video/%s", submitResult.JobID), nil)
 			pollReq.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 
 			pollResp, err := http.DefaultClient.Do(pollReq)
@@ -1083,7 +1125,7 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
 # Response: {"job_id": "vj_abc123def456", "status": "processing", ...}
 
 # Step 2: Poll for completion (repeat every 3 seconds)
-curl -X GET "https://apis.fotohub.app/v1/ai/jobs/vj_abc123def456" \
+curl -X GET "https://apis.fotohub.app/v1/ai/generate/video/vj_abc123def456" \
   -H "Authorization: Bearer fh_live_your_api_key"
 
 # Response when completed:

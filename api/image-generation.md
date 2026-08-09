@@ -25,14 +25,32 @@ POST /v1/ai/generate/image
 | `width` | integer | No | `1024` | Output image width in pixels. Range: 256–4096. Must be divisible by 64 for most models. |
 | `height` | integer | No | `1024` | Output image height in pixels. Range: 256–4096. Must be divisible by 64 for most models. |
 | `aspect_ratio` | string | No | `"1:1"` | Aspect ratio preset. Options: `"1:1"`, `"16:9"`, `"9:16"`, `"4:3"`, `"3:4"`. Overrides width/height when set. |
-| `num_images` | integer | No | `1` | Number of images to generate per request. Range: 1–4. Credits are charged per image. |
+| `num_images` | integer | No | `1` | Number of images to generate per request. A whole number, 1–8. Anything else (`0`, `-1`, `2.5`, `"3"`) is a `400`, never a silently rewritten value. Credits are charged per **delivered** image — see [Multiple images](#multiple-images-and-what-you-pay-for). |
+| `image_size` | string | No | model default | Resolution tier: `"1K"`, `"1.5K"`, `"2K"`, `"3K"`, `"4K"`. Availability and price both depend on the model. Omit it (or send `width`/`height` instead) and you get the model's 1K base price. |
 | `negative_prompt` | string | No | — | Describe what to avoid in the generated image. E.g., `"blurry, low quality, distorted faces"`. Not supported by all models. |
 | `style` | string | No | — | Style preset. Common options: `"photorealistic"`, `"cinematic"`, `"anime"`, `"digital-art"`, `"oil-painting"`. |
 | `seed` | integer | No | random | Seed for reproducible generation. Same prompt + seed + model = same output. Range: 0–4294967295. |
 
 ::: tip Resolution Tips
-Use `aspect_ratio` instead of manual width/height for most use cases. The API automatically picks optimal dimensions for the selected model. For token-based models (BytePlus), higher resolution directly increases cost.
+Use `aspect_ratio` instead of manual width/height for most use cases. The API automatically picks optimal dimensions for the selected model.
 :::
+
+### Resolution changes the price
+
+`image_size` selects a priced tier, so a 4K render costs more than a 1K one on every model that offers 4K — the provider cost itself differs by up to 15x. Send `width`/`height` instead and the tier is derived from the longest side: `< 1536` → 1K, `1536–3071` → 2K, `≥ 3072` → 4K.
+
+| Sent | Tier billed |
+|------|-------------|
+| nothing | 1K (base price) |
+| `"image_size": "2K"` | 2K |
+| `"width": 4096, "height": 4096` | 4K |
+
+Two things worth knowing:
+
+- **Flat-priced models ignore the tier.** 20 of the active image models have no resolution dimension in their pricing; they charge the base price at any size.
+- **A capped render is billed at what it produced.** Imagen delivers 2K when asked for 4K, and is charged at the 2K tier — you are never billed for a resolution the model did not return.
+
+The exact charge always comes back in the response (`credits_used`, and `billing.breakdown`), so read that rather than pre-computing from the catalog.
 
 ## Response Format
 
@@ -1810,9 +1828,23 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 
 :::
 
-### Batch Generation with Count Parameter
+### Multiple images and what you pay for
 
-Generate multiple variations in a single API call using `num_images`. Credits are charged per image. Ideal for A/B testing, design exploration, and content pipelines.
+Generate several variations in one call with `num_images` (1–8). Ideal for A/B testing, design exploration, and content pipelines.
+
+**You pay per delivered image, not per requested image.** The charge is taken up front for the count you asked for, and the difference is refunded automatically when the provider returns fewer — which it often does, because every provider caps the count at its own maximum regardless of what you send (Seedream PRO renders exactly 1 per request; Vertex tops out at 4). Ask for 8 from a model that returns 1 and you are charged for 1.
+
+The reverse never costs you anything: BytePlus sequential mode can return *more* images than requested, and the extras are not billed.
+
+The response reports the settled figure, so `credits_used` and `len(images)` always agree:
+
+```json
+{
+  "model": "seedream-5-0-260128",
+  "credits_used": 4,
+  "images": ["https://...", "https://..."]
+}
+```
 
 ::: code-group
 
@@ -1820,7 +1852,7 @@ Generate multiple variations in a single API call using `num_images`. Credits ar
 import requests
 import concurrent.futures
 
-# Method 1: Single request with num_images (up to 4 per request)
+# Method 1: Single request with num_images (up to 8 per request)
 response = requests.post(
     "https://apis.fotohub.app/v1/ai/generate/image",
     headers={
@@ -1868,7 +1900,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
 ```
 
 ```typescript [TypeScript]
-// Method 1: Single request with num_images (up to 4 per request)
+// Method 1: Single request with num_images (up to 8 per request)
 const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
   method: "POST",
   headers: {
