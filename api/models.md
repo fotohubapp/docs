@@ -92,8 +92,9 @@ models = client.list_models(category="image")
 for m in models:
     print(f"{m['id']}: {m['name']} ({m['request_price']} {m['currency']})")
 
-# Find cheapest per-request model
-per_request = [m for m in models if m["pricing_type"] == "request"]
+# Find the cheapest flat-priced model. Compare on price_unit, not
+# pricing_type -- a per-second video model also reports "request".
+per_request = [m for m in models if m["price_unit"] == "request"]
 cheapest = min(per_request, key=lambda m: m["request_price"])
 print(f"Cheapest: {cheapest['name']} at {cheapest['request_price']} {cheapest['currency']}")
 ```
@@ -109,8 +110,9 @@ models.forEach(m => {
   console.log(`${m.id}: ${m.name} (${m.request_price} ${m.currency})`);
 });
 
-// Find cheapest per-request model
-const perRequest = models.filter(m => m.pricing_type === "request");
+// Find the cheapest flat-priced model. Compare on price_unit, not
+// pricing_type -- a per-second video model also reports "request".
+const perRequest = models.filter(m => m.price_unit === "request");
 const cheapest = perRequest.sort((a, b) => a.request_price - b.request_price)[0];
 console.log(`Cheapest: ${cheapest.name} at ${cheapest.request_price} ${cheapest.currency}`);
 ```
@@ -144,6 +146,7 @@ func main() {
             ID           string  `json:"id"`
             Name         string  `json:"name"`
             PricingType  string  `json:"pricing_type"`
+            PriceUnit    string  `json:"price_unit"`
             RequestPrice float64 `json:"request_price"`
             Currency     string  `json:"currency"`
         } `json:"models"`
