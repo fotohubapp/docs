@@ -723,7 +723,9 @@ GET /v1/console/projects/{id}/stats
   "total_tokens": 361102,
   "total_cost": 12.81,
   "error_rate": 1.80,
-  "avg_latency": 2465.66
+  "avg_latency": 2465.66,
+  "total_credits": 0,
+  "requests_without_cost": 0
 }
 ```
 
@@ -731,14 +733,24 @@ GET /v1/console/projects/{id}/stats
 |-------|------|-------------|
 | `total_requests` | integer | Requests in the last 30 days |
 | `total_tokens` | integer | Sum of tokens across those requests |
-| `total_cost` | float | Sum of `api_usage_events.cost` — USD for anything logged since 2026-08-05 |
+| `total_cost` | float | USD, summed over the requests in this window whose cost is known |
 | `error_rate` | float | Percentage (e.g. `1.80` = 1.8%), not a fraction |
 | `avg_latency` | float | Average latency in milliseconds |
+| `total_credits` | float | Credits charged in this window. A separate unit, not converted to USD |
+| `requests_without_cost` | integer | Requests with no recorded USD cost, and therefore not in `total_cost` |
 
 ::: warning
-There is no `project_id`, `period`, `total_credits_used` or `top_models` field
-in this response. For per-model counts use `GET /v1/usage`, which returns
-`topModels[]`.
+`total_cost` is a sum over a subset. Requests logged before the 2026-08-05 USD
+cutover have no recorded dollar cost, and requests paid for with credits are
+reported in `total_credits` instead — both are counted in
+`requests_without_cost`. Read that field alongside `total_cost`, or a project
+billed entirely in credits looks identical to one that spent nothing. Credits are
+not converted to USD here.
+:::
+
+::: warning
+There is no `project_id`, `period` or `top_models` field in this response. For
+per-model counts use `GET /v1/usage`, which returns `topModels[]`.
 :::
 
 ---
