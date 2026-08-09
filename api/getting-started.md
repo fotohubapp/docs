@@ -204,7 +204,7 @@ POST /v1/ai/generate/image HTTP/1.1
 Host: apis.fotohub.app
 Authorization: Bearer fh_live_abc123def456
 Content-Type: application/json
-X-Request-Id: req_unique_id_12345
+X-Request-Id: 6dfa02b7-3e18-4c95-9b40-2f7c5a1d8e63
 
 {
   "model": "seedream-5-0-260128",
@@ -268,7 +268,7 @@ Error responses follow a consistent structure with an `error` object:
     "param": "width",
     "type": "validation_error"
   },
-  "request_id": "req_abc123"
+  "request_id": "8b0d4f26-7a91-4e58-ac13-5d2b9f6e0a47"
 }
 ```
 

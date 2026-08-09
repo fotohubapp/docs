@@ -8,7 +8,17 @@ The official SDKs (Python and TypeScript) classify errors automatically, retry t
 
 ## Error Response Format
 
-Every error response follows a consistent JSON structure. Use the `error` field for programmatic handling and `message` for user-facing display. The `request_id` is included in every response for support ticket correlation.
+::: warning Read the status code and `detail`, not just the fields below
+Most endpoints return a compact body — `{"detail": "Insufficient credits"}` — and the
+rate limiter returns `{"error": "Rate limit exceeded. Please try again later."}`. Treat
+`error`, `message` and `details` as optional and branch on the **HTTP status code**,
+which is always meaningful. For correlating a call with support, use the
+`X-Request-Id` **response header**, which is present on every response — see
+[Request ID for Support](#request-id-for-support). The body carries `request_id`
+only on a `500`.
+:::
+
+Where a richer body is returned it follows this structure. Use the `error` field for programmatic handling and `message` for user-facing display.
 
 ```json
 {
@@ -19,7 +29,7 @@ Every error response follows a consistent JSON structure. Use the `error` field 
     "available_credits": 2,
     "top_up_url": "https://fotohub.app/console/billing"
   },
-  "request_id": "req_7kXm9pLqR2vN4wYz"
+  "request_id": "0f9c1b5a-4e3d-4a71-9c28-8b5d2e6f1a03"
 }
 ```
 
@@ -27,10 +37,11 @@ Every error response follows a consistent JSON structure. Use the `error` field 
 
 | Field | Type | Always Present | Description |
 |-------|------|----------------|-------------|
-| `error` | string | Yes | Machine-readable error code in snake_case. Use for switch/match statements. |
-| `message` | string | Yes | Human-readable description. Safe to display to end users. |
+| `detail` | string \| object | No | The only field most endpoints return. A string for simple failures; an object carrying `error`/`message` and extra context for the richer ones (see the [429 bodies](/api/rate-limits#_429-too-many-requests)). Check its type before indexing into it. |
+| `error` | string | No | Machine-readable error code in snake_case, where present. Use for switch/match statements. |
+| `message` | string | No | Human-readable description. Safe to display to end users. |
 | `details` | object | No | Additional context — varies by error code. May include limits, field names, or URLs. |
-| `request_id` | string | Yes | Unique request identifier (`req_xxx`). Include in support tickets for fast resolution. |
+| `request_id` | string | No | Our identifier for the call, returned in the body on `500` responses. Present as the `X-Request-Id` header on **all** responses; prefer the header. |
 
 ## HTTP Status Codes
 
@@ -56,231 +67,188 @@ The API uses standard HTTP status codes to indicate the outcome of a request. Co
 
 ## Error Codes Reference
 
-Complete list of error codes returned in the `error` field. Use these for programmatic error handling and recovery logic.
+Machine-readable `error` codes, grouped by what they refuse. Every code below appears
+inside `detail`, alongside a human-readable `message` and whatever context is useful for
+recovery — `limit` and `current` on a plan gate, `valid_tiers` on a bad tier, and so on.
 
-### Authentication and Authorization
+::: warning Not every failure has a code
+Most endpoints answer with a plain string — `{"detail": "Insufficient wallet balance.
+Need $0.04. Credits exhausted, wallet empty. Top up to continue."}` — so **branch on the
+HTTP status first** and treat `detail.error` as extra detail when it happens to be an
+object. Notably, the two most common money errors (insufficient credits and the monthly
+overage cap, both `402`) return prose, not a code.
+:::
+
+### Authentication and Access
 
 | Error Code | HTTP Status | Description | Recovery Action |
 |------------|-------------|-------------|-----------------|
-| `invalid_api_key` | 401 | The API key format is invalid or not recognized. | Check key format (must start with `fh_live_` or `fh_test_`). |
-| `expired_api_key` | 401 | The API key has passed its expiration date. | Generate a new key in the console. |
-| `revoked_api_key` | 401 | The API key was manually revoked. | Create a new key — revoked keys cannot be restored. |
+| `authentication_required` | 401 | No `Authorization` header. Every endpoint requires one. | Send `Authorization: Bearer fh_live_…`. |
+| `api_access_required` | 403 | The account has no API entitlement (`reason` says which). | Subscribe to an API plan in the console. |
+| `email_not_verified` | 403 | Email not confirmed, and a purchase was attempted. | Confirm the address from the inbox, then retry. |
+| `account_suspended` | 403 | The account is suspended. | Contact support. |
+| `account_too_new` | 403 | Wallet top-ups require the account to be at least an hour old. | Wait, then retry. |
+| `entitlement_check_unavailable` | 503 | We could not verify entitlement — our side, not yours. | Retry with backoff. |
 
-### Billing and Credits
+### Billing, Plans and Tiers
 
 | Error Code | HTTP Status | Description | Recovery Action |
 |------------|-------------|-------------|-----------------|
-| `insufficient_credits` | 402 | Not enough credits for this operation. | Top up credits or upgrade plan at `/console/billing`. |
-| `wallet_empty` | 402 | Wallet balance is zero. | Add funds to the wallet via Stripe checkout. |
-| `payment_failed` | 402 | Automatic charge failed (e.g., card declined). | Update payment method in billing settings. |
+| `insufficient_balance` | 402 | Wallet cannot cover a reservation. Carries `required_usd`. | Top up, or pick `invoice_monthly` billing. |
+| `plan_gate_exceeded` | 402 | Your plan's cap for this resource. Carries `current`, `limit`, `tier`. | Upgrade, or delete an existing resource. |
+| `key_limit_reached` | 400 | Maximum API keys for the tier. Carries `max_keys`, `upgrade_url`. | Revoke a key or upgrade. |
+| `feature_not_available` | 403 | Feature not on this tier. Carries `required_tiers`. | Upgrade to one of `required_tiers`. |
+| `model_not_available` | 403 | The model is not on your tier. Carries `tier`, `model`. | Use a permitted model or upgrade. |
+| `invalid_tier` | 400 | Unknown tier slug. Carries `valid_tiers`. | Pick one of `valid_tiers`. |
+| `invalid_upgrade` | 400 | That upgrade path does not exist. Carries `valid_upgrades`. | Pick one of `valid_upgrades`. |
+| `already_subscribed` | 400 | Already on the requested tier. | Nothing to do. |
+| `enterprise_only` | 400 | Enterprise is by application. | `POST /v1/tiers/enterprise/apply`. |
+| `application_pending` | 400 | An enterprise application is already open. | Wait for the decision. |
 
 ### Rate Limiting
 
 | Error Code | HTTP Status | Description | Recovery Action |
 |------------|-------------|-------------|-----------------|
-| `rate_limit_exceeded` | 429 | Too many requests in the current window. | Wait for Retry-After header duration, then retry. |
-| `quota_exceeded` | 429 | Daily or monthly API quota has been reached. | Wait for quota reset or upgrade to a higher tier. |
+| `rate_limit_exceeded` | 429 | Too many requests. Three limiters can produce it — see [Rate limits](/api/rate-limits#_429-too-many-requests). | Wait for the `Retry-After` header, then retry. |
 
-### Model and Generation
+### Output Routing and Destinations
 
-| Error Code | HTTP Status | Description | Recovery Action |
-|------------|-------------|-------------|-----------------|
-| `invalid_model` | 400 | Model ID is not recognized or not available. | Check `/v1/models` for valid model IDs. |
-| `model_unavailable` | 503 | Model is temporarily offline for maintenance. | Retry after a few minutes or use a fallback model. |
-| `model_overloaded` | 503 | Model is experiencing high demand. | Retry with exponential backoff. |
-| `generation_failed` | 500 | The AI provider returned an error during generation. | Retry the request. If persistent, contact support with request_id. |
-| `provider_error` | 502 | Upstream provider timed out or is unreachable. | Retry after a short delay. Provider may be experiencing issues. |
-| `timeout` | 502 | Generation exceeded the maximum allowed time. | Try a simpler prompt, lower resolution, or shorter duration. |
-
-### Validation and Input
+Only relevant if you route generations to your own bucket.
 
 | Error Code | HTTP Status | Description | Recovery Action |
 |------------|-------------|-------------|-----------------|
-| `invalid_parameters` | 400 | One or more parameters have invalid values. | Check the `details.fields` array for specific invalid params. |
-| `missing_required_field` | 400 | A required field was not included in the request. | Add the missing field listed in `details.field`. |
-| `file_too_large` | 413 | Uploaded file exceeds the size limit. | Compress or resize the file. Max 20MB for images, 100MB for video. |
-| `unsupported_format` | 400 | File format is not supported for this operation. | Convert to a supported format (JPEG, PNG, WebP, MP4, MP3). |
+| `missing_fields` | 400 | An external destination is missing required fields. Carries `fields`. | Supply everything in `fields`. |
+| `credentials_not_allowed` | 400 | Credentials were sent for a destination kind that manages its own. | Drop the credentials. |
+| `bucket_id_required` | 400 | A console-managed destination needs `bucket_id`. | Send the bucket id. |
+| `account_id_required` | 400 | The chosen preset needs an account id. | Send the account id. |
+| `invalid_path_template` | 400 | Bad path template. Carries `allowed_tokens` and an `example`. | Use only `allowed_tokens`. |
+| `too_many_rules` | 400 | Per-key routing-rule cap. Carries `limit`. | Delete a rule first. |
+| `pattern_already_routed` | 409 | The key already has a rule for that pattern. | Update the existing rule. |
+| `bucket_not_found` | 404 | No such bucket on this account. | Check the id in the console. |
+| `destination_in_use` | 409 | Still attached to keys. Carries `keys`. | Detach it from those keys first. |
+| `destination_create_failed` | 409 | Creation failed — usually a duplicate name. | Pick another name. |
+| `update_failed` | 409 | The update conflicted. | Re-read the destination and retry. |
 
-### Resource Limits
+### Everything else
 
-| Error Code | HTTP Status | Description | Recovery Action |
-|------------|-------------|-------------|-----------------|
-| `storage_limit_reached` | 403 | Storage allocation for the account is full. | Delete unused files or upgrade storage plan. |
+Failures outside these groups — invalid parameters, unsupported formats, provider
+timeouts, generation errors — return a plain `detail` string with the appropriate status
+code and **no** `error` code. `422` bodies come from request validation and carry FastAPI's
+own `detail` array of per-field errors, which is worth logging verbatim.
 
 ### Example Error Responses
 
-**400 Bad Request — Invalid Parameters:**
+Live shapes, captured against the production API. The status code is the reliable signal;
+`detail` is a string for most failures and an object for the ones that carry context.
+
+**400 Bad Request** — a hand-checked parameter:
+
+```json
+{ "detail": "prompt is required" }
+```
+
+**401 Unauthorized** — no credential, or one we do not recognise:
+
+```json
+{ "detail": "Missing Authorization header" }
+```
+
+```json
+{ "detail": "Invalid API key" }
+```
+
+**402 Payment Required** — out of money. Prose, not a code:
+
+```json
+{ "detail": "Insufficient wallet balance. Need $0.04. Credits exhausted, wallet empty. Top up to continue." }
+```
+
+Resource caps in the same status *do* carry a code and the numbers behind it:
 
 ```json
 {
-  "error": "invalid_parameters",
-  "message": "Parameter 'width' must be between 256 and 2048.",
-  "details": {
-    "fields": [
-      { "field": "width", "reason": "Value 5000 exceeds maximum of 2048" }
-    ]
-  },
-  "request_id": "req_3mPqX8nKj1vR7wLz"
+  "detail": {
+    "error": "plan_gate_exceeded",
+    "message": "Your plan (developer) allows up to 3 S3 buckets",
+    "current": 3,
+    "limit": 3,
+    "tier": "developer"
+  }
 }
 ```
 
-**401 Unauthorized — Invalid API Key:**
+**403 Forbidden** — a tier gate. `required_tiers` tells you what would clear it:
 
 ```json
 {
-  "error": "invalid_api_key",
-  "message": "The API key provided is not valid. Keys must start with fh_live_ or fh_test_.",
-  "request_id": "req_9xYm2kLpN4qW6vRt"
+  "detail": {
+    "error": "feature_not_available",
+    "message": "Feature 'output_routing' is not available on the developer tier",
+    "tier": "developer",
+    "required_tiers": ["startup", "business", "enterprise"]
+  }
 }
 ```
 
-**402 Payment Required — Insufficient Credits:**
+**404 Not Found** — note that an unknown *path* returns the same shape as a missing
+*resource*, so a typo in the URL and a deleted object are indistinguishable from the body
+alone:
 
 ```json
-{
-  "error": "insufficient_credits",
-  "message": "Not enough credits to complete this operation. Required: 5, available: 2.",
-  "details": {
-    "required_credits": 5,
-    "available_credits": 2,
-    "top_up_url": "https://fotohub.app/console/billing"
-  },
-  "request_id": "req_7kXm9pLqR2vN4wYz"
-}
-```
-
-**403 Forbidden — Storage Limit:**
-
-```json
-{
-  "error": "storage_limit_reached",
-  "message": "Your account has reached its storage limit of 10GB.",
-  "details": {
-    "used_bytes": 10737418240,
-    "limit_bytes": 10737418240
-  },
-  "request_id": "req_4nWp7xKmQ3vL9yRt"
-}
-```
-
-**404 Not Found:**
-
-```json
-{
-  "error": "not_found",
-  "message": "The resource at /v1/projects/proj_nonexistent was not found.",
-  "request_id": "req_2pXk5mNqR8vW3yLz"
-}
+{ "detail": "Not Found" }
 ```
 
 **409 Conflict:**
 
 ```json
 {
-  "error": "conflict",
-  "message": "A project with the name 'my-project' already exists.",
-  "details": {
-    "existing_id": "proj_abc123"
-  },
-  "request_id": "req_8wLm3kXp5vN7qRyz"
+  "detail": {
+    "error": "pattern_already_routed",
+    "message": "This key already has a rule for 'video/*'"
+  }
 }
 ```
 
-**413 Payload Too Large:**
+**422 Unprocessable Entity** — request-model validation. `detail` is an **array**, one
+entry per offending field. Log it verbatim; it is the most specific error we return:
 
 ```json
 {
-  "error": "file_too_large",
-  "message": "Uploaded file exceeds the maximum size of 20MB for images.",
-  "details": {
-    "file_size_bytes": 52428800,
-    "max_size_bytes": 20971520
-  },
-  "request_id": "req_6yNk9mWpX2vL4qRt"
+  "detail": [
+    { "type": "missing", "loc": ["body", "name"], "msg": "Field required", "input": { "kind": 123 } },
+    { "type": "string_type", "loc": ["body", "kind"], "msg": "Input should be a valid string", "input": 123 }
+  ]
 }
 ```
 
-**422 Unprocessable Entity:**
+**429 Too Many Requests** — the body depends on which limiter fired, so read the
+`Retry-After` header rather than the payload. All three shapes are listed under
+[429 Too Many Requests](/api/rate-limits#_429-too-many-requests).
+
+```json
+{ "error": "Rate limit exceeded. Please try again later." }
+```
+
+**500 Internal Server Error** — deliberately generic, because exception text can carry
+credentials. This is the one status that also puts the id in the body, since a bare
+"Internal server error" with nothing to quote is unactionable:
 
 ```json
 {
-  "error": "invalid_parameters",
-  "message": "Duration must be a positive number.",
-  "details": {
-    "fields": [
-      { "field": "duration", "reason": "Value -5 is not a positive number" }
-    ]
-  },
-  "request_id": "req_1qXm4kNpR7vW9yLz"
+  "detail": "Internal server error",
+  "request_id": "1878ab43-df35-460d-9336-9cc80d60c559"
 }
 ```
 
-**429 Too Many Requests:**
+**502 / 503 / 504** — an upstream provider failed, timed out, or is unreachable. These
+carry whatever the provider path reported, as a string:
 
 ```json
-{
-  "error": "rate_limit_exceeded",
-  "message": "Rate limit exceeded. Please retry after 5 seconds.",
-  "details": {
-    "limit": 60,
-    "remaining": 0,
-    "reset_at": "2026-07-18T12:00:05Z"
-  },
-  "request_id": "req_5mXk8pNqW3vL7yRt"
-}
+{ "detail": "Provider request failed" }
 ```
 
-**500 Internal Server Error:**
-
-```json
-{
-  "error": "generation_failed",
-  "message": "An internal error occurred during generation. Please retry or contact support.",
-  "request_id": "req_7wLm2kXpN4vR9qYz"
-}
-```
-
-**502 Bad Gateway:**
-
-```json
-{
-  "error": "provider_error",
-  "message": "Upstream provider timed out. Please retry your request.",
-  "details": {
-    "provider": "stability",
-    "timeout_ms": 30000
-  },
-  "request_id": "req_3pXk6mNqR9vW2yLt"
-}
-```
-
-**503 Service Unavailable:**
-
-```json
-{
-  "error": "model_unavailable",
-  "message": "Model 'kling-v3' is temporarily offline for maintenance.",
-  "details": {
-    "model": "kling-v3",
-    "estimated_recovery": "2026-07-18T13:00:00Z"
-  },
-  "request_id": "req_4nWp8xKmQ5vL3yRz"
-}
-```
-
-**504 Gateway Timeout:**
-
-```json
-{
-  "error": "timeout",
-  "message": "Request exceeded the maximum processing time of 120 seconds.",
-  "details": {
-    "timeout_ms": 120000,
-    "operation": "video_generation"
-  },
-  "request_id": "req_9xYm1kLpN6qW4vRt"
-}
-```
+Retry these with backoff and quote the `X-Request-Id`; the request log holds the
+provider's own id for the same call.
 
 ## Retry Strategies
 
@@ -841,31 +809,25 @@ When you receive a `429` response, the server includes a `Retry-After` header in
 
 | Header | Description |
 |--------|-------------|
-| `Retry-After` | Number of seconds to wait before retrying |
+| `Retry-After` | Number of seconds to wait before retrying. The only header on **every** 429 |
 | `X-RateLimit-Limit` | Maximum number of requests allowed in the current window |
 | `X-RateLimit-Remaining` | Number of requests remaining in the current window |
 | `X-RateLimit-Reset` | Unix timestamp when the rate limit window resets |
+| `X-Request-Id` | Our identifier for this call — quote it in support tickets |
+
+The `X-RateLimit-*` trio is absent when the per-endpoint limiter fires, because it
+refuses the request before anything has resolved which key or tier is calling.
 
 ### Example Rate Limit Response
 
 ```http
 HTTP/1.1 429 Too Many Requests
-Retry-After: 5
-X-RateLimit-Limit: 60
-X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 1752844805
+Retry-After: 60
 Content-Type: application/json
+X-Request-Id: ac786e3b-a048-409b-84f2-6e4c95f4984f
+Access-Control-Expose-Headers: X-Request-Id, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-Tier, Retry-After
 
-{
-  "error": "rate_limit_exceeded",
-  "message": "Rate limit exceeded. Please retry after 5 seconds.",
-  "details": {
-    "limit": 60,
-    "remaining": 0,
-    "reset_at": "2026-07-18T12:00:05Z"
-  },
-  "request_id": "req_5mXk8pNqW3vL7yRt"
-}
+{ "error": "Rate limit exceeded. Please try again later." }
 ```
 
 ### Handling Retry-After
@@ -1841,24 +1803,49 @@ fotohub_with_circuit "POST" "/ai/generate/image" '{
 
 ## Request ID for Support
 
-Every API response (success or error) includes a `request_id` field and an `X-Request-ID` response header. Always log these values — they allow our support team to quickly locate and diagnose issues.
+Every response carries an `X-Request-Id` header holding a UUID that identifies that
+one call in our request log:
+
+```http
+X-Request-Id: 1878ab43-df35-460d-9336-9cc80d60c559
+```
+
+It is on **every** response, including the two that never reach your handler: a
+`429` from the rate limiter and a `500`. Read it from the headers rather than the
+body — the body carries `request_id` only on a `500`, where the message is
+deliberately generic and there is nothing else to quote:
 
 ```json
-// From response body (always present in errors)
 {
-  "error": "generation_failed",
-  "message": "Upstream provider returned an error",
-  "request_id": "req_7kXm9pLqR2vN4wYz"
+  "detail": "Internal server error",
+  "request_id": "1878ab43-df35-460d-9336-9cc80d60c559"
 }
 ```
 
-```http
-// From response header (always present in every response)
-X-Request-ID: req_7kXm9pLqR2vN4wYz
+Every other error returns just `detail`:
+
+```json
+{ "detail": "Insufficient credits" }
 ```
 
+A few properties worth relying on:
+
+- **We mint it, always.** An `X-Request-Id` you send on the way in is ignored, so
+  the value coming back is never the one you supplied. Use your own header (or an
+  idempotency key) if you need to correlate with your own logs.
+- **One id per HTTP call**, not per job. For a long generation, the id identifies
+  the submit or the poll you made — the job itself is tracked by its `job_id`.
+- **It is readable from browser JavaScript.** `X-Request-Id` is listed in
+  `Access-Control-Expose-Headers`, along with `X-RateLimit-*`, `X-Tier` and
+  `Retry-After`.
+
+You can look an id up yourself in the developer console under **Logs** — paste it
+into the request-id box. That search ignores the selected time range, so an id
+from an old ticket still resolves. Requests made before this header existed have
+no id recorded, and show an em dash rather than a fabricated value.
+
 When contacting support, include:
-1. The `request_id`
+1. The `X-Request-Id`
 2. Timestamp of the request
 3. The endpoint and parameters used
 
@@ -1875,7 +1862,7 @@ logger = logging.getLogger("fotohub")
 
 def log_fotohub_request(response: requests.Response, endpoint: str) -> None:
     """Log every FOTOhub API response for traceability."""
-    request_id = response.headers.get("X-Request-ID", "unknown")
+    request_id = response.headers.get("X-Request-Id", "unknown")
 
     if response.status_code < 400:
         logger.info(
@@ -1912,7 +1899,7 @@ function logFotohubRequest(
   endpoint: string,
   body?: Record<string, unknown>
 ): void {
-  const requestId = response.headers.get("X-Request-ID") ?? "unknown";
+  const requestId = response.headers.get("X-Request-Id") ?? "unknown";
 
   if (response.ok) {
     console.log(
@@ -1962,7 +1949,7 @@ import (
 )
 
 func logFotohubRequest(resp *http.Response, endpoint string) {
-	requestID := resp.Header.Get("X-Request-ID")
+	requestID := resp.Header.Get("X-Request-Id")
 	if requestID == "" {
 		requestID = "unknown"
 	}
@@ -2000,7 +1987,7 @@ func example() {
 	logFotohubRequest(resp, "/ai/generate/image")
 
 	// Always include request_id in alerts to your monitoring system
-	requestID := resp.Header.Get("X-Request-ID")
+	requestID := resp.Header.Get("X-Request-Id")
 	if resp.StatusCode >= 500 {
 		fmt.Printf("ALERT: Server error on /ai/generate/image — request_id: %s\n", requestID)
 	}
@@ -2026,7 +2013,7 @@ http_code=$(echo "$response" | tail -n1)
 body=$(echo "$response" | sed '$d')
 
 # Extract request_id from headers
-request_id=$(grep -i "X-Request-ID:" /tmp/fh_headers.txt \
+request_id=$(grep -i "X-Request-Id:" /tmp/fh_headers.txt \
   | awk '{print $2}' | tr -d '\r')
 
 # Log appropriately

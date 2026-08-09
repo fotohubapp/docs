@@ -121,7 +121,10 @@ Each tier allows temporary bursts within its 4-hour burst window. For example, a
 
 ## Rate Limit Headers
 
-Every API response includes the following headers so you can monitor your usage and proactively throttle before hitting limits.
+Responses carry the following headers so you can monitor your usage and throttle yourself
+before hitting a limit. `X-Request-Id` is on every response; the `X-RateLimit-*` and
+`X-Tier` headers appear once the request has been authenticated and its tier resolved, so
+they are absent from a `401` and from the per-endpoint `429` described below.
 
 | Header | Description | Example |
 |--------|-------------|---------|
@@ -130,6 +133,11 @@ Every API response includes the following headers so you can monitor your usage 
 | `X-RateLimit-Reset` | Unix timestamp (seconds) when the current window resets | `1721234560` |
 | `X-Tier` | The tier resolved for this request | `developer` |
 | `Retry-After` | Seconds to wait before retrying (only present on 429 responses) | `12` |
+| `X-Request-Id` | Our identifier for this call — quote it in support tickets ([details](/api/errors#request-id-for-support)) | `1878ab43-df35-460d-9336-9cc80d60c559` |
+
+All of these are listed in `Access-Control-Expose-Headers`, so browser JavaScript can
+read them from a cross-origin `fetch()` — including on a `429`, where `Retry-After`
+tells you how long to wait.
 
 ### Example Response Headers
 
@@ -140,6 +148,7 @@ X-RateLimit-Limit: 60
 X-RateLimit-Remaining: 42
 X-RateLimit-Reset: 1721234560
 X-Tier: developer
+X-Request-Id: 1878ab43-df35-460d-9336-9cc80d60c559
 ```
 
 ### Example 429 Response Headers
@@ -152,37 +161,59 @@ X-RateLimit-Remaining: 0
 X-RateLimit-Reset: 1721234572
 Retry-After: 12
 X-Tier: developer
+X-Request-Id: ac786e3b-a048-409b-84f2-6e4c95f4984f
 ```
 
 ## 429 Too Many Requests
 
-When your request exceeds the rate limit, the API responds with HTTP status 429 and a JSON body indicating how long to wait before retrying.
+When your request exceeds the rate limit, the API responds with HTTP status 429.
+
+**Read `Retry-After` from the headers, not the body.** It is the only field present on
+every 429, because three separate limiters can produce one and their bodies differ:
+
+**Per-endpoint limit** (applied before authentication, keyed on your credential or
+your IP):
+
+```json
+{ "error": "Rate limit exceeded. Please try again later." }
+```
+
+**Per-key limit** (your key's own `rate_limit_per_minute`, raisable in the console).
+Like every other error raised by a handler, the payload sits under `detail`:
 
 ```json
 {
-  "error": "rate_limit_exceeded",
-  "message": "Rate limit exceeded. Retry after 12 seconds.",
-  "retry_after": 12,
-  "details": {
-    "limit": 60,
-    "remaining": 0,
-    "reset_at": "2026-07-18T12:00:12Z"
-  },
-  "request_id": "req_5mXk8pNqW3vL7yRt"
+  "detail": {
+    "error": "rate_limit_exceeded",
+    "message": "This API key is limited to 60 requests per minute. Raise the limit on the key in the console, or spread the calls out.",
+    "limit_rpm": 60,
+    "scope": "api_key"
+  }
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `error` | string | Error code, always `"rate_limit_exceeded"` |
-| `message` | string | Human-readable error message with retry guidance |
-| `retry_after` | integer | Number of seconds to wait before retrying the request |
-| `details.limit` | integer | Your per-minute request limit |
-| `details.remaining` | integer | Requests remaining (always 0 when rate limited) |
-| `details.reset_at` | string | ISO 8601 timestamp when the window resets |
+**Per-tier limit** — same envelope, with the tier and where to upgrade:
+
+```json
+{
+  "detail": {
+    "error": "rate_limit_exceeded",
+    "message": "Rate limit exceeded (60 requests/minute for developer tier). Upgrade your tier for higher limits.",
+    "tier": "developer",
+    "limit_rpm": 60,
+    "upgrade_url": "https://fotohub.app/console/tiers"
+  }
+}
+```
+
+There is no `retry_after` field in any of them, and no `request_id` in the body —
+`Retry-After` and `X-Request-Id` are headers. The per-key and per-tier limits also send
+`X-RateLimit-*`; the per-endpoint limit sends only `Retry-After`, because it refuses the
+request before anything has resolved which key or tier is calling.
 
 ::: danger Important
-Do not retry immediately after receiving a 429. Doing so will extend your cooldown period. Always wait at least the number of seconds indicated in the `retry_after` field before sending your next request.
+Do not retry immediately after receiving a 429 — that extends your cooldown. Wait at
+least the number of seconds in the `Retry-After` header before sending the next request.
 :::
 
 ## Exponential Backoff with Jitter
@@ -1391,10 +1422,10 @@ For batch processing, use a job queue with rate-aware consumers that respect the
 | Behavior | Details |
 |----------|---------|
 | Window type | Sliding window, per-minute |
-| Scope | Per API key (not per IP or user) |
+| Scope | Per API key, per tier, and per endpoint — the last falls back to your IP when the request is refused before authentication |
 | Burst allowance | 2-5x base limit for 5-30 seconds (tier-dependent) |
 | Error code on limit | HTTP 429 Too Many Requests |
-| Retry guidance | `Retry-After` header + `retry_after` field in body |
+| Retry guidance | `Retry-After` header — the body has no `retry_after` field |
 | Recommended strategy | Exponential backoff with jitter, cap at 60s |
 | Usage monitoring | `X-RateLimit-Remaining` header in every response |
 | Tier upgrades | Take effect immediately, no restart needed |
