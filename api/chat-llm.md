@@ -18,9 +18,9 @@ The `/v1/ai/chat/completions` endpoint is fully compatible with the OpenAI Pytho
 POST /v1/ai/chat/completions
 ```
 
-**Auth:** API Key (Bearer token) | **Billing:** 1-2 credits per request
+**Auth:** API Key (Bearer token) | **Billing:** per token
 
-Standard chat completions endpoint compatible with OpenAI SDKs. Supports Google Gemini, OpenAI GPT, and Anthropic Claude models with credit-based billing.
+Standard chat completions endpoint compatible with OpenAI SDKs. Supports Google Gemini, OpenAI GPT, and Anthropic Claude models.
 
 ### Parameters
 
@@ -42,71 +42,38 @@ or streaming, use the premium endpoint (`/v1/ai/chat/claude`) or the agent
 endpoint (`/v1/ai/agent/stream`) instead.
 :::
 
-### Pricing Table -- Standard Models (Credit-Based)
+### Pricing Table
 
-All standard models use simple credit-based billing: a flat credit charge per request, independent of token count. When your included credits are exhausted the request is billed from your USD wallet instead, where 1 credit is worth **$0.0536**.
+Billed on the tokens you actually use, in credits, at the per-1M rates below. The
+charge is fractional: a short reply costs a fraction of one credit rather than
+rounding up to a whole one. When your included credits are exhausted the request
+is billed from your USD wallet instead.
 
-| Model | ID | Credits/req | ~USD/1K tokens | Best for |
-|-------|-----|:-----------:|:--------------:|----------|
-| Gemini Flash | `gemini-flash` | 1 | 0.0001 | Fast responses, bulk tasks |
-| Gemini Pro | `gemini-pro` | 2 | 0.0020 | Balanced quality, general use |
-| GPT-4o | `gpt-4o` | 2 | 0.0040 | Multimodal, vision, creative |
-| Claude Sonnet | `claude-sonnet` | 2 | 0.0048 | Code, analysis, reasoning |
+| Model | ID | Credits/1M in | Credits/1M out | Best for |
+|-------|-----|:-------------:|:--------------:|----------|
+| Gemini Flash | `gemini-flash` | 20 | 166.7 | Fast responses, bulk tasks |
+| Gemini Pro | `gemini-pro` | 83 | 667 | Balanced quality, general use |
+| GPT-4o | `gpt-4o` | 200 | 1000 | Multimodal, vision, creative |
+| Claude Sonnet | `claude-sonnet` | 200 | 1000 | Code, analysis, reasoning |
 
-::: tip Token-Based Billing
-For per-token billing with precise cost control, use the [Premium Chat endpoint](#premium-chat-token-based-billing) (`/v1/ai/chat/claude`). The OpenAI-compatible endpoint documented here always bills flat credits (1 for `gemini-flash`, 2 otherwise).
-:::
+Output tokens cost 4-8x input tokens, which is why the two columns are quoted
+separately -- a single blended number would misprice any workload that is not
+half prompt and half completion. A 25-token prompt with a 150-token answer on
+`gemini-flash` costs `25/1e6 * 20 + 150/1e6 * 166.7` = **0.0255 credits**.
+
+The exact amount charged comes back on every response in `billing.credits_used`,
+with `billing.basis: "tokens"` confirming it was derived from real token counts.
 
 ### Available Models
 
-The authoritative, always-current list is returned by `GET /v1/models?category=text` — query it at runtime rather than hard-coding a list. In addition to the four credit-based models in the pricing table above, the endpoint accepts the following provider families (billed at the flat 1-2 credit rate). Some models require a subscription tier as noted.
+This endpoint accepts exactly the four IDs in the pricing table above. Any other
+value returns `400 Unknown chat model` listing the supported set -- it is never
+silently substituted with a default, so a typo fails loudly instead of quietly
+serving you a different model.
 
-#### Anthropic Claude
-
-| Model | ID | Tier |
-|-------|-----|------|
-| Claude Haiku 4.5 | `claude-haiku-4-5` | — |
-| Claude Sonnet 4.6 | `claude-sonnet-4-6` | — |
-| Claude Opus 4.5 | `claude-opus-4-5` | — |
-| Claude Opus 4.6 | `claude-opus-4-6` | — |
-
-#### OpenAI GPT
-
-| Model | ID | Tier |
-|-------|-----|------|
-| GPT-5.1 | `gpt-5.1` | Starter |
-| GPT-5.4 | `gpt-5.4` | Starter |
-| GPT-5.4 Pro | `gpt-5.4-pro` | Medium |
-
-#### xAI Grok
-
-| Model | ID | Tier |
-|-------|-----|------|
-| Grok 4 Fast | `grok-4-fast-reasoning` | Starter |
-| Grok 4.1 Fast | `grok-4-1-fast-reasoning` | Starter |
-| Grok 4.1 Fast (no reasoning) | `grok-4-1-fast-non-reasoning` | Starter |
-
-#### Alibaba Qwen
-
-| Model | ID | Tier |
-|-------|-----|------|
-| Qwen 3 Max | `qwen3-max` | — |
-| Qwen Plus | `qwen-plus` | — |
-| Qwen Flash | `qwen-flash` | — |
-
-#### Google Gemini
-
-| Model | ID | Tier |
-|-------|-----|------|
-| Gemini 2.5 Flash | `gemini-2.5-flash` | — |
-| Gemini 2.5 Flash Lite | `gemini-2.5-flash-lite` | — |
-| Gemini 2.5 Pro | `gemini-2.5-pro` | Starter |
-| Gemini 3 Flash (preview) | `gemini-3-flash-preview` | Medium |
-| Gemini 3.1 Pro (preview) | `gemini-3.1-pro-preview` | Medium |
-
-::: warning Model IDs must match exactly
-Passing an unrecognized `model` value does not error — the request is served by the default fast Gemini model instead. Always use an exact ID from `GET /v1/models` (or the tables above) to get the model you intend, and note that the credit-based endpoint uses dash notation (`claude-sonnet-4-6`), while the premium endpoint uses dots (`claude-sonnet-4.6`).
-:::
+`GET /v1/models?category=text` returns the same four. The premium endpoint
+(`/v1/ai/chat/claude`) serves a different and larger family of models with their
+own IDs in dot notation (`claude-sonnet-4.6`); those IDs are not accepted here.
 
 ### Response
 
@@ -116,7 +83,13 @@ Passing an unrecognized `model` value does not error — the request is served b
   "object": "chat.completion",
   "created": 1719849600,
   "model": "gemini-flash",
-  "credits_used": 1,
+  "credits_used": 0.0255,
+  "billing": {
+    "method": "credits",
+    "credits_used": 0.0255,
+    "usd_charged": 0,
+    "basis": "tokens"
+  },
   "choices": [
     {
       "index": 0,
@@ -145,7 +118,7 @@ POST /v1/ai/chat/claude
 
 **Auth:** API Key (Bearer token) | **Billing:** token-based (per-token pricing)
 
-Access to FOTOhub's premium chat models — the Claude-class and Nova-class families — with precise token-based billing and per-token cost breakdowns. Ideal when you need exact cost control instead of flat per-request credits.
+Access to FOTOhub's premium chat models — the Claude-class and Nova-class families — with precise token-based billing and per-token cost breakdowns. Both endpoints bill on real token counts; the difference is that this one prices natively in USD and returns a `cost_breakdown`, while the OpenAI-compatible endpoint prices in credits.
 
 ### Parameters
 
@@ -484,11 +457,15 @@ Tokens are the fundamental unit of text processing for LLMs. A token is approxim
 
 ### Credit-Based (OpenAI-Compatible Endpoint)
 
-- Fixed credit cost per request (1-2 credits)
-- Wallet charge, once credits are exhausted, is a flat per-request USD amount — not derived from token counts
-- Credits deducted immediately on request start
-- If generation fails, credits are refunded
-- Token counts included in response for transparency
+- Per-token pricing in credits (input and output rated separately)
+- Charges are fractional — a two-word reply costs a fraction of a credit
+- Billed **after** the completion, from the token counts the model reports, because
+  they are not knowable before the call. A request that exhausts your balance
+  mid-flight still returns that one completion before the next call gets a `402`
+- Nothing is charged if the provider errors, so there is no refund to wait for
+- The wallet charge, once credits run out, scales with token count too
+- `billing.basis` tells you which rate was applied: `tokens` normally, or
+  `flat_fallback` in the rare case a provider branch returns no usage figures
 
 ### Token-Based (Premium Endpoint)
 
@@ -499,7 +476,7 @@ Tokens are the fundamental unit of text processing for LLMs. A token is approxim
 - Cost = (input_tokens x input_rate) + (output_tokens x output_rate)
 
 ::: tip Estimating Costs
-A typical conversational exchange (100-word prompt, 200-word response) uses approximately 75 input tokens + 150 output tokens = 225 total tokens. With gemini-flash that is roughly $0.00002 of token value. With premium `claude-sonnet-4.6`, roughly $0.0037.
+A typical conversational exchange (100-word prompt, 200-word response) uses approximately 75 input tokens + 150 output tokens = 225 total tokens. On `gemini-flash` that is 0.026 credits; on `claude-sonnet` 0.165 credits. On the premium endpoint, `claude-sonnet-4.6` works out to roughly $0.0037.
 :::
 
 ---

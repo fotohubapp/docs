@@ -232,10 +232,10 @@ A 5-second video with `veo-3.1-generate-001` costs: `12 × 5 = 60 credits`.
 
 | Model ID | Name | Credits | Unit |
 |----------|------|---------|------|
-| `gemini-flash` | Gemini Flash | 1 | per request |
-| `gemini-pro` | Gemini Pro | 2 | per request |
-| `gpt-4o` | GPT-4o | 2 | per request |
-| `claude-sonnet` | Claude Sonnet | 2 | per request |
+| `gemini-flash` | Gemini Flash | 20 in / 166.7 out | per 1M tokens |
+| `gemini-pro` | Gemini Pro | 83 in / 667 out | per 1M tokens |
+| `gpt-4o` | GPT-4o | 200 in / 1000 out | per 1M tokens |
+| `claude-sonnet` | Claude Sonnet | 200 in / 1000 out | per 1M tokens |
 | `image-analysis` | Image Analysis | 1 | per analysis |
 | `enhance-prompt` | Prompt Enhancement | 1 | per request |
 

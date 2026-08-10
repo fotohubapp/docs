@@ -1,19 +1,29 @@
 # Music & Audio
 
-Complete audio generation and processing suite. Generate original music tracks and sound effects from text descriptions, convert text to natural-sounding speech with multiple voice options, transcribe audio to text, translate audio between languages, and dub content while preserving speaker voice characteristics.
+Audio generation and processing. Generate original music tracks and sound effects from text descriptions, convert text to natural-sounding speech with multiple voice options, and transcribe audio to text. Translation and dubbing are built by composing these endpoints — see the [Dubbing Pipeline](#dubbing-pipeline).
 
 | Capability | Description | Duration/Limits |
 |------------|-------------|-----------------|
-| **Music** | AI Composition (IDA Music, MiniMax) | 5–480 seconds |
-| **SFX** | Sound Effects | instant generation |
-| **TTS** | Text-to-Speech (IDA Voice) | 30+ languages |
-| **STT** | Transcription | auto language detect |
+| **Music** | AI composition (MiniMax, ElevenLabs) | 10–300 seconds |
+| **SFX** | Sound effects | 1–30 seconds |
+| **TTS** | Text-to-speech (IDA Voice, Google, Grok, Polly, GPT Audio) | max 3000 chars/request |
+| **STT** | Transcription | max 240 minutes, auto language detect |
 
 ---
 
-## IDA Music
+## Music Generation
 
-FOTOhub's proprietary music generation engine — **IDA Music** — runs on dedicated GPU infrastructure. It generates full songs with vocals, lyrics, and complex arrangements up to 8 minutes long.
+FOTOhub generates full music tracks from a text description via two cloud
+providers. Requests are synchronous: the response carries a finished `audio_url`.
+
+::: warning Endpoint scope
+`POST /v1/ai/generate/music` generates music and nothing else. It reads `model`,
+`prompt`, `duration`, `genre`, `mood`, `bpm`, `loop` and `instrumental` — any
+other field in the body is ignored, including `mode`. There is no mastering,
+stem-separation or analysis mode on this endpoint, and no `/music/compose`
+endpoint. Sending `mode` does not switch behaviour: the request is still billed
+and served as a music generation.
+:::
 
 ### Endpoint
 
@@ -21,249 +31,33 @@ FOTOhub's proprietary music generation engine — **IDA Music** — runs on dedi
 POST /v1/ai/generate/music
 ```
 
-Use `model: "ida-music"` to route to IDA Music.
-
-**Billing:** 2 credits (≤3 min) or 4 credits (>3 min)
-
-### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `prompt` | string | **Yes** | — | Detailed description: genre, instruments, mood, vocal style, energy. |
-| `model` | string | **Yes** | — | Must be `"ida-music"` |
-| `lyrics` | string | No | — | Song lyrics with structure tags: `[verse]`, `[chorus]`, `[bridge]`, `[outro]`. Auto-generated if omitted. |
-| `duration` | integer | No | `120` | Duration in seconds. Range: 30–480. |
-| `bpm` | integer | No | auto | Target tempo (60–220 BPM). |
-| `key_scale` | string | No | auto | Musical key: `"C major"`, `"A minor"`, `"F# major"`, etc. |
-| `time_signature` | string | No | `"4/4"` | Time signature: `"4/4"`, `"3/4"`, `"6/8"`, `"5/4"`, `"7/8"`. |
-| `vocal_language` | string | No | `"en"` | Vocal language: `"en"`, `"zh"`, `"ja"`, `"ko"`, `"es"`, `"fr"`, `"de"`, `"it"`, `"pt"`, `"ru"`, `"ar"`, `"hi"`, `"instrumental"`. |
-| `vocal_gender` | string | No | `"auto"` | `"male"`, `"female"`, or `"auto"`. |
-| `is_instrumental` | boolean | No | `false` | When true, generates instrumental only (ignores lyrics/vocal params). |
-| `quality` | string | No | `"standard"` | `"draft"` (fast, 20 steps), `"standard"` (balanced, 40 steps), `"high"` (best, 50 steps), `"max"` (highest, Heun sampler). |
-| `batch_size` | integer | No | `1` | Generate 1–4 variations in one request. |
-| `seed` | integer | No | random | Reproducibility seed. |
-| `audio_format` | string | No | `"mp3"` | Output format: `"mp3"`, `"wav"`, `"flac"`. |
-
-### Quality Presets
-
-| Preset | Steps | Guidance | Sampler | Speed |
-|--------|-------|----------|---------|-------|
-| `draft` | 20 | 5.0 | Euler | ~15s |
-| `standard` | 40 | 5.0 | Euler | ~30s |
-| `high` | 50 | 7.0 | Euler | ~45s |
-| `max` | 50 | 7.0 | Heun + ADG | ~90s |
-
-### Response
-
-```json
-{
-  "model": "ida-music",
-  "credits_used": 2,
-  "audio_url": "https://gpu.fotohub.app/static/generations/ida_m_abc123.mp3",
-  "audio_urls": ["https://gpu.fotohub.app/static/generations/ida_m_abc123.mp3"],
-  "title": "Neon Pulse",
-  "lyrics": "[verse]\nCity lights are burning bright...",
-  "duration": 120,
-  "metadata": {
-    "bpm": 128,
-    "key_scale": "A minor",
-    "time_signature": "4/4",
-    "vocal_language": "en",
-    "seed": 42
-  }
-}
-```
-
-### Compose Lyrics (Free)
-
-Generate lyrics and suggested parameters using the built-in AI composer — no credits charged.
-
-```
-POST /v1/ai/generate/music/compose
-```
-
-```json
-{
-  "prompt": "Upbeat summer pop song about road trips and freedom",
-  "vocal_language": "en",
-  "vocal_gender": "female",
-  "duration": 180
-}
-```
-
-**Response:**
-```json
-{
-  "lyrics": "[verse]\nWindows down on the highway...\n[chorus]\nWe're chasing sunsets...",
-  "title": "Highway Sunsets",
-  "cover_prompt": "Retro convertible driving through desert at golden hour",
-  "suggested_bpm": 118,
-  "suggested_key": "G major",
-  "suggested_time_signature": "4/4",
-  "suggested_duration": 180,
-  "suggested_genre": "pop"
-}
-```
-
-### Lyric Structure Tags
-
-Use these tags in `lyrics` to control song structure:
-
-```
-[intro], [verse], [chorus], [bridge], [outro],
-[pre-chorus], [hook], [interlude], [break],
-[drop], [solo], [ad-lib], [fade-out]
-```
-
-### Example
-
-::: code-group
-
-```python [Python]
-import requests
-
-response = requests.post(
-    "https://apis.fotohub.app/v1/ai/generate/music",
-    headers={
-        "Authorization": "Bearer fh_live_your_api_key",
-        "Content-Type": "application/json"
-    },
-    json={
-        "prompt": "Epic cinematic orchestral piece with soaring strings, "
-                  "powerful brass, and dramatic percussion. Build from quiet "
-                  "to a thunderous climax.",
-        "model": "ida-music",
-        "duration": 180,
-        "key_scale": "D minor",
-        "time_signature": "4/4",
-        "is_instrumental": True,
-        "quality": "high",
-        "audio_format": "flac"
-    }
-)
-
-result = response.json()
-print(f"Audio: {result['audio_url']}")
-print(f"Credits: {result['credits_used']}")
-```
-
-```typescript [TypeScript]
-const response = await fetch(
-  "https://apis.fotohub.app/v1/ai/generate/music",
-  {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer fh_live_your_api_key",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      prompt: "Epic cinematic orchestral piece with soaring strings, " +
-              "powerful brass, and dramatic percussion.",
-      model: "ida-music",
-      duration: 180,
-      key_scale: "D minor",
-      time_signature: "4/4",
-      is_instrumental: true,
-      quality: "high",
-      audio_format: "flac",
-    }),
-  }
-);
-
-const result = await response.json();
-console.log(`Audio: ${result.audio_url}`);
-```
-
-```go [Go]
-package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
-)
-
-func main() {
-	payload := map[string]interface{}{
-		"prompt":          "Epic cinematic orchestral piece with soaring strings, powerful brass, and dramatic percussion.",
-		"model":           "ida-music",
-		"duration":        180,
-		"key_scale":       "D minor",
-		"time_signature":  "4/4",
-		"is_instrumental": true,
-		"quality":         "high",
-		"audio_format":    "flac",
-	}
-	body, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/music", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-	fmt.Printf("Audio: %s\n", result["audio_url"])
-	fmt.Printf("Credits: %v\n", result["credits_used"])
-}
-```
-
-```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/ai/generate/music" \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Epic cinematic orchestral piece with soaring strings, powerful brass, and dramatic percussion.",
-    "model": "ida-music",
-    "duration": 180,
-    "key_scale": "D minor",
-    "is_instrumental": true,
-    "quality": "high",
-    "audio_format": "flac"
-  }'
-```
-
-:::
-
-::: tip IDA Music vs Cloud Models
-**IDA Music** runs on FOTOhub's own GPU infrastructure, which means: lower latency for European users, no external rate limits, full control over output quality, and significantly lower cost (2–4 credits vs 5–25 for cloud models). Use IDA Music for production music, and MiniMax for quick drafts or specific vocal styles.
-:::
-
----
-
-## Music Generation (Cloud)
-
-### Endpoint
-
-```
-POST /v1/ai/generate/music
-```
-
-**Billing:** 5–25 credits (tiered by duration)
+**Billing:** 5 credits/min (`minimax`) or 12 credits/min (`elevenlabs`), per started minute
 
 ### Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | string | **Yes** | — | Detailed description of the music. Include genre, instruments, mood, energy level, and intended use case. |
-| `model` | string | No | `"minimax"` | `"minimax"` — cloud music generation with tiered pricing. |
-| `duration` | integer | No | `30` | Duration in seconds. Range: 5–180. Longer tracks cost more. |
-| `genre` | string | No | — | Genre hint: `"electronic"`, `"jazz"`, `"classical"`, `"hip-hop"`, `"ambient"`, `"rock"`, `"folk"`, `"cinematic"`. |
+| `model` | string | No | `"minimax"` | `"minimax"` or `"elevenlabs"`. Any other value returns `400` with the supported list. |
+| `duration` | integer | No | `30` | Duration in seconds. Range: **10–300**. Under 10 returns `400`; over 300 is clamped. Billed per started minute, so longer tracks cost more. |
+| `genre` | string | No* | — | Genre hint: `"electronic"`, `"jazz"`, `"classical"`, `"hip-hop"`, `"ambient"`, `"rock"`, `"folk"`, `"cinematic"`. **Required for `"elevenlabs"`** — that provider rejects a missing genre, so the call is refused with `400` before billing. |
 | `mood` | string | No | — | Mood hint: `"happy"`, `"melancholic"`, `"energetic"`, `"calm"`, `"dark"`, `"uplifting"`, `"mysterious"`. |
-| `tempo` | integer | No | `120` | Target tempo in BPM. Range: 60–200. |
+| `bpm` | integer | No | auto | Target tempo in BPM. Range: 60–200; outside that returns `400`. `tempo` is accepted as a deprecated alias. |
+| `loop` | boolean | No | `false` | Generate a seamlessly loopable track. |
 | `instrumental` | boolean | No | `true` | When true, generates instrumental-only (no vocals). Set false for vocal elements. |
 
 ### Pricing
 
-| Model | Credits | USD | Notes |
-|-------|---------|-----|-------|
-| MiniMax Music | 5 / 10 / 25 | $0.0804 | ≤30s: 5cr, ≤60s: 10cr, >60s: 25cr — flat wallet price per generation |
+Billed **per started minute**, per model — not on a duration ladder. A 90-second
+track is 2 minutes.
+
+| Model | Credits/min | Notes |
+|-------|:-----------:|-------|
+| MiniMax Music | 5 | Cloud generation, default |
+| ElevenLabs Music | 12 | Higher fidelity, `genre` required |
+
+Both endpoints are synchronous: the response carries a finished `audio_url`. If
+generation fails the charge is refunded automatically.
 
 ### Response
 
@@ -283,8 +77,9 @@ POST /v1/ai/generate/music
 }
 ```
 
-::: info Credit Tiers (MiniMax)
-MiniMax uses tiered pricing: **5 credits** for ≤30s, **10 credits** for ≤60s, **25 credits** for >60s (up to 180s).
+::: info Rounding
+Billing rounds up to the whole minute, so a 30-second and a 60-second track both
+cost one minute. A 61-second track costs two.
 :::
 
 ### Example
@@ -308,7 +103,7 @@ response = requests.post(
         "duration": 60,
         "genre": "electronic",
         "mood": "energetic",
-        "tempo": 128,
+        "bpm": 128,
         "instrumental": True
     }
 )
@@ -336,7 +131,7 @@ const response = await fetch(
       duration: 60,
       genre: "electronic",
       mood: "energetic",
-      tempo: 128,
+      bpm: 128,
       instrumental: true,
     }),
   }
@@ -365,7 +160,7 @@ func main() {
 		"duration":     60,
 		"genre":        "electronic",
 		"mood":         "energetic",
-		"tempo":        128,
+		"bpm":          128,
 		"instrumental": true,
 	}
 	body, _ := json.Marshal(payload)
@@ -398,7 +193,7 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/music" \
     "duration": 60,
     "genre": "electronic",
     "mood": "energetic",
-    "tempo": 128,
+    "bpm": 128,
     "instrumental": true
   }'
 ```
@@ -547,8 +342,8 @@ POST /v1/ai/generate/speech
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `text` | string | **Yes** | — | Text to synthesize. Max 5000 characters. Supports SSML for advanced control. |
-| `model` | string | No | `"google"` | TTS engine: `"google"` (fast, cost-effective), `"ida-voice"` (natural, cloned voices) or `"grok"` (26 multilingual voices, cheapest). |
+| `text` | string | **Yes** | — | Text to synthesize. Max **3000** characters, or **1200** for `"ida-voice"` / `"ida-voice-pro"` — see the length limits note below. Over the limit returns `400` before anything is billed. |
+| `model` | string | No | `"google"` | TTS engine: `"google"` (fast, cost-effective), `"ida-voice-pro"` (natural, premium), `"ida-voice"` (self-hosted, voice cloning) or `"grok"` (26 multilingual voices, cheapest). `"elevenlabs"` is accepted as a legacy alias for `"ida-voice-pro"`. |
 | `voice_id` | string | No | — | Voice preset ID. Google: `"pl-PL-Standard-A"`, `"en-US-Neural2-F"`. IDA Voice: custom voice ID from dashboard. Grok: `"eve"`, `"ara"`, `"leo"` and 23 more — see [Grok voices](#grok-voices). |
 | `language` | string | No | `"en"` | Target language: `"pl"`, `"en"`, `"de"`, `"fr"`, `"es"`. |
 | `speed` | number | No | `1.0` | Speech speed multiplier. Range: 0.5–2.0. |
@@ -561,6 +356,19 @@ POST /v1/ai/generate/speech
 | Grok Voice | 0.7 | $0.0375 | per 1000 characters, 26 multilingual voices |
 | Google Cloud TTS | 1 | $0.0241 | per 1000 characters, fast |
 | IDA Voice Pro | 2 | $0.0482 | per 1000 characters, natural voice, cloning |
+
+Billed per 1000 characters, not per request, and the block count is fractional
+above the first one — a 2500-character synthesis bills 2.5 blocks, not 3. The
+first block is always charged in full, so anything under 1000 characters costs
+one block. `characters_processed` in the response is the figure billed.
+
+::: warning Length limits are transport limits
+This endpoint is synchronous and the gateway cuts a proxied request at 100
+seconds. `"ida-voice"` renders roughly 0.058s per character, so its 1200-character
+cap is about 70 seconds of synthesis plus headroom for the upload — a higher cap
+would sell a request that cannot finish. If a long call does time out the charge
+is refunded, but the request is still lost, so split long texts client-side.
+:::
 
 ### Grok voices
 
@@ -1099,18 +907,30 @@ Returns both transcription and summary in a single call (3 credits).
 POST /v1/ai/transcribe
 ```
 
-**Billing:** 1 credit per minute of audio (`"default"`), 0.3 credits per started minute (`"grok"`)
+**Billing:** 0.3 credits per started minute of input audio, both models
 
 ### Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `audio_url` | string | **Yes** | — | URL of audio file (MP3, WAV, M4A, FLAC, OGG, WebM). Max 500MB, max 4 hours. |
-| `model` | string | No | `"default"` | `"default"` (diarization, emotion analysis) or `"grok"` (faster, per-word timestamps, 0.3 credits/minute). |
-| `language` | string | No | `"auto"` | Source language or `"auto"` for detection. Options: `"pl"`, `"en"`, `"de"`, `"fr"`, `"es"`. |
-| `mode` | string | No | `"transcribe"` | `"transcribe"` (same language), `"translate"` (to English), or `"dub"` (re-synthesize in target language). Not supported by `"grok"`. |
-| `timestamps` | boolean | No | `true` | Include word-level timestamps for subtitle generation. |
-| `diarize` | boolean | No | `false` | Enable speaker diarization (identify different speakers). Not supported by `"grok"`. |
+| `audio_url` | string | **Yes** | — | URL of audio file (MP3, WAV, M4A, MP4, FLAC, OGG, WebM). Max **240 minutes**; longer returns `400` before billing. |
+| `model` | string | No | `"default"` | `"default"` or `"grok"` (per-word timestamps). Both bill 0.3 credits per started minute. |
+| `language` | string | No | `"auto"` | Source language or `"auto"` for detection. |
+
+The duration is measured from the file itself, then rounded up to whole minutes —
+a 90-second clip bills 2 minutes. `minutes_billed` in the response is the figure
+charged. If the header is unreadable the charge is one minute, the smallest
+honest amount. A failed transcription is refunded automatically.
+
+::: warning No translate or dub mode
+This endpoint transcribes in the source language. It reads only `audio_url`,
+`language` and `model` — `mode`, `timestamps` and `diarize` are ignored, so
+sending `mode: "translate"` or `mode: "dub"` returns a plain transcript and still
+bills for it. To translate, pass the transcript to
+[`/v1/ai/chat/completions`](/api/chat-llm); to dub, feed the translation to
+[`/v1/ai/generate/speech`](#text-to-speech). The
+[Dubbing Pipeline](#dubbing-pipeline) below shows both steps.
+:::
 
 #### Grok transcription
 
@@ -1280,305 +1100,6 @@ curl -X POST "https://apis.fotohub.app/v1/ai/transcribe" \
 ```
 
 :::
-
----
-
-## Audio Translation
-
-Uses the same endpoint as transcription with `mode: "translate"`.
-
-```
-POST /v1/ai/transcribe
-```
-
-**Billing:** 2 credits per minute of audio
-
-Set `"mode": "translate"` to translate any spoken audio to English text.
-
-### Response
-
-```json
-{
-  "credits_used": 4,
-  "billing": {
-    "method": "credits",
-    "credits_used": 4,
-    "usd_charged": 0,
-    "pln_charged": 0
-  },
-  "text": "Good morning, I would like to order a graphic design project for my company...",
-  "source_language": "pl",
-  "target_language": "en",
-  "duration_minutes": 2.0,
-  "confidence": 0.94
-}
-```
-
-::: info
-Audio translation always outputs English text, regardless of source language. The source language is auto-detected and reported in the response.
-:::
-
----
-
-## Audio Dubbing
-
-Translate and re-synthesize audio while preserving the original speaker's voice characteristics.
-
-```
-POST /v1/ai/transcribe
-```
-
-**Billing:** 5 credits per minute of audio
-
-### Additional Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `mode` | string | **Yes** | Must be `"dub"` |
-| `target_language` | string | **Yes** | Target language: `"pl"`, `"en"`, `"de"`, `"fr"`, `"es"` |
-| `preserve_timing` | boolean | No | Match original speech timing for video sync (default: true) |
-
-### Response
-
-```json
-{
-  "credits_used": 15,
-  "billing": {
-    "method": "credits",
-    "credits_used": 15,
-    "usd_charged": 0,
-    "pln_charged": 0
-  },
-  "audio_url": "https://s1.fotohub.app/storage/v1/object/public/generations/dubbed/dub_q2w3e4.mp3",
-  "source_language": "pl",
-  "target_language": "en",
-  "duration_minutes": 3.0,
-  "speakers_detected": 2,
-  "format": "mp3"
-}
-```
-
-### Example
-
-::: code-group
-
-```python [Python]
-import requests
-
-# Dub a Polish podcast episode into English
-response = requests.post(
-    "https://apis.fotohub.app/v1/ai/transcribe",
-    headers={
-        "Authorization": "Bearer fh_live_your_api_key",
-        "Content-Type": "application/json"
-    },
-    json={
-        "audio_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/podcast-ep01.mp3",
-        "mode": "dub",
-        "target_language": "en",
-        "preserve_timing": True
-    }
-)
-
-result = response.json()
-print(f"Dubbed audio: {result['audio_url']}")
-print(f"Source: {result['source_language']} -> Target: {result['target_language']}")
-print(f"Speakers detected: {result['speakers_detected']}")
-print(f"Credits used: {result['credits_used']}")
-```
-
-```typescript [TypeScript]
-const response = await fetch(
-  "https://apis.fotohub.app/v1/ai/transcribe",
-  {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer fh_live_your_api_key",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      audio_url: "https://s1.fotohub.app/storage/v1/object/public/uploads/podcast-ep01.mp3",
-      mode: "dub",
-      target_language: "en",
-      preserve_timing: true,
-    }),
-  }
-);
-
-const result = await response.json();
-console.log(`Dubbed audio: ${result.audio_url}`);
-console.log(`Source: ${result.source_language} -> Target: ${result.target_language}`);
-console.log(`Speakers detected: ${result.speakers_detected}`);
-console.log(`Credits used: ${result.credits_used}`);
-```
-
-```go [Go]
-package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
-)
-
-func main() {
-	payload := map[string]interface{}{
-		"audio_url":       "https://s1.fotohub.app/storage/v1/object/public/uploads/podcast-ep01.mp3",
-		"mode":            "dub",
-		"target_language": "en",
-		"preserve_timing": true,
-	}
-	body, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/transcribe", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-	fmt.Printf("Dubbed audio: %s\n", result["audio_url"])
-	fmt.Printf("Source: %s -> Target: %s\n", result["source_language"], result["target_language"])
-	fmt.Printf("Speakers detected: %v\n", result["speakers_detected"])
-	fmt.Printf("Credits used: %v\n", result["credits_used"])
-}
-```
-
-```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/ai/transcribe" \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "audio_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/podcast-ep01.mp3",
-    "mode": "dub",
-    "target_language": "en",
-    "preserve_timing": true
-  }'
-```
-
-:::
-
-::: warning Processing Time
-Audio dubbing is the most computationally intensive audio operation. Expect processing times of 2–5× the audio duration. For files longer than 10 minutes, the response will include a `job_id` for asynchronous polling.
-:::
-
----
-
-## Audio Mastering
-
-Professional mastering chain — applies EQ, compression, limiting, stereo imaging, and loudness normalization.
-
-```
-POST /v1/ai/generate/music
-```
-
-Set `"mode": "master"` to use the mastering pipeline instead of generation.
-
-**Billing:** 3 credits per track
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `audio_url` | string | **Yes** | URL of the audio file to master |
-| `mode` | string | **Yes** | Must be `"master"` |
-| `preset` | string | No | Mastering preset: `"streaming"` (Spotify/YouTube), `"cd"` (dynamic), `"podcast"` (voice-optimized), `"loud"` (maximum loudness) |
-| `target_lufs` | number | No | Target integrated loudness (default: -14 LUFS for streaming) |
-| `format` | string | No | Output: `"wav"` (24-bit), `"flac"`, `"mp3"` (320kbps) |
-
----
-
-## Stem Separation (Demucs)
-
-Separate a mixed audio track into individual stems using Meta's Demucs model.
-
-```
-POST /v1/ai/generate/music
-```
-
-Set `"mode": "stems"` to split audio into components.
-
-**Billing:** 3 credits per track
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `audio_url` | string | **Yes** | URL of the mixed audio file |
-| `mode` | string | **Yes** | Must be `"stems"` |
-| `stems` | integer | No | Number of stems: `2` (vocals + instrumental), `4` (vocals + drums + bass + other), `6` (adds piano + guitar). Default: 4. |
-| `format` | string | No | Output format per stem: `"wav"`, `"flac"`, `"mp3"` |
-
-### Response
-
-```json
-{
-  "credits_used": 3,
-  "stems": {
-    "vocals": "https://gpu.fotohub.app/static/stems/abc123_vocals.wav",
-    "drums": "https://gpu.fotohub.app/static/stems/abc123_drums.wav",
-    "bass": "https://gpu.fotohub.app/static/stems/abc123_bass.wav",
-    "other": "https://gpu.fotohub.app/static/stems/abc123_other.wav"
-  },
-  "duration_seconds": 245
-}
-```
-
----
-
-## Audio Analysis
-
-Analyze audio properties: BPM, musical key, loudness (LUFS), dynamic range, frequency spectrum.
-
-```
-POST /v1/ai/generate/music
-```
-
-Set `"mode": "analyze"` for analysis (free, no credits).
-
-### Response
-
-```json
-{
-  "bpm": 128,
-  "key": "A minor",
-  "time_signature": "4/4",
-  "loudness_lufs": -8.2,
-  "dynamic_range_db": 6.4,
-  "peak_db": -0.3,
-  "duration_seconds": 234.5
-}
-```
-
----
-
-## ACE-Step Composition
-
-AI-powered music composition using the ACE-Step model — creates structured compositions with lyrics support.
-
-```
-POST /v1/ai/generate/music
-```
-
-Set `"model": "ace-step"` to use ACE-Step.
-
-**Billing:** 3 credits per composition
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `prompt` | string | **Yes** | Musical description (genre, mood, instruments, style) |
-| `model` | string | **Yes** | Must be `"ace-step"` |
-| `lyrics` | string | No | Song lyrics with structure tags |
-| `duration` | integer | No | Duration in seconds (30-300) |
-| `seed` | integer | No | Reproducibility seed |
 
 ---
 
@@ -1840,31 +1361,24 @@ Quick reference for choosing the right model for your use case.
 
 | Category | Model | Credits | USD Cost | Best For |
 |----------|-------|---------|----------|----------|
-| **Music** | IDA Music (≤3 min) | 2 | $0.1072 | Production music, European latency |
-| **Music** | IDA Music (>3 min) | 4 | $0.2144 | Long-form compositions, albums |
-| **Music** | MiniMax (≤30s) | 5 | $0.0804 | Short jingles, quick drafts |
-| **Music** | MiniMax (≤60s) | 10 | $0.0804 | Medium tracks, ads |
-| **Music** | MiniMax (>60s) | 25 | $0.0804 | Full tracks via cloud |
-| **Music** | ElevenLabs Music | 10 | $0.2010 | Vocal-focused tracks |
-| **Music** | ACE-Step | 3 | $0.1608 | Structured compositions with lyrics |
-| **SFX** | ElevenLabs SFX | 3 | $0.0603 | Sound effects, foley |
-| **TTS** | Google Cloud TTS | 1 | $0.0241 | Budget TTS, per 1K chars |
-| **TTS** | IDA Voice Pro | 2 | $0.0482 | Natural voice, cloning, per 1K chars |
-| **TTS** | GPT Audio 1.5 | 2 | $0.1072 | Premium quality, voice instructions |
-| **TTS** | Polly (Neural) | 1 per 10K | $0.0536 | Bulk narration, 106 voices |
-| **Transcription** | Whisper | 1 | $0.0161 | Per minute of audio |
-| **Transcription** | Voxtral Small | 2 | $0.1072 | LLM-quality context |
-| **Transcription** | Voxtral Mini | 1 | $0.0536 | Fast transcription |
-| **Translation** | Whisper Translate | 2 | $0.0322 | Per minute, to English |
-| **Dubbing** | FOTOhub Dub | 5 | $0.1206 | Per minute, voice preserved |
-| **Mastering** | FOTOhub Master | 3 | $0.0402 | Per track |
-| **Stems** | Demucs | 3 | $0.0804 | Per track, 2/4/6 stems |
-| **Analysis** | FOTOhub Analyze | 0 | Free | BPM, key, loudness |
+| **Music** | MiniMax | 5 / min | Jingles, drafts, full tracks |
+| **Music** | ElevenLabs Music | 12 / min | Higher fidelity, `genre` required |
+| **SFX** | ElevenLabs SFX | 3 | Sound effects, foley — fixed per generation |
+| **TTS** | Grok Voice | 0.7 / 1K chars | Cheapest, 26 multilingual voices |
+| **TTS** | Google Cloud TTS | 1 / 1K chars | Budget TTS, fast |
+| **TTS** | IDA Voice / Pro | 2 / 1K chars | Natural voice, cloning |
+| **TTS** | GPT Audio 1.5 | 2 per request | Premium quality, voice instructions |
+| **TTS** | Polly (Neural) | 1 per 10K chars | Bulk narration, 106 voices |
+| **Transcription** | Default | 0.3 / min | Diarization, emotion analysis |
+| **Transcription** | Grok | 0.3 / min | Per-word timestamps |
+| **Transcription** | Voxtral Small | 2 per file | LLM-quality context |
+| **Transcription** | Voxtral Mini | 1 per file | Fast transcription |
 
 ::: info Choosing a TTS Model
-- **Google Cloud TTS** (1 cr) — fast, cost-effective, good for UI narration and notifications
-- **IDA Voice Pro** (2 cr) — natural prosody, supports voice cloning, best for branded voices
-- **GPT Audio 1.5** (2 cr) — highest quality, supports freeform style instructions, ideal for podcasts and audiobooks
+- **Grok Voice** (0.7 cr/1K) — cheapest, one voice speaks any language
+- **Google Cloud TTS** (1 cr/1K) — fast, cost-effective, good for UI narration and notifications
+- **IDA Voice Pro** (2 cr/1K) — natural prosody, supports voice cloning, best for branded voices
+- **GPT Audio 1.5** (2 cr/request) — highest quality, supports freeform style instructions, ideal for podcasts and audiobooks
 - **Polly** (1 cr/10K chars) — cheapest for bulk content, 106 voices across 41 languages
 :::
 
@@ -1881,24 +1395,25 @@ Quick reference for choosing the right model for your use case.
 
 ## Pricing Summary
 
-| Service | Model | Credits | USD Cost | Unit |
-|---------|-------|---------|----------|------|
-| Music | IDA Music (≤3 min) | 2 | $0.1072 | per generation |
-| Music | IDA Music (>3 min) | 4 | $0.2144 | per generation |
-| Music | MiniMax | 5–25 | $0.0804 | flat, whatever the duration tier |
-| Music | ElevenLabs | 10 | $0.2010 | per generation |
-| Music | ACE-Step | 3 | $0.1608 | per composition |
-| Sound Effects | ElevenLabs SFX | 3 | $0.0603 | fixed per generation |
-| TTS | Google Cloud | 1 | $0.0241 | per 1000 characters |
-| TTS | IDA Voice Pro | 2 | $0.0482 | per 1000 characters |
-| TTS | GPT Audio 1.5 | 2 | $0.1072 | per request |
-| TTS | Polly (Neural) | 1 | $0.0536 | per 10,000 characters |
-| Transcription | Whisper | 1 | $0.0161 | per minute of audio |
-| Transcription | Voxtral Small | 2 | $0.1072 | per audio file |
-| Translation | — | 2 | $0.0322 | per minute of audio |
-| Dubbing | — | 5 | $0.1206 | per minute of audio |
-| Mastering | — | 3 | $0.0402 | per track |
-| Stems | Demucs | 3 | $0.0804 | per track |
+| Service | Model | Credits | Unit |
+|---------|-------|---------|------|
+| Music | MiniMax | 5 | per started minute |
+| Music | ElevenLabs | 12 | per started minute |
+| Sound Effects | ElevenLabs SFX | 3 | fixed per generation |
+| TTS | Grok Voice | 0.7 | per 1000 characters |
+| TTS | Google Cloud | 1 | per 1000 characters |
+| TTS | IDA Voice / Pro | 2 | per 1000 characters |
+| TTS | GPT Audio 1.5 | 2 | per request |
+| TTS | Polly (Neural) | 1 | per 10,000 characters |
+| Transcription | Default | 0.3 | per started minute |
+| Transcription | Grok | 0.3 | per started minute |
+| Transcription | Voxtral Mini | 1 | per audio file |
+| Transcription | Voxtral Small | 2 | per audio file |
+
+Character-billed endpoints charge fractional blocks above the first (2500 chars =
+2.5 blocks); minute-billed endpoints round up to the whole minute. Every response
+reports what was charged in `credits_used`, alongside `characters_processed` or
+`minutes_billed`.
 
 ## Error Responses
 

@@ -11,10 +11,12 @@ FOTOhub offers **dual billing** — pick what fits your workload:
 Fixed cost per operation. Best for production workloads where you need cost certainty.
 
 ```
-1 credit = 1 chat response (flash-tier models)
 2 credits = 1 image (Seedream, FLUX Pro)
 5 credits = 1 premium image (Imagen 4 Ultra)
 ```
+
+Chat is the exception: it bills per token, in fractions of a credit. See
+[Chat / LLM Costs](#chat-llm-costs) below.
 
 ### Tokens (Precise)
 
@@ -78,16 +80,20 @@ credits/s at 720p because the input frames bill too.
 
 ## Chat / LLM Costs
 
-The credit-based chat endpoint (`/v1/ai/chat/completions`) bills a flat **1 credit** for flash-tier models and **2 credits** for all others, per request.
+The chat endpoint (`/v1/ai/chat/completions`) bills the tokens you actually use,
+in credits, and the charge is fractional — a short reply costs a fraction of one
+credit. Output tokens cost 4-8x input, so the two are rated separately.
 
-| Model | Credits/response |
-|-------|-----------------|
-| `gemini-flash` | 1.0 |
-| `gemini-pro` | 2.0 |
-| `gpt-4o` | 2.0 |
-| `claude-sonnet` | 2.0 |
+| Model | Credits/1M in | Credits/1M out |
+|-------|--------------:|---------------:|
+| `gemini-flash` | 20 | 166.7 |
+| `gemini-pro` | 83 | 667 |
+| `gpt-4o` | 200 | 1000 |
+| `claude-sonnet` | 200 | 1000 |
 
-For exact per-token billing on premium models, use the token-based endpoint (`/v1/ai/chat/claude`). See the [Chat/LLM reference](/api/chat-llm) for token rates.
+A 75-token prompt with a 150-token answer is 0.026 credits on `gemini-flash`.
+For billing in USD with a per-request `cost_breakdown`, use the premium endpoint
+(`/v1/ai/chat/claude`). See the [Chat/LLM reference](/api/chat-llm).
 
 ## Free Operations
 

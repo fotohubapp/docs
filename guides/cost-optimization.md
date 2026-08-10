@@ -25,7 +25,7 @@ Credits are consumed first. When depleted, the system falls back to wallet billi
 |----------|-------|---------|
 | Image generation | 1-5 credits | seedream-5-0-260128 = 2 credits |
 | Video generation | 8-15 credits (per 5s) | wan2.2-t2v-plus = 6 credits/5s |
-| Chat / text | 1-2 credits | gemini-flash = 1 credit |
+| Chat / text | per token, fractional | gemini-flash = 0.026 cr for a short exchange |
 | Audio / TTS | 1-3 credits | IDA Voice = 1 credit |
 | Music generation | 3-8 credits | music generation = 3 credits |
 
@@ -483,7 +483,7 @@ Review your usage weekly. The top 3 models by spend are usually where optimizati
 |------|-------------|---------------|---------|
 | Product photo | flux-2-klein-4b (1 cr) | imagen-4-ultra (5 cr) | 80% |
 | Social video | wan2.2-t2v-plus (6 cr / 5s) | veo-3.1-generate-001 (60 cr / 5s) | 90% |
-| Chat summary | gemini-flash (1 cr) | claude-sonnet (2 cr) | 50% |
+| Chat summary | gemini-flash (0.026 cr) | claude-sonnet (0.165 cr) | 84% |
 | TTS narration | IDA Voice (1 cr) | — | — |
 | Bulk 100 images | 100 credits | 500 credits (premium) | 80% |
 
