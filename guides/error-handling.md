@@ -879,32 +879,48 @@ except ServerError as e:
 
 ## Idempotency
 
-For critical operations, use idempotency keys to prevent duplicate charges:
+Retrying a request that charges credits risks paying for the same work twice —
+the dangerous case is a timeout or a `504` that arrives *after* the generation
+already started. The `X-Idempotency-Key` header closes that gap: a repeat with
+the same key within 24 hours returns the original response instead of running
+the operation again.
+
+### With an SDK: automatic
+
+Both official SDKs retry on their own (three attempts by default), so from
+version **1.10.0** they mint one key per logical call and reuse it across that
+call's retries. You do not have to do anything — the code you already have is
+protected:
 
 ::: code-group
 ```python [Python]
-import uuid
-
-# Generate a unique key per logical operation
-idempotency_key = str(uuid.uuid4())
-
+# fotohub >= 1.10.0 — the retries inside this call share one
+# X-Idempotency-Key, so a timeout after the render started is replayed,
+# not charged again.
 result = client.generate_image(
     prompt="Product photo",
     model="seedream-5-0-260128",
-    idempotency_key=idempotency_key,  # Safe to retry
 )
 ```
 ```typescript [TypeScript]
-import { randomUUID } from "crypto";
-
-const idempotencyKey = randomUUID();
-
+// fotohub >= 1.10.0 — same guarantee, nothing to pass.
 const result = await client.generateImage({
   prompt: "Product photo",
   model: "seedream-5-0-260128",
-  idempotencyKey, // Safe to retry
 });
 ```
+:::
+
+Two separate calls always get two different keys, even with identical
+arguments: asking twice means you want two generations, and collapsing them
+would lose one you paid for.
+
+### Calling the API directly
+
+Send the header yourself, and reuse the same value for every retry of the same
+logical operation:
+
+::: code-group
 ```go [Go]
 package main
 
@@ -914,25 +930,34 @@ import (
 )
 
 func main() {
+    // One key for the operation — reused by every retry of it.
     idempotencyKey := uuid.New().String()
 
     req, _ := http.NewRequest("POST",
         "https://apis.fotohub.app/v1/ai/generate/image", nil)
-    req.Header.Set("Idempotency-Key", idempotencyKey)
+    req.Header.Set("X-Idempotency-Key", idempotencyKey)
     // ... rest of request
 }
 ```
 ```bash [cURL]
-# Idempotency key prevents duplicate charges on retry
+# Reusing this key on a retry replays the first result instead of charging again
 IDEM_KEY=$(uuidgen)
 
 curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: $IDEM_KEY" \
+  -H "X-Idempotency-Key: $IDEM_KEY" \
   -d '{"prompt": "Product photo", "model": "seedream-5-0-260128"}'
 ```
 :::
+
+A replayed response carries `Idempotent-Replay: true`, which is how you tell it
+from a fresh, separately charged execution. If your first attempt is still
+running you get `409` with `Retry-After` — retry to collect its result. Reusing
+a key with a *different* body is `422`, not a replay.
+
+See [Idempotency](/api/errors#idempotency) for the full rules and which
+endpoints are covered.
 
 ---
 

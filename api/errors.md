@@ -283,8 +283,14 @@ Recommended defaults:
 | 502 Bad Gateway | Retry | Exponential backoff (start at 5s) |
 | 503 Service Unavailable | Retry | Exponential backoff (start at 5s) |
 | 504 Gateway Timeout | Retry | Exponential backoff (start at 5s) |
+| 409 **on a request carrying `X-Idempotency-Key`** | Retry | Use `Retry-After`; your own earlier attempt is still in flight |
 | 400/401/402/403/404/409/422 | Do NOT retry | Fix request and resubmit |
 | Network timeout | Retry | Exponential backoff + use idempotency key |
+
+The two 409 rows are not a contradiction: with an idempotency key a 409 means
+*"the request you already sent with this key is still running"*, so waiting
+collects its result. Without a key it is an ordinary conflict and retrying it
+changes nothing. See [Idempotency](#idempotency).
 
 ### Implementation — Retry with Exponential Backoff
 
@@ -1010,15 +1016,47 @@ fi
 
 To safely retry requests without risking duplicate charges or duplicate generations, include the `X-Idempotency-Key` header. If a request with the same key is received within 24 hours, the API returns the original cached response without re-executing the operation.
 
+::: tip Using an SDK? This is already handled
+The Python and TypeScript SDKs retry automatically (three attempts by default),
+which is exactly the situation this header exists for. From version **1.10.0**
+they mint one key per logical call and reuse it across that call's retries, so
+a timeout arriving after a render already started is replayed rather than
+charged again. Nothing to pass — but do upgrade if you are below 1.10.0.
+
+Two separate calls always get two different keys, even with identical
+arguments: asking twice means you want two generations.
+:::
+
 ### Rules
 
 ::: warning Important
 - Keys must be unique per distinct operation (use UUIDs).
 - Keys expire after 24 hours.
-- Same key + different request body = returns the original cached response (not the new request).
+- Same key + **different** request body = `422`. The key is not reused for a new
+  request, and the earlier response is not returned in its place — silently
+  answering a new prompt with an old image would be indistinguishable from a bug.
 - Keys are scoped to your API key — different API keys can use the same idempotency key independently.
 - Only applicable to mutating operations (POST, PUT, PATCH). GET requests are naturally idempotent.
+- Applies to the generation and media endpoints (`/v1/ai/*`, `/v1/images/*`,
+  `/v1/video/*`, `/v1/shorts/*`, `/v1/story/*`, `/v1/3d/*`, `/v1/voice/*`) —
+  the calls that spend credits. Streaming endpoints are excluded, because a
+  buffered stream could not be replayed and would have to be held back in full
+  before the first byte reached you: `/v1/ai/chat/*`, `/v1/ai/agent/stream`,
+  `/v1/ai/gabriel/*`, `/v1/ai/tts/*` and `/v1/story/generate`.
 :::
+
+### Responses
+
+| Situation | Status | What it means |
+|-----------|--------|---------------|
+| First request with this key | normal response | The operation ran and was charged once. |
+| Repeat, first one finished | original response + `Idempotent-Replay: true` | Replayed from cache. Nothing was charged again. |
+| Repeat, first one still running | `409` + `Retry-After` | Your original call is in flight. Retry shortly to collect its result; the operation is charged once. |
+| Same key, different body | `422` | Use a new key for a new request. |
+| First attempt failed (4xx/5xx) | the error | Nothing is cached, so the same key can be retried freely. |
+
+The `Idempotent-Replay: true` response header is how you tell a replay from a
+fresh, separately charged execution without comparing bodies.
 
 ### Implementation
 
@@ -1067,10 +1105,16 @@ def generate_with_idempotency(prompt: str, max_retries: int = 3) -> dict:
             if response.status_code < 400:
                 return response.json()
 
-            # Retryable errors — safe to retry with same idempotency key
-            if response.status_code in (429, 500, 502, 503, 504):
+            # Retryable errors — safe to retry with same idempotency key.
+            # 409 belongs here ONLY because we are sending an idempotency key:
+            # it means our own earlier attempt is still in flight, so waiting
+            # collects its result. Without a key, 409 is a real conflict.
+            if response.status_code in (409, 429, 500, 502, 503, 504):
                 if attempt < max_retries - 1:
                     delay = min(1 * (2 ** attempt), 30) + random.uniform(0, 1)
+                    retry_after = response.headers.get("retry-after")
+                    if retry_after:
+                        delay = max(delay, float(retry_after))
                     print(f"Retrying ({attempt + 1}/{max_retries}) in {delay:.1f}s...")
                     time.sleep(delay)
                     continue
@@ -1141,10 +1185,17 @@ async function generateWithIdempotency(
         return response.json();
       }
 
-      // Retryable errors — safe to retry with same idempotency key
-      if ([429, 500, 502, 503, 504].includes(response.status)) {
+      // Retryable errors — safe to retry with same idempotency key.
+      // 409 belongs here ONLY because we send an idempotency key: it means our
+      // own earlier attempt is still in flight, so waiting collects its result.
+      // Without a key, 409 is a real conflict and must not be retried.
+      if ([409, 429, 500, 502, 503, 504].includes(response.status)) {
         if (attempt < maxRetries - 1) {
-          const delay = Math.min(1000 * Math.pow(2, attempt), 30000);
+          const retryAfter = Number(response.headers.get("retry-after")) * 1000;
+          const delay = Math.max(
+            Math.min(1000 * Math.pow(2, attempt), 30000),
+            Number.isFinite(retryAfter) ? retryAfter : 0
+          );
           const jitter = Math.random() * 1000;
           console.warn(`Retrying (${attempt + 1}/${maxRetries}) in ${((delay + jitter) / 1000).toFixed(1)}s...`);
           await new Promise((r) => setTimeout(r, delay + jitter));
@@ -1208,8 +1259,11 @@ func generateWithIdempotency(prompt string, maxRetries int) (map[string]interfac
 		"height": 1024,
 	})
 
+	// 409 is retryable here ONLY because we send an idempotency key: it means
+	// our own earlier attempt is still in flight. Without a key it is a real
+	// conflict and must not be retried.
 	retryableStatusCodes := map[int]bool{
-		429: true, 500: true, 502: true, 503: true, 504: true,
+		409: true, 429: true, 500: true, 502: true, 503: true, 504: true,
 	}
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
