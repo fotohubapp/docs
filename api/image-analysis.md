@@ -26,20 +26,30 @@ POST /v1/ai/analyze/image
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `image_url` | string | Yes | -- | URL of the image to analyze. Must be publicly accessible or a FOTOhub storage URL. Supports JPEG, PNG, WebP, and GIF (first frame). Maximum file size: 20MB. |
-| `features` | string[] | No | `["labels"]` | Array of analysis features to run. Options: `"labels"`, `"faces"`, `"nsfw"`, `"ocr"`, `"colors"`, `"objects"`. Multiple features can be combined in a single request. |
-| `language` | string | No | `"en"` | Language for label and description output. Supported: `"en"` (English), `"pl"` (Polish), `"de"` (German), `"fr"` (French), `"es"` (Spanish). OCR extracts text in any language regardless of this setting. |
-| `max_labels` | integer | No | `10` | Maximum number of labels to return when using the labels feature. Range: 1-50. Labels are returned in descending confidence order. |
-| `min_confidence` | number | No | `0.5` | Minimum confidence threshold (0.0-1.0) for returned results. Lower values return more results but may include less accurate detections. |
+| `features` | string[] | No | `["labels", "objects"]` | Array of analysis features to run. Options: `"labels"`, `"objects"`, `"faces"`, `"nsfw"`, `"ocr"`, `"colors"`, `"landmarks"`, `"logos"`. `"text"` is an alias for `"ocr"` and `"safe_search"` for `"nsfw"`. Multiple features can be combined in a single request. An unrecognised name returns `400` — it is not ignored. |
+| `language` | string | No | `"en"` | Language hint passed to the provider. It biases OCR toward the expected script; label names are always returned in English. Send `"auto"` to omit the hint entirely. |
+| `max_labels` | integer | No | `50` | Maximum number of labels to return when using the labels feature. Range: 1-50. Labels are returned in descending confidence order. |
+| `min_confidence` | number | No | `0` | Minimum confidence threshold (0.0-1.0), applied to `labels`, `objects` and `faces`. `nsfw` and `ocr` carry no numeric score, so the threshold does not apply to them. Default `0` returns everything the provider found. |
 
 ::: tip Fixed Cost
-Image analysis costs a flat **1 credit** per request ($0.0161 billed from your USD wallet once included credits are exhausted), regardless of how many features you select. Analyzing all 6 features in a single request is more cost-effective than making 6 separate calls.
+Image analysis costs a flat **1 credit** per request ($0.0161 billed from your USD wallet once included credits are exhausted), regardless of how many features you select. Requesting every feature in a single call is therefore cheaper than making one call per feature.
 :::
 
 ---
 
 ## Response Format
 
-The response includes only the features you requested. Each feature returns its results under a dedicated key in the response object.
+The response includes only the features you requested. Each feature returns its
+results under a dedicated key in the response object.
+
+::: warning Confidence scores and bounding boxes
+Not every annotation carries a numeric confidence. Face detection and content
+safety return **likelihood buckets** (`VERY_UNLIKELY` … `VERY_LIKELY`), not
+floats, and OCR blocks carry no per-block confidence at all. Bounding boxes come
+back in two coordinate systems, so always read `bounding_box.units`: `"pixels"`
+for faces and OCR, `"normalized"` (0-1 fractions of width and height) for
+objects.
+:::
 
 ### Full Analysis Response (All Features)
 
@@ -49,150 +59,133 @@ The response includes only the features you requested. Each feature returns its 
   "billing": {
     "method": "credits",
     "credits_used": 1,
-    "usd_charged": 0,
-    "pln_charged": 0
+    "usd_charged": 0
   },
   "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/photo.jpg",
   "features_analyzed": ["labels", "faces", "nsfw", "ocr", "colors", "objects"],
+  "auto_tags": ["outdoor", "mountain", "landscape", "person", "backpack"],
   "labels": [
     { "name": "outdoor", "confidence": 0.98 },
     { "name": "mountain", "confidence": 0.95 },
     { "name": "landscape", "confidence": 0.94 },
     { "name": "nature", "confidence": 0.92 },
-    { "name": "sky", "confidence": 0.91 },
-    { "name": "sunset", "confidence": 0.87 },
-    { "name": "clouds", "confidence": 0.82 }
+    { "name": "sky", "confidence": 0.91 }
   ],
   "faces": [
     {
-      "bounding_box": { "x": 120, "y": 80, "width": 150, "height": 180 },
+      "bounding_box": { "x": 120, "y": 80, "width": 150, "height": 180, "units": "pixels" },
       "confidence": 0.97,
-      "attributes": {
-        "age_estimate": 32,
-        "gender": "female",
-        "emotion": "happy",
-        "glasses": false,
-        "beard": false
+      "likelihood": {
+        "joy": "VERY_LIKELY",
+        "sorrow": "VERY_UNLIKELY",
+        "anger": "VERY_UNLIKELY",
+        "surprise": "UNLIKELY",
+        "headwear": "VERY_UNLIKELY",
+        "blurred": "VERY_UNLIKELY"
       }
     }
   ],
   "nsfw": {
     "is_safe": true,
-    "scores": {
-      "safe": 0.97,
-      "suggestive": 0.02,
-      "adult": 0.005,
-      "violence": 0.003,
-      "gore": 0.001
+    "likelihood": {
+      "adult": "VERY_UNLIKELY",
+      "violence": "VERY_UNLIKELY",
+      "racy": "UNLIKELY",
+      "medical": "VERY_UNLIKELY",
+      "spoof": "VERY_UNLIKELY"
     }
   },
   "ocr": {
     "text": "Welcome to\nMountain View Lodge\nEst. 2019",
     "blocks": [
-      {
-        "text": "Welcome to",
-        "confidence": 0.99,
-        "bounding_box": { "x": 50, "y": 20, "width": 200, "height": 30 }
-      },
-      {
-        "text": "Mountain View Lodge",
-        "confidence": 0.98,
-        "bounding_box": { "x": 40, "y": 55, "width": 250, "height": 35 }
-      },
-      {
-        "text": "Est. 2019",
-        "confidence": 0.95,
-        "bounding_box": { "x": 80, "y": 95, "width": 120, "height": 25 }
-      }
+      { "text": "Welcome", "bounding_box": { "x": 50, "y": 20, "width": 110, "height": 30, "units": "pixels" } },
+      { "text": "to", "bounding_box": { "x": 168, "y": 22, "width": 30, "height": 28, "units": "pixels" } }
     ]
   },
   "colors": {
     "dominant": [
-      { "hex": "#2D5A8E", "name": "Steel Blue", "percentage": 35.2 },
-      { "hex": "#F4A460", "name": "Sandy Brown", "percentage": 22.8 },
-      { "hex": "#228B22", "name": "Forest Green", "percentage": 18.5 },
-      { "hex": "#F5F5DC", "name": "Beige", "percentage": 12.3 },
-      { "hex": "#4A4A4A", "name": "Dark Gray", "percentage": 11.2 }
-    ],
-    "palette_type": "warm",
-    "brightness": 0.62
+      { "hex": "#2d5a8e", "score": 0.41, "percentage": 35.2 },
+      { "hex": "#f4a460", "score": 0.22, "percentage": 22.8 },
+      { "hex": "#228b22", "score": 0.18, "percentage": 18.5 }
+    ]
   },
   "objects": [
     {
       "name": "person",
       "confidence": 0.96,
-      "bounding_box": { "x": 100, "y": 60, "width": 200, "height": 400 }
+      "bounding_box": { "x": 0.09, "y": 0.07, "width": 0.19, "height": 0.52, "units": "normalized" }
     },
     {
       "name": "backpack",
       "confidence": 0.89,
-      "bounding_box": { "x": 140, "y": 120, "width": 80, "height": 100 }
-    },
-    {
-      "name": "mountain",
-      "confidence": 0.94,
-      "bounding_box": { "x": 0, "y": 0, "width": 1024, "height": 500 }
+      "bounding_box": { "x": 0.13, "y": 0.15, "width": 0.07, "height": 0.13, "units": "normalized" }
     }
-  ],
-  "metadata": {
-    "input_size": "1024x768",
-    "processing_time_ms": 3450
-  }
+  ]
 }
 ```
 
----
+`auto_tags` is a flat, deduplicated, lower-cased union of the labels, objects,
+landmarks and logos that were detected — the shortcut when all you want is a tag
+list to index.
+
 
 ## Feature Details
 
-### Labels — Semantic Labels
+Requesting a feature that was not detected in the image returns an empty array
+for it (`"faces": []`), not a missing key.
 
-Returns high-level semantic labels describing the image content. Labels are ranked by confidence and cover categories like scenes, activities, objects, and styles. Useful for auto-tagging, content categorization, and search indexing.
+### labels — Semantic Labels
 
-- **Returns:** Array of `{ name, confidence }` objects sorted by confidence descending.
-- **Control:** Use `max_labels` and `min_confidence` to filter results.
+High-level semantic labels describing image content: scenes, activities, objects
+and styles. Useful for auto-tagging, categorisation and search indexing.
 
-### Faces — Face Detection
+- **Returns:** array of `{ name, confidence }`, confidence descending, names lower-cased.
+- **Control:** `max_labels` (1-50) trims the list, `min_confidence` filters it.
 
-Detects faces in the image and returns a detection confidence together with an estimate of the facial expression. Age, gender and accessory attributes are not returned.
+### faces — Face Detection
 
-- **Returns:** Array of face objects with `confidence` and expression likelihoods.
-- **Expressions:** joy, sorrow, anger, surprise.
-- **Note:** Face detection does not perform identification or recognition, and no face templates are created. The expression estimate is stored with the photo and is deleted together with it. Under the EU AI Act this is an emotion-recognition feature, so inform the people in your images that you use it.
+Detects faces and returns a detection confidence plus expression likelihoods.
+**Age, gender and accessory attributes are not returned.**
 
-### NSFW — Content Safety
+- **Returns:** array of `{ bounding_box, confidence, likelihood }`.
+- **Likelihood keys:** `joy`, `sorrow`, `anger`, `surprise`, `headwear`, `blurred`, each one of `VERY_UNLIKELY`, `UNLIKELY`, `POSSIBLE`, `LIKELY`, `VERY_LIKELY`.
+- **Note:** no identification or recognition is performed and no face templates are created. Under the EU AI Act the expression estimate is an emotion-recognition feature, so inform the people in your images that you use it.
 
-Evaluates the image for content safety across multiple categories. Returns a boolean safety flag and detailed confidence scores for each category. Use this to moderate user-uploaded content or validate AI-generated images.
+### nsfw — Content Safety
 
-- **Categories:** safe, suggestive, adult, violence, gore.
-- **Threshold:** `is_safe` is true when all unsafe categories score below 0.15.
-- **Use case:** User upload moderation, generated content filtering, content policy enforcement.
+Evaluates the image for unsafe content. Also accepted as `safe_search`.
 
-### OCR — Text Extraction
+- **Returns:** `{ is_safe, likelihood }` where `likelihood` covers `adult`, `violence`, `racy`, `medical` and `spoof`.
+- **Threshold:** `is_safe` is `false` when any of `adult`, `violence` or `racy` is `LIKELY` or `VERY_LIKELY`. For a stricter or looser policy, read `likelihood` yourself instead of trusting the flag.
+- **Use case:** upload moderation, generated-content filtering, policy enforcement.
 
-Extracts all visible text from the image using optical character recognition. Returns both the full concatenated text and individual text blocks with positions and confidence scores. Supports printed and handwritten text in any language.
+### ocr — Text Extraction
 
-- **Returns:** Full text string plus array of blocks with position data.
-- **Languages:** Auto-detects text language. Works with Latin, Cyrillic, CJK, Arabic, and more.
-- **Best for:** Document digitization, receipt scanning, sign reading, watermark detection.
+Extracts visible text. Also accepted as `text`.
 
-### Colors — Color Palette
+- **Returns:** `{ text, blocks }` — the full concatenated string plus one entry per detected word with its pixel bounding box. Blocks carry no confidence score.
+- **Languages:** auto-detected. Pass `language` to hint the expected script when detection struggles.
 
-Extracts the dominant color palette from the image. Returns up to 5 dominant colors with hex values, human-readable names, and percentage coverage. Also includes palette type classification and overall brightness score.
+### colors — Color Palette
 
-- **Returns:** Array of dominant colors plus `palette_type` and `brightness`.
-- **Palette types:** warm, cool, neutral, vibrant, muted, monochrome.
-- **Use case:** Design tools, theme generation, color matching, accessibility checks.
+Extracts the dominant colour palette.
 
-### Objects — Object Detection
+- **Returns:** `{ dominant: [{ hex, score, percentage }] }`. `percentage` is the share of pixels; `score` is the provider's own relevance weighting.
+- **Not returned:** human-readable colour names, `palette_type`, `brightness`.
 
-Detects and localizes individual objects in the image with bounding boxes. Returns object class names, confidence scores, and pixel-level positions. Supports 600+ object categories from the COCO and Open Images vocabularies.
+### objects — Object Detection
 
-- **Returns:** Array of objects with `name`, `confidence`, and `bounding_box` coordinates.
-- **Coordinates:** Bounding box in pixels (x, y, width, height) relative to original image dimensions.
-- **Max objects:** Up to 50 objects per image, filtered by `min_confidence`.
+Detects and localises individual objects.
 
----
+- **Returns:** array of `{ name, confidence, bounding_box }` with **normalized** coordinates (0-1 fractions), not pixels. Multiply by the image width/height to crop.
+- **Filtering:** `min_confidence` applies here too.
+
+### landmarks / logos
+
+Two extra features not covered by the six above: `landmarks` returns recognised
+places and `logos` returns recognised brand marks, both as
+`{ name, confidence }`. They are included in `auto_tags` when requested.
+
 
 ## Code Examples
 
@@ -237,7 +230,7 @@ if data.get("ocr"):
 
 # Get dominant colors
 for color in data["colors"]["dominant"]:
-    print(f"  {color['hex']} ({color['name']}): {color['percentage']}%")
+    print(f"  {color['hex']}: {color['percentage']}%")
 ```
 
 ```typescript [TypeScript]
@@ -278,7 +271,7 @@ if (data.ocr) {
 
 // Get dominant colors
 for (const color of data.colors.dominant) {
-  console.log(`  ${color.hex} (${color.name}): ${color.percentage}%`);
+  console.log(`  ${color.hex}: ${color.percentage}%`);
 }
 ```
 
@@ -391,8 +384,8 @@ print(f"Full text:\n{full_text}")
 
 # Get individual text blocks with positions
 for block in data["ocr"]["blocks"]:
-    print(f"[{block['confidence']:.2f}] '{block['text']}' "
-          f"at ({block['bounding_box']['x']}, {block['bounding_box']['y']})")
+    box = block["bounding_box"]
+    print(f"'{block['text']}' at ({box['x']}, {box['y']}) [{box['units']}]")
 ```
 
 ```typescript [TypeScript]
@@ -415,10 +408,8 @@ console.log("Full text:", data.ocr.text);
 
 // Get individual text blocks with positions
 for (const block of data.ocr.blocks) {
-  console.log(
-    `[${block.confidence.toFixed(2)}] '${block.text}' ` +
-    `at (${block.bounding_box.x}, ${block.bounding_box.y})`
-  );
+  const box = block.bounding_box;
+  console.log(`'${block.text}' at (${box.x}, ${box.y}) [${box.units}]`);
 }
 ```
 
@@ -577,32 +568,40 @@ For a streamlined workflow, you can skip the separate enhance call and pass `enh
 
 ## Error Responses
 
-### 400 — Invalid Feature
+Errors come back in the standard API shape — a `detail` string. See
+[Error Handling](/api/errors) for the full contract.
 
-One or more values in the `features` array is not a valid feature name. Valid options: labels, faces, nsfw, ocr, colors, objects.
+### 400 — Missing or Invalid Input
 
-### 422 — Image Not Accessible
+Either `image_url` was absent, or one or more values in `features` is not a
+recognised feature name. Nothing is charged: validation runs before billing.
 
-The provided `image_url` could not be fetched. Ensure the URL is publicly accessible, returns a valid image content type, and the file is under 20MB.
+```json
+{ "detail": "Unknown features: sentiment. Supported: colors, faces, labels, landmarks, logos, nsfw, objects, ocr, safe_search, text" }
+```
+
+### 402 — Insufficient Credits
+
+Credits are exhausted and the wallet cannot cover the charge.
+
+### 424 — Analysis Failed
+
+The image could not be analysed — most often because `image_url` is not
+publicly reachable, is not a supported image type, or exceeds the 20 MB limit.
+The credit is refunded automatically and the body says so:
+
+```json
+{ "detail": "Google Vision API Error: Image not found or forbidden (no credits were charged for this request)" }
+```
 
 ### 429 — Rate Limit Exceeded
 
-Image analysis is limited to 60 requests per minute. The `Retry-After` header indicates when to retry.
-
-### Error Response Example
+Image analysis falls under the default limit of 60 requests per minute (also
+capped by your key's own `rate_limit_per_minute`). The `Retry-After` header says
+when to retry. The rate-limiter body uses `error`, not `detail`:
 
 ```json
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "Invalid feature: 'sentiment'. Valid features: labels, faces, nsfw, ocr, colors, objects",
-    "status": 400,
-    "details": {
-      "invalid_features": ["sentiment"],
-      "valid_features": ["labels", "faces", "nsfw", "ocr", "colors", "objects"]
-    }
-  }
-}
+{ "error": "Rate limit exceeded. Please try again later." }
 ```
 
 ---
@@ -615,7 +614,7 @@ Use the `labels` and `ocr` features to generate alt text for images automaticall
 
 ### Content Moderation
 
-Deploy the `nsfw` feature in your upload pipeline to automatically flag or reject content that violates your platform policies. The multi-category scoring allows you to set custom thresholds per category.
+Deploy the `nsfw` feature in your upload pipeline to automatically flag or reject content that violates your platform policies. Read `nsfw.likelihood` rather than the `is_safe` flag when you need a stricter policy than "LIKELY or worse on adult, violence or racy".
 
 ### Data Extraction
 
@@ -623,7 +622,7 @@ Use `ocr` to digitize documents, receipts, business cards, and signage. The bloc
 
 ### Design Automation
 
-Use the `colors` feature to extract palettes from reference images, then apply them to templates, themes, or brand assets. The palette type classification helps match images to design contexts.
+Use the `colors` feature to extract palettes from reference images, then apply them to templates, themes, or brand assets. Each entry gives a hex value and the share of pixels it covers, so you can weight a generated theme by prominence.
 
 ### Search and Discovery
 
@@ -631,7 +630,7 @@ Combine `labels` and `objects` to build rich search indexes. Auto-tag uploaded c
 
 ### Face-Aware Cropping
 
-Use the `faces` feature to detect face positions before cropping or resizing images, ensuring faces are never cut off in thumbnails or responsive layouts.
+Use the `faces` feature to detect face positions before cropping or resizing images, ensuring faces are never cut off in thumbnails or responsive layouts. Face boxes are in pixels (`units: "pixels"`), so they can be applied to the source image directly.
 
 ---
 
@@ -646,5 +645,5 @@ The wallet price applies only once your included credits are exhausted; while cr
 request, `billing.usd_charged` is `0`.
 
 ::: tip Batch Analysis
-For analyzing multiple images, send them as separate parallel requests rather than sequentially. The API supports up to 60 concurrent analysis requests per minute, so you can process a batch of images efficiently. Use the `X-Idempotency-Key` header to safely retry failed requests without double-charging.
+For analysing multiple images, send them as separate parallel requests rather than sequentially — but stay under 60 requests per minute, or the 61st gets a `429`. There is no idempotency-key support on this endpoint, so a blind retry of a request that already succeeded is charged again; retry only on `4xx`/`5xx`, where a failed analysis is refunded automatically.
 :::
