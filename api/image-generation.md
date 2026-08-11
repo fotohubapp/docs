@@ -252,9 +252,9 @@ Gemini's native multimodal image models — text-to-image, image-to-image, and m
 
 Unlike the SeedDream models above, Dreamina 4.6 (`model: "dreamina-4-6"`) is billed **flat per returned image**, not by token/resolution — it accepts up to 14 reference images for image-to-image composition and can output 1K/2K/4K.
 
-| Model ID | Name | Price (USD) | Credits | Notes |
-|----------|------|-------------|---------|-------|
-| `dreamina-4-6` | Dreamina 4.6 | 0.1072 | 2 | up to 14 reference images, force_single by default |
+| Model ID | Name | Price (USD) | Notes |
+|----------|------|-------------|-------|
+| `dreamina-4-6` | Dreamina 4.6 | 0.031 per image | up to 14 reference images, force_single by default. Same price at every resolution. |
 
 ::: warning A single request can return multiple images
 Dreamina 4.6 supports generating a group of up to 9 images from one prompt. This endpoint sends `force_single: true` by default so you are charged for exactly 1 image — pass `"force_single": false` (or `"num_images"` greater than 1) if you want a group, and note that the response is billed for however many images actually come back, not a number you request.
@@ -283,18 +283,30 @@ Response:
 ```json
 {
   "model": "dreamina-4-6",
-  "credits_used": 2,
+  "cost_usd": 0.031,
+  "currency": "USD",
   "billing": {
-    "method": "credits",
-    "usd_charged": 0,
-    "pln_charged": 0,
-    "breakdown": { "credits_charged": 2, "pricing_type": "per_image_resolution" }
+    "method": "wallet",
+    "cost_usd": 0.031,
+    "balance_usd": 24.28,
+    "currency": "USD",
+    "images_billed": 1,
+    "images_returned": 1,
+    "breakdown": {
+      "currency": "USD",
+      "rate_usd_per_image": 0.031,
+      "quantity": 1,
+      "amount_usd": 0.031,
+      "pricing_type": "per_image_resolution"
+    }
   },
   "images": [
     "https://p16-aiop-sign-sg.ibyteimg.com/tos-alisg-i-e2jboc02s9-sg/....png?..."
   ]
 }
 ```
+
+`images_billed` and `images_returned` are separate numbers because a group request is charged for what BytePlus actually delivers. One image is charged up front; extras are charged once the real count is known, so a group of 4 costs $0.124.
 
 This call is synchronous — unlike the async job pattern used for [avatar and motion-transfer generation](/api/avatar-motion), Dreamina 4.6 returns the finished image URL(s) directly in the response.
 

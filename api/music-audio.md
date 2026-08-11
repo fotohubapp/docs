@@ -858,13 +858,13 @@ POST /v1/ai/transcribe/voxtral/transcribe
 POST /v1/ai/transcribe/voxtral/summarize
 ```
 
-**Billing:** 1–2 credits per audio file
+**Billing:** per started minute of input audio, in USD
 
 ### Transcribe
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `audio` | string | **Yes** | — | Base64-encoded audio (WAV, MP3, OGG, FLAC, WebM). Max 25MB. |
+| `audio` | string | **Yes** | — | Base64-encoded audio (WAV, MP3, OGG, FLAC, WebM). Max 25MB, max **240 minutes**. |
 | `model` | string | No | `"voxtral-small"` | Model: `"voxtral-small"` (24B, quality) or `"voxtral-mini"` (3B, fast). |
 | `language` | string | No | — | Language hint for better accuracy. |
 | `prompt` | string | No | — | Context/instruction for the model. |
@@ -875,10 +875,18 @@ POST /v1/ai/transcribe/voxtral/summarize
 {
   "text": "Transcribed text content here...",
   "model": "voxtral-small",
-  "credits_used": 2,
+  "minutes_billed": 2,
+  "cost_usd": 0.04,
+  "currency": "USD",
   "tokens": { "input": 1200, "output": 150 }
 }
 ```
+
+The duration is measured from the file itself and rounded up to whole minutes —
+a 95-second clip bills 2 minutes. `minutes_billed` is the figure the charge was
+computed from. If the header is unreadable the charge is one minute, the smallest
+honest amount. A failed transcription is refunded automatically, and every request
+rejected with a `400` is refused before the wallet is touched.
 
 ### Summarize
 
@@ -888,14 +896,27 @@ Same parameters as transcribe, plus:
 |-----------|------|----------|---------|-------------|
 | `format` | string | No | `"bullets"` | Summary format: `"bullets"` or `"paragraph"`. |
 
-Returns both transcription and summary in a single call (3 credits).
+Returns both transcription and summary in a single call. Priced as the per-minute
+transcription **plus one fixed summarisation charge** — the summary is a single
+completion capped at 4096 tokens, so it does not grow with the length of the
+audio.
 
 ### Pricing
 
-| Model | Credits | Quality | Speed |
-|-------|---------|---------|-------|
-| Voxtral Small 24B | 2 | High (LLM-quality context) | ~10s |
-| Voxtral Mini 3B | 1 | Good (fast) | ~3s |
+| Model | Transcribe | Summarize | Quality | Speed |
+|-------|-----------|-----------|---------|-------|
+| Voxtral Small 24B | $0.020 / minute | $0.020 / minute + $0.010 | High (LLM-quality context) | ~10s |
+| Voxtral Mini 3B | $0.005 / minute | $0.005 / minute + $0.005 | Good (fast) | ~3s |
+
+Worked examples, Voxtral Small:
+
+| Audio length | Minutes billed | Transcribe | Summarize |
+|---|---|---|---|
+| 40 seconds | 1 | $0.020 | $0.030 |
+| 95 seconds | 2 | $0.040 | $0.050 |
+| 60 minutes | 60 | $1.200 | $1.210 |
+
+Both legs are itemised per model in [`GET /v1/pricing`](/api/billing).
 
 ---
 
@@ -1359,20 +1380,20 @@ When `language` is set to `"auto"` (default for transcription), FOTOhub automati
 
 Quick reference for choosing the right model for your use case.
 
-| Category | Model | Credits | USD Cost | Best For |
-|----------|-------|---------|----------|----------|
-| **Music** | MiniMax | 5 / min | Jingles, drafts, full tracks |
-| **Music** | ElevenLabs Music | 12 / min | Higher fidelity, `genre` required |
-| **SFX** | ElevenLabs SFX | 3 | Sound effects, foley — fixed per generation |
-| **TTS** | Grok Voice | 0.7 / 1K chars | Cheapest, 26 multilingual voices |
-| **TTS** | Google Cloud TTS | 1 / 1K chars | Budget TTS, fast |
-| **TTS** | IDA Voice / Pro | 2 / 1K chars | Natural voice, cloning |
-| **TTS** | GPT Audio 1.5 | 2 per request | Premium quality, voice instructions |
-| **TTS** | Polly (Neural) | 1 per 10K chars | Bulk narration, 106 voices |
-| **Transcription** | Default | 0.3 / min | Diarization, emotion analysis |
-| **Transcription** | Grok | 0.3 / min | Per-word timestamps |
-| **Transcription** | Voxtral Small | 2 per file | LLM-quality context |
-| **Transcription** | Voxtral Mini | 1 per file | Fast transcription |
+| Category | Model | Price | Best For |
+|----------|-------|-------|----------|
+| **Music** | MiniMax | 5 credits / min | Jingles, drafts, full tracks |
+| **Music** | ElevenLabs Music | 12 credits / min | Higher fidelity, `genre` required |
+| **SFX** | ElevenLabs SFX | 3 credits | Sound effects, foley — fixed per generation |
+| **TTS** | Grok Voice | 0.7 credits / 1K chars | Cheapest, 26 multilingual voices |
+| **TTS** | Google Cloud TTS | 1 credit / 1K chars | Budget TTS, fast |
+| **TTS** | IDA Voice / Pro | 2 credits / 1K chars | Natural voice, cloning |
+| **TTS** | GPT Audio 1.5 | 2 credits / request | Premium quality, voice instructions |
+| **TTS** | Polly (Neural) | 1 credit / 10K chars | Bulk narration, 106 voices |
+| **Transcription** | Default | 0.3 credits / min | Diarization, emotion analysis |
+| **Transcription** | Grok | 0.3 credits / min | Per-word timestamps |
+| **Transcription** | Voxtral Small | $0.020 / min | LLM-quality context |
+| **Transcription** | Voxtral Mini | $0.005 / min | Fast transcription |
 
 ::: info Choosing a TTS Model
 - **Grok Voice** (0.7 cr/1K) — cheapest, one voice speaks any language
@@ -1395,32 +1416,38 @@ Quick reference for choosing the right model for your use case.
 
 ## Pricing Summary
 
-| Service | Model | Credits | Unit |
-|---------|-------|---------|------|
-| Music | MiniMax | 5 | per started minute |
-| Music | ElevenLabs | 12 | per started minute |
-| Sound Effects | ElevenLabs SFX | 3 | fixed per generation |
-| TTS | Grok Voice | 0.7 | per 1000 characters |
-| TTS | Google Cloud | 1 | per 1000 characters |
-| TTS | IDA Voice / Pro | 2 | per 1000 characters |
-| TTS | GPT Audio 1.5 | 2 | per request |
-| TTS | Polly (Neural) | 1 | per 10,000 characters |
-| Transcription | Default | 0.3 | per started minute |
-| Transcription | Grok | 0.3 | per started minute |
-| Transcription | Voxtral Mini | 1 | per audio file |
-| Transcription | Voxtral Small | 2 | per audio file |
+| Service | Model | Price | Unit |
+|---------|-------|-------|------|
+| Music | MiniMax | 5 credits | per started minute |
+| Music | ElevenLabs | 12 credits | per started minute |
+| Sound Effects | ElevenLabs SFX | 3 credits | fixed per generation |
+| TTS | Grok Voice | 0.7 credits | per 1000 characters |
+| TTS | Google Cloud | 1 credit | per 1000 characters |
+| TTS | IDA Voice / Pro | 2 credits | per 1000 characters |
+| TTS | GPT Audio 1.5 | 2 credits | per request |
+| TTS | Polly (Neural) | 1 credit | per 10,000 characters |
+| Transcription | Default | 0.3 credits | per started minute |
+| Transcription | Grok | 0.3 credits | per started minute |
+| Transcription | Voxtral Mini | $0.005 | per started minute |
+| Transcription | Voxtral Small | $0.020 | per started minute |
+| Voxtral summarize | Mini / Small | + $0.005 / + $0.010 | once per request, on top of the per-minute rate |
 
 Character-billed endpoints charge fractional blocks above the first (2500 chars =
-2.5 blocks); minute-billed endpoints round up to the whole minute. Every response
-reports what was charged in `credits_used`, alongside `characters_processed` or
-`minutes_billed`.
+2.5 blocks); minute-billed endpoints round up to the whole minute, so a 95-second
+file bills 2 minutes. Every response reports what was charged — `cost_usd` on the
+USD-priced endpoints, `credits_used` on the rest — alongside
+`characters_processed` or `minutes_billed`.
+
+`GET /v1/pricing` returns the live figures with their units and an itemised
+breakdown per leg, which is the authoritative source if this table and the API
+ever disagree.
 
 ## Error Responses
 
 | Status | Code | Description |
 |--------|------|-------------|
 | 400 | `bad_request` | Invalid parameters: unsupported format, duration out of range, invalid voice_id. |
-| 402 | `insufficient_credits` | Not enough credits for the requested operation. |
+| 402 | `insufficient_funds` | Wallet balance will not cover the request. The body carries `required_usd`, `balance_usd`, `shortfall_usd` and `topup_url`. |
 | 413 | `file_too_large` | Audio file exceeds 500MB. Compress or split before uploading. |
 | 422 | `unprocessable_audio` | File corrupted, unsupported codec, or no detectable speech. |
 | 429 | `rate_limit_exceeded` | Audio limits: 20 req/min (TTS/SFX), 10 req/min (music), 5 req/min (transcription/dubbing). |

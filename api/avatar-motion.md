@@ -6,7 +6,8 @@ Generate talking/performing avatar videos from a single portrait plus an audio c
 |---|---|
 | **Avatar models** | `omnihuman-1-0`, `omnihuman-1-5` |
 | **Motion-transfer model** | `dreamactor-m2` |
-| **Billing** | Per second of output, based on real input length |
+| **Billing** | Prepaid USD from your wallet, per second of output, based on real input length |
+| **Price** | Avatar $0.12/s · Motion transfer $0.05/s |
 | **Processing** | Asynchronous — returns a `job_id` for polling |
 
 ::: info Where Dreamina 4.6 lives
@@ -24,7 +25,7 @@ POST /v1/ai/avatar
 ```
 
 **Authentication:** Bearer token (API key)
-**Billing:** 7.4 credits per second of output audio (capped at 15s = 111 credits max)
+**Billing:** $0.12 per second of output audio, taken from your wallet (capped at 15s = $1.80 max)
 **Processing:** Asynchronous — returns a `job_id` for polling
 
 OmniHuman takes a single portrait image and an audio clip and generates a video where the person speaks or performs in sync with the audio — no driving video needed, the motion is inferred entirely from the audio.
@@ -39,7 +40,7 @@ OmniHuman takes a single portrait image and an audio clip and generates a video 
 | `duration_seconds` | number | No | `15` (max) | The real length of `audio_url`, in seconds. **Providing this only ever lowers your charge** — if omitted, you are billed for the full 15-second ceiling regardless of how short your clip actually is. |
 
 ::: tip Always send `duration_seconds`
-Billing scales with this value, clamped to the model's own 0-15s range. A 3-second clip billed without it costs the same as a 15-second one (111 credits) — sending the real length brings that down to ~23 credits.
+Billing scales with this value, clamped to the model's own 0-15s range. A 3-second clip billed without it costs the same as a 15-second one ($1.80) — sending the real length brings that down to $0.36.
 :::
 
 ### Request Example
@@ -60,16 +61,18 @@ Billing scales with this value, clamped to the model's own 0-15s range. A 3-seco
   "model": "omnihuman-1-0",
   "job_id": "7daa69b8-a2b7-402e-8759-bb64aa224eb2",
   "status": "queued",
-  "credits_used": 60,
+  "cost_usd": 0.96,
+  "currency": "USD",
   "billing": {
-    "method": "credits",
-    "usd_charged": 0,
-    "pln_charged": 0,
+    "method": "wallet",
+    "cost_usd": 0.96,
+    "balance_usd": 24.31,
+    "currency": "USD",
     "breakdown": {
-      "rate_per_second": 7.4,
+      "currency": "USD",
+      "rate_usd_per_second": 0.12,
       "duration_seconds": 8.0,
-      "credits_exact": 59.2,
-      "credits_charged": 60,
+      "amount_usd": 0.96,
       "pricing_type": "per_second"
     }
   },
@@ -77,7 +80,7 @@ Billing scales with this value, clamped to the model's own 0-15s range. A 3-seco
 }
 ```
 
-Credits are charged at submit time, rounded up to the nearest whole credit (`credits_exact` is what the raw rate × duration computes to; `credits_charged` is what actually left your balance). If the job later fails, the charge is refunded automatically — see [Polling](#polling-avatar-jobs).
+The charge is taken from your wallet at submit time, for the exact duration — nothing is rounded up to a whole cent, so a 3.7-second clip costs $0.444. `balance_usd` is what remains afterwards. If the job later fails, the charge is refunded automatically — see [Polling](#polling-avatar-jobs).
 
 ### Polling Avatar Jobs
 
@@ -93,7 +96,8 @@ Poll every 5-8 seconds. A live render of a single line of speech typically compl
   "job_id": "7daa69b8-a2b7-402e-8759-bb64aa224eb2",
   "model": "omnihuman-1-0",
   "status": "processing",
-  "credits_used": 60.0,
+  "cost_usd": 0.96,
+  "currency": "USD",
   "duration": 8,
   "created_at": "2026-08-05T07:17:20.026457+00:00"
 }
@@ -105,23 +109,29 @@ Poll every 5-8 seconds. A live render of a single line of speech typically compl
   "job_id": "7daa69b8-a2b7-402e-8759-bb64aa224eb2",
   "model": "omnihuman-1-0",
   "status": "completed",
-  "credits_used": 60.0,
+  "cost_usd": 0.96,
+  "currency": "USD",
   "duration": 8,
   "created_at": "2026-08-05T07:17:20.026457+00:00",
+  "completed_at": "2026-08-05T07:18:04.881233+00:00",
   "video_url": "https://v16m-default.tiktokcdn.com/.../video.mp4"
 }
 ```
 
-**Failed** (credits already refunded by this point):
+**Failed** (already refunded by this point — `cost_usd` drops to 0 because the money is back in your wallet):
 ```json
 {
   "job_id": "7daa69b8-a2b7-402e-8759-bb64aa224eb2",
   "model": "omnihuman-1-0",
   "status": "failed",
   "error": "Upstream status: not_found",
+  "cost_usd": 0,
+  "currency": "USD",
   "refunded": true
 }
 ```
+
+`refunded` is only ever `true` when the money actually moved back. On the rare job submitted before prepaid billing shipped, the charge is not recorded in dollars and cannot be refunded from this wallet — that response carries `refunded: false` plus a `refund_note` telling you to contact support with the `job_id`.
 
 ---
 
@@ -134,7 +144,7 @@ POST /v1/ai/motion-transfer
 ```
 
 **Authentication:** Bearer token (API key)
-**Billing:** 3.1 credits per second of driving video, clamped to 3-30 seconds (9.3-93 credits per job)
+**Billing:** $0.05 per second of driving video, clamped to 3-30 seconds ($0.15-$1.50 per job)
 **Processing:** Asynchronous — returns a `job_id` for polling
 
 DreamActor transfers the motion from a driving video onto a static character image — the character in your image performs whatever the person in the driving video does. Unlike avatar generation, this needs a full video input, not just audio.
@@ -165,16 +175,18 @@ DreamActor transfers the motion from a driving video onto a static character ima
   "model": "dreamactor-m2",
   "job_id": "e394ebd0-84ec-4266-82e9-948f353ff223",
   "status": "queued",
-  "credits_used": 19,
+  "cost_usd": 0.3,
+  "currency": "USD",
   "billing": {
-    "method": "credits",
-    "usd_charged": 0,
-    "pln_charged": 0,
+    "method": "wallet",
+    "cost_usd": 0.3,
+    "balance_usd": 24.01,
+    "currency": "USD",
     "breakdown": {
-      "rate_per_second": 3.1,
+      "currency": "USD",
+      "rate_usd_per_second": 0.05,
       "duration_seconds": 6.0,
-      "credits_exact": 18.6,
-      "credits_charged": 19,
+      "amount_usd": 0.3,
       "pricing_type": "per_second"
     }
   },
@@ -215,7 +227,8 @@ response = requests.post(
 )
 job = response.json()
 job_id = job["job_id"]
-print(f"Job submitted: {job_id}, will charge up to {job['credits_used']} credits")
+print(f"Job submitted: {job_id}, charged ${job['cost_usd']:.4f}")
+print(f"Wallet balance: ${job['billing']['balance_usd']:.2f}")
 
 while True:
     status = requests.get(
@@ -381,13 +394,32 @@ curl "https://apis.fotohub.app/v1/ai/motion-transfer/e394ebd0-84ec-4266-82e9-948
 | Status | Meaning |
 |--------|---------|
 | `400` | Missing or invalid `image_url` / `audio_url` / `video_url`, or an unrecognized `model` value. |
-| `402` | Insufficient credits and wallet balance to cover the charge. |
+| `402` | Your wallet balance cannot cover the charge. Nothing was charged and no job was submitted. |
 | `404` | `job_id` not found, or it belongs to a different API key. |
-| `424` | The upstream provider failed to start or complete the job. Credits are refunded automatically — the error message says so explicitly. |
+| `424` | The upstream provider failed to start or complete the job. Your wallet is refunded automatically — the error message says so explicitly. |
+
+A `424` from the provider:
 
 ```json
 {
-  "detail": "Upstream generation failed to start: image_url could not be fetched (no credits were charged for this request)"
+  "detail": "Upstream generation failed to start: image_url could not be fetched. Your wallet was not charged for this request."
+}
+```
+
+A `402` carries the full arithmetic, so you can top up by exactly the right amount:
+
+```json
+{
+  "detail": {
+    "error": "insufficient_funds",
+    "message": "Insufficient funds: this request costs $1.800000 but your balance is $0.420000. Top up your wallet with at least $1.380000 to continue. The FOTOhub API is prepaid: no credits or subscription plan can pay for API usage.",
+    "required_usd": 1.8,
+    "balance_usd": 0.42,
+    "shortfall_usd": 1.38,
+    "currency": "USD",
+    "charged": false,
+    "topup_url": "https://fotohub.app/console/wallet"
+  }
 }
 ```
 

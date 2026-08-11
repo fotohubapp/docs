@@ -508,11 +508,14 @@ Text-to-SFX generation via `/v1/ai/generate/sfx`. Uses `prompt` field for descri
 
 ### Speech-to-Text (STT)
 
-| Model | Credits | Features |
-|-------|---------|----------|
-| **Voxtral Small 24B** | 2 | LLM-quality transcription, context understanding |
-| **Voxtral Mini 3B** | 1 | Fast budget transcription |
-| Whisper Large v3 | 1 | 99+ languages, auto-detection, timestamps |
+| Model | Price | Features |
+|-------|-------|----------|
+| **Voxtral Small 24B** | $0.020 / minute | LLM-quality transcription, context understanding |
+| **Voxtral Mini 3B** | $0.005 / minute | Fast budget transcription |
+| Whisper Large v3 | 0.3 credits / minute | 99+ languages, auto-detection, timestamps |
+
+All three are billed per **started** minute of input audio, so a 95-second file
+bills 2 minutes.
 
 **Voxtral** — Mistral's speech-to-text LLM. Better context understanding than traditional ASR. See [Music & Audio → Voxtral](/api/music-audio#speech-to-text-voxtral).
 
