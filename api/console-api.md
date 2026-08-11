@@ -1176,6 +1176,94 @@ by the Stripe webhook, so an account that has never completed a Stripe payment
 has none. There is no download endpoint here; use `GET /v1/billing/invoices`
 (different route, JWT-only) for Stripe's own payment history.
 
+### Get Invoice Details
+
+```
+GET /v1/console/billing/invoice-details
+```
+
+The buyer details that will appear on this account's invoices. JWT only — this is
+console surface, not something an `fh_` key can read or write.
+
+**Response (200 OK):**
+
+```json
+{
+  "details": {
+    "company_name": "Example GmbH",
+    "company_nip": null,
+    "company_vat_eu": "DE123456789",
+    "address_line1": "Hauptstraße 1",
+    "address_line2": null,
+    "city": "Berlin",
+    "postal_code": "10115",
+    "country": "DE",
+    "phone": "+49 30 123456",
+    "invoice_email": "ap@example.com",
+    "wants_invoice": true,
+    "updated_at": "2026-08-11T09:14:22.104Z"
+  },
+  "vat_treatment": "eu_reverse_charge",
+  "affects_spending": false
+}
+```
+
+An account that has never saved anything gets the same shape with every field
+`null`, `country: "PL"` and `wants_invoice: false`, so a form can bind straight
+to it without null-guarding each field.
+
+`vat_treatment` is derived, read-only, and returned because it is the one
+consequence of this form that is not visible in the form itself:
+
+| Value | When | Effect on your invoice |
+|-------|------|------------------------|
+| `polish_vat` | `country` is `PL` | Polish VAT at the standard rate |
+| `eu_reverse_charge` | `company_vat_eu` starts with your own EU `country` code | Reverse charge — VAT is your obligation, not ours |
+| `eu_no_vat_id` | EU country, no matching VAT id | Charged at our rate (EU MOSS) |
+| `export_zero_rated` | Outside the EU | Zero-rated export |
+
+`affects_spending` is always `false` and is stated rather than implied: these
+details never gate a request. The wallet balance is the only thing that does.
+
+### Save Invoice Details
+
+```
+PUT /v1/console/billing/invoice-details
+```
+
+**Request Body** — every field optional; omitted fields keep their stored value,
+so a partial `PUT` is not destructive.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `company_name` | string | Buyer name on the invoice |
+| `company_nip` | string | Polish NIP. Normalised: a `PL` prefix, spaces and dashes are stripped, then the 10-digit checksum is validated |
+| `company_vat_eu` | string | EU VAT id **with** its country prefix, e.g. `DE123456789`. The prefix is what selects reverse charge, so a number saved without it is unusable |
+| `address_line1` | string | Street address |
+| `address_line2` | string | Suite, floor, etc. |
+| `city` | string | City |
+| `postal_code` | string | Postal code |
+| `country` | string | 2-letter ISO code, uppercased. Defaults to `PL` |
+| `phone` | string | Contact phone |
+| `invoice_email` | string | Where the invoice PDF is sent. Lowercased. Set this even if it matches your account email — accounts payable is usually a different mailbox |
+| `wants_invoice` | boolean | `false` (default) means receipts only |
+
+Returns the same shape as the `GET`, reflecting what was stored.
+
+**Validation errors (400):**
+
+| `error` | Cause |
+|---------|-------|
+| `empty_update` | The body carried no invoice fields at all |
+| `invoice_details_incomplete` | `wants_invoice` is `true` but `company_name` or `country` is missing. Carries a `missing` array naming which |
+
+An invoice needs a named buyer and a country to be a document at all, so that is
+refused here — where you can see why — rather than producing a nameless invoice a
+month later. Set `wants_invoice: false` to receive receipts only.
+
+A malformed NIP, VAT id, country code or email is rejected as a `422` by the
+request validator with the offending field named.
+
 ### Top Up the Wallet
 
 ```
@@ -1196,9 +1284,8 @@ POST /v1/billing/topup
   "checkout_url": "https://checkout.stripe.com/c/pay/cs_live_...",
   "package": {
     "slug": "topup-500",
-    "amount_usd": 120,
-    "bonus_credits": 1500,
-    "discount_pct": 15
+    "name": "$120",
+    "amount_usd": 120
   },
   "pay_currency": "usd"
 }
@@ -1206,6 +1293,20 @@ POST /v1/billing/topup
 
 The endpoint returns a Stripe Checkout URL — the balance moves only after the
 payment webhook lands, so there is no `new_balance` in this response.
+
+`amount_usd` is the only figure that moves money. When `pay_currency` is `pln`
+Stripe charges the złoty equivalent at that moment's rate, but the wallet is
+credited `amount_usd` either way, so a settlement rate that drifts by a few
+cents never desyncs your balance from what you were quoted.
+
+::: warning No bonus, no volume discount
+Earlier versions of this page showed `bonus_credits` and `discount_pct` on the
+package object. Neither field exists any more, and neither ever paid out: the
+top-up webhook credits `amount_usd` and nothing else. A prepaid USD wallet has
+no credits to grant. `POST /v1/tiers/wallet/topup` still returns
+`bonus_credits: null` for one release because shipped SDK builds type it — read
+it as "no such thing", not as "this package has no bonus".
+:::
 
 ::: warning Package slugs are historical
 The slug numbers date from when packages were priced in PLN. The amounts are
