@@ -82,6 +82,65 @@ would not move a single one. `GET /v1/buckets` and `GET /v1/buckets/:id`
 both echo the stored value.
 :::
 
+### What storage costs
+
+Simple Buckets are billed **hourly from your prepaid wallet**, in USD, for the
+bytes you are holding at the time — not per upload and not per request. Uploading
+a file costs nothing; keeping it costs the per-GB-hour rate for as long as it is
+there, and deleting it stops the accrual on the next hourly run.
+
+The rate is published under `storage` in
+[`GET /v1/pricing`](/api/billing) and is 1:1 with the AWS S3 list price
+for `eu-central-1`. Read it from the API rather than hardcoding it.
+
+```json
+{
+  "storage": {
+    "standard": {
+      "price_per_gb_monthly": "0.024500",
+      "price_per_gb_hourly": "0.00003356",
+      "currency": "USD",
+      "source": "AWS S3 Standard eu-central-1 list price"
+    }
+  }
+}
+```
+
+::: warning An empty wallet cannot accept uploads
+`POST /v1/photos/upload` returns `402 insufficient_funds` when your wallet
+balance is `$0.00`, because storage bills every hour for as long as the bytes
+are held. Any positive balance is enough to upload — there is no per-request
+price to cover.
+
+```json
+{
+  "detail": {
+    "error": "insufficient_funds",
+    "message": "Insufficient funds: your wallet balance is $0.00. Storage is billed from the wallet every hour for the bytes you hold, so an empty wallet cannot accept new uploads. Top up your wallet to continue.",
+    "balance_usd": 0,
+    "billed": "hourly_storage",
+    "charged": false,
+    "topup_url": "https://fotohub.app/console/wallet"
+  }
+}
+```
+
+Unlike the per-request `402` from a generation endpoint, this one carries no
+`required_usd` or `shortfall_usd`: there is no single amount to quote. Branch on
+`error === "insufficient_funds"`, not on those fields.
+:::
+
+::: tip Uploads without a bucket land in `api-uploads`
+`POST /v1/photos/upload` accepts an upload with no `bucket_name`. Those files are
+filed into an `api-uploads` bucket created automatically on your account the first
+time you need it, so their storage is metered like everything else.
+
+It is an ordinary bucket: it appears in `GET /v1/buckets`, its files list under
+`GET /v1/photos?bucket_name=api-uploads`, and `DELETE /v1/buckets/:id` removes it
+and its contents. It is created **private**, so those uploads come back as signed
+URLs unless you pass `is_public=true`.
+:::
+
 ---
 
 ## S3 Enterprise

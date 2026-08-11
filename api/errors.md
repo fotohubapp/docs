@@ -95,6 +95,8 @@ overage cap, both `402`) return prose, not a code.
 | Error Code | HTTP Status | Description | Recovery Action |
 |------------|-------------|-------------|-----------------|
 | `insufficient_balance` | 402 | Wallet cannot cover a reservation. Carries `required_usd`. | Top up, or pick `invoice_monthly` billing. |
+| `insufficient_funds` | 402 | The wallet cannot pay for this request. Carries `required_usd`, `balance_usd`, `shortfall_usd`, `topup_url`. | Top up by at least `shortfall_usd`. |
+| `insufficient_funds` (storage) | 402 | The wallet is empty and the endpoint bills by accrual, not per request — see `billed: "hourly_storage"`. Carries `balance_usd` but **no** `required_usd` or `shortfall_usd`, because there is no single amount to quote. | Top up any amount. Branch on `error`, never on `required_usd`. |
 | `plan_gate_exceeded` | 402 | Your plan's cap for this resource. Carries `current`, `limit`, `tier`. | Upgrade, or delete an existing resource. |
 | `key_limit_reached` | 400 | Maximum API keys for the tier. Carries `max_keys`, `upgrade_url`. | Revoke a key or upgrade. |
 | `feature_not_available` | 403 | Feature not on this tier. Carries `required_tiers`. | Upgrade to one of `required_tiers`. |
