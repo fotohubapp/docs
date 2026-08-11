@@ -9,7 +9,7 @@ The official SDKs (Python and TypeScript) classify errors automatically, retry t
 ## Error Response Format
 
 ::: warning Read the status code and `detail`, not just the fields below
-Most endpoints return a compact body — `{"detail": "Insufficient credits"}` — and the
+Most endpoints return a compact body — `{"detail": "prompt is required"}` — and the
 rate limiter returns `{"error": "Rate limit exceeded. Please try again later."}`. Treat
 `error`, `message` and `details` as optional and branch on the **HTTP status code**,
 which is always meaningful. For correlating a call with support, use the
@@ -18,18 +18,22 @@ which is always meaningful. For correlating a call with support, use the
 only on a `500`.
 :::
 
-Where a richer body is returned it follows this structure. Use the `error` field for programmatic handling and `message` for user-facing display.
+Where a richer body is returned, the whole of it sits **inside `detail`** — the framework
+puts it there, so `error` and `message` are one level down, not at the top. Use `error`
+for programmatic handling and `message` for user-facing display.
 
 ```json
 {
-  "error": "insufficient_credits",
-  "message": "Not enough credits to complete this operation. Required: 5, available: 2.",
-  "details": {
-    "required_credits": 5,
-    "available_credits": 2,
-    "top_up_url": "https://fotohub.app/console/billing"
-  },
-  "request_id": "0f9c1b5a-4e3d-4a71-9c28-8b5d2e6f1a03"
+  "detail": {
+    "error": "insufficient_funds",
+    "message": "Insufficient funds: this request costs $0.045000 but your balance is $0.002000. Top up your wallet with at least $0.043000 to continue. The FOTOhub API is prepaid: no credits or subscription plan can pay for API usage.",
+    "required_usd": 0.045,
+    "balance_usd": 0.002,
+    "shortfall_usd": 0.043,
+    "currency": "USD",
+    "charged": false,
+    "topup_url": "https://fotohub.app/console/wallet"
+  }
 }
 ```
 
@@ -53,7 +57,7 @@ The API uses standard HTTP status codes to indicate the outcome of a request. Co
 | 201 | Created | Resource successfully created (e.g., new API key, project). | No |
 | 400 | Bad Request | Invalid parameters, malformed JSON, or missing required fields. | No |
 | 401 | Unauthorized | Missing or invalid API key in the Authorization header. | No |
-| 402 | Payment Required | Insufficient credits or wallet balance for this operation. | No |
+| 402 | Payment Required | Your prepaid wallet cannot cover this request. Carries the price, your balance and the shortfall — see [402 Payment Required](#_402-payment-required). | No |
 | 403 | Forbidden | API key does not have permission for this resource or action. | No |
 | 404 | Not Found | The endpoint or requested resource does not exist. | No |
 | 409 | Conflict | Resource already exists (e.g., duplicate project name). | No |
@@ -72,11 +76,13 @@ inside `detail`, alongside a human-readable `message` and whatever context is us
 recovery — `limit` and `current` on a plan gate, `valid_tiers` on a bad tier, and so on.
 
 ::: warning Not every failure has a code
-Most endpoints answer with a plain string — `{"detail": "Insufficient wallet balance.
-Need $0.04. Credits exhausted, wallet empty. Top up to continue."}` — so **branch on the
-HTTP status first** and treat `detail.error` as extra detail when it happens to be an
-object. Notably, the two most common money errors (insufficient credits and the monthly
-overage cap, both `402`) return prose, not a code.
+Many endpoints answer with a plain string — `{"detail": "prompt is required"}` — so
+**branch on the HTTP status first** and treat `detail.error` as extra detail when it
+happens to be an object.
+
+`402` is the exception, and the one worth handling precisely: every out-of-funds refusal
+across the whole API is an object carrying `error: "insufficient_funds"` and the amounts
+behind it. See [402 Payment Required](#_402-payment-required).
 :::
 
 ### Authentication and Access
@@ -94,9 +100,9 @@ overage cap, both `402`) return prose, not a code.
 
 | Error Code | HTTP Status | Description | Recovery Action |
 |------------|-------------|-------------|-----------------|
-| `insufficient_balance` | 402 | Wallet cannot cover a reservation. Carries `required_usd`. | Top up, or pick `invoice_monthly` billing. |
-| `insufficient_funds` | 402 | The wallet cannot pay for this request. Carries `required_usd`, `balance_usd`, `shortfall_usd`, `topup_url`. | Top up by at least `shortfall_usd`. |
-| `insufficient_funds` (storage) | 402 | The wallet is empty and the endpoint bills by accrual, not per request — see `billed: "hourly_storage"`. Carries `balance_usd` but **no** `required_usd` or `shortfall_usd`, because there is no single amount to quote. | Top up any amount. Branch on `error`, never on `required_usd`. |
+| `insufficient_funds` | 402 | The wallet cannot pay for this request. Carries `required_usd`, `balance_usd`, `shortfall_usd`, `charged: false`, `topup_url`. | Top up by at least `shortfall_usd`. |
+| `insufficient_funds` (S3 bucket) | 402 | The wallet cannot cover the bucket's up-front reservation. Same fields, plus a `hint`. | Top up, or create the bucket with `billing_mode: "invoice_monthly"`. |
+| `insufficient_funds` (storage accrual) | 402 | The wallet is empty and the endpoint bills by accrual, not per request — see `billed: "hourly_storage"`. Carries `balance_usd` but **no** `required_usd` or `shortfall_usd`, because there is no single amount to quote. | Top up any amount. Branch on `error`, never on `required_usd`. |
 | `plan_gate_exceeded` | 402 | Your plan's cap for this resource. Carries `current`, `limit`, `tier`. | Upgrade, or delete an existing resource. |
 | `key_limit_reached` | 400 | Maximum API keys for the tier. Carries `max_keys`, `upgrade_url`. | Revoke a key or upgrade. |
 | `feature_not_available` | 403 | Feature not on this tier. Carries `required_tiers`. | Upgrade to one of `required_tiers`. |
@@ -159,13 +165,27 @@ Live shapes, captured against the production API. The status code is the reliabl
 { "detail": "Invalid API key" }
 ```
 
-**402 Payment Required** — out of money. Prose, not a code:
+**402 Payment Required** — out of money. Every out-of-funds refusal in the API looks like
+this, and every amount in it is USD. Full treatment in
+[402 Payment Required](#_402-payment-required):
 
 ```json
-{ "detail": "Insufficient wallet balance. Need $0.04. Credits exhausted, wallet empty. Top up to continue." }
+{
+  "detail": {
+    "error": "insufficient_funds",
+    "message": "Insufficient funds: this request costs $0.045000 but your balance is $0.002000. Top up your wallet with at least $0.043000 to continue. The FOTOhub API is prepaid: no credits or subscription plan can pay for API usage.",
+    "required_usd": 0.045,
+    "balance_usd": 0.002,
+    "shortfall_usd": 0.043,
+    "currency": "USD",
+    "charged": false,
+    "topup_url": "https://fotohub.app/console/wallet"
+  }
+}
 ```
 
-Resource caps in the same status *do* carry a code and the numbers behind it:
+Resource caps in the same status carry a different code, and topping up will not clear
+them:
 
 ```json
 {
@@ -251,6 +271,130 @@ carry whatever the provider path reported, as a string:
 
 Retry these with backoff and quote the `X-Request-Id`; the request log holds the
 provider's own id for the same call.
+
+## 402 Payment Required
+
+The API is **prepaid**. It charges your wallet in USD per request, and nothing else can
+pay for one: no subscription plan, no credit balance from your fotohub.app account, no
+invoice at month end. A wallet that cannot cover a request gets a `402` before the
+provider is called, so a refusal costs nothing.
+
+Every out-of-funds refusal, on every endpoint, carries `error: "insufficient_funds"` and
+the amounts behind it:
+
+```json
+{
+  "detail": {
+    "error": "insufficient_funds",
+    "code": "insufficient_funds",
+    "message": "Insufficient funds: this request costs $0.045000 but your balance is $0.002000. Top up your wallet with at least $0.043000 to continue. The FOTOhub API is prepaid: no credits or subscription plan can pay for API usage.",
+    "required_usd": 0.045,
+    "balance_usd": 0.002,
+    "shortfall_usd": 0.043,
+    "currency": "USD",
+    "charged": false,
+    "charged_usd": 0,
+    "topup_url": "https://fotohub.app/console/wallet",
+    "operation": "generate_image:seedream-5-0-pro"
+  }
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `error` / `code` | Always `insufficient_funds`. Both keys carry the same value; `error` is the one to switch on. |
+| `message` | The complete explanation, safe to show a user. Always present, even when the amounts are not. |
+| `required_usd` | What this request would have cost, at the price you would have been charged. |
+| `balance_usd` | Your wallet at the moment of refusal. `0` is a real value — an empty wallet, not a missing field. |
+| `shortfall_usd` | `required_usd - balance_usd`: the minimum top-up that makes this exact request go through. |
+| `charged` / `charged_usd` | Always `false` / `0`. Stated rather than implied — a 402 moves no money and calls no provider. |
+| `topup_url` | Where to top up. Link it rather than hardcoding a path. |
+| `operation` | The priced operation, usually `<action>:<model>`. Worth logging: it says which model drained the wallet. |
+
+Because nothing was charged, the request can be retried **unchanged** once the wallet is
+funded — no idempotency key needed, and no partial state to clean up.
+
+### The storage exception
+
+The storage endpoints bill by hourly accrual against the bytes you hold, not per request,
+so there is no single amount to quote. Their 402 carries `billed: "hourly_storage"`, a
+balance, and **no** `required_usd` or `shortfall_usd`:
+
+```json
+{
+  "detail": {
+    "error": "insufficient_funds",
+    "message": "Insufficient funds: your wallet balance is $0.00. Storage is billed from the wallet every hour for the bytes you hold, so an empty wallet cannot accept new uploads. Top up your wallet to continue. The FOTOhub API is prepaid: no credits or subscription plan can pay for API usage.",
+    "balance_usd": 0,
+    "currency": "USD",
+    "charged": false,
+    "topup_url": "https://fotohub.app/console/wallet",
+    "billed": "hourly_storage"
+  }
+}
+```
+
+So branch on `error`, treat the amounts as optional, and decode them into a nullable type.
+A `float` that turns an absent `required_usd` into `0.0` reports a free request; an empty
+string coerced the same way reports an empty wallet. Both are wrong, and both look like
+data.
+
+### Check before you spend
+
+`POST /v1/billing/estimate` prices up to 100 operations without running any of them, so a
+batch job can stop at the last affordable item instead of collecting a 402:
+
+```bash
+curl -s -X POST https://apis.fotohub.app/v1/billing/estimate \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"operations": [{"type": "generate_image", "model": "seedream-5-0-260128", "count": 40}]}'
+```
+
+```json
+{
+  "currency": "USD",
+  "billing_model": "prepaid_wallet_usd",
+  "total_usd": 1.50052,
+  "provider_cost_usd": 1.50052,
+  "margin": 1.0,
+  "balance_usd": 0.9,
+  "sufficient": false,
+  "priced": true,
+  "breakdown": [
+    {
+      "type": "generate_image",
+      "model": "seedream-5-0-260128",
+      "count": 40,
+      "priced": true,
+      "unit": "per_piece",
+      "amount_usd": 1.50052,
+      "provider_cost_usd": 1.50052,
+      "pricing_verified": true,
+      "breakdown": [
+        { "leg": "output", "unit": "per_piece", "quantity": 40, "rate_usd": 0.037513, "amount_usd": 1.50052 }
+      ]
+    }
+  ]
+}
+```
+
+Prefer the server's `sufficient` verdict to comparing the numbers yourself — it is
+computed against the same wallet read the charge will use. Two things to know about it:
+
+- An operation with no published rate comes back `priced: false` with `amount_usd: null`
+  and a `reason`. `total_usd` then covers only the priced legs and top-level `priced` is
+  `false`, so `sufficient: true` on that response means "the wallet is not empty", not
+  "this batch is covered".
+- `total_credits` is present and always `null`. It is a deprecated field kept for older
+  SDK builds; there is no credit unit in the API. Read `total_usd`.
+
+You also do not have to poll the balance: every billed response carries
+`billing.balance_usd`, the wallet **after** that charge, so a client can warn its user
+while there is still money left.
+
+For the wallet itself — reading the balance, top-up packages, spend history — see
+[Billing](/api/billing).
 
 ## Retry Strategies
 
@@ -349,10 +493,20 @@ def request_with_retry(
                 return response.json()
 
             error_body = response.json()
-            error_code = error_body.get("error", "unknown")
-            message = error_body.get("message", "Unknown error")
-            request_id = error_body.get("request_id", "")
-            details = error_body.get("details", {})
+            # Everything the API reports about a failure sits under `detail`,
+            # which is a string on most endpoints and an object on the ones that
+            # carry context. Flatten both into the same three fields.
+            detail = error_body.get("detail")
+            if isinstance(detail, dict):
+                error_code = detail.get("error", "unknown")
+                message = detail.get("message") or str(detail)
+                details = detail
+            else:
+                error_code = "unknown"
+                message = detail if isinstance(detail, str) else "Unknown error"
+                details = {}
+            # `X-Request-Id` is on every response; the body only carries it on 500.
+            request_id = response.headers.get("X-Request-Id", "")
 
             # Non-retryable error — raise immediately
             if response.status_code not in RETRYABLE_STATUS_CODES:
@@ -402,8 +556,8 @@ try:
     print(f"Generated: {result['url']}")
 
 except FotohubAPIError as e:
-    if e.error == "insufficient_credits":
-        print(f"Out of credits! Top up at fotohub.app/console/billing")
+    if e.error == "insufficient_funds":
+        print(f"{e} — top up at {e.details.get('topup_url')}")
     elif e.error == "invalid_parameters":
         print(f"Bad request: {e} — fields: {e.details.get('fields', [])}")
     elif e.error == "model_unavailable":
@@ -418,26 +572,34 @@ const API_KEY = "fh_live_your_api_key";
 
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
+// `detail` is a string on most endpoints and an object on the ones that carry
+// context (402, 403 gates, 409). A 422 makes it an array, one entry per field.
 interface FotoHubErrorBody {
-  error: string;
-  message: string;
-  details?: Record<string, unknown>;
-  request_id: string;
+  detail?: string | Record<string, unknown> | unknown[];
 }
 
 class FotohubAPIError extends Error {
   status: number;
   code: string;
   requestId: string;
-  details?: Record<string, unknown>;
+  details: Record<string, unknown>;
 
-  constructor(status: number, body: FotoHubErrorBody) {
-    super(body.message);
+  constructor(status: number, body: FotoHubErrorBody, requestId: string) {
+    const detail = body.detail;
+    const isObject =
+      typeof detail === "object" && detail !== null && !Array.isArray(detail);
+    const fields = isObject ? (detail as Record<string, unknown>) : {};
+
+    super(
+      (typeof fields.message === "string" && fields.message) ||
+        (typeof detail === "string" ? detail : JSON.stringify(detail ?? "Unknown error"))
+    );
     this.name = "FotohubAPIError";
     this.status = status;
-    this.code = body.error;
-    this.requestId = body.request_id;
-    this.details = body.details;
+    this.code = typeof fields.error === "string" ? fields.error : "unknown";
+    // The header is on every response; the body only carries an id on 500.
+    this.requestId = requestId;
+    this.details = fields;
   }
 }
 
@@ -469,16 +631,19 @@ async function requestWithRetry<T>(
       return response.json() as Promise<T>;
     }
 
-    const errorBody: FotoHubErrorBody = await response.json();
+    const errorBody: FotoHubErrorBody = await response
+      .json()
+      .catch(() => ({ detail: response.statusText }));
+    const requestId = response.headers.get("X-Request-Id") ?? "";
 
     // Non-retryable error
     if (!RETRYABLE_STATUS_CODES.has(response.status)) {
-      throw new FotohubAPIError(response.status, errorBody);
+      throw new FotohubAPIError(response.status, errorBody, requestId);
     }
 
     // Last attempt — throw
     if (attempt === maxRetries) {
-      throw new FotohubAPIError(response.status, errorBody);
+      throw new FotohubAPIError(response.status, errorBody, requestId);
     }
 
     // Calculate delay
@@ -497,9 +662,9 @@ async function requestWithRetry<T>(
     const totalDelay = delay + jitter;
 
     console.warn(
-      `[${errorBody.error}] Retry ${attempt + 1}/${maxRetries} ` +
+      `[${response.status}] Retry ${attempt + 1}/${maxRetries} ` +
         `in ${(totalDelay / 1000).toFixed(1)}s ` +
-        `(request_id: ${errorBody.request_id})`
+        `(request_id: ${requestId})`
     );
 
     await new Promise((resolve) => setTimeout(resolve, totalDelay));
@@ -524,8 +689,8 @@ try {
 } catch (e) {
   if (e instanceof FotohubAPIError) {
     switch (e.code) {
-      case "insufficient_credits":
-        console.error("Out of credits! Top up at fotohub.app/console/billing");
+      case "insufficient_funds":
+        console.error(`${e.message} — top up at ${e.details.topup_url}`);
         break;
       case "invalid_parameters":
         console.error(`Bad request: ${e.message}`, e.details);
@@ -1041,7 +1206,7 @@ arguments: asking twice means you want two generations.
 - Only applicable to mutating operations (POST, PUT, PATCH). GET requests are naturally idempotent.
 - Applies to the generation and media endpoints (`/v1/ai/*`, `/v1/images/*`,
   `/v1/video/*`, `/v1/shorts/*`, `/v1/story/*`, `/v1/3d/*`, `/v1/voice/*`) —
-  the calls that spend credits. Streaming endpoints are excluded, because a
+  the calls that spend money. Streaming endpoints are excluded, because a
   buffered stream could not be replayed and would have to be held back in full
   before the first byte reached you: `/v1/ai/chat/*`, `/v1/ai/agent/stream`,
   `/v1/ai/gabriel/*`, `/v1/ai/tts/*` and `/v1/story/generate`.
@@ -1881,7 +2046,7 @@ deliberately generic and there is nothing else to quote:
 Every other error returns just `detail`:
 
 ```json
-{ "detail": "Insufficient credits" }
+{ "detail": "prompt is required" }
 ```
 
 A few properties worth relying on:
@@ -2227,84 +2392,102 @@ fi
 
 ::: code-group
 
+There is one billing error to handle: the wallet cannot pay. The amounts live in
+`detail`, and every one of them is optional — the storage endpoints send a balance
+without a price, so read them defensively and fall back to the `message`, which is
+always complete enough to show a user.
+
 ```python [Python]
-def handle_billing_error(error_code: str, details: dict):
-    """Handle billing failures and guide user to resolution."""
-    if error_code == "insufficient_credits":
-        required = details.get("required_credits", "?")
-        available = details.get("available_credits", "?")
-        top_up_url = details.get("top_up_url", "https://fotohub.app/console/billing")
-        print(f"Insufficient credits: need {required}, have {available}")
-        print(f"Top up at: {top_up_url}")
-        # Option: auto-switch to wallet payment if credits exhausted
-        return {"action": "top_up", "url": top_up_url}
+TOPUP_URL = "https://fotohub.app/console/wallet"
 
-    elif error_code == "wallet_empty":
-        print("Wallet balance is zero. Add funds to continue.")
-        return {"action": "add_funds", "url": "https://fotohub.app/console/billing"}
 
-    elif error_code == "payment_failed":
-        print("Payment method declined. Update your card details.")
-        return {"action": "update_payment", "url": "https://fotohub.app/console/billing/payment"}
+def handle_insufficient_funds(detail: dict) -> dict:
+    """Turn a 402 body into something to show, and something to do about it."""
+    balance = detail.get("balance_usd")
+    required = detail.get("required_usd")
+    shortfall = detail.get("shortfall_usd")
+
+    # Accrual-billed endpoints (storage) quote no price: there is no single
+    # amount, only "the wallet is empty". Do not print `$None`.
+    if required is None:
+        print(f"Wallet empty (${balance:.2f}). {detail.get('message', '')}")
+    else:
+        print(f"This request costs ${required:.6f}, wallet holds ${balance:.6f}")
+        print(f"Top up at least ${shortfall:.6f}")
+
+    # Nothing was charged and no provider was called, so the operation can simply
+    # be retried once the wallet is funded — no idempotency key needed.
+    return {
+        "action": "top_up",
+        "url": detail.get("topup_url") or TOPUP_URL,
+        "min_topup_usd": shortfall,
+        "retryable_after_topup": True,
+    }
 
 
 # Usage — graceful degradation in a web app
-try:
-    result = request_with_retry("POST", "/ai/generate/image", {
-        "model": "seedream-5-0-260128",
-        "prompt": "A landscape",
-    })
-except FotohubAPIError as e:
-    if e.status == 402:
-        recovery = handle_billing_error(e.error, e.details)
-        # Show user a friendly billing page redirect
+response = requests.post(
+    f"{API_BASE}/ai/generate/image",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={"model": "seedream-5-0-260128", "prompt": "A landscape"},
+    timeout=60,
+)
+
+if response.status_code == 402:
+    detail = response.json().get("detail")
+    if isinstance(detail, dict) and detail.get("error") == "insufficient_funds":
+        recovery = handle_insufficient_funds(detail)
         # return redirect(recovery["url"])
+    else:
+        # The other 402 is a plan cap on a resource — `plan_gate_exceeded`.
+        # Topping up does not clear it; the account needs a bigger plan.
+        print(detail)
 ```
 
 ```typescript [TypeScript]
-interface BillingRecovery {
-  action: "top_up" | "add_funds" | "update_payment";
-  url: string;
+const TOPUP_URL = "https://fotohub.app/console/wallet";
+
+interface InsufficientFunds {
+  error: "insufficient_funds";
+  message: string;
+  balance_usd: number;
+  // Absent on the storage endpoints, which bill by hourly accrual and so have
+  // no per-request price to quote.
+  required_usd?: number;
+  shortfall_usd?: number;
+  topup_url?: string;
+  operation?: string;
+  charged: false;
 }
 
-function handleBillingError(
-  errorCode: string,
-  details: Record<string, unknown>
-): BillingRecovery {
-  switch (errorCode) {
-    case "insufficient_credits": {
-      const required = details.required_credits ?? "?";
-      const available = details.available_credits ?? "?";
-      const topUpUrl =
-        (details.top_up_url as string) ?? "https://fotohub.app/console/billing";
-      console.error(`Insufficient credits: need ${required}, have ${available}`);
-      return { action: "top_up", url: topUpUrl };
-    }
-    case "wallet_empty":
-      console.error("Wallet balance is zero. Add funds to continue.");
-      return { action: "add_funds", url: "https://fotohub.app/console/billing" };
-    case "payment_failed":
-      console.error("Payment method declined. Update your card details.");
-      return {
-        action: "update_payment",
-        url: "https://fotohub.app/console/billing/payment",
-      };
-    default:
-      return { action: "top_up", url: "https://fotohub.app/console/billing" };
-  }
+function isInsufficientFunds(detail: unknown): detail is InsufficientFunds {
+  return (
+    typeof detail === "object" &&
+    detail !== null &&
+    (detail as { error?: string }).error === "insufficient_funds"
+  );
 }
 
 // Usage in a Next.js API route or similar
-try {
-  const result = await requestWithRetry("POST", "/ai/generate/image", {
-    model: "seedream-5-0-260128",
-    prompt: "A landscape",
-  });
-} catch (e) {
-  if (e instanceof FotohubAPIError && e.status === 402) {
-    const recovery = handleBillingError(e.code, e.details ?? {});
-    // Redirect user to billing page
-    // return NextResponse.redirect(recovery.url);
+const res = await fetch(`${API_BASE}/ai/generate/image`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ model: "seedream-5-0-260128", prompt: "A landscape" }),
+});
+
+if (res.status === 402) {
+  const { detail } = await res.json();
+  if (isInsufficientFunds(detail)) {
+    // Show the amounts if the endpoint quoted them, the message otherwise.
+    console.error(detail.message);
+    // return NextResponse.redirect(detail.topup_url ?? TOPUP_URL);
+  } else {
+    // `plan_gate_exceeded` — a resource cap, not an empty wallet. Topping up
+    // does not clear it.
+    console.error(detail);
   }
 }
 ```
@@ -2312,36 +2495,53 @@ try {
 ```go [Go]
 package main
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
-type BillingRecovery struct {
-	Action string
-	URL    string
+const topupURL = "https://fotohub.app/console/wallet"
+
+// Pointers, not float64: `required_usd` is absent on the storage endpoints, and
+// a plain float64 would decode that absence as 0 — an amount, and the wrong one.
+type insufficientFunds struct {
+	Error        string   `json:"error"`
+	Message      string   `json:"message"`
+	BalanceUsd   *float64 `json:"balance_usd"`
+	RequiredUsd  *float64 `json:"required_usd"`
+	ShortfallUsd *float64 `json:"shortfall_usd"`
+	TopupURL     string   `json:"topup_url"`
+	Operation    string   `json:"operation"`
+	Charged      bool     `json:"charged"`
 }
 
-func handleBillingError(errorCode string, details map[string]interface{}) BillingRecovery {
-	switch errorCode {
-	case "insufficient_credits":
-		required := details["required_credits"]
-		available := details["available_credits"]
-		topUpURL, _ := details["top_up_url"].(string)
-		if topUpURL == "" {
-			topUpURL = "https://fotohub.app/console/billing"
-		}
-		fmt.Printf("Insufficient credits: need %v, have %v\n", required, available)
-		return BillingRecovery{Action: "top_up", URL: topUpURL}
-
-	case "wallet_empty":
-		fmt.Println("Wallet balance is zero. Add funds to continue.")
-		return BillingRecovery{Action: "add_funds", URL: "https://fotohub.app/console/billing"}
-
-	case "payment_failed":
-		fmt.Println("Payment method declined. Update your card details.")
-		return BillingRecovery{Action: "update_payment", URL: "https://fotohub.app/console/billing/payment"}
-
-	default:
-		return BillingRecovery{Action: "top_up", URL: "https://fotohub.app/console/billing"}
+// handleBillingError reports a 402 and returns the minimum top-up that clears
+// it, or nil when the endpoint quoted no amount.
+func handleBillingError(body []byte) *float64 {
+	var envelope struct {
+		Detail insufficientFunds `json:"detail"`
 	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil
+	}
+	d := envelope.Detail
+	if d.Error != "insufficient_funds" {
+		// plan_gate_exceeded — a resource cap. Money will not fix it.
+		fmt.Println(d.Message)
+		return nil
+	}
+
+	url := d.TopupURL
+	if url == "" {
+		url = topupURL
+	}
+	if d.RequiredUsd == nil {
+		fmt.Printf("Wallet empty. %s\nTop up at: %s\n", d.Message, url)
+		return nil
+	}
+	fmt.Printf("Costs $%.6f, wallet holds $%.6f. Top up $%.6f at %s\n",
+		*d.RequiredUsd, *d.BalanceUsd, *d.ShortfallUsd, url)
+	return d.ShortfallUsd
 }
 ```
 
@@ -2359,23 +2559,26 @@ http_code=$(echo "$response" | tail -n1)
 body=$(echo "$response" | sed '$d')
 
 if [ "$http_code" = "402" ]; then
-  error_code=$(echo "$body" | jq -r '.error')
-  top_up_url=$(echo "$body" | jq -r '.details.top_up_url // "https://fotohub.app/console/billing"')
+  error_code=$(echo "$body" | jq -r '.detail.error // ""')
+  topup_url=$(echo "$body" | jq -r '.detail.topup_url // "https://fotohub.app/console/wallet"')
 
-  case "$error_code" in
-    insufficient_credits)
-      required=$(echo "$body" | jq -r '.details.required_credits')
-      available=$(echo "$body" | jq -r '.details.available_credits')
-      echo "Insufficient credits: need $required, have $available" >&2
-      echo "Top up at: $top_up_url" >&2
-      ;;
-    wallet_empty)
-      echo "Wallet empty. Add funds at: $top_up_url" >&2
-      ;;
-    payment_failed)
-      echo "Payment declined. Update card at fotohub.app/console/billing/payment" >&2
-      ;;
-  esac
+  if [ "$error_code" = "insufficient_funds" ]; then
+    # `// empty` leaves these unset on the storage endpoints, which quote a
+    # balance but no price. `// 0` would invent an amount.
+    required=$(echo "$body" | jq -r '.detail.required_usd // empty')
+    shortfall=$(echo "$body" | jq -r '.detail.shortfall_usd // empty')
+    balance=$(echo "$body" | jq -r '.detail.balance_usd')
+
+    if [ -n "$required" ]; then
+      echo "Costs \$$required, wallet holds \$$balance. Top up \$$shortfall" >&2
+    else
+      echo "Wallet empty (\$$balance)." >&2
+    fi
+    echo "Top up at: $topup_url" >&2
+  else
+    # plan_gate_exceeded, or a plain string detail.
+    echo "$body" | jq -r '.detail.message // .detail' >&2
+  fi
   exit 1
 fi
 ```
@@ -2834,7 +3037,7 @@ Store `request_id` in your logs for every request. It is the fastest way to get 
 
 ### Use idempotency keys for mutations
 
-Any request that charges credits or creates resources should include the `X-Idempotency-Key` header. This prevents duplicate operations when retrying after timeouts or network errors.
+Any request that charges your wallet or creates resources should include the `X-Idempotency-Key` header. This prevents duplicate operations — and duplicate charges — when retrying after timeouts or network errors.
 
 ### Implement circuit breakers
 
@@ -2855,7 +3058,15 @@ Different operations have different expected durations. Configure timeouts accor
 
 ### Handle 402 gracefully in UI
 
-When users run out of credits, show a clear path to top up rather than a generic error page. The `details.top_up_url` field provides a direct link to the billing page.
+When the wallet runs out, show a clear path to top up rather than a generic error page.
+`detail.shortfall_usd` is the exact minimum that makes the request go through, and
+`detail.topup_url` links straight to the wallet. Nothing was charged, so the operation can
+be retried unchanged once the balance is there.
+
+Better still, do not reach the 402: check `POST /v1/billing/estimate` before a batch, and
+watch `billing.balance_usd` on each successful response — every billed response reports
+the balance left after the charge, so a UI can warn before the wallet is empty rather than
+after.
 
 ### Use model fallbacks for production
 
