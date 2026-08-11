@@ -55,6 +55,7 @@ POST /v1/buckets
   "path_prefix": "user_123/my-project-assets",
   "is_active": true,
   "is_public": false,
+  "region": "eu",
   "max_file_size_mb": 100,
   "allowed_mime_types": ["image/png", "image/jpeg", "video/mp4"],
   "created_at": "2026-07-18T12:00:00Z"
@@ -63,6 +64,22 @@ POST /v1/buckets
 
 ::: tip
 Bucket names are sanitized to `[a-zA-Z0-9_-]` and limited to 50 characters.
+:::
+
+::: warning Simple Buckets are EU-only
+`region` is accepted on create, but `"eu"` is the only value FOTOhub-managed
+storage accepts — it defaults to `"eu"` when omitted, and anything else is a
+`400`. These buckets physically live in `eu-central-1`; there is no managed
+option in another region.
+
+For output that must land somewhere else, do not use `region` — create an
+[output destination](/guides/bucket-delivery) pointing at your own bucket in
+that region instead, and route a key's generations there.
+
+`region` cannot be changed after creation (`PATCH /v1/buckets/:id` rejects it
+with a `400`): it records where the bytes already live, and relabelling it
+would not move a single one. `GET /v1/buckets` and `GET /v1/buckets/:id`
+both echo the stored value.
 :::
 
 ---

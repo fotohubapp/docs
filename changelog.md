@@ -6,6 +6,41 @@ Track new models, features, and improvements to the FOTOhub API.
 
 ## August 2026
 
+### Registered face deletion & retention <Badge type="tip" text="NEW" />
+
+A registered virtual portrait (`POST /v1/ai/assets/register`) is biometric data,
+and it can now be erased on demand instead of only being written, never removed:
+
+- **`DELETE /v1/ai/assets/{asset_id}`** — deletes the face at the provider and
+  records the erasure locally. Idempotent (`already_deleted: true` on a repeat
+  call); `404` if the asset is not yours; `502` — safe to retry — if the
+  provider delete failed, in which case nothing was recorded as deleted.
+- **`retention_hours`** (optional, 1-8760) on `POST /v1/ai/assets/register` —
+  the asset self-deletes once it elapses. A background sweep runs every 15
+  minutes, so expiry is eventually consistent shortly after `expires_at`, not
+  exact to the second. Omit it to keep the face until you delete it.
+- **`GET /v1/ai/assets`** and **`GET /v1/ai/assets/{asset_id}`** now also
+  return `retention_hours`, `expires_at`, and `purged_at`.
+
+See [Managing registered faces](/api/video-generation#managing-registered-faces)
+for the full reference and response shapes.
+
+### Storage bucket region field <Badge type="tip" text="NEW" />
+
+`POST /v1/buckets` and `PATCH /v1/buckets/:id` now surface `region` explicitly:
+
+- `POST /v1/buckets` accepts an optional `region`, but **`"eu"` is the only
+  value FOTOhub-managed storage accepts** (default when omitted) — these
+  buckets are stored in `eu-central-1`. Anything else is a `400` pointing you
+  at [output destinations](/guides/bucket-delivery) for residency outside the EU.
+- `PATCH /v1/buckets/:id` rejects `region` outright with a `400`: it records
+  where the bytes already live, and a bucket cannot be relabelled into a
+  different region without moving the data.
+- `GET /v1/buckets` and `GET /v1/buckets/:id` include `region` on every row.
+
+This does not affect S3 Enterprise (`/v1/storage/s3/*`), which already
+provisions real AWS buckets across 16 regions — see [Available Regions](/api/storage#available-regions).
+
 ### Seedance 2.5 <Badge type="tip" text="NEW" />
 
 `seedance-2-5` — the longest single-request clip on the platform, and the first model

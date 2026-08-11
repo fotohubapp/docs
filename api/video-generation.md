@@ -872,7 +872,7 @@ Register a portrait once, then reuse it across generations so the same face appe
 in every clip:
 
 ```bash
-# 1. Register (free — returns {asset_id, uri, status})
+# 1. Register (free — returns {asset_id, uri, status, retention_hours, expires_at})
 curl -X POST "https://apis.fotohub.app/v1/ai/assets/register" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
@@ -899,6 +899,119 @@ IDs are scoped to your account and rejected with a 400 if they belong to someone
 accepts any unknown field with a 200, so neither flag does anything — accepting them
 silently would let you build on a guarantee that does not exist. `content_filter: true`
 is accepted, since standard moderation is what already happens.
+:::
+
+### Managing registered faces
+
+A registered virtual portrait is biometric data, and it is treated that way end to
+end: it is scoped to your account, it can be listed, and it can be erased on demand
+rather than living forever once registered.
+
+#### Automatic expiry: `retention_hours`
+
+Pass an optional `retention_hours` (integer, 1-8760) on `POST /v1/ai/assets/register`
+to have the asset delete itself, at the provider and in our records, once it elapses
+— use it to honour a data-minimisation policy or a time-boxed consent without having
+to remember to call `DELETE` yourself:
+
+```bash
+curl -X POST "https://apis.fotohub.app/v1/ai/assets/register" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image_url": "https://s1.fotohub.app/storage/v1/object/public/photos/face.jpg",
+    "retention_hours": 24
+  }'
+```
+
+```json
+{
+  "asset_id": "as_9f3c1a2b",
+  "uri": "asset://as_9f3c1a2b",
+  "status": "Active",
+  "source_url": "https://s1.fotohub.app/storage/v1/object/public/photos/face.jpg",
+  "retention_hours": 24,
+  "expires_at": "2026-08-11T14:00:00Z"
+}
+```
+
+Omit `retention_hours` and the face is kept until you delete it — the field is
+opt-in so an existing integration does not silently start losing faces it depends
+on. A background sweep runs every 15 minutes and deletes anything past its
+`expires_at`, so expiry is eventually consistent within that window rather than
+exact to the second.
+
+#### List your registered faces
+
+```
+GET /v1/ai/assets?limit=50&offset=0
+```
+
+```bash
+curl "https://apis.fotohub.app/v1/ai/assets" \
+  -H "Authorization: Bearer fh_live_your_api_key"
+```
+
+```json
+{
+  "assets": [
+    {
+      "asset_id": "as_9f3c1a2b",
+      "uri": "asset://as_9f3c1a2b",
+      "source_url": "https://s1.fotohub.app/storage/v1/object/public/photos/face.jpg",
+      "asset_type": "Image",
+      "status": "Active",
+      "source": "public_api",
+      "created_at": "2026-08-10T14:00:00Z",
+      "retention_hours": 24,
+      "expires_at": "2026-08-11T14:00:00Z",
+      "purged_at": null
+    }
+  ],
+  "count": 1
+}
+```
+
+`GET /v1/ai/assets/{asset_id}` returns the same shape for one asset, with its
+live status re-checked against the provider.
+
+A `purged_at` timestamp means the face is gone, and it is the final state: the
+provider is not re-queried for an erased asset, so the status stays `Deleted`.
+`source_url` is cleared at the same time and comes back `null`, so a purged
+record cannot be used to reconstruct what was erased.
+
+#### Delete a registered face
+
+```
+DELETE /v1/ai/assets/{asset_id}
+```
+
+```bash
+curl -X DELETE "https://apis.fotohub.app/v1/ai/assets/as_9f3c1a2b" \
+  -H "Authorization: Bearer fh_live_your_api_key"
+```
+
+Use this to honour an erasure request immediately, rather than waiting on
+`retention_hours` or on the asset simply never being reused. The delete happens
+at the provider first; the local record is only marked erased once that is
+confirmed — so a `200` here means the face is actually gone, not just that we
+intend to remove it.
+
+```json
+{ "asset_id": "as_9f3c1a2b", "deleted": true, "reason": "deleted" }
+```
+
+| Response | Meaning |
+|---|---|
+| `200 {"deleted": true, "reason": ...}` | Erased just now. |
+| `200 {"deleted": true, "already_deleted": true}` | Already erased (by a prior call or by the retention sweep) — deleting twice is not an error. |
+| `404` | No asset with that id on your account. Matches `GET` — confirming an id exists for someone else would leak the shared asset pool. |
+| `502` | The provider delete failed. Nothing was recorded as deleted, so the asset is untouched and safe to retry. |
+
+::: tip Retrying a 502
+A `502` means the face is unchanged — not partially deleted, not deleted locally
+but not upstream. Retry the same `DELETE` call; there is no cleanup step to run
+first.
 :::
 
 ---
