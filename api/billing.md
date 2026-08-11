@@ -497,7 +497,7 @@ Returns the full pricing catalog: every model grouped by category, plus credit-c
 ```json
 {
   "currency": "USD",
-  "margin_info": "All prices include platform fee. Volume discounts available for Enterprise.",
+  "margin_info": "Prices are the provider's own rate, 1:1, with no platform fee added. Billed in USD from your prepaid wallet balance.",
   "pricing": {
     "image_generation": {
       "description": "AI Image Generation",

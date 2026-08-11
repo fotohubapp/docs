@@ -15,20 +15,24 @@ POST /v1/ai/generate/3d
 ```
 
 **Authentication:** Bearer token (API key)
-**Billing:** 3-15 credits per generation (varies by model)
-**Processing:** Job-based — submit, then poll `GET /v1/ai/generate/3d/{job_id}`
+**Billing:** USD, charged from your prepaid wallet before the generation starts — see [Pricing](#pricing)
+**Processing:** Synchronous — one request returns the finished model. There is no queue and nothing to poll.
+
+::: warning There is no 3D job queue
+Earlier versions of this page described a submit-then-poll flow. That was never how the endpoint behaved: `POST /v1/ai/generate/3d` blocks until the mesh is ready (up to ~60s for `fh-pro-3d`) and returns it in the response. Set a generous client timeout instead of writing a polling loop.
+:::
 
 ---
 
 ## Available Models
 
-| Model | Name | Credits | Speed | Mode | Status |
-|-------|------|---------|-------|------|--------|
-| `fh-lite-3d` | FH Lite 3D | 3 | ~3s | image-to-3d | Available |
-| `fh-text-3d` | FH Text 3D | 5 | ~25s | text-to-3d | Available |
-| `fh-pro-3d` | FH Pro 3D | 15 | ~60s | image-to-3d | Not yet enabled |
+| Model | Name | Price (USD) | Speed | Mode | Status |
+|-------|------|-------------|-------|------|--------|
+| `fh-lite-3d` | FH Lite 3D | $0.160772 | ~3s | image-to-3d | Available |
+| `fh-text-3d` | FH Text 3D | $0.267953 | ~25s | text-to-3d | Available |
+| `fh-pro-3d` | FH Pro 3D | $0.803859 | ~60s | image-to-3d | Not yet enabled |
 
-Prefer [`GET /v1/ai/generate/3d/models`](#list-available-models) over hardcoding this table: it returns the same ids with a live `available` flag, so a model being switched on needs no client change.
+Prefer [`GET /v1/ai/generate/3d/models`](#list-available-models) or [`GET /v1/pricing`](/api/billing) over hardcoding this table: both return the same ids with a live `available` flag and the live price, so a repricing or a model being switched on needs no client change.
 
 ::: warning `fh-pro-3d` is not callable yet
 It is listed with `available: false`. Requests naming it pass validation but will not produce a model until the service is enabled — build against `fh-lite-3d` and `fh-text-3d`.
@@ -141,52 +145,56 @@ Generate a 3D model from a text description. `fh-text-3d` is the only model that
 
 ```json
 {
-  "id": "3d_gen_8f3k2j1m4n5p",
-  "url": "https://s3point.fotohub.app/3d/3d_gen_8f3k2j1m4n5p.glb",
-  "format": "glb",
+  "operation": "generate_3d",
   "model": "fh-lite-3d",
-  "status": "completed",
-  "thumbnail_url": "https://s3point.fotohub.app/3d/3d_gen_8f3k2j1m4n5p_thumb.png",
-  "poly_count": 45000,
-  "file_size": 2457600,
+  "success": true,
+  "file_id": "8f3k2j1m-4n5p-4a2b-9c1d-3e4f5a6b7c8d",
+  "url": "https://s1.fotohub.app/storage/v1/object/sign/cloud-drive/...",
+  "storage_path": "<user_id>/3d/8f3k2j1m-4n5p-4a2b-9c1d-3e4f5a6b7c8d.glb",
+  "name": "3d_model_1754899200000.glb",
+  "stats": {
+    "file_size_bytes": 2457600,
+    "duration_ms": 3184
+  },
+  "cost_usd": 0.160772,
+  "currency": "USD",
   "billing": {
-    "credits_used": 5,
-    "credits_remaining": 495
+    "cost_usd": 0.160772,
+    "balance_usd": 12.416538,
+    "currency": "USD",
+    "method": "wallet",
+    "model": "prepaid"
   }
 }
 ```
 
-### Status Values
+`url` is a **signed link valid for 2 hours**. Persist the file, or re-sign it later with [`GET /v1/ai/generate/3d/{file_id}`](#retrieve-a-generated-model).
 
-| Status | Description |
-|--------|-------------|
-| `queued` | Job is in the queue |
-| `processing` | Generation is in progress |
-| `completed` | 3D model is ready for download |
-| `failed` | Generation failed (check error field) |
+::: tip Fields that do not exist
+This page previously documented `id`, `status`, `poly_count` and `thumbnail_url`. None of them are returned — the identifier is `file_id`, and there is no thumbnail or polygon count in the response. Read `stats.file_size_bytes` for size.
+:::
 
-### Error Response
+### Error Responses
+
+Every error carries `detail`, and any error raised before or instead of a successful generation states plainly that you were not billed.
 
 ```json
 {
-  "error": {
-    "code": "invalid_image",
-    "message": "Unable to detect a clear subject in the provided image. Ensure the object is clearly visible against a simple background.",
-    "credits_refunded": 5
+  "detail": {
+    "error": "prompt is required for text-to-3d mode",
+    "note": "Your wallet was not charged for this request."
   }
 }
 ```
 
-Common error codes:
-
-| Code | Description |
-|------|-------------|
-| `invalid_image` | Image cannot be processed (corrupt, no clear subject) |
-| `invalid_prompt` | Text prompt is empty or too short |
-| `model_unavailable` | Requested model is temporarily offline |
-| `mode_not_supported` | Model does not support the requested mode |
-| `generation_failed` | Internal rendering error (credits refunded) |
-| `file_too_large` | Input image exceeds 20MB limit |
+| Status | Meaning |
+|--------|---------|
+| `400` | Bad request — `image_base64` missing for `image-to-3d`, or `prompt` missing for `text-to-3d`. Not charged. |
+| `401` | Missing or invalid API key. Not charged. |
+| `402` | `code: insufficient_funds` — your prepaid wallet cannot cover the generation. Nothing was charged; top up and retry. |
+| `422` | Validation error — unknown `model`, `mode`, `quality` or `format`. Not charged. |
+| `424` | The generation failed on our side (engine or storage). **The charge is refunded automatically** and the response says so. |
+| `429` | Rate limit exceeded for your tier. Not charged. |
 
 ---
 
@@ -216,8 +224,9 @@ result = client.generate_3d(
 )
 
 print(f"3D Model: {result['url']}")
-print(f"Polygons: {result['poly_count']}")
-print(f"Credits used: {result['billing']['credits_used']}")
+print(f"Size: {result['stats']['file_size_bytes'] / 1024:.0f} KB")
+print(f"Charged: ${result['cost_usd']:.6f}")
+print(f"Wallet balance: ${result['billing']['balance_usd']:.6f}")
 ```
 
 ```typescript [TypeScript]
@@ -239,8 +248,9 @@ const result = await client.generate3D({
 });
 
 console.log(`3D Model: ${result.url}`);
-console.log(`Polygons: ${result.polyCount}`);
-console.log(`Credits used: ${result.billing.creditsUsed}`);
+console.log(`Size: ${(result.stats.file_size_bytes / 1024).toFixed(0)} KB`);
+console.log(`Charged: $${result.cost_usd}`);
+console.log(`Wallet balance: $${result.billing.balance_usd}`);
 ```
 
 ```go [Go]
@@ -289,7 +299,7 @@ func main() {
 	var result map[string]interface{}
 	json.Unmarshal(respBody, &result)
 	fmt.Printf("3D Model: %s\n", result["url"])
-	fmt.Printf("Polygons: %.0f\n", result["poly_count"])
+	fmt.Printf("Charged: $%v\n", result["cost_usd"])
 }
 ```
 
@@ -311,7 +321,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
 
 ### Text-to-3D Generation
 
-Generate a 3D model from a text prompt using FH Pro 3D for maximum quality.
+Generate a 3D model from a text prompt. `fh-text-3d` is the only model that accepts `mode: "text-to-3d"` — the examples below used to name `fh-pro-3d`, which is image-only and not enabled, so they could not have worked.
 
 ::: code-group
 ```python [Python]
@@ -322,16 +332,15 @@ client = FotoHub(api_key="fh_live_your_api_key")
 # Generate 3D model from text description
 result = client.generate_3d(
     mode="text-to-3d",
-    model="fh-pro-3d",
+    model="fh-text-3d",
     prompt="A medieval stone castle with four towers and a drawbridge",
     quality="high",
     format="glb",
-    options={"pbr": True}
 )
 
 print(f"3D Model: {result['url']}")
-print(f"Format: {result['format']}")
-print(f"File size: {result['file_size'] / 1024 / 1024:.1f} MB")
+print(f"File size: {result['stats']['file_size_bytes'] / 1024 / 1024:.1f} MB")
+print(f"Charged: ${result['cost_usd']:.6f}")
 ```
 
 ```typescript [TypeScript]
@@ -342,16 +351,15 @@ const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
 // Generate 3D model from text description
 const result = await client.generate3D({
   mode: "text-to-3d",
-  model: "fh-pro-3d",
+  model: "fh-text-3d",
   prompt: "A medieval stone castle with four towers and a drawbridge",
   quality: "high",
   format: "glb",
-  options: { pbr: true },
 });
 
 console.log(`3D Model: ${result.url}`);
-console.log(`Format: ${result.format}`);
-console.log(`File size: ${(result.fileSize / 1024 / 1024).toFixed(1)} MB`);
+console.log(`File size: ${(result.stats.file_size_bytes / 1024 / 1024).toFixed(1)} MB`);
+console.log(`Charged: $${result.cost_usd}`);
 ```
 
 ```go [Go]
@@ -368,11 +376,10 @@ import (
 func main() {
 	payload := map[string]interface{}{
 		"mode":    "text-to-3d",
-		"model":   "fh-pro-3d",
+		"model":   "fh-text-3d",
 		"prompt":  "A medieval stone castle with four towers and a drawbridge",
 		"quality": "high",
 		"format":  "glb",
-		"options": map[string]interface{}{"pbr": true},
 	}
 	body, _ := json.Marshal(payload)
 
@@ -391,7 +398,7 @@ func main() {
 	var result map[string]interface{}
 	json.Unmarshal(respBody, &result)
 	fmt.Printf("3D Model: %s\n", result["url"])
-	fmt.Printf("Format: %s\n", result["format"])
+	fmt.Printf("Charged: $%v\n", result["cost_usd"])
 }
 ```
 
@@ -401,81 +408,71 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "text-to-3d",
-    "model": "fh-pro-3d",
+    "model": "fh-text-3d",
     "prompt": "A medieval stone castle with four towers and a drawbridge",
     "quality": "high",
-    "format": "glb",
-    "options": {"pbr": true}
+    "format": "glb"
   }'
 ```
 :::
 
 ---
 
-### Async Generation with Polling
+### Handling Long Generations
 
-For models like `fh-pro-3d` and `fh-pro-3d` that take 15-30 seconds, use async polling to check job status.
+There is no job queue: the request blocks until the mesh is ready. `fh-text-3d` takes roughly 25s and `fh-pro-3d` up to a minute, which exceeds the default timeout of most HTTP clients — so raise the timeout rather than reaching for a polling loop.
+
+::: warning This section used to document a polling loop
+It showed a `while` loop reading `status` from `GET /v1/ai/generate/3d/{job_id}`. That loop could never terminate: the response contains no `status` field to become `"completed"`, because the generation is already finished when the POST returns. If you copied it, replace it with the code below.
+:::
 
 ::: code-group
 ```python [Python]
 from fotohub import FotoHub
 import base64
-import time
 
-client = FotoHub(api_key="fh_live_your_api_key")
+# The SDK default timeout is too short for fh-pro-3d.
+client = FotoHub(api_key="fh_live_your_api_key", timeout=180.0)
 
 with open("product.jpg", "rb") as f:
     image_b64 = base64.b64encode(f.read()).decode()
 
-# Submit generation job
-job = client.generate_3d(
+result = client.generate_3d(
     mode="image-to-3d",
-    model="fh-pro-3d",
+    model="fh-lite-3d",
     image=image_b64,
     quality="high",
     format="glb",
 )
 
-# If job is still processing, poll for completion
-if job["status"] != "completed":
-    job_id = job["id"]
-    while True:
-        status = client.get_3d_status(job_id)
-        print(f"Status: {status['status']}")
-        if status["status"] == "completed":
-            print(f"Download: {status['url']}")
-            break
-        elif status["status"] == "failed":
-            print(f"Error: {status['error']}")
-            break
-        time.sleep(3)
+# Already complete — nothing to poll.
+print(f"Download: {result['url']}")
+print(f"Took: {result['stats']['duration_ms']} ms")
+print(f"Charged: ${result['cost_usd']:.6f}")
 ```
 
 ```typescript [TypeScript]
 import { FotoHub } from "fotohub";
 import { readFileSync } from "fs";
 
-const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
+const client = new FotoHub({
+  apiKey: "fh_live_your_api_key",
+  timeout: 180_000,
+});
 
 const imageBase64 = readFileSync("product.jpg").toString("base64");
 
-// Submit generation job
-const job = await client.generate3D({
+const result = await client.generate3D({
   mode: "image-to-3d",
-  model: "fh-pro-3d",
+  model: "fh-lite-3d",
   image: imageBase64,
   quality: "high",
   format: "glb",
 });
 
-// Use waitFor3D helper for automatic polling
-const completed = await client.waitFor3D(job.id, {
-  pollInterval: 3000,
-  onProgress: (status) => console.log(`Status: ${status.status}`),
-});
-
-console.log(`Download: ${completed.url}`);
-console.log(`Polygons: ${completed.polyCount}`);
+console.log(`Download: ${result.url}`);
+console.log(`Took: ${result.stats.duration_ms} ms`);
+console.log(`Charged: $${result.cost_usd}`);
 ```
 
 ```go [Go]
@@ -498,7 +495,7 @@ func main() {
 
 	payload := map[string]interface{}{
 		"mode":         "image-to-3d",
-		"model":        "fh-pro-3d",
+		"model":        "fh-lite-3d",
 		"image_base64": imageB64,
 		"quality":      "high",
 		"format":       "glb",
@@ -509,70 +506,34 @@ func main() {
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, _ := http.DefaultClient.Do(req)
+	// Long enough for the slowest model; the call is synchronous.
+	client := &http.Client{Timeout: 180 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
 	defer resp.Body.Close()
 	respBody, _ := io.ReadAll(resp.Body)
 
-	var job map[string]interface{}
-	json.Unmarshal(respBody, &job)
-
-	// Poll for completion
-	jobID := job["id"].(string)
-	for {
-		pollReq, _ := http.NewRequest("GET",
-			fmt.Sprintf("https://apis.fotohub.app/v1/ai/generate/3d/%s", jobID), nil)
-		pollReq.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-
-		pollResp, _ := http.DefaultClient.Do(pollReq)
-		pollBody, _ := io.ReadAll(pollResp.Body)
-		pollResp.Body.Close()
-
-		var status map[string]interface{}
-		json.Unmarshal(pollBody, &status)
-
-		fmt.Printf("Status: %s\n", status["status"])
-		if status["status"] == "completed" {
-			fmt.Printf("Download: %s\n", status["url"])
-			break
-		} else if status["status"] == "failed" {
-			fmt.Printf("Error: %v\n", status["error"])
-			break
-		}
-		time.Sleep(3 * time.Second)
-	}
+	var result map[string]interface{}
+	json.Unmarshal(respBody, &result)
+	fmt.Printf("Download: %s\n", result["url"])
+	fmt.Printf("Charged: $%v\n", result["cost_usd"])
 }
 ```
 
 ```bash [cURL]
-# Submit job
-JOB_ID=$(curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
+# --max-time, not a polling loop: the model is in this one response.
+curl -s --max-time 180 -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "image-to-3d",
-    "model": "fh-pro-3d",
+    "model": "fh-lite-3d",
     "image_base64": "'$(base64 -w0 product.jpg)'",
     "quality": "high",
     "format": "glb"
-  }' | jq -r '.id')
-
-echo "Job submitted: $JOB_ID"
-
-# Poll for completion
-while true; do
-  STATUS=$(curl -s https://apis.fotohub.app/v1/ai/generate/3d/$JOB_ID \
-    -H "Authorization: Bearer fh_live_your_api_key" | jq -r '.status')
-  echo "Status: $STATUS"
-  if [ "$STATUS" = "completed" ]; then
-    curl -s https://apis.fotohub.app/v1/ai/generate/3d/$JOB_ID \
-      -H "Authorization: Bearer fh_live_your_api_key" | jq '.url'
-    break
-  elif [ "$STATUS" = "failed" ]; then
-    echo "Generation failed"
-    break
-  fi
-  sleep 3
-done
+  }' | jq '{url: .url, took_ms: .stats.duration_ms, charged: .cost_usd}'
 ```
 :::
 
@@ -609,7 +570,7 @@ with open("sneaker_3d.glb", "wb") as f:
     f.write(response.content)
 
 print(f"Saved: sneaker_3d.glb ({len(response.content) / 1024:.0f} KB)")
-print(f"Thumbnail: {result['thumbnail_url']}")
+print(f"Charged: ${result['cost_usd']:.6f}")
 ```
 
 ```typescript [TypeScript]
@@ -636,7 +597,7 @@ const buffer = Buffer.from(await response.arrayBuffer());
 writeFileSync("sneaker_3d.glb", buffer);
 
 console.log(`Saved: sneaker_3d.glb (${(buffer.length / 1024).toFixed(0)} KB)`);
-console.log(`Thumbnail: ${result.thumbnailUrl}`);
+console.log(`Charged: $${result.cost_usd}`);
 ```
 
 ```go [Go]
@@ -687,7 +648,7 @@ func main() {
 	written, _ := io.Copy(outFile, dlResp.Body)
 
 	fmt.Printf("Saved: sneaker_3d.glb (%d KB)\n", written/1024)
-	fmt.Printf("Thumbnail: %s\n", result["thumbnail_url"])
+	fmt.Printf("Charged: $%v\n", result["cost_usd"])
 }
 ```
 
@@ -709,7 +670,7 @@ RESULT=$(curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
 MODEL_URL=$(echo $RESULT | jq -r '.url')
 curl -o sneaker_3d.glb "$MODEL_URL"
 echo "Downloaded: sneaker_3d.glb"
-echo "Thumbnail: $(echo $RESULT | jq -r '.thumbnail_url')"
+echo "Charged: $(echo $RESULT | jq -r '.cost_usd') USD"
 ```
 :::
 
@@ -745,7 +706,7 @@ for fmt, use_case in formats.items():
         format=fmt,
     )
     print(f"  {fmt.upper()} ({use_case}): {result['url']}")
-    print(f"    File size: {result['file_size'] / 1024:.0f} KB")
+    print(f"    File size: {result['stats']['file_size_bytes'] / 1024:.0f} KB")
 ```
 
 ```typescript [TypeScript]
@@ -766,7 +727,7 @@ for (const format of formats) {
     image: imageBase64,
     format,
   });
-  console.log(`${format.toUpperCase()}: ${result.url} (${(result.fileSize / 1024).toFixed(0)} KB)`);
+  console.log(`${format.toUpperCase()}: ${result.url} (${(result.stats.file_size_bytes / 1024).toFixed(0)} KB)`);
 }
 ```
 
@@ -808,7 +769,8 @@ func main() {
 
 		var result map[string]interface{}
 		json.Unmarshal(respBody, &result)
-		fmt.Printf("%s: %s (%.0f KB)\n", format, result["url"], result["file_size"].(float64)/1024)
+		stats := result["stats"].(map[string]interface{})
+		fmt.Printf("%s: %s (%.0f KB)\n", format, result["url"], stats["file_size_bytes"].(float64)/1024)
 	}
 }
 ```
@@ -823,7 +785,7 @@ curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
     "model": "fh-lite-3d",
     "image_base64": "'$(base64 -w0 product.jpg)'",
     "format": "glb"
-  }' | jq '{format: .format, url: .url, size_kb: (.file_size / 1024)}'
+  }' | jq '{url: .url, size_kb: (.stats.file_size_bytes / 1024), charged: .cost_usd}'
 
 # Generate USDZ for iOS AR
 curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
@@ -834,7 +796,7 @@ curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
     "model": "fh-lite-3d",
     "image_base64": "'$(base64 -w0 product.jpg)'",
     "format": "usdz"
-  }' | jq '{format: .format, url: .url, size_kb: (.file_size / 1024)}'
+  }' | jq '{url: .url, size_kb: (.stats.file_size_bytes / 1024), charged: .cost_usd}'
 
 # Generate STL for 3D printing
 curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
@@ -845,7 +807,7 @@ curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
     "model": "fh-lite-3d",
     "image_base64": "'$(base64 -w0 product.jpg)'",
     "format": "stl"
-  }' | jq '{format: .format, url: .url, size_kb: (.file_size / 1024)}'
+  }' | jq '{url: .url, size_kb: (.stats.file_size_bytes / 1024), charged: .cost_usd}'
 ```
 :::
 
@@ -886,12 +848,14 @@ for filename in os.listdir(product_dir):
     results.append({
         "product": filename,
         "model_url": result["url"],
-        "thumbnail": result["thumbnail_url"],
+        "cost_usd": result["cost_usd"],
     })
     print(f"Generated: {filename} -> {result['url']}")
 
-print(f"\nTotal: {len(results)} models generated")
-print(f"Credits used: {len(results) * 5}")
+# Sum what you were actually charged rather than multiplying a hardcoded rate:
+# a repricing would silently invalidate the second form.
+total = sum(r["cost_usd"] for r in results)
+print(f"\nTotal: {len(results)} models, ${total:.6f} charged")
 ```
 
 ```typescript [TypeScript]
@@ -922,12 +886,13 @@ for (const filename of files) {
   results.push({
     product: filename,
     modelUrl: result.url,
-    thumbnail: result.thumbnailUrl,
+    costUsd: result.cost_usd,
   });
   console.log(`Generated: ${filename} -> ${result.url}`);
 }
 
-console.log(`\nTotal: ${results.length} models, ${results.length * 5} credits`);
+const total = results.reduce((sum, r) => sum + r.costUsd, 0);
+console.log(`\nTotal: ${results.length} models, $${total.toFixed(6)} charged`);
 ```
 
 ```go [Go]
@@ -950,6 +915,7 @@ func main() {
 	entries, _ := os.ReadDir(productDir)
 
 	var count int
+	var totalUSD float64
 	for _, entry := range entries {
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
 		if ext != ".jpg" && ext != ".png" && ext != ".webp" {
@@ -980,8 +946,11 @@ func main() {
 		json.Unmarshal(respBody, &result)
 		fmt.Printf("Generated: %s -> %s\n", entry.Name(), result["url"])
 		count++
+		if c, ok := result["cost_usd"].(float64); ok {
+			totalUSD += c
+		}
 	}
-	fmt.Printf("\nTotal: %d models, %d credits\n", count, count*5)
+	fmt.Printf("\nTotal: %d models, $%.6f charged\n", count, totalUSD)
 }
 ```
 
@@ -998,7 +967,7 @@ for file in product_photos/*.jpg; do
       "image_base64": "'$(base64 -w0 "$file")'",
       "format": "glb",
       "quality": "standard"
-    }' | jq '{file: "'$file'", url: .url, polys: .poly_count}'
+    }' | jq '{file: "'$file'", url: .url, charged: .cost_usd}'
 done
 ```
 :::
@@ -1033,9 +1002,9 @@ result = client.generate_3d(
     }
 )
 
-print(f"Polygon count: {result['poly_count']}")
-print(f"File size: {result['file_size'] / 1024:.0f} KB")
+print(f"File size: {result['stats']['file_size_bytes'] / 1024:.0f} KB")
 print(f"URL: {result['url']}")
+print(f"Charged: ${result['cost_usd']:.6f}")
 ```
 
 ```typescript [TypeScript]
@@ -1060,8 +1029,8 @@ const result = await client.generate3D({
   },
 });
 
-console.log(`Polygon count: ${result.polyCount}`);
-console.log(`File size: ${(result.fileSize / 1024).toFixed(0)} KB`);
+console.log(`File size: ${(result.stats.file_size_bytes / 1024).toFixed(0)} KB`);
+console.log(`Charged: $${result.cost_usd}`);
 ```
 
 ```go [Go]
@@ -1105,8 +1074,8 @@ func main() {
 
 	var result map[string]interface{}
 	json.Unmarshal(respBody, &result)
-	fmt.Printf("Polygons: %.0f\n", result["poly_count"])
-	fmt.Printf("File size: %.0f KB\n", result["file_size"].(float64)/1024)
+	stats := result["stats"].(map[string]interface{})
+	fmt.Printf("File size: %.0f KB\n", stats["file_size_bytes"].(float64)/1024)
 }
 ```
 
@@ -1125,53 +1094,52 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
       "target_polys": 25000,
       "texture": true
     }
-  }' | jq '{polys: .poly_count, size_kb: (.file_size / 1024), url: .url}'
+  }' | jq '{size_kb: (.stats.file_size_bytes / 1024), url: .url, charged: .cost_usd}'
 ```
 :::
 
 ---
 
-## Check Job Status
-
-For longer-running models, poll the status endpoint:
+## Retrieve a Generated Model
 
 ```
-GET /v1/ai/generate/3d/{job_id}
+GET /v1/ai/generate/3d/{file_id}
 ```
+
+Not a status endpoint — the generation is already complete when the POST returns. This exists for one reason: the `url` you got back is a signed link that expires after 2 hours, and this re-signs it. Pass the `file_id` from the generate response. **Free — no charge is taken.**
+
+Returns `404` if no asset with that id belongs to your account. `status` is always `"completed"`, because an incomplete generation is never stored.
 
 ::: code-group
 ```python [Python]
-status = client.get_3d_status("3d_gen_8f3k2j1m4n5p")
-print(f"Status: {status['status']}")
-if status["status"] == "completed":
-    print(f"URL: {status['url']}")
+asset = client.get_3d_status("8f3k2j1m-4n5p-4a2b-9c1d-3e4f5a6b7c8d")
+print(f"Fresh URL: {asset['url']}")     # valid another hour
+print(f"Model: {asset['model']}, format: {asset['format']}")
 ```
 
 ```typescript [TypeScript]
-const status = await client.get3DStatus("3d_gen_8f3k2j1m4n5p");
-console.log(`Status: ${status.status}`);
-if (status.status === "completed") {
-  console.log(`URL: ${status.url}`);
-}
+const asset = await client.get3DStatus("8f3k2j1m-4n5p-4a2b-9c1d-3e4f5a6b7c8d");
+console.log(`Fresh URL: ${asset.url}`);
+console.log(`Model: ${asset.model}, format: ${asset.format}`);
 ```
 
 ```go [Go]
 req, _ := http.NewRequest("GET",
-    "https://apis.fotohub.app/v1/ai/generate/3d/3d_gen_8f3k2j1m4n5p", nil)
+    "https://apis.fotohub.app/v1/ai/generate/3d/8f3k2j1m-4n5p-4a2b-9c1d-3e4f5a6b7c8d", nil)
 req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 
 resp, _ := http.DefaultClient.Do(req)
 defer resp.Body.Close()
 body, _ := io.ReadAll(resp.Body)
 
-var status map[string]interface{}
-json.Unmarshal(body, &status)
-fmt.Printf("Status: %s\n", status["status"])
+var asset map[string]interface{}
+json.Unmarshal(body, &asset)
+fmt.Printf("Fresh URL: %s\n", asset["url"])
 ```
 
 ```bash [cURL]
-curl https://apis.fotohub.app/v1/ai/generate/3d/3d_gen_8f3k2j1m4n5p \
-  -H "Authorization: Bearer fh_live_your_api_key"
+curl https://apis.fotohub.app/v1/ai/generate/3d/8f3k2j1m-4n5p-4a2b-9c1d-3e4f5a6b7c8d \
+  -H "Authorization: Bearer fh_live_your_api_key" | jq '.url'
 ```
 :::
 
@@ -1189,12 +1157,12 @@ Returns all 3D models with current availability, pricing, and capabilities.
 ```python [Python]
 models = client.list_3d_models()
 for m in models:
-    print(f"{m['id']}: {m['name']} — {m['credits']} credits, modes: {m['modes']}")
+    print(f"{m['id']}: {m['name']} — ${m['price_usd']:.6f}, {m['mode']}, available={m['available']}")
 ```
 
 ```typescript [TypeScript]
 const models = await client.list3DModels();
-models.forEach(m => console.log(`${m.id}: ${m.name} — ${m.credits} credits`));
+models.forEach(m => console.log(`${m.id}: ${m.name} — $${m.price_usd} (${m.mode})`));
 ```
 
 ```go [Go]
@@ -1224,65 +1192,75 @@ curl https://apis.fotohub.app/v1/ai/generate/3d/models \
 | PBR Materials | No | No | Yes |
 | Texture Maps | Vertex only | Vertex only | Full PBR set |
 | Simplification | Yes | No | Yes |
-| GLB | Yes | Yes | Yes |
-| OBJ | Yes | Yes | Yes |
-| STL | Yes | Yes | Yes |
-| USDZ | Yes | Yes | No | Yes | Yes |
-| Speed | ~3s | <1s | ~15s | ~15s | ~30s |
-| Credits | 5 | 5 | 10 | 15 | 25 |
+| GLB / OBJ / STL | Yes | Yes | Yes |
+| USDZ | Yes | Yes | Yes |
+| Speed | ~3s | ~25s | ~60s |
+| Price (USD) | $0.160772 | $0.267953 | $0.803859 |
+| Callable today | Yes | Yes | No (`available: false`) |
+
+::: tip This table was wrong in three ways
+It had five value columns under three headers, so `USDZ`, `Speed` and the price row were misaligned; it listed prices in credits, which this API does not accept; and the speeds contradicted the model table above. The figures here match `GET /v1/ai/generate/3d/models`.
+:::
 
 ### When to Use Each Model
 
+Only `fh-lite-3d` and `fh-text-3d` are callable today, so every row naming `fh-pro-3d` describes what it will be for once enabled.
+
 | Scenario | Recommended Model | Reasoning |
 |----------|-------------------|-----------|
-| Quick product preview | `fh-lite-3d` | Instant results, good quality |
-| Rapid prototyping iteration | `fh-lite-3d` | Fast, low cost per attempt |
-| Text-based concept art | `fh-text-3d` | Only text-to-3D option (budget) |
-| E-commerce product page | `fh-pro-3d` | Clean topology, HD textures |
-| Game-ready assets | `fh-pro-3d` | Full PBR material set |
-| 3D printing | `fh-pro-3d` | Clean manifold mesh |
-| iOS AR Quick Look | `fh-pro-3d` | Best USDZ output with materials |
-| Batch processing (100+ items) | `fh-lite-3d` | Fastest, lowest credit cost |
-| Client presentation | `fh-pro-3d` | Highest visual quality |
+| Quick product preview | `fh-lite-3d` | Fastest and cheapest per attempt |
+| Rapid prototyping iteration | `fh-lite-3d` | ~3s round trip |
+| Text-based concept art | `fh-text-3d` | The only text-to-3D option |
+| Batch processing (100+ items) | `fh-lite-3d` | Lowest cost, lowest latency |
+| E-commerce product page | `fh-pro-3d` (pending) | Clean topology, full texture set |
+| Game-ready assets | `fh-pro-3d` (pending) | Full PBR material set |
+| 3D printing | `fh-lite-3d` today | STL discards colour anyway, so the cheaper mesh is usually enough |
 
 ---
 
 ## Performance Tips
 
 - **Image quality matters**: For image-to-3d, use clean product photos with a solid or simple background for best results. Remove background first using the [Image Editing](/api/image-editing) endpoint.
-- **Choose the right model**: Use `fh-lite-3d` for instant previews (5 credits, <1s), `fh-pro-3d` or `fh-pro-3d` for production assets.
+- **Choose the right model**: `fh-lite-3d` for previews and batches, `fh-text-3d` when you have no reference photo.
 - **Format selection**: Use GLB for web/AR, STL for 3D printing, USDZ for iOS AR Quick Look.
-- **Polling**: Models like `fh-pro-3d` and `fh-pro-3d` take 15-30s. Use the `waitFor3D` SDK method or poll `/v1/ai/generate/3d/{id}` every 3 seconds.
-- **Batch efficiency**: For large catalogs, use `fh-lite-3d` (cheapest, fastest) first, then regenerate hero products with `fh-pro-3d`.
+- **Set a long timeout, do not poll**: the call is synchronous. Allow up to 180s and skip the polling loop — there is no queue.
+- **Save the file**: `url` is signed for 2 hours. Download and store it, or re-sign later with `GET /v1/ai/generate/3d/{file_id}`.
 - **Polygon budgets**: Mobile AR typically needs <50,000 polygons. Web viewers work well with <100,000. Use `simplify` + `target_polys` to control output.
-- **File size optimization**: Draft quality produces files 60-70% smaller than high quality. Use draft for thumbnails and previews.
+- **File size optimization**: Draft quality produces files 60-70% smaller than high quality. Use draft for previews.
 
 ---
 
 ## Rate Limits
 
+Rate limits are per API tier, not per endpoint — see `GET /v1/tiers` for your own. The lowest tier starts at 30 requests per minute and 3 concurrent jobs.
+
 | Limit | Value |
 |-------|-------|
-| Requests per minute | 10 |
-| Max concurrent jobs | 5 |
+| Requests per minute | Per tier (30 and up) |
+| Concurrent jobs | Per tier (3 and up) |
 | Max image upload size | 20 MB |
-| Job result retention | 48 hours |
+| Prompt length | 500 characters |
+| Signed `url` lifetime | 2 hours (re-sign anytime) |
+
+The generated `.glb` is stored in your Files and is not auto-deleted; a previous version of this page claimed a 48-hour result retention, which applied to nothing.
 
 ---
 
 ## Pricing
 
-| Model | Credits per Generation |
-|-------|----------------------|
-| FH Lite 3D (`fh-lite-3d`) | 3 |
-| FH Text 3D (`fh-text-3d`) | 5 |
-| FH Pro 3D (`fh-pro-3d`) | 15 |
+Charged in USD from your prepaid wallet, at our provider cost with no markup.
 
-::: info Credit Costs
-Quality settings do not affect credit cost — you pay the same whether using draft, standard, or high quality. Format selection also does not change pricing.
+| Model | Price per Generation |
+|-------|---------------------|
+| FH Lite 3D (`fh-lite-3d`) | $0.160772 |
+| FH Text 3D (`fh-text-3d`) | $0.267953 |
+| FH Pro 3D (`fh-pro-3d`) | $0.803859 |
+
+::: info What does and does not change the price
+Quality (`draft`/`standard`/`high`) and output format do not affect the price — you pay the per-generation rate above regardless. Retrieving an asset with `GET /v1/ai/generate/3d/{file_id}` is free, and a generation that fails on our side is refunded to your wallet automatically.
 :::
 
-See [Billing & Pricing](/api/billing) for credit package details and tier information.
+`GET /v1/pricing` is the live source for these figures; the table here is a snapshot. See [Billing & Pricing](/api/billing) for wallet top-ups and invoice settings.
 
 ---
 
@@ -1291,4 +1269,4 @@ See [Billing & Pricing](/api/billing) for credit package details and tier inform
 - [Image Editing](/api/image-editing) — Remove backgrounds before 3D generation
 - [Image Generation](/api/image-generation) — Generate source images for text-to-3D workflows
 - [Models](/api/models) — Full model catalog and status
-- [Billing & Pricing](/api/billing) — Credit packages and tier discounts
+- [Billing & Pricing](/api/billing) — Wallet top-ups, live prices and invoice settings
