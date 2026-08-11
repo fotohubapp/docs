@@ -2,9 +2,19 @@
 
 FOTOhub provides access to **30+ image generation models** from 8 providers: Google (Vertex AI Imagen + Gemini), OpenAI, Microsoft, BytePlus, xAI, Black Forest Labs, MiniMax, and Kling. Generate photorealistic images, illustrations, concept art, and more via a single unified endpoint.
 
-::: info Two Billing Modes
-- **Credit-based** — Fixed cost per image regardless of resolution. Most models use this mode.
-- **Token-based** — Cost scales with output resolution (pixel count). Used by BytePlus SeedDream models.
+::: info One billing mode: prepaid USD
+Every image is charged in **USD from your prepaid wallet**, at the provider's own
+per-image price. There are no credits on this endpoint, no plan allowance, and no
+currency conversion — a fotohub.app subscription cannot pay for API usage. Prices run
+from **$0.005** to **$0.80** per image depending on the model and the resolution tier.
+
+Two things follow from that:
+
+- **Some models are flat-priced, some are tiered.** A tiered model charges more at 2K
+  than at 1K and more again at 4K; a flat-priced one charges the same at any size. Which
+  is which is per model, not per provider — see [All models](#all-models-complete-pricing).
+- **An empty wallet stops the request** with [402 `insufficient_funds`](#_402-insufficient-funds)
+  before the provider is called, and nothing is charged.
 :::
 
 ## Endpoint
@@ -14,90 +24,150 @@ POST /v1/ai/generate/image
 ```
 
 **Authentication:** Bearer token (API key)  
-**Billing:** 1–8 credits per image (credit-based) or token-based for SeedDream models
+**Billing:** $0.005–$0.80 per image, from the prepaid USD wallet
 
 ## Request Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `prompt` | string | **Yes** | — | Text description of the image to generate. Be specific — include subject, style, lighting, composition details for best results. Max 4096 characters. |
+| `prompt` | string | **Yes** | — | Text description of the image to generate. Be specific — include subject, style, lighting, composition details for best results. We enforce no length limit; the provider may reject or truncate a very long prompt. |
 | `model` | string | No | `"imagen-3-fast"` | Model identifier. See the full model list below. We recommend `seedream-5-0-260128` for best quality. |
-| `width` | integer | No | `1024` | Output image width in pixels. Range: 256–4096. Must be divisible by 64 for most models. |
-| `height` | integer | No | `1024` | Output image height in pixels. Range: 256–4096. Must be divisible by 64 for most models. |
+| `width` | integer | No | — | Pixel width. Forwarded to the GPT Image and MAI models only; on every other model it just sets the **billed resolution tier** (see below). Prefer `image_size` + `aspect_ratio`. |
+| `height` | integer | No | — | Pixel height. Same behaviour as `width`. |
 | `aspect_ratio` | string | No | `"1:1"` | Aspect ratio preset. Options: `"1:1"`, `"16:9"`, `"9:16"`, `"4:3"`, `"3:4"`. Overrides width/height when set. |
-| `num_images` | integer | No | `1` | Number of images to generate per request. A whole number, 1–8. Anything else (`0`, `-1`, `2.5`, `"3"`) is a `400`, never a silently rewritten value. Credits are charged per **delivered** image — see [Multiple images](#multiple-images-and-what-you-pay-for). |
-| `image_size` | string | No | model default | Resolution tier: `"1K"`, `"1.5K"`, `"2K"`, `"3K"`, `"4K"`. Availability and price both depend on the model. Omit it (or send `width`/`height` instead) and you get the model's 1K base price. |
+| `num_images` | integer | No | `1` | Number of images to generate per request. A whole number, 1–8. Anything else (`0`, `-1`, `2.5`, `"3"`) is a `400`, never a silently rewritten value. You pay per **delivered** image — see [Multiple images](#multiple-images-and-what-you-pay-for). |
+| `image_size` | string | No | — | Resolution tier: `"1K"`, `"1.5K"`, `"2K"`, `"3K"`, `"4K"`; anything else is a `400`. Availability and price both depend on the model. **Send it.** On a tiered model, omitting it (and `width`/`height`) is charged at the **top** of the grid — see below. |
 | `negative_prompt` | string | No | — | Describe what to avoid in the generated image. E.g., `"blurry, low quality, distorted faces"`. Not supported by all models. |
-| `style` | string | No | — | Style preset. Common options: `"photorealistic"`, `"cinematic"`, `"anime"`, `"digital-art"`, `"oil-painting"`. |
 | `seed` | integer | No | random | Seed for reproducible generation. Same prompt + seed + model = same output. Range: 0–4294967295. |
 
 ::: tip Resolution Tips
 Use `aspect_ratio` instead of manual width/height for most use cases. The API automatically picks optimal dimensions for the selected model.
 :::
 
-### Resolution changes the price
+::: warning `style`, `image_url` and `image_urls` are not accepted here
+Earlier versions of this page documented all three on this endpoint. They are dropped
+before the request reaches the provider — sending them changes nothing and does not
+change the price:
 
-`image_size` selects a priced tier, so a 4K render costs more than a 1K one on every model that offers 4K — the provider cost itself differs by up to 15x. Send `width`/`height` instead and the tier is derived from the longest side: `< 1536` → 1K, `1536–3071` → 2K, `≥ 3072` → 4K.
+- **`style`** — the generation pipeline reads a differently-named field with its own
+  preset list, and this endpoint does not populate it. Put the style in the `prompt`
+  instead (`"..., cinematic color grading, dramatic lighting"`), which works on every
+  model.
+- **`image_url` / `image_urls`** — this is a text-to-image endpoint. The one exception is
+  [`dreamina-4-6`](#byteplus-dreamina-4-6-billed-per-returned-image), which does take `image_urls`
+  (up to 14). For image-to-image and editing on other models use
+  [`POST /v1/ai/edit/image`](/api/image-editing) or the
+  [Stability tools](/api/image-editing#image-studio-stability-ai-tools).
+:::
+
+### Resolution changes the price — and omitting it costs the most
+
+On a tiered model the tier is the price. `image_size` selects it directly; `width`/`height`
+derive it from the longest side (`< 1536` → 1K, `1536–3071` → 2K, `≥ 3072` → 4K).
 
 | Sent | Tier billed |
 |------|-------------|
-| nothing | 1K (base price) |
+| `"image_size": "1K"` | 1K |
 | `"image_size": "2K"` | 2K |
 | `"width": 4096, "height": 4096` | 4K |
+| **nothing** | **the model's highest tier** |
 
-Two things worth knowing:
+That last row is the one to plan around. With no tier to resolve, the charge cannot be the
+1K rate — that would sell below what the provider bills us — so the top of the grid is
+taken instead. On `gpt-image-2` that is **$0.211 rather than $0.006**, a 35x difference
+decided by a missing field.
 
-- **Flat-priced models ignore the tier.** 20 of the active image models have no resolution dimension in their pricing; they charge the base price at any size.
-- **A capped render is billed at what it produced.** Imagen delivers 2K when asked for 4K, and is charged at the 2K tier — you are never billed for a resolution the model did not return.
+Two more things worth knowing:
 
-The exact charge always comes back in the response (`credits_used`, and `billing.breakdown`), so read that rather than pre-computing from the catalog.
+- **Flat-priced models ignore the tier entirely.** Most active image models have no
+  resolution dimension in their pricing and charge the base price at any size, so omitting
+  `image_size` costs them nothing. That includes every SeedDream except the Pro one —
+  `seedream-5-0-260128` is $0.0315 at 1K, 2K and 4K alike. Which models are tiered is listed
+  under [All models](#all-models-complete-pricing).
+- **A capped render is billed at what it produced.** Imagen delivers 2K when asked for 4K
+  and is charged at its 2K rate; you are never billed for a resolution the model did not
+  return.
+
+The exact charge always comes back in the response as `cost_usd`, so read that rather than
+pre-computing from the catalog.
 
 ## Response Format
-
-### Credit-Based Response (Standard Models)
 
 ```json
 {
   "model": "imagen-4-standard",
-  "credits_used": 3,
+  "cost_usd": 0.04,
+  "currency": "USD",
   "billing": {
-    "method": "credits",
-    "usd_charged": 0,
-    "pln_charged": 0
+    "cost_usd": 0.04,
+    "balance_usd": 24.28,
+    "currency": "USD",
+    "method": "wallet",
+    "model": "prepaid"
   },
   "images": [
-    "https://s1.fotohub.app/storage/v1/object/public/generations/img_abc123.png"
-  ],
-  "metadata": {
-    "width": 1024,
-    "height": 1024,
-    "seed": 42,
-    "model": "imagen-4-standard",
-    "generation_time_ms": 3200
-  }
+    "https://s1.fotohub.app/storage/v1/object/sign/api-generations/...?token=..."
+  ]
 }
 ```
 
-`method` is `credits` while your plan allowance covers the request, and both money
-fields are `0` because nothing was charged. Once the allowance is exhausted the
-same request returns `"method": "wallet"` with `"usd_charged": 0.1206` -- the
-model's per-request USD price. Read `usd_charged`; `pln_charged` is a legacy
-mirror of the same charge and will be removed.
+| Field | Description |
+|-------|-------------|
+| `model` | The model that rendered the images. |
+| `cost_usd` | USD taken from the wallet, net of any refund for undelivered images. This is the number to reconcile against. |
+| `currency` | Always `"USD"`. |
+| `billing.cost_usd` | Same figure as the top-level `cost_usd`. |
+| `billing.balance_usd` | Wallet balance remaining after the charge. |
+| `billing.method` / `billing.model` | Always `"wallet"` / `"prepaid"` — the API accepts no other payment. |
+| `images` | Array of output URLs, one per delivered image. Signed URLs, valid **1 hour**; re-sign from [`GET /v1/console/logs`](/api/console-api#request-logs) or deliver to your own bucket. |
+| `refunded_usd` | Present **only** when the provider returned fewer images than you asked for and the difference was refunded. See [Multiple images](#multiple-images-and-what-you-pay-for). |
+| `delivery` | Present only when you sent an `output` object — which bucket and key the files are being written to. See [bucket delivery](/guides/bucket-delivery). |
 
-### Token-Based Response (BytePlus SeedDream Models)
+There is no `credits_used` field, no `pln_charged`, and no plan allowance is consulted.
+`method` is `"wallet"` on every successful response; there is no `"credits"` mode on this
+endpoint.
+
+::: warning There is no `metadata` object
+Earlier versions of this page showed `metadata.width`, `metadata.seed` and
+`metadata.generation_time_ms`. The generation pipeline does not return a `metadata` key,
+so `data["metadata"]["seed"]` raises. The rendered size comes back in `usage.resolution`
+on BytePlus models (below); the seed is the one you sent.
+:::
+
+### BytePlus SeedDream response — with `usage` and a cost breakdown
+
+SeedDream and SeedEdit renders go through a path that reports the provider's own token
+count and an itemized quote. Everything above still applies — the extra keys are
+additive.
 
 ```json
 {
   "model": "seedream-5-0-260128",
-  "credits_used": 1,
+  "cost_usd": 0.0315,
+  "currency": "USD",
   "billing": {
-    "method": "token",
-    "credits_used": 1,
-    "usd_charged": 0.0563,
+    "cost_usd": 0.0315,
+    "balance_usd": 24.2485,
+    "currency": "USD",
+    "method": "wallet",
+    "model": "prepaid",
+    "output_tokens": 4096,
     "cost_breakdown": {
-      "output_tokens": 4096,
-      "cost_usd": 0.012288,
-      "rate_per_1m_tokens_usd": 2.00
+      "model": "seedream-5-0-260128",
+      "currency": "USD",
+      "amount_usd": 0.0315,
+      "provider_cost_usd": 0.0315,
+      "margin": 1.0,
+      "breakdown": [
+        {
+          "leg": "output",
+          "unit": "image",
+          "quantity": 1,
+          "rate_usd": 0.0315,
+          "amount_usd": 0.0315
+        }
+      ],
+      "pricing_verified": false
     }
   },
   "usage": {
@@ -109,25 +179,39 @@ mirror of the same charge and will be removed.
     "transfer_ms": 310
   },
   "images": [
-    "https://s1.fotohub.app/storage/v1/object/public/generations/img_def456.png"
-  ],
-  "metadata": {
-    "width": 1024,
-    "height": 1024,
-    "seed": 8817,
-    "model": "seedream-5-0-260128",
-    "generation_time_ms": 2100
-  }
+    "https://s1.fotohub.app/storage/v1/object/sign/api-generations/...?token=..."
+  ]
 }
 ```
 
-::: warning Two USD figures, two meanings
-`cost_breakdown.cost_usd` is what the generation cost at the token rate (see
-[Token Calculation Formula](#token-calculation-formula)). `usd_charged` is what
-was actually taken from your wallet, which uses the model's flat per-request
-price -- `$0.0563` for `seedream-5-0-260128`. It is `0` while your plan's credit
-allowance still covers the request. Reconcile invoices against `usd_charged`.
-:::
+| Field | Description |
+|-------|-------------|
+| `billing.output_tokens` | The provider's reported output token count. Informational — on flat-priced models it does **not** drive the price. |
+| `cost_breakdown.amount_usd` | The quoted charge. Equals `cost_usd`. |
+| `cost_breakdown.provider_cost_usd` | What the provider charges us. Identical to `amount_usd` while `margin` is `1.0`. |
+| `cost_breakdown.margin` | The multiplier applied to the provider price. Currently **`1.0` on every model** — you pay the provider's price, 1:1. |
+| `cost_breakdown.breakdown[]` | One entry per priced leg: `leg`, `unit`, `quantity`, `rate_usd`, `amount_usd`. A single-rate model has one leg; SeedDream Pro has two (`input` + `output`). |
+| `cost_breakdown.pricing_verified` | `true` when the rate is a figure we hold from the provider's own published price list, `false` when it comes from our catalog. Either way it is what you were charged. |
+| `cost_breakdown.note` | Present when a tier or threshold decided the rate, e.g. `"2K tier"` or `"4.19 MP (> 2.61 MP tier)"`. |
+
+A two-leg quote — SeedDream Pro above its 2.61 MP threshold, `$0.003` input plus
+`$0.090` output:
+
+```json
+{
+  "model": "dola-seedream-5-0-pro-260628",
+  "currency": "USD",
+  "amount_usd": 0.093,
+  "provider_cost_usd": 0.093,
+  "margin": 1.0,
+  "breakdown": [
+    { "leg": "input",           "unit": "piece", "quantity": 1, "rate_usd": 0.003, "amount_usd": 0.003 },
+    { "leg": "output_high_res", "unit": "piece", "quantity": 1, "rate_usd": 0.09,  "amount_usd": 0.09  }
+  ],
+  "pricing_verified": true,
+  "note": "4.19 MP (> 2.61 MP tier)"
+}
+```
 
 ### Your Latency Budget
 
@@ -136,10 +220,10 @@ rather than at a shrug.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `output_tokens` | integer | Tokens billed for this render — scales with pixel count |
+| `output_tokens` | integer | The provider's reported output token count — scales with pixel count. Informational, not the basis of the charge |
 | `total_tokens` | integer | Same figure with any input tokens included |
 | `generated_images` | integer | Images actually produced (a partly-failed batch reports fewer than requested) |
-| `resolution` | string | The size that was actually rendered, `WxH`. What you asked for is echoed in `metadata` |
+| `resolution` | string | The size that was actually rendered, `WxH`. Compare it against what you asked for — a capped render is billed at what it produced |
 | `generation_ms` | integer | Time the model spent rendering |
 | `transfer_ms` | integer | Time spent fetching the finished file and storing it. `0` when nothing had to be moved |
 
@@ -159,98 +243,107 @@ never as `0`. Both are recorded per request in
 per model.
 :::
 
-## Token-Based Billing (BytePlus Models)
-
-BytePlus SeedDream models use per-token billing where cost scales with output resolution. Generating a 4K image costs 16x more than a 1K image.
-
-::: warning Cost Scales with Resolution
-Unlike credit-based models where a 4K image costs the same as a 1K image, token-based models charge proportionally to pixel count. Always check the estimated cost before generating at high resolutions.
-:::
-
-### Token Calculation Formula
-
-```
-output_tokens = (width × height) / 256
-raw_cost_usd  = (output_tokens / 1,000,000) × rate_per_1m_usd
-cost_usd      = raw_cost_usd × 1.5          # margin
-```
-
-BytePlus bills in USD, so there is no currency conversion in this path.
-`cost_usd` in `billing.cost_breakdown` is the margin-inclusive figure.
-
-### Resolution to Token Examples
-
-| Resolution | Output Tokens | Raw @ $2/1M | `cost_usd` (with margin) |
-|-----------|---------------|-------------|--------------------------|
-| 1024 × 1024 | 4,096 | $0.008192 | $0.012288 |
-| 1536 × 1536 | 9,216 | $0.018432 | $0.027648 |
-| 2048 × 2048 | 16,384 | $0.032768 | $0.049152 |
-| 3072 × 3072 | 36,864 | $0.073728 | $0.110592 |
-| 4096 × 4096 | 65,536 | $0.131072 | $0.196608 |
-
-### Token-Based Model Rates
-
-| Model | Rate (USD/1M tokens) | Credits (min) |
-|-------|---------------------|---------------|
-| `seedream-5-0-260128` | $2.00 | 2 |
-| `seedream-4-5-251128` | $2.50 | 3 |
-| `seedream-4-0-250828` | $2.00 | 2 |
-| `dola-seedream-5-0-pro-260628` | $3.50 | 3 |
-| `seededit-3-0-i2i-250628` | $2.50 | 3 |
-
 ## All Models — Complete Pricing
+
+Every price below is USD per image, taken from the prepaid wallet, at the provider's own
+rate with **no margin** (`margin: 1.0`). Where a model is tiered, the 1K / 2K / 4K columns
+are the three charges; where it is flat, one price covers every size.
+
+A tiered model with no `image_size` and no `width`/`height` is billed at its **highest**
+column, not its 1K one. Send the tier.
 
 ### Google Vertex AI (Imagen)
 
-| Model ID | Name | Price (USD) | Credits | Notes |
-|----------|------|-------------|---------|-------|
-| `imagen-3-fast` | Imagen 3 Fast | 0.0322 | 1 | 512px fast |
-| `imagen-3-standard` | Imagen 3 Standard | 0.0643 | 2 | 1K |
-| `imagen-3-capability` | Imagen 3 Capability | 0.0643 | 2 | editing/customization |
-| `imagen-4-standard` | Imagen 4 Standard | 0.1206 | 3 | High quality |
-| `imagen-4-ultra` | Imagen 4 Ultra | 0.2412 | 5 | 4K |
+Flat-priced: Imagen charges the same at any requested size, and 4K requests are capped
+to 2K by the provider.
+
+| Model ID | Name | Price (USD) | Max `num_images` | Notes |
+|----------|------|-------------|:----------------:|-------|
+| `imagen-3-fast` | Imagen 3 Fast | 0.02 | 1 | fastest, cheapest Imagen |
+| `imagen-3-standard` | Imagen 3 Standard | 0.04 | 3 | 1K |
+| `imagen-4-fast` | Imagen 4 Fast | 0.02 | 3 | Imagen 4 quality at the Fast price |
+| `imagen-4-standard` | Imagen 4 Standard | 0.04 | 4 | high quality |
+| `imagen-4-ultra` | Imagen 4 Ultra | 0.06 | 5 | highest Imagen fidelity |
+
+::: warning `imagen-3-capability` is not available on this endpoint
+It has no price entry, so a request naming it fails with a `500` rather than rendering.
+It is the model behind [`POST /v1/ai/edit/image`](/api/image-editing), which is where to
+reach it — at that endpoint's own $0.04.
+:::
 
 ### Google — Gemini (Nano Banana family)
 
 Gemini's native multimodal image models — text-to-image, image-to-image, and multi-image composition (up to 10 reference images) in one model.
 
-| Model ID | Name | Price (USD) | Credits | Notes |
-|----------|------|-------------|---------|-------|
-| `gemini-3.1-flash-lite-image` | Nano Banana 2 Lite | 0.0536 | 1 | cheapest Gemini image model |
-| `gemini-2.5-flash-image` | Nano Banana | 0.1072 | 2 | up to 10 reference images |
-| `gemini-3.1-flash-image` | Nano Banana 2 | 0.1608 | 3 | GA |
-| `gemini-3.1-flash-image-preview` | Nano Banana 2 (Preview) | 0.1608 | 3 | preview channel |
-| `gemini-3-pro-image` | Nano Banana Pro | 0.2841 | 6 | **Recommended for quality** — 1K/2K/4K, advanced reasoning, precise text rendering |
+| Model ID | Name | 1K | 2K | 4K | Max `num_images` | Notes |
+|----------|------|---:|---:|---:|:----------------:|-------|
+| `gemini-3.1-flash-lite-image` | Nano Banana 2 Lite | 0.0336 | 0.0336 | 0.0336 | 5 | flat; cheapest Gemini image model |
+| `gemini-2.5-flash-image` | Nano Banana | 0.039 | 0.039 | 0.039 | 10 | flat; up to 10 reference images |
+| `nano-banana-fast` | Nano Banana Fast (alias) | 0.039 | 0.039 | 0.039 | 10 | alias of `gemini-2.5-flash-image` |
+| `gemini-3.1-flash-image` | Nano Banana 2 | 0.067 | 0.101 | 0.151 | 10 | GA, tiered |
+| `gemini-3.1-flash-image-preview` | Nano Banana 2 (Preview) | 0.067 | 0.101 | 0.151 | 10 | preview channel |
+| `gemini-3-pro-image` | Nano Banana Pro | 0.134 | 0.134 | 0.24 | 15 | **Recommended for quality** — advanced reasoning, precise text rendering |
+| `nano-banana-pro` | Nano Banana Pro (alias) | 0.134 | 0.134 | 0.24 | 15 | alias of `gemini-3-pro-image` |
 
 ### OpenAI
 
-| Model ID | Name | Price (USD) | Credits | Notes |
-|----------|------|-------------|---------|-------|
-| `dall-e-3-standard` | DALL-E 3 | 0.0643 | 2 | — |
-| `dall-e-3-hd` | DALL-E 3 HD | 0.1286 | 4 | — |
-| `gpt-image-1` | GPT Image 1 | 0.1608 | 4 | high fidelity |
-| `gpt-image-2` | GPT Image 2 | 0.1072 | 10 | **Recommended** — highest fidelity, 4K, best text rendering |
+Every GPT Image model is tiered, and the spread is wide — `gpt-image-2` is 35x more at
+4K than at 1K. Send `image_size` deliberately on this family.
+
+| Model ID | Name | 1K | 2K | 4K | Notes |
+|----------|------|---:|---:|---:|-------|
+| `gpt-image-1-mini` | GPT Image 1 Mini | 0.005 | 0.011 | 0.036 | cheapest OpenAI option |
+| `gpt-image-1` | GPT Image 1 | 0.011 | 0.042 | 0.167 | high fidelity |
+| `gpt-image-1.5` | GPT Image 1.5 | 0.009 | 0.034 | 0.133 | better than 1 at a lower price |
+| `gpt-image-2` | GPT Image 2 | 0.006 | 0.053 | 0.211 | **Recommended** — highest fidelity, 4K, best text rendering |
+
+::: warning DALL·E 3 is retired
+`dall-e-3`, `dall-e-3-standard` and `dall-e-3-hd` are gone. A request naming `dall-e-3`
+or `dall-e-3-hd` is refused with a `400` **before authentication**, naming the
+replacement (`gpt-image-1` and `gpt-image-1.5` respectively), and nothing is charged.
+:::
 
 ### Microsoft — MAI-Image
 
-| Model ID | Name | Price (USD) | Credits | Notes |
-|----------|------|-------------|---------|-------|
-| `mai-image-2.5-flash` | MAI-Image 2.5 Flash | 0.0536 | 1 | budget/fast |
-| `mai-image-2.5` | MAI-Image 2.5 | 0.0536 | 1 | up to 1024x1024 |
+| Model ID | Name | Price (USD) | Notes |
+|----------|------|-------------|-------|
+| `mai-image-2.5-flash` | MAI-Image 2.5 Flash | 0.022 | flat; budget/fast |
+| `mai-image-2.5` | MAI-Image 2.5 | 0.037 | flat; up to 1024x1024 |
 
-### BytePlus SeedDream (Token-Based)
+These two are the only models besides the GPT Image family that receive your `width` and
+`height` verbatim rather than just deriving a price tier from them.
 
-| Model ID | Name | ~USD @1K | Credits | Notes |
-|----------|------|----------|---------|-------|
-| `seedream-4-0-250828` | SeedDream 4.0 | 0.0482 | 2 | token-based |
-| `seedream-5-0-260128` | SeedDream 5.0 Lite | 0.0563 | 2 | **Recommended**, best value |
-| `seedream-4-5-251128` | SeedDream 4.5 | 0.0643 | 3 | token-based |
-| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro (Dola) | 0.0723 | 3 | token-based |
-| `seededit-3-0-i2i-250628` | SeedEdit 3.0 (img2img) | 0.0643 | 3 | token-based |
+### BytePlus SeedDream
 
-### BytePlus Dreamina 4.6 (Flat Per-Image)
+::: info SeedDream is flat-priced, not token-priced
+An earlier version of this page described SeedDream as billed per output token, with a
+`(width × height) / 256` formula and a 16x jump from 1K to 4K. That is not how it is
+charged. **Every SeedDream model except the Pro one costs the same at 1K, 2K and 4K.**
+`seedream-5-0-260128` is $0.0315 whether you render 1024x1024 or 4096x4096.
 
-Unlike the SeedDream models above, Dreamina 4.6 (`model: "dreamina-4-6"`) is billed **flat per returned image**, not by token/resolution — it accepts up to 14 reference images for image-to-image composition and can output 1K/2K/4K.
+`usage.output_tokens` is still reported, because the provider reports it — but it does
+not move the price on these models. The one resolution step in the family is SeedDream
+Pro's output leg, which goes from $0.045 to $0.090 above 2.61 megapixels.
+:::
+
+| Model ID | Name | Price (USD) | Max `num_images` | Notes |
+|----------|------|-------------|:----------------:|-------|
+| `seedream-4-0-250828` | SeedDream 4.0 | 0.03 | 4 | flat at every resolution |
+| `seedream-5-0-260128` | SeedDream 5.0 Lite | 0.0315 | 4 | **Recommended**, best value; flat at every resolution |
+| `seedream-4-5-251128` | SeedDream 4.5 | 0.036 | 4 | flat at every resolution |
+| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro (Dola) | 0.048 ≤2.61 MP · 0.093 above | 10 | two legs: $0.003 input + $0.045 or $0.090 output. Capped at 2K |
+| `seededit-3-0-i2i-250628` | SeedEdit 3.0 (img2img) | 0.03 | 1 | flat at every resolution |
+
+SeedDream Pro is the only model on this page priced by megapixels rather than by tier, so
+its `cost_breakdown.note` reads e.g. `"1.05 MP (<= 2.61 MP tier)"`. Because the provider
+caps it at 2K, a 4K request renders and bills at 2K — $0.093.
+
+### BytePlus Dreamina 4.6 (billed per returned image)
+
+Dreamina 4.6 (`model: "dreamina-4-6"`) is the one model on this endpoint that accepts
+reference images — up to 14, for image-to-image composition — and it can output 1K/2K/4K.
+It is billed per image **actually returned**, which is not always the number you asked
+for.
 
 | Model ID | Name | Price (USD) | Notes |
 |----------|------|-------------|-------|
@@ -312,61 +405,72 @@ This call is synchronous — unlike the async job pattern used for [avatar and m
 
 ### xAI (Grok Imagine)
 
-| Model ID | Name | Price (USD) | Credits | Notes |
-|----------|------|-------------|---------|-------|
-| `grok-imagine-image` | Grok Imagine | 0.0322 | 1 | 1K, single-image edit |
-| `grok-imagine-image-pro` | Grok Imagine Pro | 0.1125 | 3 | **2K**, multi-image combine (up to 3 refs), virtual try-on |
+| Model ID | Name | 1K | 2K | 4K | Max `num_images` | Notes |
+|----------|------|---:|---:|---:|:----------------:|-------|
+| `grok-imagine-image` | Grok Imagine | 0.02 | 0.02 | 0.02 | 4 | flat; fast and cheap |
+| `grok-imagine-image-pro` | Grok Imagine Pro | 0.05 | 0.07 | 0.07 | 4 | **2K**, tiered |
+| `grok-imagine-image-quality` | Grok Imagine Quality | 0.05 | 0.07 | 0.07 | 10 | same rate as Pro, higher batch cap |
 
 #### xAI Grok Image — Capabilities
 
 | Feature | `grok-imagine-image` | `grok-imagine-image-pro` |
 |---------|:-------------------:|:------------------------:|
 | Text-to-Image | Yes | Yes |
-| Single Image Edit | Yes | Yes |
-| Multi-Image Combine (up to 3) | — | Yes |
-| Virtual Try-On | — | Yes |
 | Max Resolution | 1K | 2K |
-| Max `num_images` per request | 10 | 10 |
+| Max `num_images` per request | 4 | 4 |
 | Aspect Ratios | 7 | 7 |
 
 **Supported Aspect Ratios:** `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `9:16`, `16:9`
 
-::: tip xAI Grok Models
-Grok Imagine Pro is ideal for e-commerce: multi-image product listings, virtual try-on, and high-quality edits at 2K resolution. The basic model is a fast, budget-friendly option for social media and quick prototypes at 1K.
+::: warning Reference images do not reach Grok from this endpoint
+Grok Imagine Pro's single-image edit, multi-image combine and virtual try-on modes were
+listed here previously. `image_url` and `image_urls` are not forwarded on
+`/v1/ai/generate/image` for any model except `dreamina-4-6`, so those modes are not
+reachable here — a request with them renders text-to-image and charges for it. Use
+[`POST /v1/ai/edit/image`](/api/image-editing) for editing, and `dreamina-4-6` above for
+multi-reference composition.
 :::
 
 ### Black Forest Labs — FLUX
 
-FLUX models cover the full range from ultra-fast lightweight generation to maximum-fidelity output and context-aware editing.
+| Model ID | Name | 1K | 2K | 4K | Max `num_images` | Notes |
+|----------|------|---:|---:|---:|:----------------:|-------|
+| `flux-2-pro` | FLUX.2 Pro | 0.03 | 0.075 | 0.255 | 4 | balanced, versatile; tiered |
+| `flux-1.1-pro` | FLUX 1.1 Pro | 0.04 | 0.04 | 0.04 | 4 | flat; high quality, creative |
+| `flux-kontext-pro` | FLUX Kontext Pro | 0.04 | 0.04 | 0.04 | 4 | flat; context-aware, style transfer |
+| `flux-2-flex` | FLUX.2 Flex | 0.05 | 0.20 | 0.80 | 4 | tiered, steepest curve on the page |
 
-| Model ID | Name | Price (USD) | Credits | Notes |
-|----------|------|-------------|---------|-------|
-| `flux-2-klein-4b` | FLUX.2 Klein 4B | 0.0225 | 1 | ultra-fast, lightweight 4B model |
-| `flux-2-klein-9b` | FLUX.2 Klein 9B | 0.0241 | 1 | fast, lightweight 9B model |
-| `flux-2-pro` | FLUX.2 Pro | 0.0482 | 2 | balanced, versatile |
-| `flux-1.1-pro` | FLUX 1.1 Pro | 0.0643 | 2 | high quality, creative |
-| `flux-kontext-pro` | FLUX Kontext Pro | 0.0643 | 2 | context-aware editing, style transfer |
-| `flux-1.1-pro-ultra` | FLUX 1.1 Pro Ultra | 0.0965 | 3 | ultra detail, large canvas |
-| `flux-2-max` | FLUX.2 Max | 0.1125 | 4 | highest FLUX quality |
-| `flux-kontext-max` | FLUX Kontext Max | 0.1286 | 4 | maximum context fidelity |
+::: danger Six FLUX models are unavailable upstream
+`flux-1.1-pro-ultra`, `flux-1.1-pro-raw`, `flux-kontext-max`, `flux-2-max`,
+`flux-2-klein-4b` and `flux-2-klein-9b` are switched off at the provider. A request
+naming one of them is charged, fails, and is refunded — so you lose the round trip, not
+the money, but you get no image. They were listed as buyable here in earlier versions of
+this page; they are not.
 
-::: tip FLUX Model Range
-The Klein models are optimized for speed and cost, while Pro, Ultra, and Max deliver progressively higher fidelity. Kontext models specialize in context-aware editing and style transfer.
+Substitutes that do render: `flux-2-pro` for Max-tier quality, `flux-kontext-pro` for
+Kontext, and — since the Klein models were the batch/budget recommendation —
+`minimax-image-01` ($0.005) or `gpt-image-1-mini` ($0.005 at 1K).
 :::
 
 ### MiniMax
 
-| Model ID | Name | Price (USD) | Credits | Notes |
-|----------|------|-------------|---------|-------|
-| `minimax-image-01` | MiniMax Image 01 | 0.0056 | 1 | lowest-cost budget option |
+| Model ID | Name | Price (USD) | Max `num_images` | Notes |
+|----------|------|-------------|:----------------:|-------|
+| `minimax-image-01` | MiniMax Image 01 | 0.005 | 4 | flat; cheapest model on the endpoint |
 
 ### Kling
 
-| Model ID | Name | Price (USD) | Credits | Notes |
-|----------|------|-------------|---------|-------|
-| `kling-v2-1` | Kling V2.1 | 0.0643 | 2 | balanced quality |
-| `kling-v3` | Kling V3 | 0.1608 | 5 | high quality |
-| `kling-v3-omni` | Kling V3 Omni | 0.2412 | 8 | premium, highest fidelity, all modes |
+| Model ID | Name | Price (USD) | Max `num_images` | Notes |
+|----------|------|-------------|:----------------:|-------|
+| `kling-v2-1` | Kling V2.1 | 0.012 | 9 | flat; balanced quality |
+| `kling-v3` | Kling V3 | 0.025 | 1 | flat; high quality |
+| `kling-v3-omni` | Kling V3 Omni | 0.025 | 1 | flat; premium, all modes |
+
+### FOTOhub IDA Q
+
+Self-hosted, so there is nothing to pay a provider for: `ida-q-image` is **$0.00** per
+image. It runs asynchronously — the request returns a `job_id` and a `poll_url` rather
+than images. See [IDA Q](/api/ida-q).
 
 ## Code Examples
 
@@ -392,7 +496,8 @@ response = requests.post(
 
 data = response.json()
 print(f"Image URL: {data['images'][0]}")
-print(f"Credits used: {data['credits_used']}")
+print(f"Charged: ${data['cost_usd']}")
+print(f"Wallet balance: ${data['billing']['balance_usd']}")
 ```
 
 ```typescript [TypeScript]
@@ -411,7 +516,8 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 
 const data = await response.json();
 console.log("Image URL:", data.images[0]);
-console.log("Credits used:", data.credits_used);
+console.log("Charged: $", data.cost_usd);
+console.log("Wallet balance: $", data.billing.balance_usd);
 ```
 
 ```go [Go]
@@ -449,7 +555,7 @@ func main() {
 
 	images := data["images"].([]interface{})
 	fmt.Println("Image URL:", images[0])
-	fmt.Println("Credits used:", data["credits_used"])
+	fmt.Println("Charged (USD):", data["cost_usd"])
 }
 ```
 
@@ -466,14 +572,17 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 
 :::
 
-### Token-Based Model (SeedDream)
+### SeedDream — reading the cost breakdown
+
+SeedDream is flat-priced, so the 2048x2048 render below costs the same $0.0315 as a
+1024x1024 one. The response carries the itemized quote, which is what to log.
 
 ::: code-group
 
 ```python [Python]
 import requests
 
-# SeedDream models use token-based billing — cost scales with resolution
+# SeedDream is flat-priced: this 2K render costs the same as a 1K one
 response = requests.post(
     "https://apis.fotohub.app/v1/ai/generate/image",
     headers={
@@ -490,13 +599,16 @@ response = requests.post(
 
 data = response.json()
 print(f"Image URL: {data['images'][0]}")
-print(f"Output tokens: {data['usage']['output_tokens']}")
-print(f"Cost (USD): {data['billing']['cost_breakdown']['cost_usd']}")
-# At 2048x2048: 16,384 tokens → ~$0.0492
+print(f"Charged: ${data['cost_usd']}")                        # 0.0315 at any resolution
+print(f"Provider cost: ${data['billing']['cost_breakdown']['provider_cost_usd']}")
+print(f"Margin: {data['billing']['cost_breakdown']['margin']}x")  # 1.0 — you pay 1:1
+for leg in data["billing"]["cost_breakdown"]["breakdown"]:
+    print(f"  {leg['leg']}: {leg['quantity']} x ${leg['rate_usd']} = ${leg['amount_usd']}")
+print(f"Output tokens (informational): {data['usage']['output_tokens']}")
 ```
 
 ```typescript [TypeScript]
-// SeedDream models use token-based billing — cost scales with resolution
+// SeedDream is flat-priced: this 2K render costs the same as a 1K one
 const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
   method: "POST",
   headers: {
@@ -513,9 +625,12 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 
 const data = await response.json();
 console.log("Image URL:", data.images[0]);
-console.log("Output tokens:", data.usage.output_tokens);
-console.log("Cost (USD):", data.billing.cost_breakdown.cost_usd);
-// At 2048x2048: 16,384 tokens → ~$0.0492
+console.log("Charged: $", data.cost_usd);                    // 0.0315 at any resolution
+console.log("Margin:", data.billing.cost_breakdown.margin);  // 1.0 — you pay 1:1
+for (const leg of data.billing.cost_breakdown.breakdown) {
+  console.log(`  ${leg.leg}: ${leg.quantity} x $${leg.rate_usd} = $${leg.amount_usd}`);
+}
+console.log("Output tokens (informational):", data.usage.output_tokens);
 ```
 
 ```go [Go]
@@ -558,9 +673,9 @@ func main() {
 	images := data["images"].([]interface{})
 
 	fmt.Println("Image URL:", images[0])
-	fmt.Println("Output tokens:", usage["output_tokens"])
-	fmt.Println("Cost (USD):", breakdown["cost_usd"])
-	// At 2048x2048: 16,384 tokens -> ~$0.0492
+	fmt.Println("Charged (USD):", data["cost_usd"]) // 0.0315 at any resolution
+	fmt.Println("Margin:", breakdown["margin"])     // 1.0 - you pay 1:1
+	fmt.Println("Output tokens (informational):", usage["output_tokens"])
 }
 ```
 
@@ -585,7 +700,8 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 ```python [Python]
 import requests
 
-# Imagen 4 Ultra and FLUX Pro Ultra support native 4K output
+# gpt-image-2 renders native 4K. Imagen caps at 2K and is billed at the tier it
+# delivered, so asking Imagen for 4096 gets you a 2K image at the 2K price.
 response = requests.post(
     "https://apis.fotohub.app/v1/ai/generate/image",
     headers={
@@ -603,11 +719,12 @@ response = requests.post(
 
 data = response.json()
 print(f"4K Image: {data['images'][0]}")
-print(f"Credits: {data['credits_used']}")  # 5 credits for ultra
+print(f"Charged: ${data['cost_usd']}")  # 0.06 — Imagen 4 Ultra is flat-priced
 ```
 
 ```typescript [TypeScript]
-// Imagen 4 Ultra and FLUX Pro Ultra support native 4K output
+// gpt-image-2 renders native 4K. Imagen caps at 2K and is billed at the tier it
+// delivered, so asking Imagen for 4096 gets you a 2K image at the 2K price.
 const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
   method: "POST",
   headers: {
@@ -625,7 +742,7 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 
 const data = await response.json();
 console.log("4K Image:", data.images[0]);
-console.log("Credits:", data.credits_used); // 5 credits for ultra
+console.log("Charged: $", data.cost_usd); // 0.06 — Imagen 4 Ultra is flat-priced
 ```
 
 ```go [Go]
@@ -665,7 +782,7 @@ func main() {
 
 	images := data["images"].([]interface{})
 	fmt.Println("4K Image:", images[0])
-	fmt.Println("Credits:", data["credits_used"]) // 5 credits for ultra
+	fmt.Println("Charged (USD):", data["cost_usd"]) // 0.06 - flat-priced
 }
 ```
 
@@ -691,7 +808,9 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 ```python [Python]
 import requests
 
-# Generate 4 variations in a single request
+# Generate 4 variations in a single request.
+# `image_size` is mandatory in practice on flux-2-pro: without it each image is
+# charged at the top of the grid ($0.255 instead of $0.03).
 response = requests.post(
     "https://apis.fotohub.app/v1/ai/generate/image",
     headers={
@@ -702,19 +821,22 @@ response = requests.post(
         "prompt": "Minimalist logo design for a tech startup, clean vector style",
         "model": "flux-2-pro",
         "num_images": 4,
-        "aspect_ratio": "1:1"
+        "aspect_ratio": "1:1",
+        "image_size": "1K"
     }
 )
 
 data = response.json()
-# Credits charged: 4 images x 2 credits = 8 credits total
+# Charged: 4 images x $0.03 (flux-2-pro at 1K) = $0.12
 for i, url in enumerate(data["images"]):
     print(f"Variation {i+1}: {url}")
-print(f"Total credits: {data['credits_used']}")
+print(f"Total charged: ${data['cost_usd']}")
 ```
 
 ```typescript [TypeScript]
-// Generate 4 variations in a single request
+// Generate 4 variations in a single request.
+// `image_size` is mandatory in practice on flux-2-pro: without it each image is
+// charged at the top of the grid ($0.255 instead of $0.03).
 const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
   method: "POST",
   headers: {
@@ -725,16 +847,17 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
     prompt: "Minimalist logo design for a tech startup, clean vector style",
     model: "flux-2-pro",
     num_images: 4,
-    aspect_ratio: "1:1"
+    aspect_ratio: "1:1",
+    image_size: "1K"
   })
 });
 
 const data = await response.json();
-// Credits charged: 4 images x 2 credits = 8 credits total
+// Charged: 4 images x $0.03 (flux-2-pro at 1K) = $0.12
 data.images.forEach((url: string, i: number) => {
   console.log(`Variation ${i + 1}: ${url}`);
 });
-console.log("Total credits:", data.credits_used);
+console.log("Total charged: $", data.cost_usd);
 ```
 
 ```go [Go]
@@ -754,6 +877,8 @@ func main() {
 		"model":        "flux-2-pro",
 		"num_images":   4,
 		"aspect_ratio": "1:1",
+		// Without this each image is charged at the top of the grid ($0.255).
+		"image_size":   "1K",
 	}
 	body, _ := json.Marshal(payload)
 
@@ -771,12 +896,12 @@ func main() {
 	var data map[string]interface{}
 	json.Unmarshal(respBody, &data)
 
-	// Credits charged: 4 images x 2 credits = 8 credits total
+	// Charged: 4 images x $0.03 (flux-2-pro at 1K) = $0.12
 	images := data["images"].([]interface{})
 	for i, url := range images {
 		fmt.Printf("Variation %d: %s\n", i+1, url)
 	}
-	fmt.Println("Total credits:", data["credits_used"])
+	fmt.Println("Total charged (USD):", data["cost_usd"])
 }
 ```
 
@@ -788,13 +913,17 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
     "prompt": "Minimalist logo design for a tech startup, clean vector style",
     "model": "flux-2-pro",
     "num_images": 4,
-    "aspect_ratio": "1:1"
+    "aspect_ratio": "1:1",
+    "image_size": "1K"
   }'
 ```
 
 :::
 
-### Negative Prompt & Style Preset
+### Negative Prompt & Fixed Seed
+
+Style goes in the `prompt` — the `style` parameter is not forwarded (see the note under
+[Request Parameters](#request-parameters)). `negative_prompt` and `seed` are.
 
 ::: code-group
 
@@ -808,18 +937,20 @@ response = requests.post(
         "Content-Type": "application/json"
     },
     json={
-        "prompt": "Portrait of a woman in Renaissance style, oil painting, dramatic lighting, rich colors",
+        # The style belongs in the prompt itself — it is the only place that works
+        # on every model.
+        "prompt": "Portrait of a woman in Renaissance style, classic oil painting "
+                  "textures, dramatic lighting, rich colors",
         "model": "flux-kontext-pro",
         "negative_prompt": "blurry, low quality, distorted, deformed, watermark, text overlay, cartoon",
-        "style": "oil-painting",
         "aspect_ratio": "3:4",
-        "seed": 42  # Use seed for reproducible results
+        "seed": 42  # Same prompt + seed + model = same output
     }
 )
 
 data = response.json()
 print(f"Image: {data['images'][0]}")
-print(f"Seed used: {data['metadata']['seed']}")  # 42 — same result every time
+print(f"Charged: ${data['cost_usd']}")  # 0.04 — flux-kontext-pro is flat-priced
 ```
 
 ```typescript [TypeScript]
@@ -830,18 +961,20 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
     "Content-Type": "application/json"
   },
   body: JSON.stringify({
-    prompt: "Portrait of a woman in Renaissance style, oil painting, dramatic lighting, rich colors",
+    // The style belongs in the prompt itself — it is the only place that works
+    // on every model.
+    prompt: "Portrait of a woman in Renaissance style, classic oil painting textures, " +
+            "dramatic lighting, rich colors",
     model: "flux-kontext-pro",
     negative_prompt: "blurry, low quality, distorted, deformed, watermark, text overlay, cartoon",
-    style: "oil-painting",
     aspect_ratio: "3:4",
-    seed: 42 // Use seed for reproducible results
+    seed: 42 // Same prompt + seed + model = same output
   })
 });
 
 const data = await response.json();
 console.log("Image:", data.images[0]);
-console.log("Seed used:", data.metadata.seed); // 42 — same result every time
+console.log("Charged: $", data.cost_usd); // 0.04 — flat-priced
 ```
 
 ```go [Go]
@@ -857,10 +990,10 @@ import (
 
 func main() {
 	payload := map[string]interface{}{
-		"prompt":          "Portrait of a woman in Renaissance style, oil painting, dramatic lighting, rich colors",
+		// The style belongs in the prompt itself.
+		"prompt":          "Portrait of a woman in Renaissance style, classic oil painting textures, dramatic lighting, rich colors",
 		"model":           "flux-kontext-pro",
 		"negative_prompt": "blurry, low quality, distorted, deformed, watermark, text overlay, cartoon",
-		"style":           "oil-painting",
 		"aspect_ratio":    "3:4",
 		"seed":            42,
 	}
@@ -881,9 +1014,8 @@ func main() {
 	json.Unmarshal(respBody, &data)
 
 	images := data["images"].([]interface{})
-	metadata := data["metadata"].(map[string]interface{})
 	fmt.Println("Image:", images[0])
-	fmt.Println("Seed used:", metadata["seed"]) // 42 - same result every time
+	fmt.Println("Charged (USD):", data["cost_usd"]) // 0.04 - flat-priced
 }
 ```
 
@@ -892,10 +1024,9 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "Portrait of a woman in Renaissance style, oil painting, dramatic lighting, rich colors",
+    "prompt": "Portrait of a woman in Renaissance style, classic oil painting textures, dramatic lighting, rich colors",
     "model": "flux-kontext-pro",
     "negative_prompt": "blurry, low quality, distorted, deformed, watermark, text overlay, cartoon",
-    "style": "oil-painting",
     "aspect_ratio": "3:4",
     "seed": 42
   }'
@@ -925,13 +1056,14 @@ response = requests.post(
                   "dramatic studio lighting, soft shadows, bokeh background, commercial quality",
         "model": "grok-imagine-image-pro",
         "aspect_ratio": "2:3",
+        "image_size": "2K",
         "num_images": 1
     }
 )
 
 data = response.json()
 print(f"2K product shot: {data['images'][0]}")
-# 3 credits, 2K resolution, portrait 2:3 aspect
+# $0.07 at 2K, portrait 2:3 aspect
 ```
 
 ```typescript [TypeScript]
@@ -946,12 +1078,14 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
             "dramatic studio lighting, soft shadows, bokeh background, commercial quality",
     model: "grok-imagine-image-pro",
     aspect_ratio: "2:3",
+    image_size: "2K",
     num_images: 1
   })
 });
 
 const data = await response.json();
 console.log("2K product shot:", data.images[0]);
+console.log("Charged: $", data.cost_usd); // 0.07 at the 2K tier
 ```
 
 ```go [Go]
@@ -970,6 +1104,7 @@ func main() {
 		"prompt":       "Premium product photography of a luxury perfume bottle on marble surface, dramatic studio lighting, soft shadows, bokeh background, commercial quality",
 		"model":        "grok-imagine-image-pro",
 		"aspect_ratio": "2:3",
+		"image_size":   "2K",
 		"num_images":   1,
 	}
 	body, _ := json.Marshal(payload)
@@ -990,7 +1125,7 @@ func main() {
 
 	images := data["images"].([]interface{})
 	fmt.Println("2K product shot:", images[0])
-	// 3 credits, 2K resolution, portrait 2:3 aspect
+	// $0.07 at 2K, portrait 2:3 aspect
 }
 ```
 
@@ -1002,6 +1137,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
     "prompt": "Premium product photography of a luxury perfume bottle on marble surface, dramatic studio lighting, soft shadows, bokeh background, commercial quality",
     "model": "grok-imagine-image-pro",
     "aspect_ratio": "2:3",
+    "image_size": "2K",
     "num_images": 1
   }'
 ```
@@ -1031,7 +1167,7 @@ response = requests.post(
 )
 
 data = response.json()
-# 4 variations at 1 credit each = 4 credits total
+# 4 variations at $0.02 each = $0.08 total
 for i, url in enumerate(data["images"]):
     print(f"Variation {i+1}: {url}")
 ```
@@ -1053,7 +1189,7 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 });
 
 const data = await response.json();
-// 4 variations at 1 credit each = 4 credits total
+// 4 variations at $0.02 each = $0.08 total
 data.images.forEach((url: string, i: number) => {
   console.log(`Variation ${i + 1}: ${url}`);
 });
@@ -1093,7 +1229,7 @@ func main() {
 	var data map[string]interface{}
 	json.Unmarshal(respBody, &data)
 
-	// 4 variations at 1 credit each = 4 credits total
+	// 4 variations at $0.02 each = $0.08 total
 	images := data["images"].([]interface{})
 	for i, url := range images {
 		fmt.Printf("Variation %d: %s\n", i+1, url)
@@ -1115,512 +1251,108 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 
 :::
 
-### Product Display Edit (Single Reference Image)
+### Reference-image modes are not on this endpoint
 
-Edit an existing product photo — change background, lighting, or context while preserving the product.
+Earlier versions of this page showed single-image edit, multi-image combine (up to 3
+references) and virtual try-on here, all via `image_url` / `image_urls` on
+`grok-imagine-image-pro`. Neither field is forwarded to Grok: this endpoint is
+text-to-image only, so those requests render from the prompt alone and are charged for it.
 
-::: code-group
+Where those workflows actually live:
 
-```python [Python]
-import requests
+| Want | Use |
+|------|-----|
+| Edit one photo — background, lighting, context | [`POST /v1/ai/edit/image`](/api/image-editing) at $0.04, or a [Stability tool](/api/image-editing#image-studio-stability-ai-tools) |
+| Compose several reference images into one | [`dreamina-4-6`](#byteplus-dreamina-4-6-billed-per-returned-image) — up to 14 references, $0.031 per returned image |
+| Virtual try-on | [`POST /v1/ai/tryon`](/api/tryon) — a purpose-built endpoint, not a prompt trick |
 
-response = requests.post(
-    "https://apis.fotohub.app/v1/ai/generate/image",
-    headers={
-        "Authorization": "Bearer fh_live_your_api_key",
-        "Content-Type": "application/json"
-    },
-    json={
-        "prompt": "Place this product in a modern minimalist kitchen, marble countertop, "
-                  "soft natural window light, lifestyle photography",
-        "model": "grok-imagine-image-pro",
-        "aspect_ratio": "3:4",
-        "image_url": "https://your-storage.com/product-photo.jpg"
-    }
-)
-
-data = response.json()
-print(f"Edited product: {data['images'][0]}")
-# 3 credits — single image edit mode
-```
-
-```typescript [TypeScript]
-const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer fh_live_your_api_key",
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    prompt: "Place this product in a modern minimalist kitchen, marble countertop, " +
-            "soft natural window light, lifestyle photography",
-    model: "grok-imagine-image-pro",
-    aspect_ratio: "3:4",
-    image_url: "https://your-storage.com/product-photo.jpg"
-  })
-});
-
-const data = await response.json();
-console.log("Edited product:", data.images[0]);
-```
-
-```go [Go]
-package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-)
-
-func main() {
-	payload := map[string]interface{}{
-		"prompt":       "Place this product in a modern minimalist kitchen, marble countertop, soft natural window light, lifestyle photography",
-		"model":        "grok-imagine-image-pro",
-		"aspect_ratio": "3:4",
-		"image_url":    "https://your-storage.com/product-photo.jpg",
-	}
-	body, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
-	json.Unmarshal(respBody, &data)
-
-	images := data["images"].([]interface{})
-	fmt.Println("Edited product:", images[0])
-	// 3 credits - single image edit mode
-}
-```
-
-```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Place this product in a modern minimalist kitchen, marble countertop, soft natural window light",
-    "model": "grok-imagine-image-pro",
-    "aspect_ratio": "3:4",
-    "image_url": "https://your-storage.com/product-photo.jpg"
-  }'
-```
-
-:::
-
-### Combined Product Listing (Multi-Image, up to 3 References)
-
-Combine multiple product images into a single cohesive composition. Only available with `grok-imagine-image-pro`.
-
-::: code-group
-
-```python [Python]
-import requests
-
-response = requests.post(
-    "https://apis.fotohub.app/v1/ai/generate/image",
-    headers={
-        "Authorization": "Bearer fh_live_your_api_key",
-        "Content-Type": "application/json"
-    },
-    json={
-        "prompt": "Arrange all products in an elegant flat-lay composition, "
-                  "clean white background, consistent lighting, e-commerce catalog style",
-        "model": "grok-imagine-image-pro",
-        "aspect_ratio": "1:1",
-        "image_urls": [
-            "https://your-storage.com/product-1.jpg",
-            "https://your-storage.com/product-2.jpg",
-            "https://your-storage.com/product-3.jpg"
-        ]
-    }
-)
-
-data = response.json()
-print(f"Combined listing: {data['images'][0]}")
-# 3 credits — multi-image combine mode (max 3 reference images)
-```
-
-```typescript [TypeScript]
-const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer fh_live_your_api_key",
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    prompt: "Arrange all products in an elegant flat-lay composition, " +
-            "clean white background, consistent lighting, e-commerce catalog style",
-    model: "grok-imagine-image-pro",
-    aspect_ratio: "1:1",
-    image_urls: [
-      "https://your-storage.com/product-1.jpg",
-      "https://your-storage.com/product-2.jpg",
-      "https://your-storage.com/product-3.jpg"
-    ]
-  })
-});
-
-const data = await response.json();
-console.log("Combined listing:", data.images[0]);
-```
-
-```go [Go]
-package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-)
-
-func main() {
-	payload := map[string]interface{}{
-		"prompt":       "Arrange all products in an elegant flat-lay composition, clean white background, consistent lighting, e-commerce catalog style",
-		"model":        "grok-imagine-image-pro",
-		"aspect_ratio": "1:1",
-		"image_urls": []string{
-			"https://your-storage.com/product-1.jpg",
-			"https://your-storage.com/product-2.jpg",
-			"https://your-storage.com/product-3.jpg",
-		},
-	}
-	body, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
-	json.Unmarshal(respBody, &data)
-
-	images := data["images"].([]interface{})
-	fmt.Println("Combined listing:", images[0])
-	// 3 credits - multi-image combine mode (max 3 reference images)
-}
-```
-
-```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Arrange all products in an elegant flat-lay composition, clean white background, consistent lighting",
-    "model": "grok-imagine-image-pro",
-    "aspect_ratio": "1:1",
-    "image_urls": [
-      "https://your-storage.com/product-1.jpg",
-      "https://your-storage.com/product-2.jpg",
-      "https://your-storage.com/product-3.jpg"
-    ]
-  }'
-```
-
-:::
-
-::: warning Multi-Image Limits
-- Maximum **3 reference images** per request
-- Only available with `grok-imagine-image-pro` model
-- All images must be publicly accessible URLs or FOTOhub storage URLs
-- Higher resolution images produce better combine results
-:::
-
-### Virtual Try-On (2 References — Person + Garment)
-
-Show a person wearing a specific garment or accessory. Provide the person photo and the product image.
-
-::: code-group
-
-```python [Python]
-import requests
-
-response = requests.post(
-    "https://apis.fotohub.app/v1/ai/generate/image",
-    headers={
-        "Authorization": "Bearer fh_live_your_api_key",
-        "Content-Type": "application/json"
-    },
-    json={
-        "prompt": "Virtual try-on: person wearing the garment from second image, "
-                  "natural fit, correct proportions, photorealistic, keep person's face and body",
-        "model": "grok-imagine-image-pro",
-        "aspect_ratio": "3:4",
-        "image_urls": [
-            "https://your-storage.com/model-photo.jpg",     # Person
-            "https://your-storage.com/dress-product.jpg"    # Garment
-        ]
-    }
-)
-
-data = response.json()
-print(f"Try-on result: {data['images'][0]}")
-# 3 credits — virtual try-on mode via multi-image
-```
-
-```typescript [TypeScript]
-const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer fh_live_your_api_key",
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    prompt: "Virtual try-on: person wearing the garment from second image, " +
-            "natural fit, correct proportions, photorealistic",
-    model: "grok-imagine-image-pro",
-    aspect_ratio: "3:4",
-    image_urls: [
-      "https://your-storage.com/model-photo.jpg",
-      "https://your-storage.com/dress-product.jpg"
-    ]
-  })
-});
-
-const data = await response.json();
-console.log("Try-on result:", data.images[0]);
-```
-
-```go [Go]
-package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-)
-
-func main() {
-	payload := map[string]interface{}{
-		"prompt":       "Virtual try-on: person wearing the garment from second image, natural fit, correct proportions, photorealistic, keep person's face and body",
-		"model":        "grok-imagine-image-pro",
-		"aspect_ratio": "3:4",
-		"image_urls": []string{
-			"https://your-storage.com/model-photo.jpg",
-			"https://your-storage.com/dress-product.jpg",
-		},
-	}
-	body, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer(body))
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
-	json.Unmarshal(respBody, &data)
-
-	images := data["images"].([]interface{})
-	fmt.Println("Try-on result:", images[0])
-	// 3 credits - virtual try-on mode via multi-image
-}
-```
-
-```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Virtual try-on: person wearing the garment from second image, natural fit, photorealistic",
-    "model": "grok-imagine-image-pro",
-    "aspect_ratio": "3:4",
-    "image_urls": [
-      "https://your-storage.com/model-photo.jpg",
-      "https://your-storage.com/dress-product.jpg"
-    ]
-  }'
-```
-
-:::
-
-::: tip Virtual Try-On Best Practices
-1. **Person image first** — full-body or half-body shot, clear pose, neutral background
-2. **Garment image second** — flat-lay or mannequin shot showing full garment
-3. Use `3:4` or `2:3` aspect ratio for best full-body results
-4. Include "keep person's face" in prompt to preserve identity
-5. Works with clothing, accessories, eyewear, hats, shoes
-:::
 
 ---
 
-## Image Editing
+## Editing an existing image
 
-Modify existing images with AI-powered editing operations including inpainting, outpainting, background replacement, object removal, and upscaling.
+Editing lives on its own endpoint, `POST /v1/ai/edit/image` — inpaint, outpaint,
+background swap and object removal, at a flat **$0.04** per edit whatever the mode or
+size. Upscaling is not one of its modes; it is a [Stability
+tool](/api/image-editing#image-studio-stability-ai-tools) (`fast-upscale` $0.03,
+`conservative-upscale` $0.40, `creative-upscale` $0.60).
 
-### Endpoint
-
-```
-POST /v1/ai/edit/image
-```
-
-**Billing:** 2 credits per edit (fixed, regardless of mode or resolution)
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `image_url` | string | **Yes** | URL of the source image. Must be publicly accessible or a FOTOhub storage URL. |
-| `prompt` | string | **Yes** | Description of the desired edit. |
-| `mode` | string | **Yes** | `"inpaint"`, `"outpaint"`, `"bgswap"`, `"remove"`, or `"upscale"` |
-| `mask_url` | string | No | Mask image URL (white = edit area). Required for `"inpaint"` mode. |
-
-### Editing Examples
-
-::: code-group
-
-```python [Background Swap]
-import requests
-
-response = requests.post(
-    "https://apis.fotohub.app/v1/ai/edit/image",
-    headers={
-        "Authorization": "Bearer fh_live_your_api_key",
-        "Content-Type": "application/json"
-    },
-    json={
-        "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/photo.jpg",
-        "prompt": "Professional studio background with soft gradient lighting",
-        "mode": "bgswap"
-    }
-)
-
-data = response.json()
-print(f"Edited image: {data['images'][0]}")
-```
-
-```python [Inpaint]
-import requests
-
-response = requests.post(
-    "https://apis.fotohub.app/v1/ai/edit/image",
-    headers={
-        "Authorization": "Bearer fh_live_your_api_key",
-        "Content-Type": "application/json"
-    },
-    json={
-        "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/room.jpg",
-        "prompt": "A modern minimalist sofa with clean lines",
-        "mode": "inpaint",
-        "mask_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/room_mask.png"
-    }
-)
-
-data = response.json()
-print(f"Edited image: {data['images'][0]}")
-```
-
-```python [Upscale]
-import requests
-
-response = requests.post(
-    "https://apis.fotohub.app/v1/ai/edit/image",
-    headers={
-        "Authorization": "Bearer fh_live_your_api_key",
-        "Content-Type": "application/json"
-    },
-    json={
-        "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/low_res.jpg",
-        "prompt": "Enhance resolution, preserve details, sharpen edges",
-        "mode": "upscale"
-    }
-)
-
-data = response.json()
-print(f"Upscaled image: {data['images'][0]}")
-```
-
-:::
+Full parameters, response shape and error contract: **[Image Editing](/api/image-editing)**.
 
 ## Model Comparison Table
 
 A comprehensive overview of all available image models with their capabilities, performance characteristics, and pricing.
 
-| Model ID | Provider | Max Resolution | Speed | Quality | Credits | Key Features |
-|----------|----------|---------------|:-----:|:-------:|:-------:|--------------|
-| `imagen-3-fast` | Google Vertex AI | 512x512 | 5/5 | 3/5 | 1 | Ultra-fast drafts, lowest cost |
-| `imagen-3-standard` | Google Vertex AI | 1024x1024 | 4/5 | 4/5 | 2 | Balanced speed/quality |
-| `imagen-3-capability` | Google Vertex AI | 1024x1024 | 4/5 | 4/5 | 2 | Editing and customization |
-| `imagen-4-standard` | Google Vertex AI | 2048x2048 | 3/5 | 4/5 | 3 | High quality, good for production |
-| `imagen-4-ultra` | Google Vertex AI | 4096x4096 | 2/5 | 5/5 | 5 | Native 4K, highest fidelity from Google |
-| `gemini-3.1-flash-lite-image` | Google Gemini | 1024x1024 | 5/5 | 3/5 | 1 | Nano Banana 2 Lite, cheapest Gemini |
-| `gemini-2.5-flash-image` | Google Gemini | 1024x1024 | 4/5 | 4/5 | 2 | Nano Banana, up to 10 reference images |
-| `gemini-3.1-flash-image` | Google Gemini | 1024x1024 | 4/5 | 4/5 | 3 | Nano Banana 2, GA |
-| `gemini-3-pro-image` | Google Gemini | 4096x4096 | 2/5 | 5/5 | 6 | Nano Banana Pro, 1K/2K/4K, precise text rendering |
-| `dall-e-3-standard` | OpenAI | 1024x1024 | 3/5 | 4/5 | 2 | Strong prompt following, text rendering |
-| `dall-e-3-hd` | OpenAI | 1792x1792 | 3/5 | 4/5 | 4 | HD variant, better details |
-| `gpt-image-1` | OpenAI | 2048x2048 | 3/5 | 5/5 | 4 | High OpenAI fidelity, photorealism |
-| `gpt-image-2` | OpenAI | 4096x4096 | 2/5 | 5/5 | 10 | Highest OpenAI fidelity, best text rendering, 4K |
-| `mai-image-2.5-flash` | Microsoft | 1024x1024 | 4/5 | 3/5 | 1 | Budget/fast Azure AI model |
-| `mai-image-2.5` | Microsoft | 1024x1024 | 3/5 | 4/5 | 1 | Azure AI flagship, prompt rewriting |
-| `seedream-5-0-260128` | BytePlus | 4096x4096 | 4/5 | 5/5 | 2 | **Recommended** -- best value, token-based |
-| `seedream-4-5-251128` | BytePlus | 4096x4096 | 3/5 | 4/5 | 3 | Token-based, excellent detail |
-| `seedream-4-0-250828` | BytePlus | 4096x4096 | 4/5 | 4/5 | 2 | Token-based, budget-friendly |
-| `dola-seedream-5-0-pro-260628` | BytePlus | 4096x4096 | 3/5 | 5/5 | 3 | Pro quality, enhanced realism |
-| `seededit-3-0-i2i-250628` | BytePlus | 4096x4096 | 3/5 | 4/5 | 3 | Image-to-image editing, token-based |
-| `grok-imagine-image` | xAI | 1024x1024 | 4/5 | 3/5 | 1 | Fast budget option, single-image edit |
-| `grok-imagine-image-pro` | xAI | 2048x2048 | 3/5 | 4/5 | 3 | 2K, multi-image combine, virtual try-on |
-| `flux-1.1-pro` | Black Forest Labs | 1440x1440 | 3/5 | 4/5 | 2 | Creative, artistic styles |
-| `flux-1.1-pro-ultra` | Black Forest Labs | 2048x2048 | 2/5 | 5/5 | 3 | Ultra detail, large canvas |
-| `flux-kontext-pro` | Black Forest Labs | 1440x1440 | 3/5 | 4/5 | 2 | Context-aware editing, style transfer |
-| `flux-kontext-max` | Black Forest Labs | 2048x2048 | 2/5 | 5/5 | 4 | Maximum context fidelity |
-| `flux-2-max` | Black Forest Labs | 2048x2048 | 2/5 | 5/5 | 4 | Highest FLUX quality |
-| `flux-2-pro` | Black Forest Labs | 1440x1440 | 3/5 | 4/5 | 2 | Balanced, versatile |
-| `flux-2-klein-4b` | Black Forest Labs | 1024x1024 | 5/5 | 3/5 | 1 | Ultra-fast, lightweight 4B model |
-| `flux-2-klein-9b` | Black Forest Labs | 1024x1024 | 5/5 | 3/5 | 1 | Fast, lightweight 9B model |
-| `minimax-image-01` | MiniMax | 1024x1024 | 4/5 | 3/5 | 1 | Lowest-cost budget option |
-| `kling-v3-omni` | Kling | 2048x2048 | 2/5 | 5/5 | 8 | Premium, highest fidelity, all modes |
-| `kling-v3` | Kling | 2048x2048 | 2/5 | 4/5 | 5 | High quality |
-| `kling-v2-1` | Kling | 1536x1536 | 3/5 | 4/5 | 2 | Balanced |
+| Model ID | Provider | Max Resolution | Speed | Quality | 1K | 4K | Key Features |
+|----------|----------|---------------|:-----:|:-------:|---:|---:|--------------|
+| `imagen-3-fast` | Google Vertex AI | 1024x1024 | 5/5 | 3/5 | 0.02 | 0.02 | Ultra-fast drafts, `num_images` max 1 |
+| `imagen-3-standard` | Google Vertex AI | 1024x1024 | 4/5 | 4/5 | 0.04 | 0.04 | Balanced speed/quality |
+| `imagen-4-fast` | Google Vertex AI | 2048x2048 | 5/5 | 4/5 | 0.02 | 0.02 | Imagen 4 quality at the Fast price |
+| `imagen-4-standard` | Google Vertex AI | 2048x2048 | 3/5 | 4/5 | 0.04 | 0.04 | High quality, good for production |
+| `imagen-4-ultra` | Google Vertex AI | 2048x2048 | 2/5 | 5/5 | 0.06 | 0.06 | Highest fidelity from Google |
+| `gemini-3.1-flash-lite-image` | Google Gemini | 1024x1024 | 5/5 | 3/5 | 0.0336 | 0.0336 | Nano Banana 2 Lite, cheapest Gemini |
+| `gemini-2.5-flash-image` | Google Gemini | 1024x1024 | 4/5 | 4/5 | 0.039 | 0.039 | Nano Banana, up to 10 reference images |
+| `gemini-3.1-flash-image` | Google Gemini | 4096x4096 | 4/5 | 4/5 | 0.067 | 0.151 | Nano Banana 2, GA |
+| `gemini-3-pro-image` | Google Gemini | 4096x4096 | 2/5 | 5/5 | 0.134 | 0.24 | Nano Banana Pro, precise text rendering |
+| `gpt-image-1-mini` | OpenAI | 4096x4096 | 4/5 | 4/5 | 0.005 | 0.036 | Cheapest OpenAI option |
+| `gpt-image-1` | OpenAI | 4096x4096 | 3/5 | 5/5 | 0.011 | 0.167 | High OpenAI fidelity, photorealism |
+| `gpt-image-1.5` | OpenAI | 4096x4096 | 3/5 | 5/5 | 0.009 | 0.133 | Better than 1, and cheaper |
+| `gpt-image-2` | OpenAI | 4096x4096 | 2/5 | 5/5 | 0.006 | 0.211 | Highest OpenAI fidelity, best text rendering |
+| `mai-image-2.5-flash` | Microsoft | 1024x1024 | 4/5 | 3/5 | 0.022 | 0.022 | Budget/fast Azure AI model |
+| `mai-image-2.5` | Microsoft | 1024x1024 | 3/5 | 4/5 | 0.037 | 0.037 | Azure AI flagship, prompt rewriting |
+| `seedream-5-0-260128` | BytePlus | 4096x4096 | 4/5 | 5/5 | 0.0315 | 0.0315 | **Recommended** — best value, flat price at 4K |
+| `seedream-4-5-251128` | BytePlus | 4096x4096 | 3/5 | 4/5 | 0.036 | 0.036 | Excellent detail, flat price |
+| `seedream-4-0-250828` | BytePlus | 4096x4096 | 4/5 | 4/5 | 0.03 | 0.03 | Budget-friendly, flat price |
+| `dola-seedream-5-0-pro-260628` | BytePlus | 2048x2048 | 3/5 | 5/5 | 0.048 | 0.093 | Pro quality; the one megapixel-priced model |
+| `seededit-3-0-i2i-250628` | BytePlus | 4096x4096 | 3/5 | 4/5 | 0.03 | 0.03 | Image-to-image, `num_images` max 1 |
+| `dreamina-4-6` | BytePlus | 4096x4096 | 3/5 | 5/5 | 0.031 | 0.031 | Up to 14 reference images; billed per returned image |
+| `grok-imagine-image` | xAI | 1024x1024 | 4/5 | 3/5 | 0.02 | 0.02 | Fast budget option |
+| `grok-imagine-image-pro` | xAI | 2048x2048 | 3/5 | 4/5 | 0.05 | 0.07 | 2K quality tier |
+| `grok-imagine-image-quality` | xAI | 2048x2048 | 3/5 | 4/5 | 0.05 | 0.07 | Same rate as Pro, `num_images` up to 10 |
+| `flux-2-pro` | Black Forest Labs | 4096x4096 | 3/5 | 4/5 | 0.03 | 0.255 | Balanced, versatile |
+| `flux-1.1-pro` | Black Forest Labs | 1440x1440 | 3/5 | 4/5 | 0.04 | 0.04 | Creative, artistic styles |
+| `flux-kontext-pro` | Black Forest Labs | 1440x1440 | 3/5 | 4/5 | 0.04 | 0.04 | Context-aware editing, style transfer |
+| `flux-2-flex` | Black Forest Labs | 4096x4096 | 2/5 | 5/5 | 0.05 | 0.80 | Highest available FLUX detail; steep 4K price |
+| `minimax-image-01` | MiniMax | 1024x1024 | 4/5 | 3/5 | 0.005 | 0.005 | Cheapest model on the endpoint |
+| `kling-v3-omni` | Kling | 2048x2048 | 2/5 | 5/5 | 0.025 | 0.025 | Premium, all modes, `num_images` max 1 |
+| `kling-v3` | Kling | 2048x2048 | 2/5 | 4/5 | 0.025 | 0.025 | High quality, `num_images` max 1 |
+| `kling-v2-1` | Kling | 1536x1536 | 3/5 | 4/5 | 0.012 | 0.012 | Balanced, `num_images` up to 9 |
+| `ida-q-image` | FOTOhub | 2048x2048 | 3/5 | 4/5 | 0.00 | 0.00 | Self-hosted, free; [async](/api/ida-q) |
+
+The 1K and 4K columns are equal on a flat-priced model. Where they differ the model is
+tiered and 2K sits between them — the per-provider tables above carry the middle column.
+`imagen-3-capability`, `dall-e-3*`, and the six disabled FLUX ids are deliberately absent:
+see [OpenAI](#openai) and [FLUX](#black-forest-labs-flux).
 
 ::: tip Choosing a Model
-- **Best value**: `seedream-5-0-260128` -- high quality at token-based pricing, scales to 4K
-- **Fastest**: `imagen-3-fast`, `flux-2-klein-4b`, or `flux-2-klein-9b` for sub-second generations
-- **Highest quality**: `gemini-3-pro-image` (Nano Banana Pro), `gpt-image-2`, `imagen-4-ultra`, or `flux-2-max` for print/commercial work
-- **Multi-image composition**: `gemini-3.1-flash-image` or `gemini-2.5-flash-image` (Nano Banana) -- up to 10 reference images in one call
-- **Image editing**: `flux-kontext-pro` (style transfer), `seededit-3-0-i2i-250628` (img2img), `grok-imagine-image-pro` (multi-image)
-- **Budget**: `grok-imagine-image`, `minimax-image-01`, or `gemini-3.1-flash-lite-image` at 1 credit per image
+- **Best value**: `seedream-5-0-260128` — $0.0315 at every resolution, so 4K costs what 1K does
+- **Cheapest that renders**: `minimax-image-01` and `gpt-image-1-mini` at $0.005
+- **Fastest**: `imagen-3-fast` or `imagen-4-fast` at $0.02
+- **Highest quality**: `gemini-3-pro-image` (Nano Banana Pro), `gpt-image-2`, or `imagen-4-ultra` for print/commercial work
+- **Multi-image composition**: `dreamina-4-6` — up to 14 references, the only model on this endpoint that takes them
+- **Image editing**: [`POST /v1/ai/edit/image`](/api/image-editing) at $0.04, or `seededit-3-0-i2i-250628`
+- **Watch the 4K price**: `flux-2-flex` ($0.80), `gpt-image-2` ($0.211) and `flux-2-pro` ($0.255) are 16–35x their own 1K rate
 :::
 
 ---
 
 ## Advanced Use Cases
 
-### 4K Ultra-Resolution with Imagen 4 Ultra
+### Native 4K for print
 
-Generate native 4K images suitable for print, large-format displays, and premium marketing materials.
+`gpt-image-2`, `gpt-image-1`, `gemini-3-pro-image`, `flux-2-pro` and every SeedDream model
+render true 4K. Imagen does not — it caps at 2K and is billed at the tier it delivered, so
+a 4096 request there gets you a 2K image at the 2K price.
+
+4K is the one place the price differs sharply between models: $0.0315 on
+`seedream-5-0-260128`, $0.211 on `gpt-image-2`, $0.80 on `flux-2-flex`. Pick deliberately.
 
 ::: code-group
 
 ```python [Python]
 import requests
 
-# Imagen 4 Ultra generates native 4K at 5 credits per image
+# gpt-image-2 at 4K: $0.211. The same call at 1K would be $0.006.
 response = requests.post(
     "https://apis.fotohub.app/v1/ai/generate/image",
     headers={
@@ -1628,10 +1360,9 @@ response = requests.post(
         "Content-Type": "application/json"
     },
     json={
-        "prompt": "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography, 8K quality",
-        "model": "imagen-4-ultra",
-        "width": 4096,
-        "height": 2304,
+        "prompt": "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography",
+        "model": "gpt-image-2",
+        "image_size": "4K",
         "aspect_ratio": "16:9",
         "negative_prompt": "low quality, blurry, distorted, watermark, oversaturated"
     }
@@ -1639,13 +1370,12 @@ response = requests.post(
 
 data = response.json()
 print(f"4K Image URL: {data['images'][0]}")
-print(f"Resolution: {data['metadata']['width']}x{data['metadata']['height']}")
-print(f"Credits used: {data['credits_used']}")  # 5 credits
-print(f"Generation time: {data['metadata']['generation_time_ms']}ms")
+print(f"Charged: ${data['cost_usd']}")            # 0.211 at the 4K tier
+print(f"Balance left: ${data['billing']['balance_usd']}")
 ```
 
 ```typescript [TypeScript]
-// Imagen 4 Ultra generates native 4K at 5 credits per image
+// gpt-image-2 at 4K: $0.211. The same call at 1K would be $0.006.
 const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
   method: "POST",
   headers: {
@@ -1653,10 +1383,9 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
     "Content-Type": "application/json"
   },
   body: JSON.stringify({
-    prompt: "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography, 8K quality",
-    model: "imagen-4-ultra",
-    width: 4096,
-    height: 2304,
+    prompt: "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography",
+    model: "gpt-image-2",
+    image_size: "4K",
     aspect_ratio: "16:9",
     negative_prompt: "low quality, blurry, distorted, watermark, oversaturated"
   })
@@ -1664,9 +1393,8 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 
 const data = await response.json();
 console.log("4K Image URL:", data.images[0]);
-console.log(`Resolution: ${data.metadata.width}x${data.metadata.height}`);
-console.log("Credits used:", data.credits_used); // 5 credits
-console.log("Generation time:", data.metadata.generation_time_ms, "ms");
+console.log("Charged: $", data.cost_usd);                  // 0.211 at the 4K tier
+console.log("Balance left: $", data.billing.balance_usd);
 ```
 
 ```go [Go]
@@ -1681,11 +1409,11 @@ import (
 )
 
 func main() {
+	// gpt-image-2 at 4K: $0.211. The same call at 1K would be $0.006.
 	payload := map[string]interface{}{
-		"prompt":          "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography, 8K quality",
-		"model":           "imagen-4-ultra",
-		"width":           4096,
-		"height":          2304,
+		"prompt":          "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography",
+		"model":           "gpt-image-2",
+		"image_size":      "4K",
 		"aspect_ratio":    "16:9",
 		"negative_prompt": "low quality, blurry, distorted, watermark, oversaturated",
 	}
@@ -1706,10 +1434,8 @@ func main() {
 	json.Unmarshal(respBody, &data)
 
 	images := data["images"].([]interface{})
-	metadata := data["metadata"].(map[string]interface{})
 	fmt.Println("4K Image URL:", images[0])
-	fmt.Printf("Resolution: %.0fx%.0f\n", metadata["width"], metadata["height"])
-	fmt.Println("Credits used:", data["credits_used"]) // 5 credits
+	fmt.Println("Charged (USD):", data["cost_usd"]) // 0.211 at the 4K tier
 }
 ```
 
@@ -1718,10 +1444,9 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography, 8K quality",
-    "model": "imagen-4-ultra",
-    "width": 4096,
-    "height": 2304,
+    "prompt": "Luxury real estate interior, open-plan living room with floor-to-ceiling windows overlooking city skyline at sunset, marble floors, designer furniture, volumetric lighting, architectural photography",
+    "model": "gpt-image-2",
+    "image_size": "4K",
     "aspect_ratio": "16:9",
     "negative_prompt": "low quality, blurry, distorted, watermark, oversaturated"
   }'
@@ -1729,16 +1454,23 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 
 :::
 
-### Image-to-Image with FLUX Kontext Pro
+### FLUX Kontext Pro — style, without a reference image
 
-Use FLUX Kontext Pro for context-aware image editing, style transfer, and guided transformations. Provide a reference image and describe the desired modification.
+`flux-kontext-pro` is trained for context-aware transformation, but on **this** endpoint it
+only ever sees your prompt: `image_url` is not forwarded, so a request that carries one is
+rendered from the text alone and charged $0.04 for it. To transform an image you already
+have, call [`POST /v1/ai/edit/image`](/api/image-editing) — same $0.04, and it actually
+reads the source.
+
+What Kontext Pro is genuinely good for here is a described style at a fixed seed, so a whole
+set comes back coherent. It is flat-priced at **$0.04** — 1K and 1440px cost the same.
 
 ::: code-group
 
 ```python [Python]
 import requests
 
-# FLUX Kontext Pro excels at style transfer and context-aware editing
+# $0.04 flat. Same seed => the same look across a set.
 response = requests.post(
     "https://apis.fotohub.app/v1/ai/generate/image",
     headers={
@@ -1746,9 +1478,8 @@ response = requests.post(
         "Content-Type": "application/json"
     },
     json={
-        "prompt": "Transform this photograph into a Studio Ghibli anime art style, maintain composition and subject, soft watercolor textures, warm pastel palette, hand-drawn feel",
+        "prompt": "Studio Ghibli anime art style, soft watercolor textures, warm pastel palette, hand-drawn feel, a quiet countryside train station at golden hour",
         "model": "flux-kontext-pro",
-        "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/original-photo.jpg",
         "aspect_ratio": "16:9",
         "seed": 7777
     }
@@ -1756,12 +1487,11 @@ response = requests.post(
 
 data = response.json()
 print(f"Styled image: {data['images'][0]}")
-print(f"Credits: {data['credits_used']}")  # 2 credits
-# Use same seed for consistent style across multiple images
+print(f"Charged: ${data['cost_usd']}")   # 0.04
 ```
 
 ```typescript [TypeScript]
-// FLUX Kontext Pro excels at style transfer and context-aware editing
+// $0.04 flat. Same seed => the same look across a set.
 const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
   method: "POST",
   headers: {
@@ -1769,9 +1499,8 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
     "Content-Type": "application/json"
   },
   body: JSON.stringify({
-    prompt: "Transform this photograph into a Studio Ghibli anime art style, maintain composition and subject, soft watercolor textures, warm pastel palette, hand-drawn feel",
+    prompt: "Studio Ghibli anime art style, soft watercolor textures, warm pastel palette, hand-drawn feel, a quiet countryside train station at golden hour",
     model: "flux-kontext-pro",
-    image_url: "https://s1.fotohub.app/storage/v1/object/public/uploads/original-photo.jpg",
     aspect_ratio: "16:9",
     seed: 7777
   })
@@ -1779,8 +1508,7 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 
 const data = await response.json();
 console.log("Styled image:", data.images[0]);
-console.log("Credits:", data.credits_used); // 2 credits
-// Use same seed for consistent style across multiple images
+console.log("Charged: $", data.cost_usd);   // 0.04
 ```
 
 ```go [Go]
@@ -1795,10 +1523,10 @@ import (
 )
 
 func main() {
+	// $0.04 flat. Same seed => the same look across a set.
 	payload := map[string]interface{}{
-		"prompt":       "Transform this photograph into a Studio Ghibli anime art style, maintain composition and subject, soft watercolor textures, warm pastel palette, hand-drawn feel",
+		"prompt":       "Studio Ghibli anime art style, soft watercolor textures, warm pastel palette, hand-drawn feel, a quiet countryside train station at golden hour",
 		"model":        "flux-kontext-pro",
-		"image_url":    "https://s1.fotohub.app/storage/v1/object/public/uploads/original-photo.jpg",
 		"aspect_ratio": "16:9",
 		"seed":         7777,
 	}
@@ -1820,8 +1548,7 @@ func main() {
 
 	images := data["images"].([]interface{})
 	fmt.Println("Styled image:", images[0])
-	fmt.Println("Credits:", data["credits_used"]) // 2 credits
-	// Use same seed for consistent style across multiple images
+	fmt.Println("Charged (USD):", data["cost_usd"]) // 0.04
 }
 ```
 
@@ -1830,9 +1557,8 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "Transform this photograph into a Studio Ghibli anime art style, maintain composition and subject, soft watercolor textures, warm pastel palette, hand-drawn feel",
+    "prompt": "Studio Ghibli anime art style, soft watercolor textures, warm pastel palette, hand-drawn feel, a quiet countryside train station at golden hour",
     "model": "flux-kontext-pro",
-    "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/original-photo.jpg",
     "aspect_ratio": "16:9",
     "seed": 7777
   }'
@@ -1848,12 +1574,24 @@ Generate several variations in one call with `num_images` (1–8). Ideal for A/B
 
 The reverse never costs you anything: BytePlus sequential mode can return *more* images than requested, and the extras are not billed.
 
-The response reports the settled figure, so `credits_used` and `len(images)` always agree:
+The response reports the settled figure. `cost_usd` is always what you actually paid, and
+`refunded_usd` appears whenever a refund was committed — so `cost_usd` and `len(images)`
+always agree. Here 4 images were requested from `seedream-5-0-260128` at $0.0315 each
+($0.126 held), 2 came back, and the other $0.063 went straight back to the wallet:
 
 ```json
 {
   "model": "seedream-5-0-260128",
-  "credits_used": 4,
+  "cost_usd": 0.063,
+  "refunded_usd": 0.063,
+  "currency": "USD",
+  "billing": {
+    "cost_usd": 0.063,
+    "balance_usd": 24.312,
+    "currency": "USD",
+    "method": "wallet",
+    "model": "prepaid"
+  },
   "images": ["https://...", "https://..."]
 }
 ```
@@ -1883,7 +1621,8 @@ response = requests.post(
 
 data = response.json()
 print(f"Generated {len(data['images'])} variations")
-print(f"Total credits: {data['credits_used']}")  # 4 images x 2 credits = 8
+print(f"Charged: ${data['cost_usd']}")           # 4 x $0.0315 = $0.126
+print(f"Refunded: ${data.get('refunded_usd', 0)}")  # set if fewer came back
 
 for i, url in enumerate(data["images"]):
     print(f"  Variation {i+1}: {url}")
@@ -1898,7 +1637,7 @@ def generate_batch(seed_offset):
         },
         json={
             "prompt": "Social media banner, abstract gradient, modern tech aesthetic",
-            "model": "flux-2-klein-4b",
+            "model": "minimax-image-01",
             "num_images": 4,
             "aspect_ratio": "16:9",
             "seed": 1000 + seed_offset
@@ -1931,7 +1670,8 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
 
 const data = await response.json();
 console.log(`Generated ${data.images.length} variations`);
-console.log(`Total credits: ${data.credits_used}`); // 4 images x 2 credits = 8
+console.log(`Charged: $${data.cost_usd}`);              // 4 x $0.0315 = $0.126
+console.log(`Refunded: $${data.refunded_usd ?? 0}`);    // set if fewer came back
 
 data.images.forEach((url: string, i: number) => {
   console.log(`  Variation ${i + 1}: ${url}`);
@@ -1947,7 +1687,7 @@ const batchPromises = Array.from({ length: 4 }, (_, i) =>
     },
     body: JSON.stringify({
       prompt: "Social media banner, abstract gradient, modern tech aesthetic",
-      model: "flux-2-klein-4b",
+      model: "minimax-image-01",
       num_images: 4,
       aspect_ratio: "16:9",
       seed: 1000 + i * 4
@@ -2003,7 +1743,7 @@ func main() {
 
 	images := data["images"].([]interface{})
 	fmt.Printf("Generated %d variations\n", len(images))
-	fmt.Printf("Total credits: %.0f\n", data["credits_used"])
+	fmt.Printf("Charged (USD): %v\n", data["cost_usd"]) // 4 x $0.0315 = $0.126
 
 	// Method 2: Parallel requests for larger batches
 	var wg sync.WaitGroup
@@ -2016,7 +1756,7 @@ func main() {
 			defer wg.Done()
 			result := generateImages(map[string]interface{}{
 				"prompt":       "Social media banner, abstract gradient, modern tech aesthetic",
-				"model":        "flux-2-klein-4b",
+				"model":        "minimax-image-01",
 				"num_images":   4,
 				"aspect_ratio": "16:9",
 				"seed":         1000 + offset,
@@ -2053,7 +1793,7 @@ seq 0 4 12 | xargs -P4 -I{} curl -s -X POST https://apis.fotohub.app/v1/ai/gener
   -H "Content-Type: application/json" \
   -d "{
     \"prompt\": \"Social media banner, abstract gradient, modern tech aesthetic\",
-    \"model\": \"flux-2-klein-4b\",
+    \"model\": \"minimax-image-01\",
     \"num_images\": 4,
     \"aspect_ratio\": \"16:9\",
     \"seed\": $((1000 + {}))
@@ -2062,39 +1802,50 @@ seq 0 4 12 | xargs -P4 -I{} curl -s -X POST https://apis.fotohub.app/v1/ai/gener
 
 :::
 
-::: warning Batch Limits
-- Maximum **4 images** per single request (`num_images` max: 4)
-- Credits are charged **per image** -- 4 images at 2 credits each = 8 credits total
-- For larger batches, use parallel requests (respect rate limit: 20 req/min default, 300 req/min on Startup plan)
-- Use `seed` parameter to get reproducible results across batch runs
+::: warning Batch limits
+- `num_images` accepts **1-8**; anything outside that is a 400 before you are charged
+- Each model has its own lower cap, and it wins. `minimax-image-01` and `seedream-*` stop at
+  4, `imagen-3-fast` and every Kling model except `kling-v2-1` at 1. The per-provider tables
+  above carry the real maximum for each id
+- You are charged **per delivered image**, and the difference is refunded when a cap trims
+  your request
+- For larger batches, run parallel requests. The rate limit is **per API key**, 60 req/min by
+  default, up to 600 if your key is configured for it
+- Use `seed` for reproducible results across batch runs
 :::
 
-### Style Presets
+### Style — put it in the prompt
 
-Apply predefined artistic styles to guide the generation. Style presets work with all models and can be combined with custom prompts.
+There is no working `style` parameter on this endpoint. Earlier versions of this page listed
+ten presets; the route does not forward the field, so it is dropped silently and you get the
+prompt-only render — at full price. Style belongs in the prompt text, which every model reads.
+
+The pattern below gets you exactly what the presets promised: one prompt, one fixed `seed`,
+a style clause appended per variant, so only the style changes between renders.
 
 ::: code-group
 
 ```python [Python]
 import requests
 
-# Available style presets
-STYLES = [
-    "photorealistic",   # Studio photography, natural lighting
-    "cinematic",        # Film-like color grading, dramatic lighting
-    "anime",            # Japanese animation style
-    "digital-art",      # Digital illustration, clean lines
-    "oil-painting",     # Classic oil painting textures
-    "watercolor",       # Soft watercolor washes
-    "3d-render",        # CGI / 3D rendered look
-    "pixel-art",        # Retro pixel art style
-    "comic-book",       # Bold lines, halftone shading
-    "minimalist",       # Clean, simple, whitespace-heavy
-]
+# Style clauses that behave like the old presets -- append one to the prompt.
+STYLES = {
+    "photorealistic": "photorealistic, studio photography, natural lighting, sharp focus",
+    "cinematic":      "cinematic film still, dramatic lighting, anamorphic, color graded",
+    "anime":          "Japanese anime illustration, cel shading, clean linework",
+    "digital-art":    "digital illustration, clean vector lines, flat colors",
+    "oil-painting":   "oil painting on canvas, visible brushwork, impasto texture",
+    "watercolour":    "watercolour wash, soft bleeding edges, paper grain",
+    "3d-render":      "3D render, octane, global illumination, subsurface scattering",
+    "pixel-art":      "16-bit pixel art, limited palette, crisp pixels",
+    "comic-book":     "comic book art, bold ink outlines, halftone shading",
+    "minimalist":     "minimalist composition, generous negative space, two-tone palette",
+}
 
-# Generate same prompt with different styles for comparison
+SUBJECT = "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky"
+
 results = {}
-for style in ["photorealistic", "cinematic", "anime", "oil-painting"]:
+for name in ["photorealistic", "cinematic", "anime", "oil-painting"]:
     response = requests.post(
         "https://apis.fotohub.app/v1/ai/generate/image",
         headers={
@@ -2102,37 +1853,38 @@ for style in ["photorealistic", "cinematic", "anime", "oil-painting"]:
             "Content-Type": "application/json"
         },
         json={
-            "prompt": "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky",
+            "prompt": f"{SUBJECT}, {STYLES[name]}",
             "model": "seedream-5-0-260128",
-            "style": style,
             "aspect_ratio": "16:9",
-            "seed": 42  # Same seed for fair comparison
+            "seed": 42  # same seed => only the style changes
         }
     )
-    results[style] = response.json()["images"][0]
-    print(f"Style '{style}': {results[style]}")
+    data = response.json()
+    results[name] = data["images"][0]
+    print(f"Style '{name}': {results[name]}  (${data['cost_usd']})")
+
+print(f"4 styles x $0.0315 = ${4 * 0.0315:.4f}")
 ```
 
 ```typescript [TypeScript]
-// Available style presets
-const STYLES = [
-  "photorealistic",   // Studio photography, natural lighting
-  "cinematic",        // Film-like color grading, dramatic lighting
-  "anime",            // Japanese animation style
-  "digital-art",      // Digital illustration, clean lines
-  "oil-painting",     // Classic oil painting textures
-  "watercolor",       // Soft watercolor washes
-  "3d-render",        // CGI / 3D rendered look
-  "pixel-art",        // Retro pixel art style
-  "comic-book",       // Bold lines, halftone shading
-  "minimalist",       // Clean, simple, whitespace-heavy
-] as const;
+// Style clauses that behave like the old presets -- append one to the prompt.
+const STYLES: Record<string, string> = {
+  "photorealistic": "photorealistic, studio photography, natural lighting, sharp focus",
+  "cinematic":      "cinematic film still, dramatic lighting, anamorphic, color graded",
+  "anime":          "Japanese anime illustration, cel shading, clean linework",
+  "digital-art":    "digital illustration, clean vector lines, flat colors",
+  "oil-painting":   "oil painting on canvas, visible brushwork, impasto texture",
+  "watercolour":    "watercolour wash, soft bleeding edges, paper grain",
+  "3d-render":      "3D render, octane, global illumination, subsurface scattering",
+  "pixel-art":      "16-bit pixel art, limited palette, crisp pixels",
+  "comic-book":     "comic book art, bold ink outlines, halftone shading",
+  "minimalist":     "minimalist composition, generous negative space, two-tone palette",
+};
 
-// Generate same prompt with different styles for comparison
-const stylesToCompare = ["photorealistic", "cinematic", "anime", "oil-painting"];
+const SUBJECT = "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky";
 const results: Record<string, string> = {};
 
-for (const style of stylesToCompare) {
+for (const name of ["photorealistic", "cinematic", "anime", "oil-painting"]) {
   const response = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
     method: "POST",
     headers: {
@@ -2140,17 +1892,16 @@ for (const style of stylesToCompare) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      prompt: "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky",
+      prompt: `${SUBJECT}, ${STYLES[name]}`,
       model: "seedream-5-0-260128",
-      style,
       aspect_ratio: "16:9",
-      seed: 42 // Same seed for fair comparison
+      seed: 42 // same seed => only the style changes
     })
   });
 
   const data = await response.json();
-  results[style] = data.images[0];
-  console.log(`Style '${style}': ${results[style]}`);
+  results[name] = data.images[0];
+  console.log(`Style '${name}': ${results[name]}  ($${data.cost_usd})`);
 }
 ```
 
@@ -2166,15 +1917,21 @@ import (
 )
 
 func main() {
-	styles := []string{"photorealistic", "cinematic", "anime", "oil-painting"}
+	// Style clauses that behave like the old presets -- append one to the prompt.
+	styles := map[string]string{
+		"photorealistic": "photorealistic, studio photography, natural lighting, sharp focus",
+		"cinematic":      "cinematic film still, dramatic lighting, anamorphic, color graded",
+		"anime":          "Japanese anime illustration, cel shading, clean linework",
+		"oil-painting":   "oil painting on canvas, visible brushwork, impasto texture",
+	}
+	subject := "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky"
 
-	for _, style := range styles {
+	for name, clause := range styles {
 		payload := map[string]interface{}{
-			"prompt":       "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky",
+			"prompt":       subject + ", " + clause,
 			"model":        "seedream-5-0-260128",
-			"style":        style,
 			"aspect_ratio": "16:9",
-			"seed":         42, // Same seed for fair comparison
+			"seed":         42, // same seed => only the style changes
 		}
 		body, _ := json.Marshal(payload)
 
@@ -2193,47 +1950,53 @@ func main() {
 		json.Unmarshal(respBody, &data)
 
 		images := data["images"].([]interface{})
-		fmt.Printf("Style '%s': %s\n", style, images[0])
+		fmt.Printf("Style '%s': %s  ($%v)\n", name, images[0], data["cost_usd"])
 	}
 }
 ```
 
 ```bash [cURL]
-# Generate with cinematic style preset
+# One style, written into the prompt
 curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky",
+    "prompt": "A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky, cinematic film still, dramatic lighting, anamorphic, color graded",
     "model": "seedream-5-0-260128",
-    "style": "cinematic",
     "aspect_ratio": "16:9",
     "seed": 42
   }'
 
-# Compare multiple styles using a loop
-for style in photorealistic cinematic anime oil-painting; do
-  echo "=== Style: $style ==="
+# Compare styles at a fixed seed
+for style in \
+  "photorealistic, studio photography, natural lighting, sharp focus" \
+  "cinematic film still, dramatic lighting, anamorphic, color graded" \
+  "Japanese anime illustration, cel shading, clean linework" \
+  "oil painting on canvas, visible brushwork, impasto texture"
+do
+  echo "=== $style ==="
   curl -s -X POST https://apis.fotohub.app/v1/ai/generate/image \
     -H "Authorization: Bearer fh_live_your_api_key" \
     -H "Content-Type: application/json" \
     -d "{
-      \"prompt\": \"A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky\",
+      \"prompt\": \"A lone samurai standing on a hilltop, cherry blossoms falling, dramatic sky, $style\",
       \"model\": \"seedream-5-0-260128\",
-      \"style\": \"$style\",
       \"aspect_ratio\": \"16:9\",
       \"seed\": 42
-    }" | jq '.images[0]'
+    }" | jq '{image: .images[0], cost_usd}'
 done
 ```
 
 :::
 
-::: tip Style Preset Tips
-- Style presets **modify** the prompt internally -- they do not override it. Your prompt details still matter.
-- Combine style with `negative_prompt` for best results (e.g., style `"anime"` + negative `"photorealistic, 3d render"`)
-- Not all models support all styles equally. FLUX and SeedDream models produce the most consistent style results.
-- Use `seed` to compare styles fairly -- same seed + same prompt ensures only the style changes.
+::: tip Getting style right
+- Put the style **after** the subject. Models weight the opening of a prompt most heavily, so
+  lead with what the image is of and finish with how it should look.
+- Pair the style clause with `negative_prompt` to push away from its opposite — an anime style
+  clause plus `negative_prompt: "photorealistic, 3d render"` is much cleaner than either alone.
+- Fix the `seed` when comparing. Same seed + same subject means only your style clause changed.
+- Style consistency varies by model. SeedDream and FLUX hold a described style most reliably;
+  Imagen tends to drift back toward photographic.
 :::
 
 ---
@@ -2246,43 +2009,69 @@ Optimize your image generation workflow for speed, cost, and quality.
 
 | Use Case | Recommended Model | Why |
 |----------|-------------------|-----|
-| Quick prototypes & drafts | `imagen-3-fast` or `flux-2-klein-4b` | Sub-2s generation, 1 credit |
-| Production web assets | `seedream-5-0-260128` | Best quality/price ratio, 2 credits |
-| Print & large-format | `imagen-4-ultra` or `gpt-image-1` | Native 4K, highest detail |
-| E-commerce product shots | `grok-imagine-image-pro` | Multi-image combine, virtual try-on |
-| Style transfer & editing | `flux-kontext-pro` | Context-aware, preserves composition |
-| Batch social media content | `flux-2-klein-4b` | Ultra-fast, 1 credit, good enough for social |
-| A/B testing creatives | `seedream-5-0-260128` with `num_images: 4` | 4 variations per request |
+| Quick prototypes & drafts | `imagen-3-fast` or `imagen-4-fast` | Sub-2s generation, $0.02 flat |
+| Cheapest possible iteration | `minimax-image-01` or `gpt-image-1-mini` at 1K | $0.005 per image |
+| Production web assets | `seedream-5-0-260128` | Best quality per dollar, $0.0315 at any resolution |
+| Print & large-format | `imagen-4-ultra` ($0.06, 2K max) or `gemini-3-pro-image` ($0.24 at 4K) | Highest detail; check the 4K column before committing |
+| Text inside the image | `gemini-3-pro-image` or `gpt-image-2` | The two that render legible type reliably |
+| Composing several reference photos | `dreamina-4-6` | Up to 14 references, $0.031 per returned image — the only model here that reads them |
+| Editing an existing photo | [`POST /v1/ai/edit/image`](/api/image-editing) | $0.04, and it actually receives your source image |
+| Batch social content | `minimax-image-01` or `seedream-4-0-250828` | $0.005 / $0.03, both fast enough to run 4 at a time |
+| A/B testing creatives | `seedream-5-0-260128` with `num_images: 4` | 4 variations per request, $0.126 the set |
 
 ### Resolution Strategy
 
-::: warning Token-Based Models Scale with Resolution
-For BytePlus SeedDream models, cost scales linearly with pixel count. A 4K image (4096x4096) costs **16x more** than a 1K image (1024x1024). Generate at the lowest resolution that meets your needs, then upscale if required.
+::: warning Resolution changes the price on 12 models, and not at all on the rest
+There is no single rule. Whether 4K costs more than 1K is a property of the model:
+
+- **Flat** — every Imagen, every SeedDream (`seedream-*`, `seededit-*`), `dreamina-4-6`,
+  `mai-image-2.5*`, `minimax-image-01`, every Kling, `flux-1.1-pro`, `flux-kontext-pro`,
+  `gemini-2.5-flash-image`, `gemini-3.1-flash-lite-image`, `nano-banana-fast`. Render at the
+  highest resolution the model supports — it is free to do so.
+- **Tiered** — the whole GPT Image family, `gemini-3.1-flash-image`, `gemini-3-pro-image`,
+  `flux-2-pro`, `flux-2-flex`, `grok-imagine-image-pro`, `grok-imagine-image-quality`. Here
+  4K costs 1.4x to 35x the 1K price, so the tier is a real budget decision.
 :::
 
-**Cost-effective resolution workflow:**
-1. **Draft at 1024x1024** -- validate composition and style (4,096 tokens, ~$0.0123)
-2. **Refine at 2048x2048** -- check details before committing (16,384 tokens, ~$0.0492)
-3. **Final at 4096x4096** -- only for approved compositions (65,536 tokens, ~$0.1966)
+The single most expensive mistake on this endpoint is **omitting the tier on a tiered
+model**. With no `image_size` and no `width`/`height`, there is nothing to derive a tier
+from, so the top of the grid is charged rather than selling below what the provider bills
+us — a `gpt-image-2` call with no size is $0.211 instead of $0.006. Always send
+`image_size`, or `width`/`height` (≥3072 → 4K, ≥1536 → 2K, else 1K).
 
-For credit-based models (Imagen, DALL-E, FLUX), resolution does not affect price -- always generate at maximum supported resolution.
+**Cost-effective workflow on a tiered model** (`gpt-image-2`):
+1. **Draft at `image_size: "1K"`** — validate composition and style, $0.006 a render
+2. **Refine at `"2K"`** — check detail before committing, $0.053
+3. **Final at `"4K"`** — approved compositions only, $0.211
+
+Or skip the ladder entirely: `seedream-5-0-260128` renders 4K for $0.0315, which is less
+than a 2K `gpt-image-2` draft.
 
 ### Speed Optimization
 
-1. **Use `aspect_ratio` instead of `width`/`height`** -- the API picks optimal dimensions for each model, avoiding unnecessary upsampling.
-2. **Parallel requests** -- send multiple requests concurrently rather than waiting sequentially. Respect your plan's rate limit.
-3. **Prefer fast models for iteration** -- use `imagen-3-fast` or `flux-2-klein-4b` during prompt development, switch to premium models for final output.
-4. **Set `seed` for reproducibility** -- when iterating on a prompt, a fixed seed lets you see only the effect of prompt changes.
+1. **Use `aspect_ratio` instead of `width`/`height`** — the API picks the optimal dimensions for each model, avoiding unnecessary upsampling. Send `image_size` alongside it to pin the price tier.
+2. **Parallel requests** — send concurrently rather than sequentially. The limit is per API key: 60 req/min by default, up to 600 on a key configured for it.
+3. **Prefer fast models for iteration** — `imagen-3-fast`, `imagen-4-fast` or `minimax-image-01` during prompt development; switch to the premium model for the final render.
+4. **Set `seed` for reproducibility** — a fixed seed while iterating shows you the effect of the prompt change alone.
+5. **Watch the 100-second ceiling** — requests through `apis.fotohub.app` are cut off by the CDN at 100 s. `dola-seedream-5-0-pro-260628` at 4K can exceed that. If you hit repeated `504`s on a slow model, drop the resolution or switch models — nothing is charged on a timeout.
 
 ### Cost Optimization
 
-| Strategy | Savings |
-|----------|---------|
-| Use `seedream-5-0-260128` instead of `gpt-image-1` for standard quality | ~80% cheaper |
-| Generate 1K then upscale (edit endpoint) vs native 4K on token models | ~75% cheaper |
-| Use `flux-2-klein-4b` for non-critical assets | 1 credit vs 2-5 credits |
-| Batch with `num_images: 4` (one network round-trip) | Faster, same credits |
-| Use `aspect_ratio` preset (avoids wasted pixels from wrong dimensions) | Variable |
+| Strategy | Saving |
+|----------|--------|
+| `seedream-5-0-260128` at 4K instead of `gpt-image-2` at 4K | $0.0315 vs $0.211 — **85% cheaper** |
+| `seedream-5-0-260128` at 4K instead of `flux-2-flex` at 4K | $0.0315 vs $0.80 — **96% cheaper** |
+| Always send `image_size` on a tiered model | Up to **97%** — an untiered `gpt-image-2` call is charged $0.211 instead of $0.006 |
+| `minimax-image-01` for non-critical assets | $0.005 vs $0.03–0.06 on a mid-tier model |
+| `imagen-4-fast` instead of `imagen-4-standard` | $0.02 vs $0.04 — **half**, same 2K ceiling |
+| Batch with `num_images` (one round-trip) | Faster; the price is per image either way |
+| Check a model's real `num_images` cap before batching | Asking 8 from a model that returns 1 is refunded, but you waited for it |
+
+::: tip Verify, don't estimate
+Every response carries the settled `cost_usd`, and BytePlus models carry a per-leg
+`cost_breakdown`. Reconcile against those, not against this page — and read your running
+total from [`GET /v1/billing/usage`](/api/billing).
+:::
 
 ### Prompt Engineering Best Practices
 
@@ -2292,51 +2081,105 @@ For credit-based models (Imagen, DALL-E, FLUX), resolution does not affect price
 4. **Use negative prompts** -- explicitly exclude unwanted elements: `"blurry, watermark, text, distorted hands"`
 5. **Iterate with seeds** -- find a good seed, then refine the prompt while keeping the seed fixed
 
-### Rate Limits by Plan
+### Rate Limits
 
-| Plan | Requests/min | Images/min (with num_images: 4) | Monthly Credits |
-|------|:------------:|:-------------------------------:|:---------------:|
-| Free | 10 | 40 | 50 |
-| Developer | 60 | 240 | 500 |
-| Startup | 300 | 1,200 | 5,000 |
-| Business | 1,000 | 4,000 | 25,000 |
-| Enterprise | 5,000 | 20,000 | Unlimited |
+The limit is **per API key**, not per plan and not per account. Every key ships at
+**60 requests per minute** and can be raised to **600** in the console. No subscription
+plan changes it, and there is no monthly image or credit allowance to run out of — the
+wallet balance is the only other thing that can stop a request.
 
-::: tip Handling Rate Limits
-When you receive a `429` response, check the `Retry-After` header for the number of seconds to wait. Implement exponential backoff in production applications. Consider upgrading your plan if you consistently hit limits.
+| | |
+|---|---|
+| Default | 60 requests/min per key |
+| Maximum | 600 requests/min per key |
+| Scope | The key, so keys do not share a window |
+| Window | 60 seconds |
+
+Every response carries the current window:
+
+```
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 57
+X-RateLimit-Reset: 1754924400
+```
+
+On a `429` the body is `{"error": "rate_limit_exceeded", "limit_rpm": 60, "scope": "api_key"}`
+and `Retry-After: 60` is set. Nothing is charged.
+
+::: tip Handling rate limits
+Read `X-RateLimit-Remaining` and pace yourself rather than waiting for the `429`. When one
+does arrive, honour `Retry-After` and back off exponentially. If you consistently need more,
+raise the limit on the key in the console — up to 600/min — instead of creating extra keys.
 :::
 
 ---
 
 ## Error Responses
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | `invalid_model` | The specified model does not exist or is not available for image generation. |
-| 400 | `invalid_dimensions` | Width or height is out of range (256–4096) or not divisible by 64. |
-| 400 | `invalid_prompt` | Prompt is empty, exceeds maximum length (4096 chars), or contains blocked content. |
-| 401 | `unauthorized` | Missing or invalid API key. Ensure the Authorization header uses format: `Bearer fh_live_*` |
-| 402 | `insufficient_credits` | Account does not have enough credits. Purchase more or upgrade your plan. |
-| 429 | `rate_limit_exceeded` | Too many requests. Default: 20 req/min for image generation. Check `Retry-After` header. |
-| 500 | `generation_failed` | Upstream provider error. No credits are charged on failure. |
+| Status | Code / shape | Description | Charged? |
+|--------|--------------|-------------|----------|
+| 400 | `"prompt is required"` | Empty or missing `prompt`. | No |
+| 400 | `"num_images must be …"` | Not an integer, below 1, or above 8. | No |
+| 400 | `"image_size must be one of 1K, 1.5K, 2K, 3K, 4K"` | Unrecognised tier. | No |
+| 400 | retirement message | `dall-e-3` / `dall-e-3-hd`. Names the replacement (`gpt-image-1` / `gpt-image-1.5`) and refuses before authentication. | No |
+| 401 | `"Invalid API key"` / `"API key has expired"` | Missing, malformed, revoked or expired key. Header must be `Bearer fh_live_*`. | No |
+| 403 | scope or IP denial | The key's scopes do not cover this endpoint, or its IP allowlist rejected you. | No |
+| 402 | `insufficient_funds` | The wallet cannot cover the render. Refused before the provider. | No |
+| 429 | `rate_limit_exceeded` | Over the key's per-minute limit. `Retry-After: 60`. | No |
+| 500 | `"Pricing is not configured for '<model>'"` | The model has no price. `imagen-3-capability` is the live example. Refused, not billed. | No |
+| 500 | upstream message | The provider failed after the charge: safety refusal, provider error, or one of the six switched-off FLUX ids. | Refunded |
+| 502 | `"<function> unreachable"` | The generation pipeline could not be reached. | Refunded |
+| 504 | `"<function> did not respond within Ns"` | Timed out — 300 s at the origin, but the CDN cuts a proxied request at 100 s. | Refunded |
 
-### Error Response Example
+### 402 — Insufficient funds
+
+The one error worth branching on. Raised before any provider is called, so nothing is spent:
 
 ```json
 {
-  "error": {
-    "code": "insufficient_credits",
-    "message": "Insufficient credits. Required: 3, available: 1. Please top up your account.",
-    "status": 402,
-    "details": {
-      "required_credits": 3,
-      "available_credits": 1,
-      "model": "imagen-4-standard"
-    }
+  "detail": {
+    "error": "insufficient_funds",
+    "code": "insufficient_funds",
+    "message": "Insufficient funds: this request costs $0.126000 but your balance is $0.040000. Top up your wallet with at least $0.086000 to continue. The FOTOhub API is prepaid: no credits or subscription plan can pay for API usage.",
+    "required_usd": 0.126,
+    "balance_usd": 0.04,
+    "shortfall_usd": 0.086,
+    "currency": "USD",
+    "charged": false,
+    "charged_usd": 0,
+    "topup_url": "https://fotohub.app/console/wallet",
+    "operation": "generate_image:seedream-5-0-260128"
   }
 }
 ```
 
-::: tip No Charge on Failure
-If a generation fails due to a provider error (500), your credits are **not** deducted. You will only be charged for successful generations that return image URLs.
-:::
+Top up by at least `shortfall_usd`. A fotohub.app subscription does not help: API usage is
+payable only from the wallet. Note `required_usd` scales with `num_images` and the tier — the
+$0.126 above is 4 SeedDream images.
+
+### Nothing delivered, nothing charged
+
+The charge happens before the provider on every model, so any failure after it is reversed.
+When the reversal commits, the sentence **`Your wallet was not charged for this request.`**
+is appended to the error message — and it is appended *only* then, so its absence means
+check [`GET /v1/billing/usage`](/api/billing) rather than assume.
+
+```json
+{
+  "detail": "{\"error\":\"Generowanie zablokowane przez filtr bezpieczenstwa. Spróbuj zmodyfikować prompt lub użyj innego modelu.\",\"errorId\":\"a1b2c3\",\"refunded\":false}. Your wallet was not charged for this request."
+}
+```
+
+Two things to know about that string:
+
+- **`detail` is a string, not an object**, and the upstream body is embedded in it verbatim —
+  so it is sometimes JSON, sometimes Polish, and on a disabled model the inner `error` is
+  missing entirely (you get little more than an `errorId`). Do not parse it. Branch on the
+  HTTP status, log the body, and retry a `500`/`502`/`504` once: nothing was charged, so the
+  retry is free.
+- **The `"refunded"` flag inside the quoted body is not about your wallet.** It refers to the
+  internal credit ledger, which the API does not bill from, and reads `false` on every API
+  request. The appended sentence is the one to trust.
+
+A partial delivery is settled the same way, without an error: ask for 8, get 4, and the other
+4 are refunded with `refunded_usd` on the success response.
