@@ -38,7 +38,7 @@ const result = await client.generateImage({
 });
 
 console.log(`Image: ${result.images[0]}`);
-console.log(`Credits used: ${result.credits_used}`);
+console.log(`Cost: $${result.cost_usd}`);
 ```
 
 ## Client Initialization
@@ -240,7 +240,7 @@ const result = await client.generateImage({
 });
 
 console.log(`Image: ${result.images[0]}`);
-console.log(`Credits used: ${result.credits_used}`);
+console.log(`Cost: $${result.cost_usd}`);
 ```
 
 ### Multiple Images with Options
@@ -259,9 +259,9 @@ for (const imageUrl of result.images) {
   console.log(imageUrl);
 }
 
-// Access billing information
-console.log(`Credits used: ${result.credits_used}`);
-console.log(`Credits remaining: ${result.billing.credits_remaining}`);
+// Access billing information -- the API is prepaid in USD
+console.log(`Cost: $${result.cost_usd}`);
+console.log(`Balance left: $${result.billing.balance_usd}`);
 ```
 
 ### With Explicit Dimensions
@@ -282,21 +282,36 @@ const result = await client.generateImage({
 interface ImageResult {
   /** Model used for generation */
   model: string;
-  /** Credits consumed */
-  credits_used: number;
+  /** USD charged. Same figure as `billing.cost_usd`. */
+  cost_usd?: number;
+  /** Always `'USD'`. */
+  currency?: 'USD';
   /** Billing information */
   billing: BillingInfo;
   /** Array of generated image URLs */
   images: string[];
   /** Generation metadata */
   metadata?: ImageMetadata;
+  /** @deprecated Not sent by the prepaid API. Use `cost_usd`. */
+  credits_used?: number;
 }
 
 interface BillingInfo {
-  credits_used: number;
-  credits_remaining?: number;
+  /** USD charged, to six decimal places. */
+  cost_usd: number;
+  /** Wallet balance AFTER this charge. */
+  balance_usd?: number | null;
+  currency?: 'USD';
+  method?: 'wallet';
+  model?: 'prepaid';
 }
 ```
+
+::: warning Do not default `credits_used` to `0`
+It is deprecated and absent on every current response. Code that reads
+`result.credits_used ?? 0` reports a real charge as a free generation. Read
+`cost_usd`.
+:::
 
 ## Video Generation
 
@@ -315,7 +330,7 @@ const result = await client.generateVideo({
 });
 
 console.log(`Video URL: ${result.video_url}`);
-console.log(`Credits used: ${result.credits_used}`);
+console.log(`Cost: $${result.cost_usd}`);
 ```
 
 ### Image-to-Video
@@ -336,8 +351,10 @@ const result = await client.generateVideo({
 interface VideoResult {
   /** Model used */
   model: string;
-  /** Credits consumed */
-  credits_used: number;
+  /** USD charged. Same figure as `billing.cost_usd`. */
+  cost_usd?: number;
+  /** @deprecated Not sent by the prepaid API. Use `cost_usd`. */
+  credits_used?: number;
   /** Video output URL */
   video_url?: string;
   /** Current status */
@@ -357,8 +374,9 @@ job is finished, so the result already contains `video_url`.
 
 `seedance-2-5` (the default) is the only model that produces a **30-second clip in
 one request**, and the only one that accepts a source video for editing or
-extension. Native audio is **included in its price** — 14.5 credits/s at 720p, 6.4
-at 480p, the same with `generate_audio` on or off.
+extension. Native audio is **included in its price** — $0.0107 per 1000 output
+tokens whether `generate_audio` is on or off, which works out to about $1.17 for a
+5-second 720p clip and $6.99 for a 30-second one.
 
 ```typescript
 const video = await client.generateSeedance({
@@ -373,7 +391,7 @@ const video = await client.generateSeedance({
 });
 
 console.log(video.video_url);
-console.log(video.credits_used); // 435
+console.log(video.cost_usd); // e.g. 6.99138
 ```
 
 ::: warning 720p ceiling
@@ -400,8 +418,9 @@ console.log(edited.task_type);    // "editing"
 console.log(edited.aspect_ratio); // "adaptive"
 ```
 
-A source video raises the rate to 17.6 credits/s at 720p, because its frames bill
-as input. Image and audio references do not change the rate.
+A source video raises the cost, because its frames bill as input tokens on top of
+the output. Image and audio references do not change the rate. Price the exact call
+with `estimateCost()` first if the difference matters.
 
 ### Face consistency
 
@@ -480,7 +499,9 @@ interface SeedanceResult extends VideoResult {
   generate_audio?: boolean;
   /** Inferred task: t2v | reference | editing | extension | frames */
   task_type?: string;
-  /** Charge detail — breakdown carries credits_per_second, duration, resolution */
+  /** USD charged. Same figure as `billing.cost_usd`. */
+  cost_usd?: number;
+  /** Charge detail — `cost_usd`, `balance_usd`, and a per-leg token breakdown */
   billing?: Record<string, unknown>;
   poll_url?: string;
   estimated_seconds?: number;
@@ -491,8 +512,8 @@ interface SeedanceResult extends VideoResult {
 ```
 
 Throws `JobTimeoutError` if the job outlives `maxWait` (it may still finish — the
-job id is on the error) and `JobFailedError` if the render fails, in which case
-credits are refunded server-side.
+job id is on the error) and `JobFailedError` if the render fails, in which case the
+wallet is refunded server-side and the response says so explicitly.
 
 ## Music Generation
 
@@ -505,7 +526,7 @@ const result = await client.generateMusic({
 
 console.log(`Audio URL: ${result.audio_url}`);
 console.log(`Duration: ${result.duration}s`);
-console.log(`Credits used: ${result.credits_used}`);
+console.log(`Cost: $${result.cost_usd}`);   // per minute: 30s on minimax is $0.0125
 ```
 
 ### MusicResult Response Type
@@ -514,8 +535,10 @@ console.log(`Credits used: ${result.credits_used}`);
 interface MusicResult {
   /** Model used */
   model: string;
-  /** Credits consumed */
-  credits_used: number;
+  /** USD charged. Music is billed per minute of generated audio. */
+  cost_usd?: number;
+  /** @deprecated Not sent by the prepaid API. Use `cost_usd`. */
+  credits_used?: number;
   /** URL to the generated audio file */
   audio_url: string;
   /** Duration in seconds */
@@ -523,9 +546,15 @@ interface MusicResult {
 }
 ```
 
+Only two providers are accepted: `minimax` ($0.025/min) and `elevenlabs`
+($0.045/min).
+
 ## Chat Completions
 
-### Standard Chat (Credit-Based)
+### Standard Chat (OpenAI-compatible)
+
+Billed from the real token counts of the completion. Four ids are accepted:
+`gemini-flash`, `gemini-pro`, `gpt-4o`, `claude-sonnet`.
 
 ```typescript
 const chat = await client.chat({
@@ -536,7 +565,8 @@ const chat = await client.chat({
 });
 
 console.log(chat.choices[0].message.content);
-console.log(`Credits used: ${chat.credits_used}`);
+console.log(`Cost: $${chat.cost_usd}`);
+console.log(`Tokens: ${chat.usage.prompt_tokens} in / ${chat.usage.completion_tokens} out`);
 ```
 
 ### Premium Chat (Token-Based Billing)
@@ -576,7 +606,9 @@ interface ChatResult {
   id: string;
   /** Model used */
   model: string;
-  /** Credits consumed */
+  /** USD charged, derived from the real token counts below. */
+  cost_usd?: number;
+  /** @deprecated Not sent by the prepaid API. Use `cost_usd`. */
   credits_used?: number;
   /** Completion choices */
   choices: Array<{
@@ -592,8 +624,13 @@ interface ChatResult {
   };
   /** Billing information */
   billing?: {
-    credits_used: number;
-    credits_remaining?: number;
+    cost_usd: number;
+    balance_usd?: number | null;
+    currency?: 'USD';
+    /** `'tokens'` on chat — the charge came from the counts above. */
+    basis?: 'tokens' | 'flat_fallback';
+    /** Per-leg breakdown: input tokens and output tokens priced separately. */
+    legs?: Array<Record<string, unknown>>;
   };
 }
 ```
@@ -672,7 +709,7 @@ interface AgentFrame {
   text?: string;
   message?: string;
   usage?: { input_tokens: number; output_tokens: number; total_tokens: number };
-  billing?: { credits_used: number };
+  billing?: { cost_usd: number };
 }
 
 async function* agentFrames(messages: unknown[], model = 'claude-sonnet-4.6') {
@@ -903,7 +940,7 @@ export async function generateImage(prompt: string) {
 
   return {
     imageUrl: result.images[0],
-    creditsUsed: result.credits_used,
+    costUsd: result.cost_usd,
   };
 }
 ```
@@ -946,27 +983,34 @@ interface StabilityResult {
   image: string;        // base64-encoded output image (NOT a URL)
   tool: string;         // the tool_id that ran
   seed: number | null;  // seed used, when the model returns one
-  credits_used: number; // credits charged for the call
+  cost_usd: number;     // USD charged for the call
 }
 ```
 
-The 13 tool IDs, their credit cost, and which extra inputs they consume:
+The 13 tool IDs, their price, and which extra inputs they consume. Every price
+below is ✅ verified against Stability's published rate:
 
-| `tool_id`             | Credits | Mask     | Prompt   | Reference |
-| --------------------- | ------- | -------- | -------- | --------- |
-| `fast-upscale`        | 1       | —        | —        | —         |
-| `conservative-upscale`| 2       | —        | —        | —         |
-| `creative-upscale`    | 3       | —        | —        | —         |
-| `remove-background`   | 1       | —        | —        | —         |
-| `erase-object`        | 2       | required | —        | —         |
-| `inpaint`             | 3       | required | required | —         |
-| `outpaint`            | 3       | optional | required | —         |
-| `search-replace`      | 3       | —        | required | —         |
-| `search-recolor`      | 3       | —        | required | —         |
-| `style-transfer`      | 2       | —        | —        | required  |
-| `style-guide`         | 2       | —        | required | required  |
-| `control-sketch`      | 3       | —        | required | —         |
-| `control-structure`   | 3       | —        | required | —         |
+| `tool_id`             | USD    | Mask     | Prompt   | Reference |
+| --------------------- | -----: | -------- | -------- | --------- |
+| `fast-upscale`        | 0.03   | —        | —        | —         |
+| `outpaint`            | 0.06   | optional | required | —         |
+| `erase-object`        | 0.07   | required | —        | —         |
+| `inpaint`             | 0.07   | required | required | —         |
+| `remove-background`   | 0.07   | —        | —        | —         |
+| `search-replace`      | 0.07   | —        | required | —         |
+| `search-recolor`      | 0.07   | —        | required | —         |
+| `style-guide`         | 0.07   | —        | required | required  |
+| `control-sketch`      | 0.07   | —        | required | —         |
+| `control-structure`   | 0.07   | —        | required | —         |
+| `style-transfer`      | 0.08   | —        | —        | required  |
+| `conservative-upscale`| 0.40   | —        | —        | —         |
+| `creative-upscale`    | 0.60   | —        | —        | —         |
+
+::: warning The two heavy upscalers are 13-20x the fast one
+`conservative-upscale` at $0.40 and `creative-upscale` at $0.60 cost more than a
+5-second Veo 3.1 Lite video. Use `fast-upscale` at $0.03 unless you specifically
+need detail synthesis.
+:::
 
 ### List Available Tools
 
@@ -974,7 +1018,7 @@ The 13 tool IDs, their credit cost, and which extra inputs they consume:
 listStabilityTools(): Promise<StabilityTool[]>
 ```
 
-Returns all available Stability AI tools with their credit cost and input requirements (`GET /stability/tools`).
+Returns all available Stability AI tools with their USD price and input requirements (`GET /stability/tools`).
 
 ::: code-group
 ```typescript [TypeScript]
@@ -985,7 +1029,7 @@ const client = new FotoHub({ apiKey: process.env.SUPABASE_ACCESS_TOKEN! });
 
 const tools = await client.listStabilityTools();
 for (const tool of tools) {
-  console.log(`${tool.id}: ${tool.credits} credits (mask=${tool.requires_mask}, prompt=${tool.requires_prompt})`);
+  console.log(`$${tool.price_usd} per ${tool.unit} — ${tool.id} (mask=${tool.requires_mask}, prompt=${tool.requires_prompt})`);
 }
 ```
 
@@ -996,7 +1040,7 @@ from fotohub import FotoHub
 client = FotoHub(api_key=os.environ["SUPABASE_ACCESS_TOKEN"])
 
 for tool in client.stability_tools():
-    print(f"{tool['id']}: {tool['credits']} credits (mask={tool['requires_mask']})")
+    print(f"{tool['id']}: ${tool['price_usd']} per {tool['unit']} (mask={tool['requires_mask']})")
 ```
 
 ```go [Go]
@@ -1014,7 +1058,7 @@ func main() {
 
     tools, _ := client.ListStabilityTools()
     for _, tool := range tools {
-        fmt.Printf("%s: %d credits\n", tool.ID, tool.Credits)
+        fmt.Printf("%s: $%.2f\n", tool.ID, tool.PriceUSD)
     }
 }
 ```
@@ -1032,7 +1076,7 @@ curl https://apis.fotohub.app/stability/tools \
 stabilityUpscale(imageBase64: string, type?: 'fast' | 'creative' | 'conservative'): Promise<StabilityResult>
 ```
 
-Upscales an image to a higher resolution. `type` defaults to `'fast'` (1 credit); `'conservative'` costs 2 credits and `'creative'` costs 3. Each mode maps to the tool IDs `fast-upscale`, `conservative-upscale`, and `creative-upscale`.
+Upscales an image to a higher resolution. `type` defaults to `'fast'` ($0.03); `'conservative'` costs $0.40 and `'creative'` costs $0.60. Each mode maps to the tool IDs `fast-upscale`, `conservative-upscale`, and `creative-upscale`.
 
 The examples below show the base64 input/output pattern once — read a file, base64-encode it, send it, and decode the returned string. Later tools reuse the same `imageBase64` variable without repeating the file-reading boilerplate.
 
@@ -1050,7 +1094,7 @@ const result = await client.stabilityUpscale(imageBase64, 'creative');
 
 // Output is base64 too — decode it to save the file.
 writeFileSync('photo-upscaled.png', Buffer.from(result.image, 'base64'));
-console.log(`Credits used: ${result.credits_used}, seed: ${result.seed}`);
+console.log(`Cost: $${result.cost_usd}, seed: ${result.seed}`);
 ```
 
 ```python [Python]
@@ -1068,7 +1112,7 @@ result = client.stability_upscale(image_base64, type="creative")
 # Output is base64 too — decode it to save the file.
 with open("photo-upscaled.png", "wb") as f:
     f.write(base64.b64decode(result["image"]))
-print(f"Credits used: {result['credits_used']}")
+print(f"Cost: ${result['cost_usd']}")
 ```
 
 ```go [Go]
@@ -1093,7 +1137,7 @@ func main() {
     // Output is base64 too — decode it to save the file.
     out, _ := base64.StdEncoding.DecodeString(result.Image)
     os.WriteFile("photo-upscaled.png", out, 0644)
-    fmt.Printf("Credits used: %v\n", result.CreditsUsed)
+    fmt.Printf("Cost: $%.2f\n", result.CostUSD)
 }
 ```
 
@@ -1105,7 +1149,7 @@ curl -X POST https://apis.fotohub.app/stability/creative-upscale \
   -H "Authorization: Bearer <SUPABASE_JWT>" \
   -H "Content-Type: application/json" \
   -d "{\"image\": \"$IMAGE_B64\", \"output_format\": \"png\"}"
-# → { "image": "<base64>", "tool": "creative-upscale", "seed": null, "credits_used": 3 }
+# → { "image": "<base64>", "tool": "creative-upscale", "seed": null, "cost_usd": 0.6 }
 ```
 :::
 
@@ -1115,7 +1159,7 @@ curl -X POST https://apis.fotohub.app/stability/creative-upscale \
 stabilityRemoveBackground(imageBase64: string): Promise<StabilityResult>
 ```
 
-Removes the background from an image, returning a transparent PNG in `result.image` (base64). Costs 1 credit.
+Removes the background from an image, returning a transparent PNG in `result.image` (base64). Costs $0.07.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1152,7 +1196,7 @@ curl -X POST https://apis.fotohub.app/stability/remove-background \
 stabilityErase(imageBase64: string, maskBase64: string): Promise<StabilityResult>
 ```
 
-Runs the `erase-object` tool: erases the masked region from an image and fills it with context-aware content. The **mask is required** and is a base64 image where white marks the area to erase. Costs 2 credits.
+Runs the `erase-object` tool: erases the masked region from an image and fills it with context-aware content. The **mask is required** and is a base64 image where white marks the area to erase. Costs $0.07.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1198,7 +1242,7 @@ curl -X POST https://apis.fotohub.app/stability/erase-object \
 stabilityInpaint(imageBase64: string, maskBase64: string, prompt: string): Promise<StabilityResult>
 ```
 
-Fills a masked region with AI-generated content guided by a text prompt. Both the **mask and prompt are required**. Costs 3 credits.
+Fills a masked region with AI-generated content guided by a text prompt. Both the **mask and prompt are required**. Costs $0.07.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1243,7 +1287,7 @@ curl -X POST https://apis.fotohub.app/stability/inpaint \
 stabilityOutpaint(imageBase64: string, padding: { left?: number; right?: number; up?: number; down?: number }): Promise<StabilityResult>
 ```
 
-Extends an image beyond its borders in the specified directions (pixels to extend per side). A `prompt` is required by the model (pass one via `runStabilityTool` if you need to guide the fill); a `mask` is optional. Costs 3 credits.
+Extends an image beyond its borders in the specified directions (pixels to extend per side). A `prompt` is required by the model (pass one via `runStabilityTool` if you need to guide the fill); a `mask` is optional. Costs $0.06.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1288,7 +1332,7 @@ curl -X POST https://apis.fotohub.app/stability/outpaint \
 stabilitySearchReplace(imageBase64: string, searchPrompt: string, replacePrompt: string): Promise<StabilityResult>
 ```
 
-Finds objects matching `searchPrompt` in the image and replaces them with content described by `replacePrompt`. Under the hood the replacement text is sent as `prompt` and the target as `search_prompt`. Costs 3 credits.
+Finds objects matching `searchPrompt` in the image and replaces them with content described by `replacePrompt`. Under the hood the replacement text is sent as `prompt` and the target as `search_prompt`. Costs $0.07.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1331,7 +1375,7 @@ curl -X POST https://apis.fotohub.app/stability/search-replace \
 stabilityRecolor(imageBase64: string, searchPrompt: string, newColor: string): Promise<StabilityResult>
 ```
 
-Recolors a specific object in the image. `searchPrompt` selects the object to recolor and `newColor` describes the target color. This maps to the `search-recolor` tool (`search_prompt` = the object, `prompt` = the new color). Costs 3 credits.
+Recolors a specific object in the image. `searchPrompt` selects the object to recolor and `newColor` describes the target color. This maps to the `search-recolor` tool (`search_prompt` = the object, `prompt` = the new color). Costs $0.07.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1374,7 +1418,7 @@ curl -X POST https://apis.fotohub.app/stability/search-recolor \
 stabilityStyleTransfer(imageBase64: string, referenceBase64: string): Promise<StabilityResult>
 ```
 
-Applies the visual style of a reference image to the content of the source image. The **reference image is required** and is sent as the base64 `reference` field. Costs 2 credits.
+Applies the visual style of a reference image to the content of the source image. The **reference image is required** and is sent as the base64 `reference` field. Costs $0.08.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1615,7 +1659,7 @@ const result = await client.waitFor3D('job_abc123', {
 
 console.log(`3D Model URL: ${result.url}`);
 console.log(`Format: ${result.format}`);
-console.log(`Credits: ${result.billing.credits_used}`);
+console.log(`Cost: $${result.billing.cost_usd}`);
 ```
 
 ```python [Python]
@@ -1627,7 +1671,7 @@ result = client.wait_for_3d(
 )
 print(f"3D Model URL: {result.url}")
 print(f"Format: {result.format}")
-print(f"Credits: {result.billing.credits_used}")
+print(f"Cost: ${result.billing.cost_usd}")
 ```
 
 ```go [Go]
@@ -1639,7 +1683,7 @@ result, _ := client.WaitFor3D("job_abc123", fotohub.WaitOptions{
     },
 })
 fmt.Printf("3D Model URL: %s\n", result.URL)
-fmt.Printf("Credits: %d\n", result.Billing.CreditsUsed)
+fmt.Printf("Cost: $%.6f\n", result.Billing.CostUSD)
 ```
 
 ```bash [cURL]
@@ -1660,78 +1704,80 @@ done
 list3DModels(): Promise<Model[]>
 ```
 
-Returns all available 3D generation models with their capabilities, credit costs, and supported modes.
+Returns all available 3D generation models with their USD price and supported modes. `price_usd` comes from the same rate table the charge uses, so it cannot drift from what you are billed.
 
 ::: code-group
 ```typescript [TypeScript]
 const models = await client.list3DModels();
 for (const m of models) {
-  console.log(`${m.name} (${m.id}): ${m.credits} credits — ${m.speed}`);
-  console.log(`  Modes: ${m.modes.join(', ')}`);
+  console.log(`${m.name} (${m.id}): $${m.price_usd} per ${m.unit} — ${m.speed}`);
+  console.log(`  Mode: ${m.mode}`);
 }
 ```
 
 ```python [Python]
 models = client.list_3d_models()
 for m in models:
-    print(f"{m.name} ({m.id}): {m.credits} credits - {m.speed}")
-    print(f"  Modes: {', '.join(m.modes)}")
+    print(f"{m.name} ({m.id}): ${m.price_usd} per {m.unit} - {m.speed}")
+    print(f"  Mode: {m.mode}")
 ```
 
 ```go [Go]
 models, _ := client.List3DModels()
 for _, m := range models {
-    fmt.Printf("%s (%s): %d credits - %s\n", m.Name, m.ID, m.Credits, m.Speed)
-    fmt.Printf("  Modes: %v\n", m.Modes)
+    fmt.Printf("%s (%s): $%.6f per %s - %s\n", m.Name, m.ID, m.PriceUSD, m.Unit, m.Speed)
+    fmt.Printf("  Mode: %s\n", m.Mode)
 }
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/3d/models \
+curl -X GET https://apis.fotohub.app/v1/ai/generate/3d/models \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
 
 ### Available 3D Models
 
-| Model | Credits | Speed | Modes |
-|-------|---------|-------|-------|
-| `fh-lite-3d` | 3 | ~3s | image-to-3d |
-| `fh-text-3d` | 5 | ~25s | text-to-3d |
-| `fh-pro-3d` | 15 | ~60s | image-to-3d |
+| Model | USD | Speed | Mode |
+|-------|----:|-------|------|
+| `fh-lite-3d` | 0.160772 | ~3s | image-to-3d |
+| `fh-text-3d` | 0.267953 | ~25s | text-to-3d |
+| `fh-pro-3d` | 0.803859 | ~60s | image-to-3d |
 
 ## Billing
 
-Manage credits, wallet balance, pricing information, transactions, and top-up packages.
+Manage the prepaid USD wallet, pricing information, transactions, and top-up packages. The API is prepaid — there are no credits, and nothing here is denominated in them.
 
 ### Get Balance
 
 ```typescript
-getBalance(): Promise<Balance>
+getBalance(): Promise<BillingBalance>
 ```
 
-Returns your current credit balance and wallet balance in USD.
+Returns your prepaid wallet balance and this month's spend, both in USD. The
+`credits` field this used to return came from `user_usage_tracker`, the **web
+app's** subscription counter — it told API developers they had hundreds of
+credits available while their spendable API balance was $0. The API is prepaid
+and credits cannot pay for it. Read the tier separately with
+[`getCurrentTier()`](#get-current-tier).
 
 ::: code-group
 ```typescript [TypeScript]
 const balance = await client.getBalance();
-console.log(`Credits: ${balance.credits_available}`);
-console.log(`Wallet: $${balance.wallet.balance}`);
-console.log(`Plan: ${balance.plan}`);
+console.log(`Balance: $${balance.wallet.balance_usd}`);
+console.log(`Spent this month: $${balance.spend.this_month_usd}`);
 ```
 
 ```python [Python]
 balance = client.get_balance()
-print(f"Credits: {balance.credits_available}")
-print(f"Wallet: ${balance['wallet']['balance']}")
-print(f"Plan: {balance.plan}")
+print(f"Balance: ${balance['wallet']['balance_usd']}")
+print(f"Spent this month: ${balance['spend']['this_month_usd']}")
 ```
 
 ```go [Go]
 balance, _ := client.GetBalance()
-fmt.Printf("Credits: %d\n", balance.CreditsAvailable)
-fmt.Printf("Wallet: $%.2f\n", balance.Wallet.Balance)
-fmt.Printf("Plan: %s\n", balance.Plan)
+fmt.Printf("Balance: $%.6f\n", balance.Wallet.BalanceUSD)
+fmt.Printf("Spent this month: $%.6f\n", balance.Spend.ThisMonthUSD)
 ```
 
 ```bash [cURL]
@@ -1743,34 +1789,33 @@ curl -X GET https://apis.fotohub.app/v1/billing/balance \
 ### Get Pricing
 
 ```typescript
-getPricing(category?: string): Promise<PricingInfo>
+getPricing(): Promise<PricingCatalog>
 ```
 
-Returns pricing for all models, optionally filtered by category (`image`, `video`, `audio`, `chat`, `3d`).
+Returns the full USD pricing catalog — the same rate table `bill_operation`
+charges from. Prefer `GET /v1/pricing` (the [Model Pricing](/api/models) page)
+for anything you display or budget against; this endpoint's `pricing` object is
+converted from a legacy PLN catalog at the live NBP rate and can drift against
+the actual charge.
 
 ::: code-group
 ```typescript [TypeScript]
-const pricing = await client.getPricing('image');
-for (const model of pricing.models) {
-  console.log(`${model.id}: ${model.credits_per_generation} credits`);
-}
+const pricing = await client.getPricing();
+console.log(pricing.margin_info);
 ```
 
 ```python [Python]
-pricing = client.get_pricing(category="image")
-for model in pricing.models:
-    print(f"{model.id}: {model.credits_per_generation} credits")
+pricing = client.get_pricing()
+print(pricing["margin_info"])
 ```
 
 ```go [Go]
-pricing, _ := client.GetPricing("image")
-for _, model := range pricing.Models {
-    fmt.Printf("%s: %d credits\n", model.ID, model.CreditsPerGeneration)
-}
+pricing, _ := client.GetPricing()
+fmt.Println(pricing.MarginInfo)
 ```
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/billing/pricing?category=image" \
+curl -X GET https://apis.fotohub.app/v1/billing/pricing \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
@@ -1778,31 +1823,33 @@ curl -X GET "https://apis.fotohub.app/v1/billing/pricing?category=image" \
 ### Get Plans
 
 ```typescript
-getPlans(): Promise<Plan[]>
+getPlans(): Promise<ApiPlan[]>
 ```
 
-Returns all available API subscription plans with their features. API subscription
-plans are still priced in PLN (`price_pln`); only the pay-as-you-go wallet and
-per-request billing moved to USD.
+Returns all available API subscription plans with their features. A plan buys
+rate limits and model access — it does **not** fund API calls. Every call is
+charged to the prepaid USD wallet, so a subscriber on a plan with a monthly
+credit grant and a $0 balance still gets HTTP 402. Plans keep their PLN
+monthly price (`price_pln`); only wallet spending is USD.
 
 ::: code-group
 ```typescript [TypeScript]
 const plans = await client.getPlans();
 for (const plan of plans) {
-  console.log(`${plan.name}: ${plan.price_pln} PLN/mo — ${plan.credits_monthly} credits`);
+  console.log(`${plan.name}: ${plan.rate_limit_rpm} req/min`);
 }
 ```
 
 ```python [Python]
 plans = client.get_plans()
 for plan in plans:
-    print(f"{plan['name']}: {plan['price_pln']} PLN/mo - {plan['credits_monthly']} credits")
+    print(f"{plan['name']}: {plan['rate_limit_rpm']} req/min")
 ```
 
 ```go [Go]
 plans, _ := client.GetPlans()
 for _, plan := range plans {
-    fmt.Printf("%s: %.0f PLN/mo - %d credits\n", plan.Name, plan.PricePLN, plan.CreditsMonthly)
+    fmt.Printf("%s: %d req/min\n", plan.Name, plan.RateLimitRPM)
 }
 ```
 
@@ -1812,37 +1859,36 @@ curl -X GET https://apis.fotohub.app/v1/billing/plans \
 ```
 :::
 
-### Get Credits
+### Get Credits (deprecated)
 
 ```typescript
-getCredits(): Promise<CreditInfo>
+getCredits(): Promise<CreditsInfo>
 ```
 
-Returns detailed credit information including monthly allocation, used, remaining, and reset date.
+::: warning The API has no credits
+This endpoint is deprecated. It now answers with your wallet and a message
+explaining that the API is prepaid in USD — `total`/`used`/`remaining`/`resets_at`
+are **not** in the response. It was kept as a 200 rather than turned into a 404
+so an integration already polling it gets a self-explanatory answer instead of
+one it has to guess about. Use [`getBalance()`](#get-balance).
+:::
 
 ::: code-group
 ```typescript [TypeScript]
-const credits = await client.getCredits();
-console.log(`Monthly: ${credits.monthly_allocation}`);
-console.log(`Used: ${credits.used}`);
-console.log(`Remaining: ${credits.remaining}`);
-console.log(`Resets: ${credits.reset_date}`);
+const info = await client.getCredits();
+console.log(info.message);               // why this endpoint has no credits
+console.log(`Balance: $${info.wallet.balance_usd}`);
 ```
 
 ```python [Python]
-credits = client.get_credits()
-print(f"Monthly: {credits.monthly_allocation}")
-print(f"Used: {credits.used}")
-print(f"Remaining: {credits.remaining}")
-print(f"Resets: {credits.reset_date}")
+info = client.get_credits()
+print(info["message"])
+print(f"Balance: ${info['wallet']['balance_usd']}")
 ```
 
 ```go [Go]
-credits, _ := client.GetCredits()
-fmt.Printf("Monthly: %d\n", credits.MonthlyAllocation)
-fmt.Printf("Used: %d\n", credits.Used)
-fmt.Printf("Remaining: %d\n", credits.Remaining)
-fmt.Printf("Resets: %s\n", credits.ResetDate)
+info, _ := client.GetCredits()
+fmt.Println(info.Message)
 ```
 
 ```bash [cURL]
@@ -1896,57 +1942,66 @@ curl -X PUT https://apis.fotohub.app/v1/billing/overage-limit \
 getTopupPackages(): Promise<TopupPackage[]>
 ```
 
-Returns available credit top-up packages with pricing in USD.
+Returns available wallet top-up packages. Each package credits its face value
+in USD to the prepaid wallet — there is no bonus and no credit unit involved.
 
 ::: code-group
 ```typescript [TypeScript]
 const packages = await client.getTopupPackages();
 for (const pkg of packages) {
-  console.log(`${pkg.slug}: $${pkg.amount_usd} (+${pkg.bonus_credits} bonus credits)`);
+  console.log(`${pkg.slug}: $${pkg.amount_usd} credited to the wallet`);
 }
 ```
 
 ```python [Python]
 packages = client.get_topup_packages()
 for pkg in packages:
-    print(f"{pkg['slug']}: ${pkg['amount_usd']} (+{pkg['bonus_credits']} bonus credits)")
+    print(f"{pkg['slug']}: ${pkg['amount_usd']} credited to the wallet")
 ```
 
 ```go [Go]
 packages, _ := client.GetTopupPackages()
 for _, pkg := range packages {
-    fmt.Printf("%s: $%.0f (+%d bonus credits)\n", pkg.Slug, pkg.AmountUSD, pkg.BonusCredits)
+    fmt.Printf("%s: $%.0f credited to the wallet\n", pkg.Slug, pkg.AmountUSD)
 }
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/billing/topup-packages \
+curl -X GET https://apis.fotohub.app/v1/billing/topup/packages \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
 
+Available slugs: `topup-50` ($15), `topup-100` ($25), `topup-250` ($60),
+`topup-500` ($120), `topup-1000` ($225), `topup-5000` ($1000). The names look
+mismatched against the slugs on purpose — these are new price points the owner
+approved directly, and the slugs stayed the same so nothing keying off
+`"topup-50"` breaks.
+
 ### Create Top-Up
 
 ```typescript
-createTopup(packageSlug: string): Promise<{ checkout_url: string }>
+createTopup(packageSlug: string): Promise<TopupResult>
 ```
 
-Initiates a credit top-up purchase. Returns a Stripe checkout URL to complete payment.
+Buys a wallet top-up package. Returns a checkout URL for payment; payment
+credits `amount_usd` to the prepaid wallet, the only thing that pays for API
+calls.
 
 ::: code-group
 ```typescript [TypeScript]
-const { checkout_url } = await client.createTopup('credits-500');
+const { checkout_url } = await client.createTopup('topup-500');
 console.log(`Complete purchase: ${checkout_url}`);
 // Redirect user to checkout_url
 ```
 
 ```python [Python]
-result = client.create_topup("credits-500")
-print(f"Complete purchase: {result.checkout_url}")
+result = client.create_topup("topup-500")
+print(f"Complete purchase: {result['checkout_url']}")
 ```
 
 ```go [Go]
-result, _ := client.CreateTopup("credits-500")
+result, _ := client.CreateTopup("topup-500")
 fmt.Printf("Complete purchase: %s\n", result.CheckoutURL)
 ```
 
@@ -1954,41 +2009,47 @@ fmt.Printf("Complete purchase: %s\n", result.CheckoutURL)
 curl -X POST https://apis.fotohub.app/v1/billing/topup \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"package_slug": "credits-500"}'
+  -d '{"package": "topup-500"}'
 ```
 :::
 
 ### Get Transactions
 
 ```typescript
-getTransactions(page?: number, limit?: number): Promise<Transaction[]>
+getTransactions(options?: { page?: number; pageSize?: number; type?: string }): Promise<TransactionPage>
 ```
 
-Returns paginated transaction history (credits spent, top-ups, refunds).
+Returns one page of the wallet ledger — charges, refunds, top-ups. Rows arrive
+under `data`, and there is no total count: page until a page comes back
+shorter than `pageSize`. Amounts are signed (negative is a charge); `amount_usd`
+is `null` on rows from before the 2026-08-05 USD cutover, which carry
+`amount_pln` instead.
 
 ::: code-group
 ```typescript [TypeScript]
-const transactions = await client.getTransactions(1, 25);
-for (const tx of transactions) {
-  console.log(`${tx.created_at} | ${tx.type} | ${tx.amount} ${tx.currency} | ${tx.description}`);
+const page = await client.getTransactions({ page: 1, pageSize: 25 });
+for (const tx of page.data) {
+  const amount = tx.amount_usd != null ? `$${tx.amount_usd.toFixed(6)}` : `${tx.amount_pln ?? 0} PLN (pre-USD)`;
+  console.log(`${tx.created_at} | ${tx.type} | ${amount} | ${tx.description}`);
 }
 ```
 
 ```python [Python]
-transactions = client.get_transactions(page=1, limit=25)
-for tx in transactions:
-    print(f"{tx.created_at} | {tx.type} | {tx.amount} {tx.currency} | {tx.description}")
+page = client.get_transactions(page=1, page_size=25)
+for tx in page["data"]:
+    amount = f"${tx['amount_usd']:.6f}" if tx.get("amount_usd") is not None else f"{tx.get('amount_pln') or 0} PLN (pre-USD)"
+    print(f"{tx['created_at']} | {tx['type']} | {amount} | {tx['description']}")
 ```
 
 ```go [Go]
-transactions, _ := client.GetTransactions(1, 25)
-for _, tx := range transactions {
-    fmt.Printf("%s | %s | %.2f %s | %s\n", tx.CreatedAt, tx.Type, tx.Amount, tx.Currency, tx.Description)
+page, _ := client.GetTransactions(fotohub.TransactionOptions{Page: 1, PageSize: 25})
+for _, tx := range page.Data {
+    fmt.Printf("%s | %s | $%.6f | %s\n", tx.CreatedAt, tx.Type, tx.AmountUSD, tx.Description)
 }
 ```
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/billing/transactions?page=1&limit=25" \
+curl -X GET "https://apis.fotohub.app/v1/billing/transactions?page=1&pageSize=25" \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
@@ -1996,34 +2057,42 @@ curl -X GET "https://apis.fotohub.app/v1/billing/transactions?page=1&limit=25" \
 ### Estimate Cost
 
 ```typescript
-estimateCost(operation: string, params: Record<string, any>): Promise<CostEstimate>
+estimateCost(operations: CostOperation[]): Promise<CostEstimate>
 ```
 
-Estimates the cost of an operation before executing it. Does not consume credits.
+Prices a batch of operations in USD before running them, every figure at the
+provider's own rate — nothing here touches FX. Because the account is prepaid,
+the estimate is only half an answer: it comes back with the wallet balance and
+a server-computed `sufficient` flag, so you never compare two numbers you may
+have parsed as `0`. An operation with no published rate comes back
+`priced: false` in `breakdown`, with a `reason`, and is excluded from
+`total_usd` rather than silently counted as free — check the top-level `priced`
+flag before trusting the total.
 
 ::: code-group
 ```typescript [TypeScript]
-const estimate = await client.estimateCost('image_generation', {
-  model: 'seedream-5-0-260128',
-  num_images: 4,
-});
-console.log(`Estimated: ${estimate.total_credits} credits ($${estimate.total_usd})`);
+const estimate = await client.estimateCost([
+  { type: "generate_image", model: "seedream-5-0-260128", count: 4 },
+  { type: "generate_video", model: "seedance-2-0-mini", duration: 10 },
+]);
+console.log(`$${estimate.total_usd} vs $${estimate.balance_usd} — ok: ${estimate.sufficient}`);
+if (!estimate.priced) console.warn("Estimate is partial", estimate.breakdown);
 ```
 
 ```python [Python]
-estimate = client.estimate_cost("image_generation", {
-    "model": "seedream-5-0-260128",
-    "num_images": 4,
-})
-print(f"Estimated: {estimate['total_credits']} credits (${estimate['total_usd']})")
+estimate = client.estimate_cost([
+    {"type": "generate_image", "model": "seedream-5-0-260128", "count": 4},
+    {"type": "generate_video", "model": "seedance-2-0-mini", "duration": 10},
+])
+print(f"${estimate['total_usd']} vs ${estimate['balance_usd']} - ok: {estimate['sufficient']}")
 ```
 
 ```go [Go]
-estimate, _ := client.EstimateCost("image_generation", map[string]any{
-    "model":      "seedream-5-0-260128",
-    "num_images": 4,
+estimate, _ := client.EstimateCost([]fotohub.CostOperation{
+    {Type: "generate_image", Model: "seedream-5-0-260128", Count: 4},
+    {Type: "generate_video", Model: "seedance-2-0-mini", Duration: 10},
 })
-fmt.Printf("Estimated: %d credits ($%.2f)\n", estimate.TotalCredits, estimate.TotalUSD)
+fmt.Printf("$%.6f vs $%.6f - ok: %v\n", estimate.TotalUSD, estimate.BalanceUSD, estimate.Sufficient)
 ```
 
 ```bash [cURL]
@@ -2031,8 +2100,10 @@ curl -X POST https://apis.fotohub.app/v1/billing/estimate \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "operation": "image_generation",
-    "params": {"model": "seedream-5-0-260128", "num_images": 4}
+    "operations": [
+      {"type": "generate_image", "model": "seedream-5-0-260128", "count": 4},
+      {"type": "generate_video", "model": "seedance-2-0-mini", "duration": 10}
+    ]
   }'
 ```
 :::
@@ -2090,29 +2161,24 @@ not to `price_monthly`.
 ::: code-group
 ```typescript [TypeScript]
 const catalog = await client.getTierCatalog();
-for (const tier of catalog.tiers) {
-  console.log(`${tier.name}: ${tier.rpm} rpm, ${tier.credits_monthly} credits/mo`);
-  if (tier.price_monthly > 0) {
-    console.log(`  Price: ${tier.price_monthly} PLN/mo`);
-  }
+for (const tier of [...catalog.payg, ...catalog.subscriptions]) {
+  console.log(
+    `${tier.name}: ${tier.limits.rpm} rpm, ` +
+    `${tier.price_monthly} ${tier.price_currency}/mo`
+  );
 }
 ```
 
 ```python [Python]
 catalog = client.get_tier_catalog()
-for tier in catalog.tiers:
-    print(f"{tier.name}: {tier.rpm} rpm, {tier.credits_monthly} credits/mo")
-    if tier.price_monthly > 0:
-        print(f"  Price: {tier.price_monthly} PLN/mo")
+for tier in [*catalog["payg"], *catalog["subscriptions"]]:
+    print(f"{tier['name']}: {tier['limits']['rpm']} rpm, {tier['price_monthly']} {tier['price_currency']}/mo")
 ```
 
 ```go [Go]
 catalog, _ := client.GetTierCatalog()
-for _, tier := range catalog.Tiers {
-    fmt.Printf("%s: %d rpm, %d credits/mo\n", tier.Name, tier.RPM, tier.CreditsMonthly)
-    if tier.PriceMonthly > 0 {
-        fmt.Printf("  Price: %.0f PLN/mo\n", tier.PriceMonthly)
-    }
+for _, tier := range append(catalog.Payg, catalog.Subscriptions...) {
+    fmt.Printf("%s: %d rpm, %.0f %s/mo\n", tier.Name, tier.Limits.RPM, tier.PriceMonthly, tier.PriceCurrency)
 }
 ```
 
@@ -2122,34 +2188,45 @@ curl -X GET https://apis.fotohub.app/v1/tiers/catalog \
 ```
 :::
 
+::: tip payg vs. subscriptions
+The response has no flat `tiers` array — pay-as-you-go tiers (auto-resolved
+from your wallet balance) and paid subscriptions arrive as two separate
+arrays, `payg` and `subscriptions`. Each entry's `price_currency` says whether
+its own `price_monthly` is USD or PLN; do not assume the payload's top-level
+`currency` (always `"USD"`, the wallet currency) applies to every row.
+:::
+
 ### Get Current Tier
 
 ```typescript
-getCurrentTier(): Promise<CurrentTier>
+getCurrentTier(): Promise<TierInfo>
 ```
 
-Returns your current tier with usage stats and limits.
+Returns your current tier, rate limits, and usage. The tier caps how *fast*
+you may spend — rpm, burst, concurrency, model access. What actually *pays*
+for calls is `wallet.balance_usd`; at `0` every billed endpoint returns 402
+regardless of tier.
 
 ::: code-group
 ```typescript [TypeScript]
 const tier = await client.getCurrentTier();
-console.log(`Tier: ${tier.name} (${tier.type})`);
-console.log(`Rate limit: ${tier.limits.rpm} rpm`);
-console.log(`Credits used: ${tier.usage.credits_used}/${tier.limits.credits_monthly}`);
+console.log(`Tier: ${tier.name} (${tier.limits.rpm} rpm)`);
+console.log(`Today: ${tier.usage.requests_today} / ${tier.limits.daily_quota}`);
+console.log(`Balance: $${tier.wallet.balance_usd}`);
 ```
 
 ```python [Python]
 tier = client.get_current_tier()
-print(f"Tier: {tier.name} ({tier.type})")
-print(f"Rate limit: {tier.limits.rpm} rpm")
-print(f"Credits used: {tier.usage.credits_used}/{tier.limits.credits_monthly}")
+print(f"Tier: {tier['name']} ({tier['limits']['rpm']} rpm)")
+print(f"Today: {tier['usage']['requests_today']} / {tier['limits']['daily_quota']}")
+print(f"Balance: ${tier['wallet']['balance_usd']}")
 ```
 
 ```go [Go]
 tier, _ := client.GetCurrentTier()
-fmt.Printf("Tier: %s (%s)\n", tier.Name, tier.Type)
-fmt.Printf("Rate limit: %d rpm\n", tier.Limits.RPM)
-fmt.Printf("Credits used: %d/%d\n", tier.Usage.CreditsUsed, tier.Limits.CreditsMonthly)
+fmt.Printf("Tier: %s (%d rpm)\n", tier.Name, tier.Limits.RPM)
+fmt.Printf("Today: %d / %d\n", tier.Usage.RequestsToday, tier.Limits.DailyQuota)
+fmt.Printf("Balance: $%.6f\n", tier.Wallet.BalanceUSD)
 ```
 
 ```bash [cURL]
@@ -2164,36 +2241,35 @@ curl -X GET https://apis.fotohub.app/v1/tiers/current \
 compareTiers(): Promise<TierComparison>
 ```
 
-Returns a side-by-side comparison of all tiers with feature matrix and pricing.
+Returns every tier flattened into one comparison list. It does not mark which
+tier is yours — get that from [`getCurrentTier()`](#get-current-tier).
+`price_monthly` is in `comparison.currency` (`"PLN"`); only wallet spending is
+USD.
 
 ::: code-group
 ```typescript [TypeScript]
-const comparison = await client.compareTiers();
-for (const row of comparison.features) {
-  const values = comparison.tiers.map(t => row.values[t.slug] ? 'Y' : '-').join(' | ');
-  console.log(`${row.name}: ${values}`);
+const [{ tier: mine }, comparison] = await Promise.all([
+  client.getCurrentTier(),
+  client.compareTiers(),
+]);
+for (const row of comparison.tiers) {
+  const marker = row.slug === mine ? ' ← current' : '';
+  console.log(`${row.name}: ${row.rpm} rpm${marker}`);
 }
 ```
 
 ```python [Python]
+tier = client.get_current_tier()
 comparison = client.compare_tiers()
-for row in comparison.features:
-    values = " | ".join("Y" if row.values.get(t.slug) else "-" for t in comparison.tiers)
-    print(f"{row.name}: {values}")
+for row in comparison["tiers"]:
+    marker = " <- current" if row["slug"] == tier["tier"] else ""
+    print(f"{row['name']}: {row['rpm']} rpm{marker}")
 ```
 
 ```go [Go]
 comparison, _ := client.CompareTiers()
-for _, row := range comparison.Features {
-    fmt.Printf("%s: ", row.Name)
-    for _, t := range comparison.Tiers {
-        if row.Values[t.Slug] {
-            fmt.Print("Y | ")
-        } else {
-            fmt.Print("- | ")
-        }
-    }
-    fmt.Println()
+for _, row := range comparison.Tiers {
+    fmt.Printf("%s: %d rpm\n", row.Name, row.RPM)
 }
 ```
 
@@ -2278,11 +2354,10 @@ topupWallet(
   checkout_url: string;
   amount_usd: number;
   pay_currency: string;
-  bonus_credits: number;
 }>
 ```
 
-Initiates a wallet top-up for the given amount in USD (minimum $10, maximum $15,000). Returns a Stripe checkout URL. Polish customers can add `pay_currency: 'pln'` to pay by BLIK/card/bank transfer in PLN while the wallet is still credited the USD amount.
+Initiates a wallet top-up for the given amount in USD (minimum $10, maximum $15,000). Returns a Stripe checkout URL. Polish customers can add `pay_currency: 'pln'` to pay by BLIK/card/bank transfer in PLN while the wallet is still credited the USD amount. There is no bonus and nothing here is denominated in credits — the response's `bonus_credits` field, if present, is a deprecated leftover that is always `null`.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -2725,53 +2800,53 @@ curl -X POST https://apis.fotohub.app/v1/gabriel/suggest \
 ### Get Recommendations
 
 ```typescript
-gabrielRecommend(opts?: { history?: string[]; budget_credits?: number; category?: string }): Promise<Recommendation[]>
+gabrielRecommend(options?: GabrielRecommendOptions): Promise<GabrielRecommendation[]>
 ```
 
-Returns personalized model and workflow recommendations based on your usage history and preferences.
+Returns proactive, context-aware recommendations based on user state. No
+authentication required; template-based (<100ms response).
+
+::: warning `credits_remaining` is a hint, not your API balance
+It describes *your end user's* fotohub.app subscription credits — pass it
+only if you are building on top of the web app. It never funds an API call.
+Read [`getBalance()`](#get-balance) for the prepaid USD wallet that actually
+pays for generations.
+:::
 
 ::: code-group
 ```typescript [TypeScript]
-const recommendations = await client.gabrielRecommend({
-  history: ['product photos', 'background removal', 'upscaling'],
-  budget_credits: 50,
-  category: 'image',
+const recs = await client.gabrielRecommend({
+  page: '/generate/new',
+  has_brand: false,
 });
 
-for (const rec of recommendations) {
-  console.log(`${rec.model}: ${rec.reason} (${rec.estimated_credits} credits)`);
+for (const rec of recs) {
+  console.log(`${rec.text} → ${rec.target}`);
 }
 ```
 
 ```python [Python]
-recommendations = client.gabriel_recommend(
-    history=["product photos", "background removal", "upscaling"],
-    budget_credits=50,
-    category="image"
-)
-for rec in recommendations:
-    print(f"{rec.model}: {rec.reason} ({rec.estimated_credits} credits)")
+recs = client.gabriel_recommend(page="/generate/new", has_brand=False)
+for rec in recs:
+    print(f"{rec['text']} -> {rec['target']}")
 ```
 
 ```go [Go]
-recommendations, _ := client.GabrielRecommend(fotohub.RecommendOptions{
-    History:       []string{"product photos", "background removal", "upscaling"},
-    BudgetCredits: 50,
-    Category:      "image",
+recs, _ := client.GabrielRecommend(fotohub.GabrielRecommendOptions{
+    Page:     "/generate/new",
+    HasBrand: false,
 })
-for _, rec := range recommendations {
-    fmt.Printf("%s: %s (%d credits)\n", rec.Model, rec.Reason, rec.EstimatedCredits)
+for _, rec := range recs {
+    fmt.Printf("%s -> %s\n", rec.Text, rec.Target)
 }
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/gabriel/recommend \
-  -H "Authorization: Bearer fh_live_your_api_key" \
+curl -X POST https://apis.fotohub.app/v1/ai/gabriel/recommend \
   -H "Content-Type: application/json" \
   -d '{
-    "history": ["product photos", "background removal", "upscaling"],
-    "budget_credits": 50,
-    "category": "image"
+    "page": "/generate/new",
+    "has_brand": false
   }'
 ```
 :::
@@ -2784,7 +2859,9 @@ curl -X POST https://apis.fotohub.app/v1/gabriel/recommend \
 listModels(category?: string): Promise<Model[]>
 ```
 
-Returns all available AI models, optionally filtered by category (`image`, `video`, `audio`, `chat`, `3d`).
+Returns all available AI models, optionally filtered by category (`image`, `video`, `text`, `audio`).
+Multiply by the duration when `price_unit` is `"second"` — every video model
+quotes per second, even though `pricing_type` says `"request"`.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -2793,9 +2870,9 @@ const allModels = await client.listModels();
 console.log(`Total models: ${allModels.length}`);
 
 // Filter by category
-const imageModels = await client.listModels('image');
-for (const m of imageModels) {
-  console.log(`${m.id}: ${m.name} — ${m.credits} credits (${m.status})`);
+const videoModels = await client.listModels('video');
+for (const m of videoModels) {
+  console.log(`${m.name} (${m.id}): $${m.request_price} per ${m.request_price_per}`);
 }
 ```
 
@@ -2805,9 +2882,9 @@ all_models = client.list_models()
 print(f"Total models: {len(all_models)}")
 
 # Filter by category
-image_models = client.list_models(category="image")
-for m in image_models:
-    print(f"{m.id}: {m.name} - {m.credits} credits ({m.status})")
+video_models = client.list_models(category="video")
+for m in video_models:
+    print(f"{m.name} ({m.id}): ${m.request_price} per {m.request_price_per}")
 ```
 
 ```go [Go]
@@ -2816,9 +2893,9 @@ allModels, _ := client.ListModels("")
 fmt.Printf("Total models: %d\n", len(allModels))
 
 // Filter by category
-imageModels, _ := client.ListModels("image")
-for _, m := range imageModels {
-    fmt.Printf("%s: %s - %d credits (%s)\n", m.ID, m.Name, m.Credits, m.Status)
+videoModels, _ := client.ListModels("video")
+for _, m := range videoModels {
+    fmt.Printf("%s (%s): $%.6f per %s\n", m.Name, m.ID, m.RequestPrice, m.RequestPricePer)
 }
 ```
 
@@ -2841,16 +2918,28 @@ interface Model {
   id: string;
   /** Human-readable display name */
   name: string;
-  /** Category: image, video, audio, chat, 3d */
+  /** Category: image, video, text, audio */
   category: string;
-  /** Credit cost per generation */
-  credits: number;
-  /** Current availability status */
-  status: 'active' | 'beta' | 'deprecated';
-  /** Supported features and parameters */
-  capabilities: string[];
-  /** Provider (for informational purposes) */
+  /** Provider name */
   provider: string;
+  /** Whether the model is currently offered */
+  is_active: boolean;
+  /**
+   * Price of ONE unit of this model, in USD. The unit is `price_unit` — on a
+   * video model this is per SECOND, so a 5s clip costs 5x this figure. `null`
+   * on token-priced models.
+   */
+  request_price: number | null;
+  /** What one unit of `request_price` buys: "request" | "second" | "minute" | "1k_characters" | "1k_tokens" */
+  price_unit: string;
+  /** The same thing as `price_unit`, spelled out for humans */
+  request_price_per: string;
+  /** Always "USD" */
+  currency: string;
+  /** USD per 1000 input tokens, on token-priced models */
+  input_price_per_1k_tokens?: number | null;
+  /** USD per 1000 output tokens, on token-priced models */
+  output_price_per_1k_tokens?: number | null;
 }
 ```
 
@@ -2863,12 +2952,21 @@ The SDK provides a typed error hierarchy for precise error handling across all m
 ```typescript
 import {
   FotoHubError,
-  InsufficientCreditsError,
+  InsufficientFundsError,
   RateLimitError,
   AuthenticationError,
   ValidationError,
 } from 'fotohub/errors';
 ```
+
+::: warning `InsufficientCreditsError` is a deprecated alias
+The API is prepaid in USD and has no credits. `InsufficientCreditsError` is
+exported as the exact same class as `InsufficientFundsError` (so an existing
+`instanceof InsufficientCreditsError` check still catches it), but the thrown
+error's `code` is now `insufficient_funds`, not `insufficient_credits` — code
+that compares the string needs updating. The alias is removed in the next
+major version.
+:::
 
 ### Comprehensive Error Handling
 
@@ -2877,7 +2975,7 @@ import {
 import { FotoHub } from 'fotohub';
 import {
   FotoHubError,
-  InsufficientCreditsError,
+  InsufficientFundsError,
   RateLimitError,
   AuthenticationError,
   ValidationError,
@@ -2895,20 +2993,19 @@ try {
   if (e instanceof AuthenticationError) {
     // Invalid or expired API key (401)
     console.error('Invalid API key. Check your credentials.');
-  } else if (e instanceof InsufficientCreditsError) {
-    // Not enough credits or wallet balance (402)
-    console.error(`Need: ${e.required} credits, Have: ${e.available}`);
-    console.error('Top up at fotohub.app/console');
+  } else if (e instanceof InsufficientFundsError) {
+    // Prepaid wallet is short (402) — nothing was charged
+    console.error(`Need $${e.requiredUsd}, balance $${e.balanceUsd}`);
+    console.error(`Top up $${e.shortfallUsd} at ${e.topupUrl}`);
   } else if (e instanceof RateLimitError) {
     // Too many requests (429) — SDK retries automatically, but may still throw
     console.error(`Rate limited. Retry after ${e.retryAfter}s`);
   } else if (e instanceof ValidationError) {
-    // Invalid request parameters (400)
-    console.error(`Invalid param "${e.param}": ${e.message}`);
+    // Invalid request parameters (422)
+    console.error(`Validation failed: ${JSON.stringify(e.fieldErrors)}`);
   } else if (e instanceof FotoHubError) {
     // Other API errors (4xx/5xx)
-    console.error(`[${e.status}] ${e.code}: ${e.message}`);
-    console.error(`Request ID: ${e.requestId}`);
+    console.error(`[${e.statusCode}] ${e.code}: ${e.message}`);
   } else {
     // Network errors, timeouts, etc.
     throw e;
@@ -2921,7 +3018,7 @@ from fotohub import FotoHub
 from fotohub.exceptions import (
     FotoHubError,
     AuthenticationError,
-    InsufficientCreditsError,
+    InsufficientFundsError,
     RateLimitError,
     ValidationError,
 )
@@ -2936,14 +3033,16 @@ try:
     print(f"Image: {result.images[0]}")
 except AuthenticationError:
     print("Invalid API key. Check your credentials.")
-except InsufficientCreditsError as e:
-    print(f"Need: {e.required} credits, Have: {e.available}")
+except InsufficientFundsError as e:
+    # Prepaid wallet is short. NOTHING was charged.
+    print(f"Need ${e.required_usd}, balance ${e.balance_usd}")
+    print(f"Top up ${e.shortfall_usd} at {e.topup_url}")
 except RateLimitError as e:
     print(f"Rate limited. Retry after {e.retry_after}s")
 except ValidationError as e:
-    print(f"Invalid param '{e.param}': {e.message}")
+    print(f"Validation failed: {e.field_errors}")
 except FotoHubError as e:
-    print(f"[{e.status}] {e.code}: {e.message}")
+    print(f"[{e.status_code}] {e.code}: {e.message}")
 ```
 
 ```go [Go]
@@ -2964,7 +3063,7 @@ func main() {
     })
     if err != nil {
         var authErr *fotohub.AuthenticationError
-        var creditsErr *fotohub.InsufficientCreditsError
+        var fundsErr *fotohub.InsufficientFundsError
         var rateErr *fotohub.RateLimitError
         var valErr *fotohub.ValidationError
         var apiErr *fotohub.FotoHubError
@@ -2972,14 +3071,14 @@ func main() {
         switch {
         case errors.As(err, &authErr):
             fmt.Println("Invalid API key.")
-        case errors.As(err, &creditsErr):
-            fmt.Printf("Need: %d, Have: %d\n", creditsErr.Required, creditsErr.Available)
+        case errors.As(err, &fundsErr):
+            fmt.Printf("Need $%.2f, balance $%.2f\n", fundsErr.RequiredUsd, fundsErr.BalanceUsd)
         case errors.As(err, &rateErr):
             fmt.Printf("Rate limited. Retry after %ds\n", rateErr.RetryAfter)
         case errors.As(err, &valErr):
-            fmt.Printf("Invalid param '%s': %s\n", valErr.Param, valErr.Message)
+            fmt.Printf("Validation failed: %v\n", valErr.FieldErrors)
         case errors.As(err, &apiErr):
-            fmt.Printf("[%d] %s: %s\n", apiErr.Status, apiErr.Code, apiErr.Message)
+            fmt.Printf("[%d] %s: %s\n", apiErr.StatusCode, apiErr.Code, apiErr.Message)
         default:
             fmt.Printf("Network error: %v\n", err)
         }
@@ -2991,10 +3090,10 @@ func main() {
 
 ```bash [cURL]
 # Errors return JSON with code and message:
-# 401: {"error": {"code": "authentication_failed", "message": "Invalid API key"}}
-# 402: {"error": {"code": "insufficient_credits", "message": "...", "required": 5, "available": 2}}
+# 401: {"error": {"code": "authentication_error", "message": "Invalid API key"}}
+# 402: {"detail": {"error": "insufficient_funds", "code": "insufficient_funds", "required_usd": 0.05, "balance_usd": 0.0, "shortfall_usd": 0.05, "charged": false, "topup_url": "..."}}
 # 429: {"error": {"code": "rate_limit_exceeded", "message": "...", "retry_after": 30}}
-# 400: {"error": {"code": "validation_error", "message": "...", "param": "model"}}
+# 422: {"error": {"code": "validation_error", "message": "...", "fieldErrors": {"model": ["required"]}}}
 
 curl -X POST https://apis.fotohub.app/v1/image/generate \
   -H "Authorization: Bearer fh_live_your_api_key" \
@@ -3010,35 +3109,42 @@ curl -X POST https://apis.fotohub.app/v1/image/generate \
 
 ```typescript
 class FotoHubError extends Error {
-  /** HTTP status code */
-  status: number;
   /** Machine-readable error code */
   code: string;
-  /** Human-readable error message */
-  message: string;
-  /** Request ID for support inquiries */
-  requestId?: string;
+  /** HTTP status code */
+  statusCode: number | undefined;
+  /** Additional error context */
+  details: Record<string, unknown> | undefined;
 }
 
 class AuthenticationError extends FotoHubError {
-  // status is always 401
+  // statusCode is always 401
 }
 
-class InsufficientCreditsError extends FotoHubError {
-  /** Credits required for the operation */
-  required: number;
-  /** Credits currently available */
-  available: number;
+class InsufficientFundsError extends FotoHubError {
+  // statusCode is always 402, code is "insufficient_funds"
+  /** USD price of the refused request */
+  requiredUsd: number | undefined;
+  /** USD wallet balance at the time of the refusal */
+  balanceUsd: number | undefined;
+  /** The minimum top-up that would let this request through */
+  shortfallUsd: number | undefined;
+  /** Where to add funds */
+  topupUrl: string | undefined;
+  /** The operation that was refused, e.g. `generate_image:seedream-5-0-pro` */
+  operation: string | undefined;
+  /** Nothing was charged for a refused request. Always `false`. */
+  get charged(): boolean;
 }
 
 class RateLimitError extends FotoHubError {
   /** Seconds to wait before retrying */
-  retryAfter: number;
+  retryAfter: number | undefined;
 }
 
 class ValidationError extends FotoHubError {
-  /** The parameter that failed validation */
-  param: string;
+  /** Field-level validation errors */
+  fieldErrors: Record<string, string[]> | undefined;
 }
 ```
 
@@ -3046,22 +3152,20 @@ class ValidationError extends FotoHubError {
 
 | Code | HTTP Status | Description |
 |------|-------------|-------------|
-| `authentication_failed` | 401 | Invalid or missing API key |
-| `insufficient_credits` | 402 | Not enough credits or wallet balance |
+| `authentication_error` | 401 | Invalid or missing API key |
+| `insufficient_funds` | 402 | Prepaid wallet balance too low — nothing charged |
 | `rate_limit_exceeded` | 429 | Too many requests, retry after delay |
-| `validation_error` | 400 | Invalid request parameters |
-| `model_not_found` | 404 | Requested model does not exist |
-| `model_unavailable` | 503 | Model temporarily unavailable |
-| `content_filtered` | 451 | Content blocked by safety filters |
-| `internal_error` | 500 | Server-side error |
+| `validation_error` | 422 | Invalid request parameters |
+| `not_found` | 404 | Requested resource does not exist |
+| `server_error` | 500 | Server-side error |
 
 ## Balance and Usage
 
 ```typescript
 // Check account balance
 const balance = await client.getBalance();
-console.log(`Credits: ${balance.credits_available}`);
-console.log(`Wallet: $${balance.wallet.balance}`);
+console.log(`Balance: $${balance.wallet.balance_usd}`);
+console.log(`Spent this month: $${balance.spend.this_month_usd}`);
 
 // Get usage statistics
 const usage = await client.getUsage({ period: '30d' });
@@ -3115,7 +3219,7 @@ FOTOhub-specific endpoints, not this one.
 | `generateSfx(options)` | Generate sound effects | `Promise<SfxResult>` |
 | `generateSpeech(options)` | Text-to-speech synthesis | `Promise<SpeechResult>` |
 | `transcribe(options)` | Transcribe audio to text | `Promise<TranscriptionResult>` |
-| `chat(options)` | Chat completion (credit-based) | `Promise<ChatResult>` |
+| `chat(options)` | Standard chat completion (token-billed) | `Promise<ChatResult>` |
 | `chatClaude(options)` | Premium chat completion (token-based) | `Promise<ChatResult>` |
 | `chatStream(options)` | ⚠️ Broken — targets the non-streaming endpoint and yields zero chunks while still billing. Use `fetch` on `/v1/ai/agent/stream`. | `Promise<ChatStream>` |
 | `analyzeImage(options)` | Analyze an image with vision models | `Promise<AnalysisResult>` |
@@ -3132,7 +3236,7 @@ FOTOhub-specific endpoints, not this one.
 | `getBalance()` | Get account balance | `Promise<BillingBalance>` |
 | `getPricing(category?)` | Get model pricing | `Promise<PricingCatalog>` |
 | `getPlans()` | Get subscription plans | `Promise<ApiPlan[]>` |
-| `getCredits()` | Get credit details | `Promise<CreditsInfo>` |
+| `getCredits()` | @deprecated — returns the wallet with a deprecation message | `Promise<CreditsInfo>` |
 | `setOverageLimit(hardLimitUsd, projectId?)` | Set spending limit | `Promise<OverageResult>` |
 | `getTopupPackages()` | Get top-up packages | `Promise<TopupPackage[]>` |
 | `createTopup(packageSlug)` | Create top-up checkout | `Promise<TopupResult>` |
@@ -3176,7 +3280,7 @@ The SDK automatically retries failed requests for transient errors:
 Retries do NOT apply to:
 - 400 (validation errors)
 - 401 (authentication errors)
-- 402 (insufficient credits)
+- 402 (insufficient funds)
 - 404 (not found)
 
 ```typescript

@@ -38,8 +38,7 @@ result = client.generate_image(
 )
 
 print(f"Image URL: {result['images'][0]}")
-print(f"Cost: ${result['billing']['usd_charged']}")
-print(f"Credits used: {result['billing']['credits_used']}")
+print(f"Cost: ${result['cost_usd']}")
 ```
 
 ## Client Initialization
@@ -121,10 +120,11 @@ result = client.generate_image(
 for i, url in enumerate(result['images']):
     print(f"Image {i+1}: {url}")
 
-# Billing details
-print(f"Method: {result['billing']['method']}")
-print(f"Credits used: {result['billing']['credits_used']}")
-print(f"Cost: ${result['billing']['usd_charged']}")
+# Billing details -- the API is prepaid in USD, so this is what left your wallet
+print(f"Cost: ${result['cost_usd']}")
+print(f"Currency: {result['currency']}")          # always "USD"
+print(f"Method: {result['billing']['method']}")   # "wallet"
+print(f"Balance left: ${result['billing']['balance_usd']}")
 ```
 
 ### Parameters Reference
@@ -156,7 +156,7 @@ result = client.generate_video(
 )
 
 print(f"Video URL: {result['video_url']}")
-print(f"Credits used: {result['billing']['credits_used']}")
+print(f"Cost: ${result['cost_usd']}")
 ```
 
 ### With Image Input (Image-to-Video)
@@ -190,8 +190,9 @@ still queued.
 
 `seedance-2-5` (the default) is the only model that produces a **30-second clip in
 one request**, and the only one that accepts a source video for editing or
-extension. Native audio is **included in its price** — 14.5 credits/s at 720p, 6.4
-at 480p, the same with `generate_audio` on or off.
+extension. Native audio is **included in its price** — $0.0107 per 1000 output
+tokens whether `generate_audio` is on or off, which works out to about $1.17 for a
+5-second 720p clip and $6.99 for a 30-second one.
 
 ```python
 video = client.generate_seedance(
@@ -206,7 +207,7 @@ video = client.generate_seedance(
 )
 
 print(video["video_url"])
-print(video["credits_used"])   # 435
+print(video["cost_usd"])       # e.g. 6.991380
 ```
 
 ::: warning 720p ceiling
@@ -231,8 +232,9 @@ edited = client.generate_seedance(
 print(edited["task_type"])          # "editing"
 ```
 
-A source video raises the rate to 17.6 credits/s at 720p, because its frames bill
-as input. Image and audio references do not change the rate.
+A source video raises the cost, because its frames bill as input tokens on top of
+the output. Image and audio references do not change the rate. Price the exact call
+with `client.estimate_cost(...)` before you run it if the difference matters.
 
 ### Face consistency
 
@@ -277,7 +279,7 @@ video = client.generate_seedance(
 
 Raises `fotohub.TimeoutError` if the job outlives `timeout` (it may still finish
 — the job id is in the message) and `FotoHubError` if the render fails, in which
-case credits are refunded server-side.
+case the wallet is refunded server-side and the response says so explicitly.
 
 ::: warning `fotohub.TimeoutError` shadows the builtin
 It is a `FotoHubError` subclass, **not** Python's built-in `TimeoutError`. If you
@@ -302,7 +304,7 @@ result = client.generate_music(
 
 print(f"Audio URL: {result['audio_url']}")
 print(f"Duration: {result['duration']}s")
-print(f"Credits used: {result['credits_used']}")
+print(f"Cost: ${result['cost_usd']}")   # per minute of audio -- 60s on minimax is $0.025
 ```
 
 ### Sound Effects
@@ -330,9 +332,10 @@ print(f"Speech URL: {result['audio_url']}")
 
 ## Chat Completions
 
-### Credit-Based Chat
+### OpenAI-compatible chat
 
-Uses FOTOhub credits for billing. Supports all chat models.
+Billed from the real token counts of the completion. Four model ids are accepted:
+`gemini-flash`, `gemini-pro`, `gpt-4o` and `claude-sonnet`.
 
 ```python
 response = client.chat(
@@ -346,12 +349,14 @@ response = client.chat(
 )
 
 print(response['choices'][0]['message']['content'])
-print(f"Credits used: {response['billing']['credits_used']}")
+print(f"Cost: ${response['cost_usd']}")
+print(f"Tokens: {response['usage']['prompt_tokens']} in / {response['usage']['completion_tokens']} out")
 ```
 
-### Token-Based Chat (Premium)
+### Premium chat
 
-Direct token-based billing on premium models, ideal for high-volume usage:
+The same per-token billing over a wider model list — Claude Sonnet 4.6 / 4.5 / 4,
+Claude Haiku 4.5, and Amazon Nova Pro / Lite / Micro / Premier / 2 Lite:
 
 ```python
 response = client.chat_claude(
@@ -440,7 +445,7 @@ result = client.generate_3d(
 )
 
 print(f"3D Model: {result['url']}")
-print(f"Credits: {result['billing']['credits_used']}")
+print(f"Cost: ${result['cost_usd']}")   # fh-lite-3d is $0.160772 per request
 ```
 
 ### Text to 3D
@@ -464,7 +469,7 @@ print(f"Download: {completed['url']}")
 ```python
 models = client.list_3d_models()
 for m in models:
-    print(f"{m['name']} ({m['id']}): {m['credits']} credits — {m['speed']}")
+    print(f"{m['name']} ({m['id']}): ${m['price_usd']} per {m['unit']} — {m['speed']}")
 ```
 
 ### Async 3D Generation
@@ -488,17 +493,28 @@ Manage API tiers, check usage, and handle wallet operations.
 
 ```python
 tier = client.get_current_tier()
-print(f"Tier: {tier['name']} ({tier['type']})")
+print(f"Tier: {tier['name']} ({tier['category']})")
 print(f"Rate limit: {tier['limits']['rpm']} rpm")
-print(f"Credits used: {tier['usage']['credits_used']}")
+print(f"Requests today: {tier['usage']['requests_today']}")
+print(f"Wallet: ${tier['wallet']['balance_usd']}")
 ```
+
+A tier sets throughput only. It does not include generations — every call is paid
+for from the wallet balance, on every tier.
 
 ### Browse Available Tiers
 
 ```python
 catalog = client.get_tier_catalog()
-for tier in catalog["tiers"]:
-    print(f"{tier['name']}: {tier['rpm']} rpm, {tier['credits_monthly']} credits/mo")
+
+for tier in catalog["payg"]:
+    print(f"{tier['name']}: {tier['limits']['rpm']} rpm, no monthly fee")
+
+for tier in catalog["subscriptions"]:
+    # Read price_currency per entry: PAYG thresholds are USD, subscription
+    # prices are still quoted in PLN.
+    print(f"{tier['name']}: {tier['limits']['rpm']} rpm, "
+          f"{tier['price_monthly']} {tier['price_currency']}/mo")
 ```
 
 ### Subscribe to a Tier
@@ -546,7 +562,7 @@ from fotohub import FotoHub
 from fotohub.exceptions import (
     FotoHubError,
     AuthError,
-    InsufficientCreditsError,
+    InsufficientFundsError,
     RateLimitError,
     ValidationError,
     ServerError,
@@ -560,10 +576,10 @@ try:
         prompt="A beautiful landscape",
         model="seedream-5-0-260128"
     )
-except InsufficientCreditsError as e:
-    # Not enough credits or wallet balance
-    print(f"Need: {e.required} credits, Have: {e.available}")
-    print("Top up at https://fotohub.app/console/billing")
+except InsufficientFundsError as e:
+    # Prepaid wallet is short. NOTHING was charged and no provider was called.
+    print(f"Need ${e.required_usd}, balance ${e.balance_usd}")
+    print(f"Top up ${e.shortfall_usd} at {e.topup_url}")
 except RateLimitError as e:
     # Too many requests
     print(f"Rate limited. Retry after {e.retry_after} seconds")
@@ -591,7 +607,7 @@ except FotoHubError as e:
 ```
 FotoHubError (base)
 ├── AuthError                (401)
-├── InsufficientCreditsError (402)
+├── InsufficientFundsError   (402)
 ├── ValidationError          (400, 422)
 ├── RateLimitError           (429)
 ├── ServerError              (500, 502, 503)
@@ -763,9 +779,9 @@ async def fotohub_webhook(request: Request):
 # Get current balance and usage
 balance = client.get_balance()
 
-print(f"Credits available: {balance['credits_available']}")
-print(f"Wallet balance: ${balance['wallet']['balance']}")
-print(f"Plan: {balance['plan']}")
+print(f"Wallet balance: ${balance['wallet']['balance_usd']}")
+print(f"Spent this month: ${balance['spend']['this_month_usd']}")
+print(f"Billing model: {balance['billing_model']}")   # "prepaid_wallet_usd"
 
 # Get usage statistics
 usage = client.get_usage(period="30d")
@@ -779,21 +795,28 @@ print(f"Chat messages: {usage['breakdown']['chat']}")
 ### Check Before Generating
 
 ```python
-from fotohub.exceptions import InsufficientCreditsError
+from fotohub.exceptions import InsufficientFundsError
 
-balance = client.get_balance()
-
-if balance['credits_available'] < 10:
-    print("Low credits - top up recommended")
+# Cheap and exact: ask the server whether the wallet covers the work.
+quote = client.estimate_cost([
+    {"type": "image", "model": "seedream-5-0-260128", "count": 4},
+])
+if not quote["sufficient"]:
+    print(f"Need ${quote['total_usd']}, balance ${quote['balance_usd']}")
 
 try:
     result = client.generate_image(
         prompt="A landscape painting",
         model="seedream-5-0-260128"
     )
-except InsufficientCreditsError as e:
-    print(f"Insufficient credits: need {e.required}, have {e.available}")
+except InsufficientFundsError as e:
+    # Nothing was charged and no provider ran.
+    print(f"Short by ${e.shortfall_usd} — top up at {e.topup_url}")
 ```
+
+Read `sufficient` from the estimate rather than comparing two numbers yourself:
+it is the server's own answer, and it accounts for operations that have no
+published rate (`priced: false`).
 
 ## Image Analysis
 
@@ -849,11 +872,12 @@ result = client.generate_image(
 | `generate_sfx()` | `POST /v1/ai/generate/sfx` | Generate sound effects |
 | `generate_speech()` | `POST /v1/ai/generate/speech` | Text-to-speech synthesis |
 | `transcribe()` | `POST /v1/ai/transcribe` | Audio/video transcription |
-| `chat()` | `POST /v1/ai/chat/completions` | Chat completion (credit-based) |
-| `chat_claude()` | `POST /v1/ai/chat/claude` | Premium chat completion (token-based) |
+| `chat()` | `POST /v1/ai/chat/completions` | Chat completion (OpenAI-compatible, token-billed) |
+| `chat_claude()` | `POST /v1/ai/chat/claude` | Premium chat completion (token-billed) |
 | `analyze_image()` | `POST /v1/ai/analyze/image` | Image analysis with vision models |
 | `enhance_prompt()` | `POST /v1/ai/enhance-prompt` | Improve prompts with AI |
-| `get_balance()` | `GET /v1/billing/balance` | Check credit and wallet balance |
+| `get_balance()` | `GET /v1/billing/balance` | Check the prepaid USD wallet balance |
+| `estimate_cost()` | `POST /v1/billing/estimate` | Price a set of operations before running them |
 | `get_pricing()` | `GET /v1/billing/pricing` | Get pricing catalog |
 
 ## Complete Example
@@ -863,18 +887,21 @@ A full example combining multiple features:
 ```python
 import os
 from fotohub import FotoHub
-from fotohub.exceptions import FotoHubError, InsufficientCreditsError
+from fotohub.exceptions import FotoHubError, InsufficientFundsError
 
 def main():
     # Initialize client from environment
     client = FotoHub()
 
-    # Check balance first
+    # Check the wallet first -- the API is prepaid, so $0 means nothing runs
     balance = client.get_balance()
-    print(f"Credits: {balance['credits_available']}")
+    print(f"Balance: ${balance['wallet']['balance_usd']}")
 
-    if balance['credits_available'] < 5:
-        print("Low credits. Please top up.")
+    quote = client.estimate_cost([
+        {"type": "image", "model": "seedream-5-0-260128", "count": 2},
+    ])
+    if not quote["sufficient"]:
+        print(f"Need ${quote['total_usd']}. Top up first.")
         return
 
     # Enhance a simple prompt
@@ -896,10 +923,10 @@ def main():
         for i, url in enumerate(result['images']):
             print(f"Image {i+1}: {url}")
 
-        print(f"Total cost: ${result['billing']['usd_charged']}")
+        print(f"Total cost: ${result['cost_usd']}")
 
-    except InsufficientCreditsError as e:
-        print(f"Not enough credits: need {e.required}, have {e.available}")
+    except InsufficientFundsError as e:
+        print(f"Short by ${e.shortfall_usd} — top up at {e.topup_url}")
     except FotoHubError as e:
         print(f"Error [{e.status}]: {e.message}")
 
@@ -925,8 +952,11 @@ Professional image editing tools powered by Stability AI, available through the 
 ```python
 tools = client.stability_tools()
 for tool in tools:
-    print(f"{tool['id']}: {tool['name']} - {tool['credits']} credits")
+    print(f"{tool['id']}: ${tool['price_usd']} per {tool['unit']}")
 ```
+
+Prices run from $0.03 (`fast-upscale`) to $0.60 (`creative-upscale`), so read
+`price_usd` before picking a tool.
 
 ### Upscale Image
 
@@ -1073,14 +1103,14 @@ while True:
 ```python
 models = client.list_3d_models()
 for m in models:
-    print(f"{m['id']}: {m['name']} ({m['credits']} credits, ~{m['avg_time']}s)")
+    print(f"{m['id']}: {m['name']} (${m['price_usd']} per {m['unit']}, ~{m['avg_time']}s)")
 ```
 
-| Model | Mode | Credits | Speed | Quality |
-|-------|------|---------|-------|---------|
-| `fh-lite-3d` | image-to-3d | 3 | ~3s | Good |
-| `fh-text-3d` | text-to-3d | 5 | ~25s | Good |
-| `fh-pro-3d` | image-to-3d | 15 | ~60s | High |
+| Model | Mode | Price (USD) | Speed | Quality |
+|-------|------|------------:|-------|---------|
+| `fh-lite-3d` | image-to-3d | 0.160772 | ~3s | Good |
+| `fh-text-3d` | text-to-3d | 0.267953 | ~25s | Good |
+| `fh-pro-3d` | image-to-3d | 0.803859 | ~60s | High |
 
 ## Gabriel AI (Intelligent Routing)
 
@@ -1096,12 +1126,19 @@ result = client.gabriel_classify(
     enhance_prompt=True
 )
 
-print(f"Category: {result['category']}")           # "image_generation"
-print(f"Model selected: {result['model']}")         # "seedream-5-0-260128"
-print(f"Estimated credits: {result['credits']}")    # 2
-print(f"Enhanced prompt: {result['enhanced_prompt']}")
+print(f"Action: {result['action']}")                 # "route"
+print(f"Target: {result['target']}")                 # "image_generation"
+print(f"Model selected: {result['model_selected']}") # "seedream-5-0-260128"
 print(f"Tips: {result['tips']}")
 ```
+
+::: warning `credits_estimated` is not a price
+The response still carries a `credits_estimated` integer. It is a legacy
+consumer-web weight, it is stale, and **it is not what your wallet is charged** —
+the API has no credits. Price the routed call with `estimate_cost()` or
+`GET /v1/pricing` instead. The field stays on the wire only until the next major
+SDK version.
+:::
 
 ### Streaming Classification
 
@@ -1137,7 +1174,6 @@ for s in suggestions:
 ```python
 recs = client.gabriel_recommend(
     page="dashboard",
-    credits_remaining=150,
     has_brand=True,
     recent_actions=["image_generation", "chat"]
 )
@@ -1146,33 +1182,49 @@ for r in recs:
     print(f"{r['title']}: {r['description']} [{r['action']}]")
 ```
 
-## Billing & Credits
+## Billing & Wallet
+
+The API is prepaid in USD. Every call is debited from the wallet balance; there is
+no credit line, no monthly allowance and no invoice at the end of the month.
 
 ### Get Balance
 
 ```python
 balance = client.get_balance()
-print(f"Credits: {balance['credits_available']}")
-print(f"Wallet: ${balance['wallet']['balance']}")
-print(f"Tier: {balance['tier']}")
+print(f"Balance: ${balance['wallet']['balance_usd']}")
+print(f"Pending: ${balance['wallet']['pending_usd']}")
+print(f"This month: ${balance['spend']['this_month_usd']}")
+print(f"Billing model: {balance['billing_model']}")   # "prepaid_wallet_usd"
 ```
 
 ### Get Full Pricing Catalog
 
 ```python
-pricing = client.get_pricing(category="image_generation")
+pricing = client.get_pricing()
 for model_id, info in pricing['models'].items():
-    print(f"{model_id}: {info['credits']} credits (${info['price']})")
+    print(f"{model_id}: ${info['price_usd']} per {info['unit']}")
 ```
+
+`GET /v1/pricing` is the table the wallet actually debits, and it also reports
+`provider_cost_usd` and a `verified` flag per model so you can see the provider
+rate behind the price.
 
 ### Estimate Cost Before Generation
 
 ```python
-estimate = client.estimate_cost(
-    operation="image_generation",
-    params={"model": "imagen-4-ultra", "count": 4}
-)
-print(f"Estimated: {estimate['credits']} credits (${estimate['total_usd']})")
+estimate = client.estimate_cost([
+    {"type": "image", "model": "imagen-4-ultra", "count": 4},
+    {"type": "video", "model": "veo-3.1-generate-001", "duration": 5},
+])
+
+print(f"Total: ${estimate['total_usd']}")
+print(f"Balance: ${estimate['balance_usd']}")
+print(f"Enough? {estimate['sufficient']}")
+
+for leg in estimate['breakdown']:
+    # `priced: false` means we hold no published rate for that operation, and
+    # `total_usd` then covers only the priced legs.
+    print(leg['model'], leg['amount_usd'], leg['priced'])
 ```
 
 ### Set Spending Cap
@@ -1189,18 +1241,22 @@ client.set_overage_limit(hard_limit_usd=10.0, project_id="YOUR_PROJECT_ID")
 client.set_overage_limit(hard_limit_usd=0)
 ```
 
-### Top-Up Credits
+### Top Up the Wallet
 
 ```python
 # List packages
 packages = client.get_topup_packages()
 for pkg in packages:
-    print(f"${pkg['amount_usd']} → {pkg['bonus_credits']} bonus credits (+{pkg['bonus_pct']}%)")
+    print(f"{pkg['slug']}: ${pkg['amount_usd']}")
 
-# Purchase
+# Purchase — the full amount lands in the wallet as spendable USD
 result = client.create_topup("topup-500")
 print(f"Checkout: {result['checkout_url']}")
 ```
+
+Packages run $15 / $25 / $60 / $120 / $225 / $1000. A top-up credits the wallet
+with exactly the dollars you paid — there is no bonus-credit conversion and
+nothing expires.
 
 ### Transaction History
 
@@ -1293,7 +1349,11 @@ client = FotoHub(base_url="https://apis.fotohub.app", timeout=120.0, max_retries
 | `flux-2-max` | FLUX 2 Max (highest quality) |
 | `flux-kontext-pro` | FLUX Kontext Pro (image editing) |
 | `gpt-image-1` | OpenAI GPT Image 1 |
-| `dall-e-3-standard` | OpenAI DALL-E 3 |
+| `gpt-image-2-mini` | OpenAI GPT Image 2 Mini ($0.005 at 1K — cheapest invoiced image) |
+| `ida-q-image` | FOTOhub IDA Q 1.0 (self-hosted, $0.00) |
+
+`dall-e-3` and `dall-e-3-hd` are retired and return `400` before authentication —
+use `gpt-image-1` and `gpt-image-1.5` instead.
 
 ### Video Models
 
@@ -1314,23 +1374,31 @@ client = FotoHub(base_url="https://apis.fotohub.app", timeout=120.0, max_retries
 
 ### Chat Models
 
-Credit-based, via `/v1/ai/chat/completions`:
+Every chat model is billed from the real token counts of the completion — there is
+no flat per-request chat price.
 
-| Model ID | Billing | Description |
-|----------|---------|-------------|
-| `gemini-flash` | Credits | Google Gemini Flash (fast) |
-| `gemini-pro` | Credits | Google Gemini Pro |
-| `gpt-4o` | Credits | OpenAI GPT-4o |
-| `claude-sonnet` | Token | Anthropic Claude Sonnet |
+`chat()` → `/v1/ai/chat/completions` accepts exactly four ids:
 
-Token-based premium, via `/v1/ai/chat/claude` (dot-notation IDs):
+| Model ID | $/1M in | $/1M out | Description |
+|----------|--------:|---------:|-------------|
+| `gemini-flash` | 0.30 | 2.50 | Google Gemini Flash (fast, cheapest here) |
+| `gemini-pro` | 1.25 | 10.00 | Google Gemini Pro |
+| `gpt-4o` | 3.00 | 15.00 | OpenAI (routes to GPT-5.1) |
+| `claude-sonnet` | 3.00 | 15.00 | Anthropic Claude Sonnet 4.6 |
 
-| Model ID | Billing | Description |
-|----------|---------|-------------|
-| `claude-sonnet-4.6` | Token | Claude Sonnet 4.6 (default) |
-| `claude-haiku-4.5` | Token | Claude Haiku 4.5 (fastest) |
-| `nova-pro` | Token | Amazon Nova Pro |
-| `nova-lite` | Token | Amazon Nova Lite |
+`chat_claude()` → `/v1/ai/chat/claude` accepts nine (dot-notation IDs):
+
+| Model ID | $/1M in | $/1M out | Description |
+|----------|--------:|---------:|-------------|
+| `nova-micro` | 0.035 | 0.14 | Amazon Nova Micro (cheapest LLM on the platform) |
+| `nova-2-lite` | 0.04 | 0.16 | Amazon Nova 2 Lite |
+| `nova-lite` | 0.06 | 0.24 | Amazon Nova Lite |
+| `claude-haiku-4.5` | 0.80 | 4.00 | Claude Haiku 4.5 (fastest Claude) |
+| `nova-pro` | 0.80 | 3.20 | Amazon Nova Pro |
+| `nova-premier` | 2.50 | 10.00 | Amazon Nova Premier |
+| `claude-sonnet-4` | 3.00 | 15.00 | Claude Sonnet 4 |
+| `claude-sonnet-4.5` | 3.00 | 15.00 | Claude Sonnet 4.5 |
+| `claude-sonnet-4.6` | 3.00 | 15.00 | Claude Sonnet 4.6 (default) |
 
 ::: tip Model Updates
 Available models are updated frequently. Call `GET /v1/models` (or see the [Models](/api/models) page) for the current list and pricing.
