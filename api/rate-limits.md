@@ -8,35 +8,61 @@ The official SDKs (Python and TypeScript) handle rate limiting automatically wit
 
 ## Tier Limits
 
-Your rate limit is determined by your tier. Limits are measured in requests per minute (rpm) and apply across all endpoints for your API key.
+Your tier sets how *fast* you may call. It does not include an allowance and it does
+not change prices: every account pays the same USD rate for the same model, out of its
+own prepaid wallet. A tier with a 5 000 rpm limit and a $0.00 balance generates
+nothing — see [Billing](/api/billing).
+
+::: warning Only `requests_per_minute` is enforced
+The tier objects returned by `GET /v1/tiers/current` also carry `daily_quota`,
+`burst_4h`, `concurrent_jobs` and `max_upload_mb`. **Those four are reported, not
+enforced** — no code path refuses a request on any of them today, and
+`daily_quota`/`burst_4h` are counted off web-app counters that stay at `0` on an
+API-only account. Plan against `rpm` and treat the rest as indicative.
+:::
 
 ### Pay-As-You-Go Tiers
 
-| Tier | Requirements | Requests / Minute | Daily Quota |
-|------|-------------|-------------------|-------------|
-| PAYG Basic | Fund wallet | 30 | 200 |
-| PAYG Standard | $25 wallet balance or $50 lifetime spend | 120 | 2,000 |
-| PAYG Premium | $120 wallet balance or $500 lifetime spend | 500 | 10,000 |
+These activate automatically off your wallet, with no subscription:
+
+| Tier | Slug | Unlocks at | Requests / Minute |
+|------|------|-----------|------------------:|
+| PAYG Basic | `payg-basic` | default | 30 |
+| PAYG Standard | `payg-standard` | $25 wallet balance or $50 lifetime spend | 120 |
+| PAYG Premium | `payg-premium` | $120 wallet balance or $500 lifetime spend | 500 |
+
+Either condition promotes you: a balance you are *holding*, or money you have already
+*spent*. Dropping back below the balance threshold demotes you again unless lifetime
+spend keeps you there.
 
 ### Subscription Tiers
 
 ::: info Wallet thresholds are USD, subscription prices are PLN
-PAYG tiers unlock on your **USD** wallet balance and lifetime spend. API
-subscription plans below are still billed in PLN — that part of the catalog was
-not converted.
+PAYG tiers unlock on your **USD** wallet balance and lifetime spend. The API
+subscription plans below are still billed in PLN, because they are a Polish-entity
+subscription — but **everything you generate is still billed in USD from the wallet**.
+A plan buys throughput, not usage.
 :::
 
-| Tier | Price | Requests / Minute | Daily Quota | Monthly Credits |
-|------|-------|-------------------|-------------|-----------------|
-| Free | 0 PLN/mo | 10 | 100 | 50 |
-| Developer | 49 PLN/mo | 60 | 500 | 500 |
-| Startup | 199 PLN/mo | 300 | 5,000 | 5,000 |
-| Business | 799 PLN/mo | 1,000 | 50,000 | 25,000 |
-| Enterprise | Custom | 5,000 | Unlimited | Unlimited |
+| Tier | Slug | Price | Requests / Minute |
+|------|------|-------|------------------:|
+| Developer | `sub-developer` | 49 PLN/mo | 60 |
+| Startup | `sub-startup` | 199 PLN/mo | 300 |
+| Business | `sub-business` | 799 PLN/mo | 1,000 |
+| Enterprise | `sub-enterprise` | Custom | 5,000 |
+
+There is no "Free" tier: an account with no subscription and an empty wallet is
+`payg-basic` at 30 rpm. The slugs are what `X-Tier` and the `tier` field return —
+`sub-developer`, not `developer`.
+
+Note that a `sub-developer` plan is **60 rpm, half of what `payg-standard` gives you
+for free** at a $25 balance. Check the numbers before subscribing for throughput.
 
 ### Your Current Tier
 
-Check your current tier and limits:
+Check your current tier and limits. The limits are nested under `limits`, and the
+balance that actually pays for calls is under `wallet` — read both, because they fail
+for different reasons: a `429` means slow down, a `402` means top up.
 
 ::: code-group
 
@@ -45,11 +71,10 @@ from fotohub import FotoHub
 
 client = FotoHub(api_key="fh_live_your_api_key")
 
-tier = client.tiers.current()
-print(f"Tier: {tier.name}")
-print(f"Rate limit: {tier.requests_per_minute} rpm")
-print(f"Daily quota: {tier.daily_quota}")
-print(f"Credits remaining: {tier.credits_remaining}")
+tier = client.get_current_tier()
+print(f"Tier: {tier['name']} ({tier['tier']})")
+print(f"Rate limit: {tier['limits']['rpm']} rpm")
+print(f"Balance: ${tier['wallet']['balance_usd']}")
 ```
 
 ```typescript [TypeScript]
@@ -57,11 +82,10 @@ import { FotoHub } from "fotohub";
 
 const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
 
-const tier = await client.tiers.current();
-console.log(`Tier: ${tier.name}`);
-console.log(`Rate limit: ${tier.requestsPerMinute} rpm`);
-console.log(`Daily quota: ${tier.dailyQuota}`);
-console.log(`Credits remaining: ${tier.creditsRemaining}`);
+const tier = await client.getCurrentTier();
+console.log(`Tier: ${tier.name} (${tier.tier})`);
+console.log(`Rate limit: ${tier.limits.rpm} rpm`);
+console.log(`Balance: $${tier.wallet.balance_usd}`);
 ```
 
 ```go [Go]
@@ -74,10 +98,14 @@ import (
 )
 
 type TierInfo struct {
-	Name              string `json:"name"`
-	RequestsPerMinute int    `json:"requests_per_minute"`
-	DailyQuota        int    `json:"daily_quota"`
-	CreditsRemaining  int    `json:"credits_remaining"`
+	Tier   string `json:"tier"`
+	Name   string `json:"name"`
+	Limits struct {
+		RPM int `json:"rpm"`
+	} `json:"limits"`
+	Wallet struct {
+		BalanceUSD float64 `json:"balance_usd"`
+	} `json:"wallet"`
 }
 
 func main() {
@@ -92,9 +120,9 @@ func main() {
 
 	var tier TierInfo
 	json.NewDecoder(resp.Body).Decode(&tier)
-	fmt.Printf("Tier: %s\n", tier.Name)
-	fmt.Printf("Rate limit: %d rpm\n", tier.RequestsPerMinute)
-	fmt.Printf("Daily quota: %d\n", tier.DailyQuota)
+	fmt.Printf("Tier: %s (%s)\n", tier.Name, tier.Tier)
+	fmt.Printf("Rate limit: %d rpm\n", tier.Limits.RPM)
+	fmt.Printf("Balance: $%.2f\n", tier.Wallet.BalanceUSD)
 }
 ```
 
@@ -107,17 +135,51 @@ curl https://apis.fotohub.app/v1/tiers/current \
 
 The `X-Tier` header in every response tells you which tier was resolved for that request.
 
-### Burst Allowance
+### There is no burst multiplier
 
-Each tier allows temporary bursts within its 4-hour burst window. For example, a Developer plan (500 credit 4h burst) can use credits freely within that window before being throttled. This prevents rate-spiking bots while allowing legitimate traffic patterns.
+Earlier revisions of this page described a per-tier burst multiplier (2x-5x for a few
+seconds) on top of the rpm limit. **That does not exist.** The limiter is a plain
+60-second sliding window: your `rpm` requests within any trailing minute, and the
+(rpm + 1)th is a `429`. No headroom, no multiplier, no separate burst duration.
 
-| Tier | Burst Multiplier | Burst Duration |
-|------|------------------|----------------|
-| Free | 2x (20 rpm) | 5 seconds |
-| Developer | 2x (120 rpm) | 5 seconds |
-| Startup | 3x (900 rpm) | 10 seconds |
-| Business | 3x (3,000 rpm) | 10 seconds |
-| Enterprise | 5x (25,000 rpm) | 30 seconds |
+The `burst_4h` number on the tier object is a different thing again — a four-hour
+counter from the fotohub.app subscription side that stays at `0` on an API account and
+refuses nothing.
+
+### Per-endpoint caps override your tier
+
+This is the limiter people trip over. Expensive endpoints carry their own ceiling, and
+it applies **whatever your tier** — `payg-premium` with 500 rpm still only gets 5 video
+submissions per minute. Whichever limit is lower wins, and the per-endpoint one is
+checked first, before authentication.
+
+| Endpoint | Cap |
+|----------|----:|
+| `POST /v1/ai/generate/video` | 5 / min |
+| `POST /v1/video/upscale`, `/ai-director`, `/lip-sync` | 5 / min |
+| `POST /v1/story/generate` | 3 / min |
+| `POST /v1/shorts/agent` | 3 / min |
+| `POST /v1/billing/topup`, `/v1/storage/s3/buy` | 3 / min |
+| `POST /v1/images/batch`, `/v1/video/merge`, `/v1/video/stabilize`, `/v1/video/subtitles` | 10 / min |
+| `POST /v1/ai/generate/music`, `/v1/shorts/*`, `/v1/story/step`, `/v1/ai/document` | 10 / min |
+| `POST /v1/images/*` (background, shadow, colorize, face-restore, depth-map) | 15-30 / min |
+| `POST /v1/video/*` (transcode, speed, effects, watermark) | 15 / min |
+| `POST /v1/photos/upload` | 20 / min |
+| `POST /v1/ai/tts/polly`, `/v1/ai/tts/azure` | 20 / min |
+| `POST /v1/ai/generate/image` | 30 / min |
+| `POST /v1/ai/chat`, `/v1/ai/gabriel` | 30 / min |
+| `/v1/auth/keys` | 30 / min |
+| Everything else | 60 / min |
+
+**Polling is exempt from the submit cap.** `GET /v1/ai/generate/video/{job_id}` is
+60/min, not 5/min — a 90-second render polled every 10 seconds needs about nine calls
+and would otherwise exhaust the submit budget and lock you out of your own job. The
+same applies to the IDA Q and try-on poll routes.
+
+::: tip Two limits, two fixes
+A `429` from a per-endpoint cap will not go away by upgrading your tier. Slow down, or
+submit in a queue. A `429` from the tier limit is what upgrading fixes.
+:::
 
 ## Rate Limit Headers
 
@@ -128,10 +190,10 @@ they are absent from a `401` and from the per-endpoint `429` described below.
 
 | Header | Description | Example |
 |--------|-------------|---------|
-| `X-RateLimit-Limit` | Maximum number of requests allowed in the current window | `60` |
+| `X-RateLimit-Limit` | Maximum number of requests allowed in the current window | `120` |
 | `X-RateLimit-Remaining` | Number of requests remaining in the current window | `42` |
 | `X-RateLimit-Reset` | Unix timestamp (seconds) when the current window resets | `1721234560` |
-| `X-Tier` | The tier resolved for this request | `developer` |
+| `X-Tier` | The tier slug resolved for this request | `payg-standard` |
 | `Retry-After` | Seconds to wait before retrying (only present on 429 responses) | `12` |
 | `X-Request-Id` | Our identifier for this call — quote it in support tickets ([details](/api/errors#request-id-for-support)) | `1878ab43-df35-460d-9336-9cc80d60c559` |
 
@@ -144,10 +206,10 @@ tells you how long to wait.
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
-X-RateLimit-Limit: 60
+X-RateLimit-Limit: 120
 X-RateLimit-Remaining: 42
 X-RateLimit-Reset: 1721234560
-X-Tier: developer
+X-Tier: payg-standard
 X-Request-Id: 1878ab43-df35-460d-9336-9cc80d60c559
 ```
 
@@ -156,11 +218,11 @@ X-Request-Id: 1878ab43-df35-460d-9336-9cc80d60c559
 ```http
 HTTP/1.1 429 Too Many Requests
 Content-Type: application/json
-X-RateLimit-Limit: 60
+X-RateLimit-Limit: 120
 X-RateLimit-Remaining: 0
 X-RateLimit-Reset: 1721234572
 Retry-After: 12
-X-Tier: developer
+X-Tier: payg-standard
 X-Request-Id: ac786e3b-a048-409b-84f2-6e4c95f4984f
 ```
 
@@ -198,9 +260,9 @@ Like every other error raised by a handler, the payload sits under `detail`:
 {
   "detail": {
     "error": "rate_limit_exceeded",
-    "message": "Rate limit exceeded (60 requests/minute for developer tier). Upgrade your tier for higher limits.",
-    "tier": "developer",
-    "limit_rpm": 60,
+    "message": "Rate limit exceeded (120 requests/minute for payg-standard tier). Upgrade your tier for higher limits.",
+    "tier": "payg-standard",
+    "limit_rpm": 120,
     "upgrade_url": "https://fotohub.app/console/tiers"
   }
 }
@@ -1423,7 +1485,9 @@ For batch processing, use a job queue with rate-aware consumers that respect the
 |----------|---------|
 | Window type | Sliding window, per-minute |
 | Scope | Per API key, per tier, and per endpoint — the last falls back to your IP when the request is refused before authentication |
-| Burst allowance | 2-5x base limit for 5-30 seconds (tier-dependent) |
+| Burst allowance | None. The `rpm` figure is the whole budget. |
+| Also enforced | Per-endpoint caps below your tier limit — video submit is 5/min whatever your tier |
+| Refused for no funds | HTTP 402, not 429 — a different problem with a different fix |
 | Error code on limit | HTTP 429 Too Many Requests |
 | Retry guidance | `Retry-After` header — the body has no `retry_after` field |
 | Recommended strategy | Exponential backoff with jitter, cap at 60s |
