@@ -20,7 +20,7 @@ POST /v1/ai/generate/video
 ```
 
 **Authentication:** Bearer token (API key)  
-**Billing:** per-second credits (model-dependent, 1.2-90 credits/s), or a flat per-video amount for MiniMax Hailuo models.
+**Billing:** prepaid USD from your wallet — per second of output for most models ($0.017–$0.70/s), or per 1000 output tokens for the Seedance family. No credits.
 
 ## Request Parameters
 
@@ -40,73 +40,134 @@ POST /v1/ai/generate/video
 ```json
 {
   "model": "veo-3.1-generate-001",
-  "credits_used": 60,
+  "cost_usd": 0.8,
+  "currency": "USD",
+  "billing": {
+    "cost_usd": 0.8,
+    "balance_usd": 41.732,
+    "currency": "USD",
+    "method": "wallet",
+    "model": "prepaid"
+  },
   "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/videos/vj_abc123.mp4",
   "job_id": "vj_abc123",
   "status": "completed",
-  "duration": 5
+  "duration": 4
 }
 ```
 
-This endpoint reports the charge as `credits_used` only -- there is no `billing`
-object on the video response. When your plan allowance is exhausted the same
-credits are drawn from the USD wallet at $0.0536 per credit, so the 60 credits
-above bill $3.22. Use `GET /v1/billing/usage` for the money figure.
+`cost_usd` is what left your wallet, and `billing.balance_usd` is what is left in
+it — read the balance to decide whether to dispatch the next job. There is no
+credit field: `veo-3.1-generate-001` bills $0.20 per second, and the 4 seconds
+here (Veo snaps 5 → 4, see [below](#duration-is-snapped-before-it-is-billed))
+cost $0.80. `GET /v1/billing/usage` has the same figure per request if you need to
+reconcile later.
 
 ### Processing Response (202)
 
+Seedance models submit asynchronously and answer `202` with the charge already
+applied, so the wallet figure is available before the render finishes:
+
 ```json
 {
+  "model": "seedance-2-0-mini",
   "job_id": "vj_abc123def456",
-  "status": "processing",
-  "model": "veo-3.1-generate-001",
-  "estimated_seconds": 120,
-  "poll_url": "https://apis.fotohub.app/v1/ai/generate/video/vj_abc123def456",
-  "webhook_supported": true
+  "status": "queued",
+  "cost_usd": 0.38115,
+  "currency": "USD",
+  "billing": {
+    "cost_usd": 0.38115,
+    "balance_usd": 41.35085,
+    "currency": "USD",
+    "method": "wallet",
+    "model": "prepaid",
+    "breakdown": {
+      "currency": "USD",
+      "rate_usd_per_second": 0.07623,
+      "duration_seconds": 5,
+      "resolution": "720p",
+      "audio": false,
+      "video_input": false,
+      "amount_usd": 0.38115,
+      "pricing_type": "per_second",
+      "pricing_basis": "tokens",
+      "output_tokens": 108900
+    }
+  },
+  "duration": 5,
+  "resolution": "720p",
+  "estimated_seconds": 65,
+  "poll_url": "https://apis.fotohub.app/v1/ai/generate/video/vj_abc123def456"
 }
 ```
 
+`billing.breakdown` is the authoritative money answer: it names the meter
+(`pricing_basis`), the quantity billed in that meter's own unit, and the amount.
+`rate_usd_per_second` is present on every model for convenience, but on a Seedance
+render it is *derived* — $0.38115 ÷ 5 seconds — not the rate the price was
+computed from. That rate is per 1000 output tokens and lives in
+`GET /v1/pricing?model=seedance-2-0-mini`, alongside the token formula: 108 900
+tokens × $0.0035 per 1000 is the $0.38115 above, and `output_tokens` in the
+breakdown is there so you can redo that multiplication yourself.
+
 ::: info Asynchronous Processing
-Video generation can take 30 seconds to several minutes depending on the model and duration. When the video is still processing, the response will include `"status": "processing"` and a `job_id`. Use this ID to poll for completion or configure a webhook to receive notifications.
+Video generation takes 30 seconds to several minutes depending on model, duration
+and resolution. Poll `poll_url`, or pass `callback_url` and get the same body
+POSTed to you once the job reaches a terminal state.
 :::
 
 ## Model Pricing
 
-Per-second pricing for the most commonly used model per provider (see the [full catalog](/api/models#video-generation-models) for every variant):
+Every price below is the provider's own rate, charged 1:1 in USD from your wallet.
+Pricing for the most commonly used model per provider (see the [full catalog](/api/models#video-generation-models) for every variant, or `GET /v1/pricing?model=<id>` for one):
 
-| Model | ID | Credits/s | Provider | Notes |
-|-------|-----|:---------:|----------|-------|
-| Wan 2.2 Plus | `wan2.2-t2v-plus` | 1.2 | Alibaba | cheapest tier |
-| Seedance 2.0 Mini | `seedance-2-0-mini` | 2.8 | ByteDance | budget |
-| Kling v2.5 Turbo | `kling-v2-5-turbo` | 1.6 | Kuaishou | |
-| Hailuo O2 | `hailuo-o2` | — | MiniMax | 6 credits flat, per video |
-| **Google Veo 3.1** | `veo-3.1-generate-001` | **12** | Google | native audio, up to 4K |
-| Gemini Omni Flash | `gemini-omni-flash` | 6 | Google | native audio, T2V+I2V |
-| OpenAI Sora 2 | `sora-2` | 8 | OpenAI | |
-| Grok Video 1.5 | `grok-imagine-video-1.5` | 9 | xAI | lip-sync |
-| **Seedance 2.5** | `seedance-2-5` | **14.5** (720p) / 6.4 (480p) | ByteDance | up to **30s in one clip**, audio at no extra cost |
+| Model | ID | $/second | A `duration: 5` request | Provider | Notes |
+|-------|-----|---------:|------------------------:|----------|-------|
+| Hailuo O2 | `hailuo-o2` | $0.017 | 6s → $0.102 | MiniMax | cheapest tier |
+| Wan 2.2 Plus | `wan2.2-t2v-plus` | $0.02 | 5s → $0.10 | Alibaba | budget batch |
+| Kling v2.5 Turbo | `kling-v2-5-turbo` | $0.026 | 5s → $0.13 | Kuaishou | |
+| Hailuo 2.3 | `hailuo-2.3` | $0.047 | 6s → $0.282 | MiniMax | |
+| Gemini Omni Flash | `gemini-omni-flash` | $0.1014 | 5s → $0.507 | Google | native audio, T2V+I2V |
+| OpenAI Sora 2 | `sora-2` | $0.13 | 5s → $0.65 | OpenAI | |
+| Grok Video 1.5 | `grok-imagine-video-1.5` | $0.14 | 5s → $0.70 | xAI | lip-sync |
+| **Google Veo 3.1** | `veo-3.1-generate-001` | **$0.20** | 4s → $0.80 | Google | native audio, up to 4K |
+| OpenAI Sora 2 Pro | `sora-2-pro` | $0.30 / $0.50 / $0.70 | 5s → $1.50 at 720p | OpenAI | priced per resolution |
+
+The third column is the **snapped** duration and what it actually costs: Veo will
+not render 5 seconds and Hailuo will not render fewer than 6, so those two bill a
+different length than you asked for (see
+[below](#duration-is-snapped-before-it-is-billed)).
+
+`sora-2-pro` charges $0.30/s at 720p, $0.50/s at 1024p and $0.70/s at 1080p —
+send `resolution` or you are billed the 1080p rate.
+
+**Seedance is metered per 1000 output tokens**, not per second, because that is how
+ByteDance bills it. A 5-second 720p render is $0.38115 on `seedance-2-0-mini` and
+$1.16523 on `seedance-2-5`; the full rate table, the token formula and worked
+examples are in the [pricing guide](/guides/pricing#seedance-priced-per-output-token).
 
 ::: tip Recommended Model
 **`veo-3.1-generate-001`** offers the best balance of quality, native audio, and features (last-frame + reference images) for most use cases. Use **`wan2.2-t2v-plus`** or **`wan2.2-i2v-plus`** for budget-conscious batch processing, or **`gemini-omni-flash`** when you want native audio without Veo's higher per-second cost. For anything longer than 15 seconds, **`seedance-2-5`** is the only single-request option — see [Seedance 2.5](#seedance-2-5-long-clips-video-editing) below.
 :::
 
-### Credit Scaling by Duration
+### Cost Scaling by Duration
 
-Almost every model bills `credits/s × duration` (MiniMax Hailuo is the exception — flat per-video pricing regardless of duration):
+Every per-second model bills `rate × duration`, so the cost of a clip is linear in
+its length:
 
-| Duration | Example (`veo-3.1-generate-001`, 12 cr/s) |
-|----------|---------------------------------------------|
-| 5 seconds | 60 credits ($3.22 from wallet) |
-| 10 seconds | 120 credits ($6.43 from wallet) |
-| 15 seconds | 180 credits ($9.65 from wallet) |
-
-USD figures are the wallet fallback at $0.0536 per credit, charged only after
-your plan's monthly credit allowance is used up.
+| Duration | `wan2.2-t2v-plus` ($0.02/s) | `sora-2` ($0.13/s) | `veo-3.1-generate-001` ($0.20/s) |
+|----------|----------------------------:|-------------------:|---------------------------------:|
+| 4 seconds | $0.08 | $0.52 | $0.80 |
+| 8 seconds | $0.16 | $1.04 | $1.60 |
+| 10 seconds | $0.20 | $1.30 | — (Veo caps at 8s) |
+| 15 seconds | $0.30 | — (Sora 2 caps at 12s) | — |
 
 ::: info Formula
-`total_credits = credits_per_second × duration`
+`total_usd = rate_usd_per_second × billed_duration`
 
-For example, a 10-second `wan2.2-t2v-plus` video costs: `1.2 × 10 = 12 credits`
+`billed_duration` is the **snapped** length (see below), not what you asked for.
+The Seedance family is metered per output token instead — the formula for that one
+is in the [pricing guide](/guides/pricing#seedance-priced-per-output-token).
 :::
 
 ### Duration is snapped before it is billed
@@ -120,34 +181,47 @@ No provider renders an arbitrary length. Each accepts its own set, so `duration`
 | Sora 2 | up to 12 (`sora-2-pro`: 25) | 5s |
 | Grok | up to 15 | 5s |
 | Wan (all) | up to 10 | 5s |
-| Hailuo | 6, 10 | 6s — but the price is flat per clip, so it costs the same |
+| Hailuo | 6, 10 | **6s** — billed 6s, the only family that snaps *up* |
 | Seedance | 2.0: 4–15, 1.x: 5–10, `seedance-2-5`: up to 30 | 5s |
 
 The `duration` field in the response is always the length that was rendered and billed, so reconcile against that rather than against your request. Asking Veo for 5 seconds returns `"duration": 4`, and a 4-second file.
 
-### Failures do not cost credits
+Hailuo is the one case where the snap can *raise* the bill. It renders nothing
+shorter than 6 seconds, so there is no shorter option to fall back to: a
+`duration: 5` request on `hailuo-2.3` bills 6 seconds at $0.047 — $0.282, not
+$0.235. Send 6 or 10 and there is no surprise.
 
-Credits are taken when the job is submitted and given back automatically if the generation does not produce a file:
+### Failures do not cost money
 
-- **Rejected at submit** (bad parameters, provider out of capacity) — the error response says `no credits were charged for this request`, and nothing was.
+The wallet is charged when the job is submitted and refunded automatically if the generation does not produce a file:
+
+- **Refused before the provider is called** — an empty wallet (`402`), an unknown model or a bad parameter. Nothing was ever taken, so there is nothing to give back.
+- **Rejected at submit** (provider out of capacity, credentials, upstream 4xx) — the charge is reversed first and the error message then ends with `No charge was made for this request.`
 - **Failed after submit** — the failure appears on the next poll with `"refunded": true`. Typically within seconds of the provider giving up.
 - **Never finished** — a job still `processing` 20 minutes after submit is declared failed on your next poll and refunded then.
 
-The refund happens once per job. Polling a failed job repeatedly returns `"refunded": false` on every call after the first; that means "already refunded", not "not refunded". If a refund could not be completed the message says so explicitly rather than implying a reversal that did not happen — contact support with the `job_id` in that case.
+The refund happens once per job. Polling a failed job repeatedly returns `"refunded": false` on every call after the first; that means "already refunded", not "not refunded" — check `GET /v1/billing/usage` if you need the ledger entry.
+
+::: warning Read the sentence, not the status code
+`No charge was made for this request.` is only appended when the reversal actually
+committed. If a refund could not be completed, the message says so instead — *"Your
+wallet was charged but the generation failed — contact support"* — and there is a
+real debit to reclaim. Never infer a refund from the error code alone.
+:::
 
 ## Model Comparison
 
-| Model | Provider | Credits/s | Max Duration | Resolution | Audio | Key Features |
-|-------|----------|:---------:|:------------:|:----------:|:-----:|--------------|
-| `veo-3.1-generate-001` | Google | 12 | 8s | 4K | native | last-frame, reference images |
-| `gemini-omni-flash` | Google | 6 | 10s | 720p | native (automatic) | reference-to-video |
-| `wan2.2-t2v-plus` / `-i2v-plus` | Alibaba | 1.2 | 15s | 1080p | none | cheapest, artistic |
-| `kling-v3` | Kuaishou | 5 | 15s | 1080p | optional | realistic motion |
-| `hailuo-o2` | MiniMax | — (flat) | 10s | 1080p | none | first+last frame |
-| `seedance-2-5` | ByteDance | 14.5 (720p) | **30s** | 720p | native, **included** | longest single clip, video-to-video editing, 30 image + 10 video + 10 audio references |
-| `seedance-2-0-pro` | ByteDance | 9.4 | 15s | 4K | native | highest Seedance resolution |
-| `sora-2` | OpenAI | 8 | 12s | 1080p | native | physics-accurate |
-| `grok-imagine-video-1.5` | xAI | 9 | 15s | 1080p | none | **lip-sync** generation |
+| Model | Provider | Price | Max Duration | Resolution | Audio | Key Features |
+|-------|----------|-------|:------------:|:----------:|:-----:|--------------|
+| `veo-3.1-generate-001` | Google | $0.20/s | 8s | 4K | native | last-frame, reference images |
+| `gemini-omni-flash` | Google | $0.1014/s | 10s | 720p | native (automatic) | reference-to-video |
+| `wan2.2-t2v-plus` / `-i2v-plus` | Alibaba | $0.02/s | 10s | 1080p | none | cheapest, artistic |
+| `kling-v3` | Kuaishou | $0.077/s | 10s | 1080p | optional | realistic motion |
+| `hailuo-o2` | MiniMax | $0.017/s | 10s | 1080p | none | first+last frame |
+| `seedance-2-5` | ByteDance | $0.0107 / 1K tokens | **30s** | 720p | native, **included** | longest single clip, video-to-video editing, 30 image + 10 video + 10 audio references |
+| `seedance-2-0-pro` | ByteDance | $0.004–$0.0077 / 1K tokens | 15s | 4K | native | highest Seedance resolution |
+| `sora-2` | OpenAI | $0.13/s | 12s | 1080p | native | physics-accurate |
+| `grok-imagine-video-1.5` | xAI | $0.14/s | 15s | 1080p | none | **lip-sync** generation |
 
 ::: tip Choosing a Model
 - **Best overall**: `veo-3.1-generate-001` -- native audio, high quality, competitive price
@@ -187,7 +261,7 @@ response = requests.post(
 
 result = response.json()
 print(f"Video URL: {result['video_url']}")
-print(f"Credits used: {result['credits_used']}")
+print(f"Charged: ${result['cost_usd']} — balance ${result['billing']['balance_usd']}")
 ```
 
 ```typescript [TypeScript]
@@ -213,7 +287,7 @@ const response = await fetch(
 
 const result = await response.json();
 console.log("Video URL:", result.video_url);
-console.log("Credits used:", result.credits_used);
+console.log(`Charged: $${result.cost_usd} — balance $${result.billing.balance_usd}`);
 ```
 
 ```go [Go]
@@ -249,7 +323,7 @@ func main() {
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
 	fmt.Printf("Video URL: %s\n", result["video_url"])
-	fmt.Printf("Credits used: %v\n", result["credits_used"])
+	fmt.Printf("Charged: $%v\n", result["cost_usd"])
 }
 ```
 
@@ -403,7 +477,8 @@ response = requests.post(
                   "golden hour lighting, waves crashing against cliffs, "
                   "smooth camera pan from left to right, hyperrealistic",
         "model": "veo-3.1-generate-001",
-        "duration": 10,
+        # Veo renders 4, 6 or 8 seconds — 8 is its longest, and $1.60 at $0.20/s
+        "duration": 8,
         "aspect_ratio": "16:9",
         "resolution": "4k"
     }
@@ -416,7 +491,7 @@ if result["status"] == "processing":
     print(f"Estimated wait: 2-5 minutes for 4K")
 else:
     print(f"Video URL: {result['video_url']}")
-    print(f"Credits used: {result['credits_used']}")
+    print(f"Charged: ${result['cost_usd']} for {result['duration']}s")
 ```
 
 ```typescript [TypeScript]
@@ -433,7 +508,8 @@ const response = await fetch(
               "golden hour lighting, waves crashing against cliffs, " +
               "smooth camera pan from left to right, hyperrealistic",
       model: "veo-3.1-generate-001",
-      duration: 10,
+      // Veo renders 4, 6 or 8 seconds — 8 is its longest, and $1.60 at $0.20/s
+      duration: 8,
       aspect_ratio: "16:9",
       resolution: "4k",
     }),
@@ -447,7 +523,7 @@ if (result.status === "processing") {
   console.log("Estimated wait: 2-5 minutes for 4K");
 } else {
   console.log(`Video URL: ${result.video_url}`);
-  console.log(`Credits used: ${result.credits_used}`);
+  console.log(`Charged: $${result.cost_usd} for ${result.duration}s`);
 }
 ```
 
@@ -464,8 +540,9 @@ import (
 func main() {
 	payload := map[string]interface{}{
 		"prompt":       "Aerial drone shot of a coastal city at sunset, golden hour lighting, waves crashing against cliffs, smooth camera pan from left to right, hyperrealistic",
-		"model":        "veo-3.1-generate-001",
-		"duration":     10,
+		"model": "veo-3.1-generate-001",
+		// Veo renders 4, 6 or 8 seconds — 8 is its longest, and $1.60 at $0.20/s
+		"duration":     8,
 		"aspect_ratio": "16:9",
 		"resolution":   "4k",
 	}
@@ -490,7 +567,7 @@ func main() {
 		fmt.Println("Estimated wait: 2-5 minutes for 4K")
 	} else {
 		fmt.Printf("Video URL: %s\n", result["video_url"])
-		fmt.Printf("Credits used: %v\n", result["credits_used"])
+		fmt.Printf("Charged: $%v for %vs\n", result["cost_usd"], result["duration"])
 	}
 }
 ```
@@ -502,7 +579,7 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
   -d '{
     "prompt": "Aerial drone shot of a coastal city at sunset, golden hour lighting, waves crashing against cliffs, smooth camera pan from left to right, hyperrealistic",
     "model": "veo-3.1-generate-001",
-    "duration": 10,
+    "duration": 8,
     "aspect_ratio": "16:9",
     "resolution": "4k"
   }'
@@ -662,15 +739,28 @@ per-second rate is identical with `generate_audio` on or off.
 | **Duration** | any integer **4-30** seconds (`3` and `31` are rejected with a 400) |
 | **Resolution** | `480p`, `720p` — **1080p and 4K are not supported** and return a 400 |
 | **Frame rate** | 24 fps |
-| **Price** | **14.5 credits/s** at 720p, **6.4 credits/s** at 480p |
-| **Price with a video reference** | 17.6 credits/s at 720p, 7.8 at 480p (the source frames bill as input) |
+| **Price** | **$0.0107 per 1000 output tokens**, at either resolution |
+| **Price with a video reference** | **$0.0064 per 1000 tokens** — an edit is *cheaper* than a fresh render |
 | **Audio** | native, **included in the price** |
 | **References** | up to **30 images**, **10 videos**, **10 audio clips** |
 | **Output container** | `mp4` (default) or `mov` |
 | **Mode** | asynchronous — returns `202` + `job_id`, poll or use a webhook |
 
-A 30-second 720p clip costs `14.5 × 30 = 435 credits`. A 5-second 480p draft of the
-same shot costs `6.4 × 5 = 32` — draft at 480p, finish at 720p.
+The rate is flat per token, so resolution and duration reach the price through the
+token count: `tokens = floor(tokens_per_frame × (24 × seconds + 1))`, where
+`tokens_per_frame` is 400.3125 at 480p and 900 at 720p.
+
+| What | Tokens | Cost |
+|------|-------:|-----:|
+| 30s @ 720p | 648 900 | **$6.943230** |
+| 30s @ 480p | 288 625 | $3.088288 |
+| 30s @ 720p from a source video | 648 900 | $4.152960 |
+| 5s @ 720p | 108 900 | $1.165230 |
+| 5s @ 480p | 48 437 | $0.518276 |
+
+Draft at 480p and finish at 720p: a 5-second 480p test is 52 cents against $6.94
+for the finished 30-second clip. `POST /v1/billing/estimate` prices an exact
+duration if you would rather not do the arithmetic.
 
 ::: warning 720p ceiling
 2.5 is not a superset of 2.0 Pro. It reaches 30 seconds but stops at 720p, while
@@ -751,7 +841,7 @@ video = client.generate_seedance(
 )
 
 print(video["video_url"])       # already finished — submit + poll handled for you
-print(video["credits_used"])    # 435
+print(video["cost_usd"])        # 6.94323
 ```
 
 ```typescript [TypeScript]
@@ -772,7 +862,7 @@ const video = await client.generateSeedance({
 });
 
 console.log(video.video_url);    // already finished
-console.log(video.credits_used); // 435
+console.log(video.cost_usd);     // 6.94323
 ```
 
 ```bash [cURL]
@@ -803,14 +893,25 @@ Submit response (`202`):
   "model": "seedance-2-5",
   "job_id": "8f1c2d3e-4b5a-6c7d-8e9f-0a1b2c3d4e5f",
   "status": "queued",
-  "credits_used": 435,
+  "cost_usd": 6.94323,
+  "currency": "USD",
   "billing": {
-    "method": "credits",
+    "cost_usd": 6.94323,
+    "balance_usd": 34.78762,
+    "currency": "USD",
+    "method": "wallet",
+    "model": "prepaid",
     "breakdown": {
-      "credits_per_second": 14.5,
+      "currency": "USD",
+      "rate_usd_per_second": 0.231441,
       "duration_seconds": 30,
       "resolution": "720p",
-      "audio": true
+      "audio": true,
+      "video_input": false,
+      "amount_usd": 6.94323,
+      "pricing_type": "per_second",
+      "pricing_basis": "tokens",
+      "output_tokens": 648900
     }
   },
   "duration": 30,
@@ -860,10 +961,13 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
   }'
 ```
 
-::: info A video reference costs more
-The source clip's frames bill as input, so a request with `reference_videos` is
-charged at 17.6 credits/s at 720p (7.8 at 480p) instead of the base rate. Image and
-audio references do not change the rate.
+::: info A video reference costs less, not more
+When the request carries a video input, ByteDance charges its input rate instead of
+the output one — **$0.0064 per 1000 tokens rather than $0.0107** — and the token
+count does not change. So the same 30-second 720p clip is $4.152960 as an edit
+against $6.943230 as a fresh render. Image and audio references do not change the
+rate. The `video_input: true` flag in `billing.breakdown` is what tells you the
+lower rate applied.
 :::
 
 ### Face consistency (asset IDs)
@@ -1040,7 +1144,7 @@ A `failed` response also carries `refunded`:
 }
 ```
 
-`"refunded": true` means the credits for this job are back on your balance. On every later poll of the same job it reads `false`, because the reversal already happened — see [Failures do not cost credits](#failures-do-not-cost-credits).
+`"refunded": true` means the charge for this job is back in your wallet. On every later poll of the same job it reads `false`, because the reversal already happened — see [Failures do not cost money](#failures-do-not-cost-money).
 
 ### Submit and Poll Pattern
 
@@ -1063,14 +1167,16 @@ response = requests.post(
         "prompt": "Cinematic aerial shot of a mountain range at sunrise, "
                   "volumetric fog in valleys, golden light on peaks, drone flyover",
         "model": "veo-3.1-generate-001",
-        "duration": 15,
+        "duration": 8,
         "resolution": "4k"
     }
 )
 
 result = response.json()
 job_id = result["job_id"]
-print(f"Job submitted: {job_id}")
+# The charge is on the SUBMIT response, not the poll — the wallet was debited
+# when the job was accepted.
+print(f"Job submitted: {job_id} — charged ${result['cost_usd']}")
 
 # Step 2: Poll for completion
 while True:
@@ -1082,10 +1188,10 @@ while True:
 
     if job["status"] == "completed":
         print(f"Video ready: {job['video_url']}")
-        print(f"Credits used: {job['credits_used']}")
         break
     elif job["status"] == "failed":
-        print(f"Generation failed: {job['error']}")
+        refunded = job.get("refunded")
+        print(f"Generation failed: {job['error']} (refunded: {refunded})")
         break
     else:
         print(f"Still processing... ({job.get('progress', 0)}%)")
@@ -1106,14 +1212,16 @@ const submitResponse = await fetch(
       prompt: "Cinematic aerial shot of a mountain range at sunrise, " +
               "volumetric fog in valleys, golden light on peaks, drone flyover",
       model: "veo-3.1-generate-001",
-      duration: 15,
+      duration: 8,
       resolution: "4k",
     }),
   }
 );
 
-const { job_id: jobId } = await submitResponse.json();
-console.log(`Job submitted: ${jobId}`);
+// The charge lands on the SUBMIT response — the wallet was debited when the job
+// was accepted, not when it finished.
+const { job_id: jobId, cost_usd: costUsd } = await submitResponse.json();
+console.log(`Job submitted: ${jobId} — charged $${costUsd}`);
 
 // Step 2: Poll for completion
 async function pollJob(id: string): Promise<string> {
@@ -1125,10 +1233,9 @@ async function pollJob(id: string): Promise<string> {
     const job = await res.json();
 
     if (job.status === "completed") {
-      console.log(`Credits used: ${job.credits_used}`);
       return job.video_url;
     } else if (job.status === "failed") {
-      throw new Error(job.error);
+      throw new Error(`${job.error} (refunded: ${job.refunded})`);
     }
 
     console.log(`Processing... ${job.progress ?? 0}%`);
@@ -1152,12 +1259,13 @@ import (
 )
 
 type JobResponse struct {
-	JobID       string  `json:"job_id"`
-	Status      string  `json:"status"`
-	VideoURL    string  `json:"video_url"`
-	CreditsUsed float64 `json:"credits_used"`
-	Progress    int     `json:"progress"`
-	Error       string  `json:"error"`
+	JobID    string  `json:"job_id"`
+	Status   string  `json:"status"`
+	VideoURL string  `json:"video_url"`
+	CostUSD  float64 `json:"cost_usd"`
+	Progress int     `json:"progress"`
+	Refunded bool    `json:"refunded"`
+	Error    string  `json:"error"`
 }
 
 func main() {
@@ -1165,7 +1273,7 @@ func main() {
 	payload := map[string]interface{}{
 		"prompt":     "Cinematic aerial shot of a mountain range at sunrise, volumetric fog in valleys, golden light on peaks, drone flyover",
 		"model":      "veo-3.1-generate-001",
-		"duration":   15,
+		"duration":   8,
 		"resolution": "4k",
 	}
 	body, _ := json.Marshal(payload)
@@ -1182,7 +1290,8 @@ func main() {
 
 	var submitResult JobResponse
 	json.NewDecoder(resp.Body).Decode(&submitResult)
-	fmt.Printf("Job submitted: %s\n", submitResult.JobID)
+	// The charge is on the submit response, not the poll.
+	fmt.Printf("Job submitted: %s — charged $%v\n", submitResult.JobID, submitResult.CostUSD)
 
 	// Step 2: Poll with goroutine using time.NewTicker
 	done := make(chan JobResponse)
@@ -1216,9 +1325,8 @@ func main() {
 	finalJob := <-done
 	if finalJob.Status == "completed" {
 		fmt.Printf("Video ready: %s\n", finalJob.VideoURL)
-		fmt.Printf("Credits used: %.0f\n", finalJob.CreditsUsed)
 	} else {
-		fmt.Printf("Generation failed: %s\n", finalJob.Error)
+		fmt.Printf("Generation failed: %s (refunded: %v)\n", finalJob.Error, finalJob.Refunded)
 	}
 }
 ```
@@ -1231,11 +1339,11 @@ curl -X POST "https://apis.fotohub.app/v1/ai/generate/video" \
   -d '{
     "prompt": "Cinematic aerial shot of a mountain range at sunrise, volumetric fog in valleys, golden light on peaks, drone flyover",
     "model": "veo-3.1-generate-001",
-    "duration": 15,
+    "duration": 8,
     "resolution": "4k"
   }'
 
-# Response: {"job_id": "vj_abc123def456", "status": "processing", ...}
+# Response: {"job_id": "vj_abc123def456", "status": "processing", "cost_usd": 1.6, ...}
 
 # Step 2: Poll for completion (repeat every 3 seconds)
 curl -X GET "https://apis.fotohub.app/v1/ai/generate/video/vj_abc123def456" \
@@ -1245,10 +1353,14 @@ curl -X GET "https://apis.fotohub.app/v1/ai/generate/video/vj_abc123def456" \
 # {
 #   "job_id": "vj_abc123def456",
 #   "status": "completed",
+#   "progress": 100,
 #   "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/videos/vj_abc123def456.mp4",
-#   "duration": 15,
-#   "credits_used": 45
+#   "duration": 8
 # }
+#
+# The money is on the SUBMIT response, not here. Seedance jobs are the exception:
+# their poll also carries cost_usd, because a `duration: -1` edit can be settled
+# down to the delivered length once the source clip has been decoded.
 ```
 
 :::
@@ -1539,55 +1651,90 @@ curl -X POST "http://localhost:3000/webhooks/fotohub" \
 
 ### Webhook Events
 
-These are the events accepted by `POST /v1/webhooks`. Any other value — including
-`video.ready` and `video.progress`, which older revisions of this page
+These are the events accepted by `POST /v1/console/webhooks`. Any other value —
+including `video.ready` and `video.progress`, which older revisions of this page
 documented — is rejected with `400 Invalid events`.
+
+These are the ones that matter for video:
 
 | Event | Description |
 |-------|-------------|
-| `generation.completed` | Any generation finished successfully, video included. |
+| `generation.started` | A job was accepted and handed to the provider. |
+| `generation.completed` | A generation finished successfully, video included. |
 | `generation.failed` | A generation failed. |
-| `credits.low` | Credit balance crossed the low-water mark. |
-| `credits.depleted` | Credits exhausted; further calls bill the USD wallet. |
+| `generation.refunded` | A failed job's charge was returned to your wallet. Carries `cost_usd` and `job_id`, so it reconciles against the `billing.charged` that preceded it. |
 | `billing.charged` | A wallet charge was settled. |
-| `key.used` | An API key was used. |
-| `images.batch.completed` | A batch image job finished. |
+| `billing.refunded` | A wallet charge was reversed. |
+| `billing.insufficient_funds` | A request was refused for lack of funds. Carries `required_usd` and `balance_usd`, so you learn your wallet stopped a request without parsing the 402 of the request that was refused. |
+
+Subscribe to `generation.refunded` alongside `billing.charged` if you keep your
+own ledger — the debit and its reversal are separate events, and taking only the
+first leaves your books over-counting spend on every failed job.
 
 There is no progress event for video. Poll `GET /v1/ai/generate/video/{job_id}`
 for intermediate progress.
 
+`GET /v1/console/webhooks` and the console UI list the full set, which also
+covers image batches, background editing and commerce jobs. One name on that list
+is not yet emitted by anything — `key.used` — so subscribing to it produces no
+deliveries.
+
 ::: warning Webhook Security
 - Always verify the `X-FotoHub-Signature` header using HMAC-SHA256 with your webhook secret
-- Your webhook secret is available in [Account Settings > API > Webhooks](https://fotohub.app/settings/api)
-- Respond with HTTP 200 within 10 seconds or the delivery will be retried (up to 3 attempts)
-- Failed deliveries are retried with exponential backoff: 10s, 60s, 300s
+- The secret is returned **once**, in the `201` response to `POST /v1/console/webhooks`. It is deliberately absent from every later read, including `PATCH`, so store it when you create the webhook — if you lose it, delete the webhook and create a new one
+- Respond with a 2xx or the delivery is retried, up to 3 attempts total
+- Retries back off exponentially and quickly: roughly 0.5s, then 1s, then 2s. This is not a queue that will keep trying for hours — an endpoint that is down for a minute misses the event, so treat webhooks as a fast path and reconcile against `GET /v1/billing/usage` for anything you must not lose
 :::
 
 ## Error Responses
 
 | Status | Code | Description |
 |:------:|------|-------------|
-| `400` | `bad_request` | Invalid parameters. Check that `duration` is one of the accepted values (5, 10, 15, 30, 60), `model` is a valid model ID, and `aspect_ratio` is a supported format. |
+| `400` | `bad_request` | Invalid parameters. `duration` must be a positive number — it is then snapped to what the model renders, so you never need to guess its accepted set. `model` must be a known ID (the message lists them all) and `aspect_ratio` a supported format. |
 | `401` | `unauthorized` | Missing or invalid API key. Ensure your `Authorization` header contains a valid `Bearer fh_live_...` token. |
-| `402` | `insufficient_credits` | Your account does not have enough credits for this generation. Video generation requires 8-100+ credits depending on model and duration. Top up your account or reduce the duration/resolution. |
-| `429` | `rate_limit_exceeded` | Video generation is limited to 5 requests per minute per API key. Wait for current generations to complete before submitting new ones. The response includes a `Retry-After` header indicating when you can retry. |
-| `504` | `gateway_timeout` | The generation exceeded the maximum wait time. This typically occurs with long durations (30-60s) or 4K resolution. For these cases, the API automatically returns a `job_id` for async polling rather than timing out. If you receive this error, retry with a shorter duration or lower resolution. |
+| `402` | `insufficient_funds` | Your wallet cannot cover this render. The body carries `required_usd`, `balance_usd` and `shortfall_usd`, so you can size the top-up exactly. Nothing was charged — no provider was called. |
+| `402` | `spend_limit_reached` | The wallet has the money but your own monthly cap does not allow the spend. Raise or clear the cap in the console; `spent_usd` and `limit_usd` are in the body. Distinct from `insufficient_funds` because topping up will not fix it. |
+| `429` | `rate_limit_exceeded` | Submitting video is limited to **5 requests per minute**; polling a job you already paid for has its own 60/min budget, so a normal poll loop cannot exhaust the submit allowance. `Retry-After` tells you when to retry. |
+| `501` | — | The model ID is real and priced but not yet routed on the public API. |
+| `504` | `gateway_timeout` | The generation exceeded the synchronous wait. Long durations and 4K normally return a `job_id` for polling instead of blocking, so this is rare — retry with a shorter duration or lower resolution. |
 
 ### Error Response Example
 
+A `402` from an empty wallet. Every field a client needs to react is present, so
+you never have to parse the sentence:
+
 ```json
 {
-  "error": {
-    "code": "insufficient_credits",
-    "message": "Your account has 5 credits remaining but this generation requires 30 credits.",
-    "required_credits": 30,
-    "available_credits": 5
+  "detail": {
+    "error": "insufficient_funds",
+    "code": "insufficient_funds",
+    "message": "Insufficient funds: this request costs $0.800000 but your balance is $0.120000. Top up your wallet with at least $0.680000 to continue. The FOTOhub API is prepaid: no credits or subscription plan can pay for API usage.",
+    "required_usd": 0.8,
+    "balance_usd": 0.12,
+    "shortfall_usd": 0.68,
+    "currency": "USD",
+    "charged": false,
+    "charged_usd": 0,
+    "topup_url": "https://fotohub.app/console/wallet",
+    "operation": "generate_video:veo-3.1-generate-001"
   }
 }
 ```
 
+Branch on `code`, not on the status: `insufficient_funds` and
+`spend_limit_reached` are both `402` and need opposite responses — one is fixed
+by depositing money, the other by editing a limit you set yourself.
+
+`charged: false` is stated positively on purpose. This 402 is raised **before**
+the provider is called, so there is nothing to refund and nothing to reconcile.
+
 ::: warning Rate Limits
-Video generation is rate-limited to **5 requests per minute** per API key. This limit applies across all video models. For higher throughput, contact sales for enterprise tier access with dedicated GPU capacity.
+Submitting a video is limited to **5 requests per minute**, across all video
+models. Polling `GET /v1/ai/generate/video/{job_id}` is a separate 60/min budget,
+so a render you are already waiting on never costs you a submit slot. Keys also
+carry their own `rate_limit_per_minute` (60 by default) which applies on top —
+whichever is lower wins. Raise the key limit in the console, or contact sales for
+higher submit throughput.
 :::
 
 ## Tips and Best Practices
@@ -1609,8 +1756,26 @@ When using `image_url` for image-to-video generation:
 - Kling and Hailuo models tend to produce the most natural animations from still images
 :::
 
-::: warning Credit Consumption
-Video generation is the most credit-intensive operation in the API. A single 60-second Veo 3 clip costs 150 credits. Always check `billing.credits_used` in the response to track consumption. Consider starting with short 5-second test clips before generating longer videos.
+::: warning Video is the most expensive thing you can call
+Nothing else in the API moves this much money per request. The upper end, at each
+model's own maximum duration:
+
+| Worst case | Cost |
+|-----------|-----:|
+| `sora-2-pro`, 25s at 1080p ($0.70/s) | $17.50 |
+| `seedance-2-0-pro`, 15s at 4K | $11.70 |
+| `seedance-2-5`, 30s at 720p | $6.94 |
+| `veo-3.1-generate-001`, 8s (its longest) | $1.60 |
+
+No video model renders 60 seconds — the longest anything reaches is Seedance 2.5
+at 30s, then `sora-2-pro` at 25s and Grok at 15s. Everything in the Veo, Kling,
+Hailuo and Wan families tops out at 8 or 10 seconds.
+
+Read `cost_usd` and `billing.balance_usd` off every response and keep your own
+running total: a loop that submits without checking the balance discovers the
+wallet is empty as a 402, not as a warning. Draft on `wan2.2-t2v-plus` ($0.02/s)
+or Seedance at 480p, then re-render only the shot you keep on the model you
+actually want.
 :::
 
 ::: info Output Format

@@ -1,191 +1,335 @@
 # Pricing & Cost Optimization
 
-Understand how FOTOhub pricing works and how to minimize costs for your use case.
+Understand how FOTOhub API pricing works and how to minimize costs for your use case.
 
-## Pricing Models
+## How Billing Works
 
-FOTOhub offers **dual billing** — pick what fits your workload:
-
-### Credits (Predictable)
-
-Fixed cost per operation. Best for production workloads where you need cost certainty.
+The API is **prepaid, in US dollars**. You top up a wallet, every request is
+priced in USD and deducted from that balance, and when the balance cannot cover a
+request the API refuses it with `402` and charges nothing.
 
 ```
-2 credits = 1 image (Seedream, FLUX Pro)
-5 credits = 1 premium image (Imagen 4 Ultra)
+Wallet balance ($) − price of each request = remaining balance
 ```
 
-Chat is the exception: it bills per token, in fractions of a credit. See
-[Chat / LLM Costs](#chat-llm-costs) below.
+Three things follow from that, and they surprise people coming from the web app:
 
-### Tokens (Precise)
+- **Credits cannot pay for API usage.** Credits belong to a fotohub.app
+  subscription. An account holding 5 000 credits and $0.00 in its wallet gets a
+  402 on every API call. `GET /v1/billing/balance` returns
+  `billing_model: "prepaid_wallet_usd"` and no credit field at all.
+- **There is no invoice at the end of the month and no overage credit line.** You
+  cannot spend money you have not already deposited.
+- **Prices are the provider's own rate, 1:1.** The margin multiplier is `1.0`
+  today, and every response that quotes a price also returns
+  `provider_cost_usd` beside it so you can check that yourself.
 
-Per-token billing for chat/LLM operations. Best for high-volume text workloads.
+Prices are held to 6 decimal places, so a single cheap request can legitimately
+cost $0.000398.
 
-```
-from $0.0001 per 1K tokens (Gemini Flash, blended input + output)
-```
+### Reading a price
+
+`GET /v1/pricing` publishes every rate, and each one carries the **unit** it is
+denominated in — you cannot infer the meter from the model name:
+
+| Unit | Applies to |
+|------|-----------|
+| `per_second` | most video models |
+| `per_1k_tokens` | Seedance video, and chat when quoted per 1K |
+| `per_1m_tokens` | chat / LLM |
+| `per_piece` | images |
+| `per_1k_chars` | text-to-speech |
+| `per_minute` | transcription, music, audio |
+| `per_gb_month` | storage |
+
+Each entry also carries `verified`. `true` means the figure was read off the
+provider's own price list or invoice; `false` means it is our recorded copy of
+their published rate and has not been reconciled against an invoice.
+`GET /v1/pricing/audit` lists which models are in which bucket.
 
 ## Image Generation Costs
 
-| Model | Credits | Quality | Speed |
-|-------|---------|---------|-------|
-| flux-2-klein-4b | **1.0** | Good | ~2s |
-| minimax-image-01 | **1.0** | Good | ~2s |
-| grok-imagine-image | **1.0** | Good (1K) | ~5s |
-| gemini-3.1-flash-lite-image | **1.0** | Good (Nano Banana 2 Lite, budget/fast) | ~2s |
-| seedream-5-0-260128 | 2.0 | Excellent | ~2s |
-| flux-2-pro | 2.0 | Excellent | ~4s |
-| flux-1.1-pro | 2.0 | Excellent | ~4s |
-| flux-kontext-pro | 2.0 | Excellent (editing) | ~4s |
-| gemini-2.5-flash-image | 2.0 | Excellent (Nano Banana, up to 10 reference images) | ~3s |
-| imagen-4-standard | 3.0 | Premium | ~4s |
-| grok-imagine-image-pro | 3.0 | Premium (2K, multi-image) | ~8s |
-| gemini-3.1-flash-image | 3.0 | Premium (Nano Banana 2, GA) | ~4s |
-| gemini-3.1-flash-image-preview | 3.0 | Premium (Nano Banana 2, preview channel) | ~4s |
-| imagen-4-ultra | 5.0 | Premium (4K) | ~6s |
-| gemini-3-pro-image | 6.0 | Premium (Nano Banana Pro, 1K/2K/4K, advanced reasoning + precise text) | ~8s |
+Charged per delivered image. Models marked with a range charge per resolution —
+pass `image_size` and you are billed that tier, not the highest one.
+
+| Model | 1K | 2K | 4K |
+|-------|---:|---:|---:|
+| `flux-2-klein-4b` | $0.015005 | $0.015005 | $0.015005 |
+| `grok-imagine-image` | $0.02 | $0.02 | $0.02 |
+| `minimax-image-01` | $0.03 | $0.03 | $0.03 |
+| `flux-2-pro` | $0.03 | $0.075 | $0.255 |
+| `seedream-5-0-260128` | $0.0315 | $0.0315 | $0.0315 |
+| `gemini-3.1-flash-lite-image` | $0.0336 | $0.0336 | $0.0336 |
+| `gemini-2.5-flash-image` | $0.039 | $0.039 | $0.039 |
+| `flux-1.1-pro` | $0.04 | $0.04 | $0.04 |
+| `flux-kontext-pro` | $0.04 | $0.04 | $0.04 |
+| `grok-imagine-image-pro` | $0.05 | $0.07 | $0.07 |
+| `gemini-3.1-flash-image` | $0.067 | $0.101 | $0.151 |
+| `imagen-4-standard` | $0.080386 | $0.080386 | $0.080386 |
+| `gemini-3-pro-image` | $0.134 | $0.134 | $0.24 |
+| `imagen-4-ultra` | $0.160772 | $0.160772 | $0.160772 |
 
 ::: tip BEST VALUE
-**`seedream-5-0-260128`** delivers premium quality at 2 credits — the best quality-per-credit on the platform. Use it as your default.
+**`seedream-5-0-260128`** at $0.0315 delivers premium quality for a third of what
+the Imagen tier costs. Use it as your default.
+
+If you are rendering at 1K, **`flux-2-pro`** is $0.03 — but check the tier column
+before scaling up: the same model is $0.255 at 4K, an 8.5x step.
 :::
 
 ## Video Generation Costs
 
-Most video models bill per-second (`credits/s × duration`); MiniMax Hailuo bills a flat per-video amount instead. Per-second pricing for the most commonly used model per provider (see the [full catalog](/api/models#video-generation-models) for every variant):
+Most video models are metered **per second of output**, so the price of a clip is
+`rate × duration`. Durations are snapped to what the provider will actually
+render before you are billed, so you pay for the clip you receive.
 
-| Model | ID | Credits/s | Provider | Notes |
-|-------|-----|:---------:|----------|-------|
-| Wan 2.2 Plus | `wan2.2-t2v-plus` | 1.2 | Alibaba | cheapest tier |
-| Seedance 2.0 Mini | `seedance-2-0-mini` | 2.8 | ByteDance | budget |
-| Kling v2.5 Turbo | `kling-v2-5-turbo` | 1.6 | Kuaishou | |
-| Hailuo O2 | `hailuo-o2` | — | MiniMax | 6 credits flat, per video |
-| **Google Veo 3.1** | `veo-3.1-generate-001` | **12** | Google | native audio, up to 4K |
-| Gemini Omni Flash | `gemini-omni-flash` | 6 | Google | native audio, T2V+I2V |
-| OpenAI Sora 2 | `sora-2` | 8 | OpenAI | |
-| Grok Video 1.5 | `grok-imagine-video-1.5` | 9 | xAI | lip-sync |
-| Seedance 2.5 | `seedance-2-5` | 14.5 (720p) / 6.4 (480p) | ByteDance | up to 30s in one clip, audio included |
+| Model | ID | $/second | 5s clip | Provider |
+|-------|-----|---------:|--------:|----------|
+| Hailuo O2 | `hailuo-o2` | $0.017 | $0.085 | MiniMax |
+| Wan 2.2 Plus | `wan2.2-t2v-plus` | $0.02 | $0.10 | Alibaba |
+| Kling v2.5 Turbo | `kling-v2-5-turbo` | $0.026 | $0.13 | Kuaishou |
+| Veo 3.1 Lite | `veo-3.1-lite-generate-001` | $0.03 | $0.15 | Google |
+| Kling v2.6 | `kling-v2-6` | $0.038 | $0.19 | Kuaishou |
+| Hailuo 2.3 | `hailuo-2.3` | $0.047 | $0.235 | MiniMax |
+| Veo 3.1 Fast | `veo-3.1-fast-generate-001` | $0.08 | $0.40 | Google |
+| Gemini Omni Flash | `gemini-omni-flash` | $0.1014 | $0.507 | Google |
+| OpenAI Sora 2 | `sora-2` | $0.13 | $0.65 | OpenAI |
+| Grok Video 1.5 | `grok-imagine-video-1.5` | $0.14 | $0.70 | xAI |
+| **Google Veo 3.1** | `veo-3.1-generate-001` | **$0.20** | $1.00 | Google |
+| OpenAI Sora 2 Pro | `sora-2-pro` | $0.30 / $0.50 / $0.70 | $1.50 at 720p | OpenAI |
+
+`sora-2-pro` prices per resolution ($0.30 at 720p, $0.50 at 1024p, $0.70 at
+1080p). Send `resolution` and you are billed that tier. Omit it and you get the
+1080p rate, so always send it.
+
+See the [full catalog](/api/models#video-generation-models) for every variant, or
+`GET /v1/pricing?model=<id>` for one.
 
 ::: tip BEST VALUE
-**`wan2.2-t2v-plus`** / **`hailuo-o2`** = lowest cost per second with solid quality for social content. Step up to **`veo-3.1-generate-001`** for cinematic output with native audio, or **`gemini-omni-flash`** for automatic native audio at a lower per-second rate.
+**`hailuo-o2`** / **`wan2.2-t2v-plus`** are the lowest cost per second with solid
+quality for social content. Step up to **`veo-3.1-generate-001`** for cinematic
+output with native audio, or **`gemini-omni-flash`** for automatic native audio at
+half the per-second rate.
 :::
 
+### Seedance: priced per output token
+
+The Seedance family is the exception. ByteDance bills it **per 1000 output
+tokens**, and the token count is a function of resolution and duration:
+
+```
+tokens          = floor(tokens_per_frame × (24 × seconds + 1))
+tokens_per_frame = frame pixel count / 1024
+```
+
+| Model | $/1K tokens | 5s @ 480p | 5s @ 720p | 5s @ 1080p |
+|-------|------------:|----------:|----------:|-----------:|
+| `seedance-1-5-pro-251215` | $0.0012 | $0.060766 | $0.13068 | $0.29403 |
+| `seedance-2-0-mini` | $0.0035 | $0.177233 | $0.38115 | — |
+| `seedance-2-0-fast` | $0.0056 | $0.283573 | $0.60984 | — |
+| `seedance-2-0-pro` | $0.007 (480p/720p) · $0.0077 (1080p) · $0.004 (4K) | $0.354466 | $0.7623 | $1.886693 |
+| `seedance-2-5` | $0.0107 | $0.518276 | $1.16523 | — |
+
+`seedance-1-5-pro-251215` charges $0.0024 per 1K when you ask for generated audio
+— double the video rate, so a 5-second 720p clip with audio is $0.26136. Every
+other Seedance tier includes audio at no extra cost.
+
+Only `seedance-2-0-pro` reaches 4K ($3.9204 for 5 seconds). You do not have to do
+this arithmetic yourself:
+`GET /v1/pricing?model=seedance-2-5` returns `token_formula` and worked
+`examples`, and `POST /v1/billing/estimate` prices a specific duration.
+
 ::: info Long clips
-`seedance-2-5` is the only model that reaches 30 seconds in a single request
-(`14.5 × 30 = 435 credits` at 720p). Draft at 480p first — the same shot is 6.4
-credits/s there, so a 5-second test costs 32 credits instead of 435. Native audio
-is included at both resolutions; attaching a source video raises the rate to 17.6
-credits/s at 720p because the input frames bill too.
+`seedance-2-5` is the only model that reaches 30 seconds in a single request —
+648 900 output tokens, **$6.94** at 720p. Draft at 480p first: the same 30
+seconds is $3.09 there, and a 5-second test is $0.52.
+
+Native audio is included at both resolutions. Attaching a **source video** makes
+the render *cheaper*, not dearer — input frames bill at $0.0064 per 1K instead of
+$0.0107, so that same 30-second 720p clip is $4.15 as an edit.
 :::
 
 ## Chat / LLM Costs
 
-The chat endpoint (`/v1/ai/chat/completions`) bills the tokens you actually use,
-in credits, and the charge is fractional — a short reply costs a fraction of one
-credit. Output tokens cost 4-8x input, so the two are rated separately.
+`/v1/ai/chat/completions` bills the tokens you actually use. Output tokens cost
+4-8x input, so the two are rated separately.
 
-| Model | Credits/1M in | Credits/1M out |
-|-------|--------------:|---------------:|
-| `gemini-flash` | 20 | 166.7 |
-| `gemini-pro` | 83 | 667 |
-| `gpt-4o` | 200 | 1000 |
-| `claude-sonnet` | 200 | 1000 |
+| Model | $/1M in | $/1M out |
+|-------|--------:|---------:|
+| `gemini-flash` | $0.30 | $2.50 |
+| `claude-haiku-4.5` | $0.80 | $4.00 |
+| `gemini-pro` | $1.25 | $10.00 |
+| `gpt-4o` | $3.00 | $15.00 |
+| `claude-sonnet` | $3.00 | $15.00 |
 
-A 75-token prompt with a 150-token answer is 0.026 credits on `gemini-flash`.
-For billing in USD with a per-request `cost_breakdown`, use the premium endpoint
-(`/v1/ai/chat/claude`). See the [Chat/LLM reference](/api/chat-llm).
+A 75-token prompt with a 150-token answer is **$0.000398** on `gemini-flash`.
+
+Pass the alias (`gemini-flash`, not `gemini-2.5-flash`) — the aliases are what the
+rate table is keyed on. For a per-request `cost_breakdown`, use the premium
+endpoint (`/v1/ai/chat/claude`). See the [Chat/LLM reference](/api/chat-llm).
+
+## Storage Costs
+
+FOTOhub-managed buckets are metered **hourly against the bytes you are holding**,
+and the accrual is deducted from the same wallet:
+
+| | Rate |
+|-|-----:|
+| Per GB-month | $0.0245 |
+| Per GB-hour | $0.00003356 |
+
+Holding 100 GB for a full month costs $2.45. Every storage class prices at the
+Standard rate, because managed buckets live on S3 Standard in `eu-central-1`
+whatever the class label says. Bring-your-own-bucket destinations are metered at
+the real per-class rate of the region they are in.
 
 ## Free Operations
 
-These operations cost **0 credits**:
+These cost **$0.00** and never touch the wallet:
 
-- Gabriel AI classify/suggest/recommend
-- Translation (up to 10K chars)
-- Model catalog queries
-- Billing/usage queries
+- Gabriel AI classify / suggest / recommend
+- Translation (`/v1/ai/translate`, up to 10 000 characters per request)
+- Model catalog queries (`/v1/models`, `/v1/pricing`, `/v1/plans`)
+- Billing, balance and usage queries
 - Webhook management
+
+They still consume your rate limit.
+
+## When a Request Fails
+
+Nothing is charged for a request that never produced output. Two distinct cases:
+
+**Empty wallet** — `402`, before the provider is called, so there is nothing to
+refund:
+
+```json
+{
+  "error": "insufficient_funds",
+  "message": "Insufficient funds: this request costs $0.381150 but your balance is $0.120000. Top up your wallet with at least $0.261150 to continue. The FOTOhub API is prepaid: no credits or subscription plan can pay for API usage.",
+  "required_usd": 0.38115,
+  "balance_usd": 0.12,
+  "shortfall_usd": 0.26115,
+  "charged": false,
+  "charged_usd": 0,
+  "topup_url": "https://fotohub.app/console/wallet"
+}
+```
+
+Read `shortfall_usd` to size the top-up.
+
+**Provider failure after the charge** — the wallet is refunded and the error says
+so explicitly (`"No charge was made for this request."`). If you do not see that
+sentence, reconcile against `GET /v1/billing/usage` rather than assuming.
 
 ## Cost Optimization Tips
 
-### 1. Use Gabriel AI for Model Selection
+### 1. Estimate before you spend
 
-Instead of hardcoding expensive models:
-
-```python
-route = client.gabriel_classify(
-    prompt="Generate a simple product photo",
-    context={"credits_remaining": 10}
-)
-# Gabriel picks the cheapest model that can handle the task
-```
-
-### 2. Batch with Bulk Mode
-
-For batch image generation, use bulk mode for 20% savings:
-
-```python
-result = client.generate_image(
-    prompt="Product photo",
-    num_images=4,     # 4 images for 4 credits instead of 4 separate calls
-    model="seedream-5-0-260128"
-)
-```
-
-### 3. Set Hard Spending Limits
-
-Prevent unexpected bills:
-
-```python
-client.set_overage_limit(15)  # Max $15 overage per calendar month
-```
-
-### 4. Use Budget Variants for Previews
-
-Generate quick previews with cheaper models, then regenerate final output with premium:
-
-```python
-# Preview: budget model (1.2 credits/s)
-preview = client.generate_video(prompt="...", model="wan2.2-t2v-plus")
-
-# Final: cinematic quality with native audio (12 credits/s)
-final = client.generate_video(prompt="...", model="veo-3.1-generate-001")
-```
-
-### 5. Monitor with Usage API
-
-Track spending in real-time:
-
-```python
-balance = client.get_balance()
-if balance["credits"]["remaining_period"] < 10:
-    # Alert or switch to cheaper models
-    pass
-```
-
-## Subscription Tiers
-
-| Tier | Price | Credits/mo | RPM | Best For |
-|------|-------|-----------|-----|----------|
-| Free (PAYG) | 0 PLN | 50 | 10 | Testing & prototypes |
-| Developer | 49 PLN | 500 | 60 | Side projects |
-| Startup | 199 PLN | 5000 | 300 | Production apps |
-| Business | 799 PLN | 25000 | 1000 | Scale |
-| Enterprise | Custom | Unlimited | Custom | High-volume |
-
-API subscription plans are billed in PLN. Everything else — the wallet,
-per-request overage billing and top-ups — is USD.
-
-All tiers include wallet + auto-topup for overages.
-
-## Estimating Costs
-
-Before running operations, use the cost estimator:
+`POST /v1/billing/estimate` prices a batch from the same rate table and the same
+quote builders that bill it, so the estimate cannot disagree with the charge:
 
 ```python
 estimate = client.estimate_cost([
-    {"type": "image", "model": "seedream-5-0-260128", "count": 100},
-    {"type": "video", "model": "veo-3.1-generate-001", "count": 20},
-    {"type": "chat", "model": "gemini-flash", "tokens": 500000},
+    {"type": "generate_image", "model": "seedream-5-0-260128", "count": 100},
+    {"type": "generate_video", "model": "veo-3.1-generate-001", "duration": 8, "count": 20},
+    {"type": "chat", "model": "gemini-flash",
+     "input_tokens": 400_000, "output_tokens": 100_000},
 ])
-print(f"Estimated: {estimate['total_credits']} credits (${estimate['total_usd']})")
+print(f"${estimate['total_usd']} — affordable: {estimate['sufficient']}")
+# $36.1213 — affordable: True
+# ($3.7513 for the images + $32.00 for 20 x 8s of Veo 3.1 + $0.37 of chat)
 ```
+
+Read **`sufficient`** rather than comparing numbers yourself: it is the server's
+own answer, and it degrades honestly when part of the batch has no published rate
+(`priced: false`, `amount_usd: null` — never a misleading `0`).
+
+Pass the fields the meter needs: `duration` for a per-second model,
+`input_tokens`/`output_tokens` for chat, `image_size` for a resolution-stepped
+image. An operation that omits them comes back unpriced with a reason instead of
+a guess.
+
+### 2. Draft cheap, finish expensive
+
+The spread within a family is large enough that previews should not use the final
+model:
+
+```python
+# Preview: $0.02/s
+preview = client.generate_video(prompt="...", model="wan2.2-t2v-plus")
+
+# Final: cinematic quality with native audio, $0.20/s
+final = client.generate_video(prompt="...", model="veo-3.1-generate-001")
+```
+
+Ten 5-second previews cost $1.00 on Wan, the price of a single 5-second Veo 3.1
+clip. The same applies within Seedance: draft at 480p, deliver at 720p.
+
+### 3. Send the resolution you actually want
+
+Twelve image models and `sora-2-pro` price per resolution, and omitting the field
+bills the **top** tier. A 1K `flux-2-pro` render is $0.03 with `image_size` set
+and $0.255 without it.
+
+### 4. Use Gabriel AI for model selection
+
+Gabriel is free and picks the cheapest model that can do the job:
+
+```python
+route = client.gabriel_classify(prompt="Generate a simple product photo")
+print(route["model_selected"])
+```
+
+Then price what it chose with `GET /v1/pricing?model=<id>` before dispatching.
+
+### 5. Cap your own spending
+
+A wallet is already a hard ceiling, but you can set a lower monthly one — useful
+for a shared key or an experiment you do not want draining a funded account:
+
+```python
+client.set_overage_limit(15)  # stop at $15 of spend this calendar month
+```
+
+Pass `0` or `null` to disable it and let the wallet balance be the only cap.
+
+### 6. Monitor the balance you actually spend from
+
+```python
+balance = client.get_balance()
+if balance["wallet"]["balance_usd"] < 5:
+    # Top up, or stop dispatching work
+    pass
+```
+
+There is no credit field to read here. `spend.this_month_usd` and
+`spend.monthly_limit_usd` show the running total against any cap you set.
+
+## Account Tiers
+
+Tiers set **rate and concurrency limits**. They do not include an allowance and
+they do not change prices — every account pays the same USD rate for the same
+model and pays it out of its own wallet.
+
+The pay-as-you-go tiers activate automatically from wallet balance or lifetime
+spend, with no subscription:
+
+| Tier | Unlocks at | RPM | Concurrent jobs | Max upload |
+|------|-----------|----:|----------------:|-----------:|
+| PAYG Basic | $0 | 30 | 3 | 25 MB |
+| PAYG Standard | $25 balance or $50 lifetime spend | 120 | 10 | 100 MB |
+| PAYG Premium | $120 balance or $500 lifetime spend | 500 | 30 | 500 MB |
+
+Paid API plans raise the limits further and add support commitments:
+
+| Plan | Price | RPM | Concurrent jobs | Support |
+|------|-------|----:|----------------:|---------|
+| Developer | 49 PLN/mo | 60 | 5 | Email |
+| Startup | 199 PLN/mo | 300 | 20 | Priority |
+| Business | 799 PLN/mo | 1000 | 50 | Dedicated, 99.9% SLA |
+| Enterprise | Custom | 5000 | 200 | Custom SLA |
+
+Plan subscriptions are billed in PLN because they are a Polish-entity
+subscription. **Everything you generate is still billed in USD from the wallet**
+— a plan buys throughput, not usage. See [Rate Limits](/api/rate-limits) for the
+burst windows and the `X-RateLimit-*` headers.

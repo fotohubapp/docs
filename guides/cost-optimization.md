@@ -3,46 +3,52 @@
 Maximize output quality while minimizing spend. This guide covers model selection strategies, billing mechanics, batch savings, and monitoring tools.
 
 ::: info Key Takeaway
-FOTOhub uses a **credit + wallet** hybrid billing system. Credits from your plan are consumed first (fixed cost per operation), then wallet balance is charged at token-level granularity. Choosing the right model for each task can reduce costs by 60-80% without sacrificing quality.
+The API is **prepaid USD from a wallet**. There is one billing layer, not two:
+every request is priced in dollars at the provider's own rate and deducted from
+your balance. Credits belong to a fotohub.app subscription and cannot pay for API
+usage. Choosing the right model per task cuts spend 60-80% with no quality loss.
 :::
 
 ---
 
 ## Billing Model Overview
 
-FOTOhub has two billing layers:
+One wallet, one currency, no invoice at month end:
 
-| Layer | How it works | Best for |
-|-------|-------------|----------|
-| **Credits** | Fixed cost per operation (e.g., 1 credit = 1 image) | Predictable budgets, included in plans |
-| **Wallet (USD)** | Token-level billing after credits are exhausted | Pay-as-you-go, high-volume usage |
+```
+Wallet balance ($) − price of each request = remaining balance
+```
 
-Credits are consumed first. When depleted, the system falls back to wallet billing automatically — no interruption.
+| | |
+|-|-|
+| **Currency** | USD only. No PLN, no FX conversion at request time. |
+| **Model** | Prepaid. You cannot spend money you have not deposited. |
+| **Empty wallet** | `402 insufficient_funds` before the provider is called. Nothing is charged. |
+| **Margin** | `1.0` today — prices are the provider's own rate, 1:1. |
+| **Precision** | 6 decimal places, so a cheap request can legitimately cost $0.000398. |
 
-### Credit Costs by Category
+Credits cannot pay for any of it. An account holding 5 000 credits and $0.00 in
+its wallet gets a 402 on every call — `GET /v1/billing/balance` returns
+`billing_model: "prepaid_wallet_usd"` and no credit field at all.
 
-| Category | Range | Example |
-|----------|-------|---------|
-| Image generation | 1-5 credits | seedream-5-0-260128 = 2 credits |
-| Video generation | 8-15 credits (per 5s) | wan2.2-t2v-plus = 6 credits/5s |
-| Chat / text | per token, fractional | gemini-flash = 0.026 cr for a short exchange |
-| Audio / TTS | 1-3 credits | IDA Voice = 1 credit |
-| Music generation | 3-8 credits | music generation = 3 credits |
+### The meter differs by category
 
-### Wallet (Token-Based) Pricing
+You cannot infer the unit from the model name, so `GET /v1/pricing` publishes it
+per model:
 
-When credits are exhausted, each operation is billed from your USD wallet:
+| Category | Meter | Typical range |
+|----------|-------|---------------|
+| Image generation | per delivered image | $0.015 – $0.24 |
+| Video generation | per second of output | $0.017 – $0.70/s |
+| Seedance video | per 1000 **output** tokens | $0.0012 – $0.0107 |
+| Chat / LLM | per 1M tokens, in and out rated separately | $0.30 – $15.00 / 1M |
+| TTS | per 1000 characters | $0.015 – $0.03 |
+| Transcription, music, audio | per minute | $0.001 – $0.08 |
+| Storage | per GB-month, accrued hourly | $0.0245 |
 
-| Model tier | Input (USD/1M tokens) | Output (USD/1M tokens) |
-|-----------|----------------------|----------------------|
-| Economy (Haiku-class) | $1.20 | $6.00 |
-| Standard (Sonnet-class) | $4.50 | $22.50 |
-| Premium (Opus-class) | $22.50 | $112.50 |
-| Image models | — | $0.02 – $0.24 per image |
-| Video models | — | $0.06 – $0.64 per second |
-
-Rates include the platform margin. Per-model prices are returned live by
-`GET /v1/models` and `GET /v1/billing/pricing`, both in USD.
+Every entry also carries `verified`: `true` means the figure came off the
+provider's own price list or invoice, `false` means it is our recorded copy and
+has not been reconciled against one. `GET /v1/pricing/audit` lists which is which.
 
 ---
 
@@ -54,33 +60,41 @@ Use the cheapest model that meets your quality threshold:
 
 ```
 Need photorealistic text rendering?
-  → flux-2-pro (2.0 credits)
+  → flux-2-pro ($0.03 at 1K — but $0.255 at 4K, so send image_size)
 Need general purpose, fast?
-  → seedream-5-0-260128 (2.0 credits)   ← DEFAULT
+  → seedream-5-0-260128 ($0.0315, flat at every resolution)   ← DEFAULT
 Need multi-image compose / virtual try-on?
-  → grok-imagine-image-pro (3.0 credits)
+  → grok-imagine-image-pro ($0.05 at 1K, $0.07 above)
 Budget generation (fastest / cheapest)?
-  → flux-2-klein-4b (1.0 credits) or minimax-image-01 (1.0 credits)
-Need maximum detail (4K)?
-  → imagen-4-ultra (5.0 credits)
+  → flux-2-klein-4b ($0.015005) or minimax-image-01 ($0.03)
+Need maximum detail?
+  → imagen-4-ultra ($0.160772)
 Need premium quality?
-  → imagen-4-standard (3.0 credits)
+  → imagen-4-standard ($0.080386)
 ```
 
 ### Video Generation
 
+Prices are per second, so the clip length is a multiplier — and the duration you
+send is snapped to what the model renders before it is billed.
+
 ```
 Quick preview / prototype?
-  → wan2.2-t2v-plus (6 credits / 5s)
+  → wan2.2-t2v-plus ($0.02/s → $0.10 for 5s)
 Budget-conscious bulk video?
-  → hailuo-o2 (8 credits / 5s)
+  → hailuo-o2 ($0.017/s, but its shortest render is 6s → $0.102)
 Production quality?
-  → veo-2.0-generate-001 (155 credits / 5s), kling-v3 (25 credits / 5s), or seedance-2-0-pro (47 credits / 5s)
-Longer clips (up to 60s)?
-  → sora-2 (12 credits / 5s)
-Maximum cinematic quality (with audio)?
-  → veo-3.1-generate-001 (60 credits / 5s)
+  → veo-3.1-lite-generate-001 ($0.03/s → $0.15)
+    kling-v3 ($0.077/s → $0.385)
+    seedance-2-0-pro ($0.7623 for 5s at 720p, token-priced)
+Longest single clip?
+  → seedance-2-5 (up to 30s; $6.94 at 720p, $3.09 at 480p)
+Maximum cinematic quality, native audio?
+  → veo-3.1-generate-001 ($0.20/s → $1.00 for 5s, $1.60 for its 8s maximum)
 ```
+
+No video model renders 60 seconds. Veo caps at 8s, Kling/Hailuo/Wan at 10s,
+Sora 2 at 12s (`sora-2-pro` 25s), Grok at 15s, and only `seedance-2-5` reaches 30s.
 
 ### Chat / Text AI
 
@@ -99,12 +113,24 @@ Bulk summarization?
 
 Gabriel is FOTOhub's model router. It does **not** run the generation for you —
 `POST /v1/ai/gabriel` classifies your intent and returns a routing *decision*
-(which endpoint and model to use, plus a credit estimate). You then call that
-endpoint yourself. Ask Gabriel first when you don't know which model is cheapest
-for a task; skip it when you already do, since the extra round trip buys nothing.
+(which endpoint and model to use). You then call that endpoint yourself. Ask
+Gabriel first when you don't know which model is cheapest for a task; skip it when
+you already do, since the extra round trip buys nothing.
+
+::: danger Do not price anything from `credits_estimated`
+The response still carries a `credits_estimated` field. **Ignore it.** It is a
+leftover from consumer-web credit pricing, its numbers are stale, and the API does
+not bill in credits at all. Price the model Gabriel picked with
+`GET /v1/pricing?model=<id>` and nothing else. The field survives only because
+published SDKs type it as non-optional; it will be removed after a deprecation
+window.
+:::
 
 ::: code-group
 ```python [Python]
+import os
+
+import requests
 from fotohub import FotoHub
 
 client = FotoHub()
@@ -117,7 +143,15 @@ decision = client.gabriel_classify(
 print(decision["action"])            # "route" | "answer" | "workflow" | "error"
 print(decision.get("target"))        # e.g. "/generate/new"
 print(decision.get("model_selected"))
-print(decision.get("credits_estimated"))
+
+# Then price what it chose — do NOT read credits_estimated.
+price = requests.get(
+    "https://apis.fotohub.app/v1/pricing",
+    params={"model": decision["model_selected"]},
+    headers={"Authorization": f"Bearer {os.environ['FOTOHUB_API_KEY']}"},
+    timeout=30,
+).json()
+print(price["legs"]["output"])       # {"unit": ..., "price_usd": ...}
 ```
 ```typescript [TypeScript]
 import { FotoHub } from "fotohub";
@@ -130,7 +164,15 @@ const decision = await client.gabrielClassify({
 });
 
 console.log(decision.action, decision.target);
-console.log(decision.model_selected, decision.credits_estimated);
+console.log(decision.model_selected);
+
+// Then price what it chose — do NOT read credits_estimated.
+const res = await fetch(
+  `https://apis.fotohub.app/v1/pricing?model=${decision.model_selected}`,
+  { headers: { Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}` } },
+);
+const price = await res.json();
+console.log(price.legs.output); // { unit, price_usd }
 ```
 ```go [Go]
 package main
@@ -159,8 +201,10 @@ func main() {
 
     var result map[string]interface{}
     json.NewDecoder(resp.Body).Decode(&result)
-    fmt.Printf("action=%v model=%v credits=%v\n",
-        result["action"], result["model_selected"], result["credits_estimated"])
+    // Price the chosen model with GET /v1/pricing?model=... — the
+    // credits_estimated field in this response is stale and must not be used.
+    fmt.Printf("action=%v model=%v\n",
+        result["action"], result["model_selected"])
 }
 ```
 ```bash [cURL]
@@ -188,10 +232,11 @@ Related endpoints: `POST /v1/ai/gabriel/stream` (same decision, streamed as SSE)
 :::
 
 ::: tip Gabriel is currently free
-`/v1/ai/gabriel` enforces tier access but contains no billing call, so
-classification does not consume credits today. The public catalogue lists
-`gabriel_classify` at 1 credit, so treat free calls as subject to change and do
-not build a cost model that depends on it.
+`/v1/ai/gabriel` enforces rate limits but contains no billing call, so a
+classification costs **$0.00** and your wallet is untouched. It still consumes your
+rate limit. The routing model does cost us tokens, so treat free as subject to
+change rather than a guarantee — don't build a cost model that depends on
+unlimited free classification.
 :::
 
 ---
@@ -313,35 +358,42 @@ phone case" | xargs -P 4 -I {} curl -s -X POST \
 
 ### Volume Savings
 
-There is no automatic monthly-volume discount. Volume savings come from two
-places instead: larger top-up packages carry more bonus credits (see below),
-and Enterprise contracts are priced individually — [contact sales](mailto:sales@fotohub.app).
+There is no volume discount and no bonus on a top-up: **$25 deposited is $25
+spendable**, at every package size. What a larger balance does buy is throughput —
+the pay-as-you-go tiers activate off wallet balance or lifetime spend, with no
+subscription — and Enterprise contracts, which are priced individually
+([contact sales](mailto:sales@fotohub.app)).
 
 ---
 
-## Top-Up Bonuses
+## Top-Up Packages
 
-Wallet top-ups add USD to your balance **and** grant bonus credits on top:
+`GET /v1/billing/topup/packages` is the authoritative list:
 
-| Package slug | Amount | Bonus credits | Bonus % |
-|-------------|--------|---------------|---------|
-| `topup-50` | $15 | +100 | 0% |
-| `topup-100` | $25 | +250 | 5% |
-| `topup-250` | $60 | +700 | 10% |
-| `topup-500` | $120 | +1,500 | 15% |
-| `topup-1000` | $225 | +3,500 | 20% |
-| `topup-5000` | $1,000 | +20,000 | 25% |
+| Package slug | Amount credited | Unlocks |
+|-------------|----------------:|---------|
+| `topup-50` | $15 | — |
+| `topup-100` | $25 | PAYG Standard: 120 rpm, 10 concurrent jobs, 100 MB uploads |
+| `topup-250` | $60 | (Standard) |
+| `topup-500` | $120 | PAYG Premium: 500 rpm, 30 concurrent jobs, 500 MB uploads |
+| `topup-1000` | $225 | (Premium) |
+| `topup-5000` | $1,000 | (Premium) |
 
-::: warning Slug names are historical
+The two thresholds are $25 and $120 of balance, and the package amounts land
+exactly on them — `topup-100` puts you in Standard, `topup-500` in Premium. A
+lifetime spend of $50 or $500 reaches the same tiers without holding the balance.
+
+::: warning Slug names are historical, and there is no bonus
 The slugs still read `topup-50` … `topup-5000` from the pre-USD pricing and no
-longer match the amount. Always send the **slug**, and read the amount from
-`GET /v1/billing/topup/packages` (`amount_usd`) rather than parsing it out of
-the slug.
-:::
+longer match the amount — send the **slug** and read `amount_usd` from the
+packages endpoint rather than parsing the number out of the slug.
 
-::: tip
-`topup-5000` carries the best bonus rate. `topup-500` ($120) also unlocks the
-Pay-As-You-Go Premium tier, which raises your rate limit to 500 req/min.
+Earlier revisions of this page advertised bonus credits ("+250 credits, 5%") per
+package. That grant never existed: the checkout wrote it into Stripe metadata and
+the webhook credited only the dollar amount, so a $15 top-up has always added
+exactly $15. The claim has been removed rather than corrected, because there are no
+credits in this product to grant. If volume pricing returns it will be extra
+**dollars** on the balance.
 :::
 
 ---
@@ -350,11 +402,11 @@ Pay-As-You-Go Premium tier, which raises your rate limit to 500 req/min.
 
 ### Real-Time Usage Dashboard
 
-Check current spend at [fotohub.app/billing/usage](https://fotohub.app/billing/usage):
+Check wallet balance and spend in the [console](https://fotohub.app/console/wallet):
 
-- Daily/weekly/monthly breakdown by category
-- Per-model cost analysis
-- Credit remaining vs. wallet usage ratio
+- Balance, top-up history and the ledger entry behind every charge
+- Spend by day and by model, in USD
+- Any monthly spend cap you have set, and how much of it is used
 
 ### Programmatic Usage Check
 
@@ -432,16 +484,31 @@ curl -s https://apis.fotohub.app/v1/usage \
 
 ### Budget Alerts via Webhooks
 
-Set up automatic alerts when spending thresholds are reached:
+The wallet balance is already a hard ceiling, but you can set a lower monthly one —
+useful for a shared key or an experiment you do not want draining a funded account:
 
 ```python
-# Cap monthly wallet overage (USD). Charges beyond this return HTTP 402.
+# Cap spend for the calendar month (USD). Requests past it return HTTP 402
+# with code "spend_limit_reached" — distinct from insufficient_funds, because
+# topping up will not clear it.
 client.set_overage_limit(25)  # $25 per calendar month
+
+client.set_overage_limit(0)   # 0 or None disables the cap
 ```
 
-Events emitted: `credits.low` (credits exhausted, falling back to the wallet),
-`credits.depleted` (wallet could not cover the charge) and `billing.charged`
-(a wallet charge succeeded, with `amount_usd`).
+Subscribe to these to hear about money moving:
+
+| Event | Fires when |
+|-------|-----------|
+| `billing.charged` | A charge settled. Carries the USD amount. |
+| `billing.refunded` | A charge was reversed. |
+| `billing.insufficient_funds` | A request was refused. Carries `required_usd` and `balance_usd`, so this is your low-balance alarm. |
+| `generation.refunded` | A failed job's charge went back to the wallet. Reconciles against the `billing.charged` that preceded it. |
+
+Take `billing.charged` **and** its reversals, not just the first: a ledger built on
+debits alone over-counts spend on every failed job. `credits.low` and
+`credits.depleted` are also subscribable but belong to fotohub.app subscriptions —
+the API never emits them.
 
 See the [Webhooks Guide](/guides/webhooks) for full integration details.
 
@@ -449,43 +516,82 @@ See the [Webhooks Guide](/guides/webhooks) for full integration details.
 
 ## Cost Optimization Strategies
 
-### 1. Use Gabriel Routing for Chat
+### 1. Ask Gabriel which model, don't hardcode a premium one
 
-Never hardcode a premium model for simple tasks. Gabriel routes 70% of typical queries to economy models with no quality loss.
+Gabriel is free and returns a routing *decision*, not a generation — so the pattern
+is `POST /v1/ai/gabriel` to pick the model, `GET /v1/pricing?model=<id>` to price it,
+then call the generation endpoint yourself. That costs one free round trip and saves
+you from defaulting to `claude-sonnet` for a classification `gemini-flash` does for
+6x less. Skip it when you already know the model — it buys nothing then.
 
-### 2. Cache Repeated Generations
+### 2. Reuse results instead of regenerating
 
-If you generate similar images repeatedly (e.g., product variants), use `seed` to get deterministic results and cache URLs.
+`seed` is accepted on the image routes and forwarded to the provider, so the same
+prompt plus the same seed gives you a repeatable render. Store the returned URL
+against `(prompt, model, seed)` and serve the stored one: a cache hit costs $0.00,
+and re-running a `seedream-5-0-260128` render you already have costs $0.0315 to get
+the same picture back.
+
+Note the asymmetry when you build that cache: image URLs are durable, while **video
+and audio URLs are signed and expire after one hour**. Cache the media, or the
+`job_id`, not the video URL.
 
 ### 3. Start with Lite Models
 
-For video, always prototype with `wan2.2-t2v-plus` (6 credits / 5s) before committing to `veo-3.1-generate-001` (60 credits / 5s).
+For video, always prototype with `wan2.2-t2v-plus` ($0.10 for 5s) before committing
+to `veo-3.1-generate-001` ($1.00 for 5s). Ten Wan previews cost the same as one Veo
+clip, so the draft pass is effectively free next to the final render.
 
-### 4. Use Appropriate Resolution
+### 4. Send the resolution you want
 
-- Thumbnails: 512x512 (cheapest)
-- Social media: 1024x1024 (standard)
-- Print: 2048x2048 (premium cost)
+Twelve image models and `sora-2-pro` price **per resolution**, and this is a real
+trap: omitting the field bills the **top** tier, not the cheapest one. A 1K
+`flux-2-pro` render is $0.03 with `image_size` set and $0.255 without it — an 8.5x
+step for a field you forgot. `sora-2-pro` behaves the same way: $0.30/s at 720p,
+$0.70/s at 1080p, and 1080p is what you get by default.
+
+Everything else is flat-rated: `seedream-5-0-260128` is $0.0315 at every resolution,
+`imagen-4-ultra` $0.160772 at every resolution. Sending `image_size` to a flat model
+costs nothing and saves you from remembering which is which. Seedance video is a
+third case — resolution feeds the **token count** rather than a rate tier, so a 720p
+clip is genuinely ~2x a 480p one.
 
 ### 5. Batch During Off-Peak
 
-Queues are shorter during off-peak hours (02:00-08:00 CET), resulting in faster processing and fewer timeouts (which waste credits on retries).
+Queues are shorter during off-peak hours (02:00-08:00 CET), resulting in faster
+processing and fewer timeouts. A timed-out job is refunded, but the retry is a new
+charge, so fewer retries is less spend.
 
 ### 6. Monitor and Adjust
 
-Review your usage weekly. The top 3 models by spend are usually where optimization has the biggest impact.
+Review your usage weekly and start with whatever you call most. Note that
+`GET /v1/usage` ranks `topModels` by **call count, not spend** — five `veo-3.1`
+renders outspend a thousand `gemini-flash` calls, so multiply each model's count by
+its rate before deciding where to optimise. `latestEvents[].cost` carries the per-call
+amount, and the [console](https://fotohub.app/console/wallet) breaks spend down by
+model directly.
 
 ---
 
 ## Cost Comparison Table
 
-| Task | Cheap option | Premium option | Savings |
-|------|-------------|---------------|---------|
-| Product photo | flux-2-klein-4b (1 cr) | imagen-4-ultra (5 cr) | 80% |
-| Social video | wan2.2-t2v-plus (6 cr / 5s) | veo-3.1-generate-001 (60 cr / 5s) | 90% |
-| Chat summary | gemini-flash (0.026 cr) | claude-sonnet (0.165 cr) | 84% |
-| TTS narration | IDA Voice (1 cr) | — | — |
-| Bulk 100 images | 100 credits | 500 credits (premium) | 80% |
+Same job, cheapest model that does it against the premium one. Every figure is USD
+off `GET /v1/pricing`.
+
+| Task | Cheap option | Premium option | Saving |
+|------|-------------|---------------|-------:|
+| Product photo | `flux-2-klein-4b` $0.015005 | `imagen-4-ultra` $0.160772 | 91% |
+| Product photo, good default | `seedream-5-0-260128` $0.0315 | `gemini-3-pro-image` $0.134 | 76% |
+| Social video, 5s | `wan2.2-t2v-plus` $0.10 | `veo-3.1-generate-001` $1.00 | 90% |
+| Seedance clip, 5s | `seedance-2-0-mini` $0.38115 (720p) | `seedance-2-5` $1.16523 (720p) | 67% |
+| Chat summary (75 in / 150 out) | `gemini-flash` $0.000398 | `claude-sonnet` $0.002475 | 84% |
+| TTS, 1000 characters | `tts-google` / `tts-azure` $0.015 | `tts-elevenlabs` $0.03 | 50% |
+| Bulk 100 images | $1.50 on `flux-2-klein-4b` | $16.08 on `imagen-4-ultra` | 91% |
+
+The "premium option" column is not a warning — `imagen-4-ultra` earns its price on a
+hero shot. The point is that the whole batch rarely needs it, and the spread between
+the two columns is roughly 10x on images and video, so choosing per-asset instead of
+per-project is where the money is.
 
 ---
 
