@@ -16,7 +16,13 @@ export default defineConfig({
     ['meta', { property: 'og:description', content: 'Generate images, video, music, 3D, and chat with 50+ AI models through a single unified API. SDKs for Python and TypeScript.' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
-    ['link', { href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap', rel: 'stylesheet' }],
+    // Geist (UI/display) + Geist Mono (code, labels, figures) — one family, two
+    // widths, so the hero is a plain neutral grotesque with straight terminals.
+    // Inter/JetBrains Mono was the original pair (the default of every generated
+    // docs theme); Schibsted Grotesk replaced it but its slanted terminals and
+    // narrow 'g' read as crooked at 66px. Geist is also what status.fotohub.app
+    // uses, so the two properties now read as one product.
+    ['link', { href: 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600&display=swap', rel: 'stylesheet' }],
   ],
 
   themeConfig: {

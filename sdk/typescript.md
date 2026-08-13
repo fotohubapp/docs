@@ -1792,11 +1792,17 @@ curl -X GET https://apis.fotohub.app/v1/billing/balance \
 getPricing(): Promise<PricingCatalog>
 ```
 
-Returns the full USD pricing catalog — the same rate table `bill_operation`
-charges from. Prefer `GET /v1/pricing` (the [Model Pricing](/api/models) page)
-for anything you display or budget against; this endpoint's `pricing` object is
-converted from a legacy PLN catalog at the live NBP rate and can drift against
-the actual charge.
+Returns the full USD pricing catalog. `margin_info` states the rule that applies
+to every figure on it: the provider's own rate, 1:1, with no platform fee added,
+billed from your prepaid wallet.
+
+Prefer `GET /v1/pricing` (the [Model Pricing](/api/models) page) for anything you
+display or budget against. Both endpoints are USD, but this one rounds each entry
+to four decimals, so a fraction-of-a-cent leg (prompt enhancement is $0.0004)
+reads as `0.0004` here while `/v1/pricing` gives you the unrounded per-unit rate
+`bill_operation` actually charges. There is no credit column: `credit_costs` was
+removed, because an API call cannot be paid for in credits — a key holding
+web-app credits and a $0 wallet gets HTTP 402.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1826,11 +1832,18 @@ curl -X GET https://apis.fotohub.app/v1/billing/pricing \
 getPlans(): Promise<ApiPlan[]>
 ```
 
-Returns all available API subscription plans with their features. A plan buys
-rate limits and model access — it does **not** fund API calls. Every call is
-charged to the prepaid USD wallet, so a subscriber on a plan with a monthly
-credit grant and a $0 balance still gets HTTP 402. Plans keep their PLN
-monthly price (`price_pln`); only wallet spending is USD.
+::: warning There are no plans to list
+This endpoint returns an **empty array**. The API sells no subscription: rate
+limits come from a tier that is derived from your wallet balance and lifetime
+spend, and `POST /v1/tiers/subscribe` answers 410. It is still served as a 200 so
+an integration already calling it keeps working — it will simply find nothing to
+iterate. Use [`getTierCatalog()`](#get-tier-catalog) for the limits and
+[`getTopupPackages()`](#get-top-up-packages) for what you can actually buy.
+:::
+
+```json
+{ "plans": [] }
+```
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1942,41 +1955,94 @@ curl -X PUT https://apis.fotohub.app/v1/billing/overage-limit \
 getTopupPackages(): Promise<TopupPackage[]>
 ```
 
-Returns available wallet top-up packages. Each package credits its face value
-in USD to the prepaid wallet — there is no bonus and no credit unit involved.
+Returns the 12 wallet top-up packages. Each credits `total_usd` — what you pay
+plus the **volume bonus**, which is extra spendable dollars, not a credit unit.
+From $500 up every rung earns one, rising from 5% to 20%.
 
 ::: code-group
 ```typescript [TypeScript]
 const packages = await client.getTopupPackages();
 for (const pkg of packages) {
-  console.log(`${pkg.slug}: $${pkg.amount_usd} credited to the wallet`);
+  console.log(
+    `${pkg.slug}: pay $${pkg.amount_usd} → $${pkg.total_usd} in the wallet` +
+      (pkg.bonus_usd ? ` (+$${pkg.bonus_usd}, ${pkg.bonus_pct}%)` : ''),
+  );
 }
+// scale-1000: pay $1000 → $1100 in the wallet (+$100, 10%)
 ```
 
 ```python [Python]
 packages = client.get_topup_packages()
 for pkg in packages:
-    print(f"{pkg['slug']}: ${pkg['amount_usd']} credited to the wallet")
+    print(f"{pkg['slug']}: pay ${pkg['amount_usd']} → ${pkg['total_usd']}")
 ```
 
 ```go [Go]
 packages, _ := client.GetTopupPackages()
 for _, pkg := range packages {
-    fmt.Printf("%s: $%.0f credited to the wallet\n", pkg.Slug, pkg.AmountUSD)
+    fmt.Printf("%s: pay $%.0f → $%.0f\n", pkg.Slug, pkg.AmountUSD, pkg.TotalUSD)
 }
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/billing/topup/packages \
-  -H "Authorization: Bearer fh_live_your_api_key"
+curl -X GET https://apis.fotohub.app/v1/billing/topup/packages
 ```
 :::
 
-Available slugs: `topup-50` ($15), `topup-100` ($25), `topup-250` ($60),
-`topup-500` ($120), `topup-1000` ($225), `topup-5000` ($1000). The names look
-mismatched against the slugs on purpose — these are new price points the owner
-approved directly, and the slugs stayed the same so nothing keying off
-`"topup-50"` breaks.
+The endpoint is public — no key required — so you can render the pricing table
+before a visitor signs up.
+
+| Slug | You pay | Bonus | Credited |
+|------|--------:|------:|---------:|
+| `topup-50` | $15 | — | $15 |
+| `topup-100` | $25 | — | $25 |
+| `topup-250` | $60 | — | $60 |
+| `topup-500` | $120 | — | $120 |
+| `scale-500` | $500 | +$25 (5%) | $525 |
+| **`scale-1000`** | **$1,000** | **+$100 (10%)** | **$1,100** |
+| `scale-2000` | $2,000 | +$240 (12%) | $2,240 |
+| `scale-3000` | $3,000 | +$390 (13%) | $3,390 |
+| `scale-5000` | $5,000 | +$750 (15%) | $5,750 |
+| `scale-7500` | $7,500 | +$1,275 (17%) | $8,775 |
+| `scale-10000` | $10,000 | +$1,800 (18%) | $11,800 |
+| **`scale-15000`** | **$15,000** | **+$3,000 (20%)** | **$18,000** |
+
+::: warning The four starter slugs are not their amounts
+`topup-50` charges **$15**, `topup-100` **$25**, `topup-250` **$60** and
+`topup-500` **$120** — historical names from the pre-USD PLN pricing, kept so
+nothing keying off `"topup-50"` breaks. The `scale-*` slugs do match their dollar
+amounts. Read `amount_usd` / `total_usd` from the API rather than hardcoding
+either. `topup-1000` ($225) and `topup-5000` ($1,000) still resolve but are no
+longer listed.
+:::
+
+### Get the Package List with the Bonus Ladder
+
+```typescript
+getTopupPackageList(): Promise<TopupPackageList>
+```
+
+Returns the same packages plus `min_usd`, `max_usd` and `bonus_tiers` — the
+machine-readable ladder. Use this when you quote a **custom** amount, because the
+bonus is a function of the money, not of the package.
+
+```typescript
+const { packages, min_usd, max_usd, bonus_tiers } = await client.getTopupPackageList();
+
+// bonus_tiers is ordered high → low; the FIRST match wins.
+function bonusFor(amountUsd: number): number {
+  const tier = bonus_tiers.find((t) => amountUsd >= t.min_usd);
+  return tier ? Math.floor(amountUsd * tier.bonus_pct) / 100 : 0;
+}
+
+bonusFor(2500);  // 325 — the 13% rung
+bonusFor(499);   // 0 — below the first rung
+console.log(`Custom top-ups: $${min_usd}–$${max_usd}`);
+```
+
+Iterate `bonus_tiers` **in the order the API returns it** and stop at the first
+match. Sorting it ascending would pay a $15,000 top-up the $500 rung's 5% instead
+of 20% — a $2,250 error. Rungs never stack, and the bonus is floored to the cent.
 
 ### Create Top-Up
 
@@ -1984,24 +2050,26 @@ approved directly, and the slugs stayed the same so nothing keying off
 createTopup(packageSlug: string): Promise<TopupResult>
 ```
 
-Buys a wallet top-up package. Returns a checkout URL for payment; payment
-credits `amount_usd` to the prepaid wallet, the only thing that pays for API
-calls.
+Buys a wallet top-up package. Returns a checkout URL for payment; payment credits
+`total_usd` — the amount paid plus the bonus — to the prepaid wallet, the only
+thing that pays for API calls. The bonus lands as its own `top_up_bonus` ledger
+row beside the `top_up` row.
 
 ::: code-group
 ```typescript [TypeScript]
-const { checkout_url } = await client.createTopup('topup-500');
-console.log(`Complete purchase: ${checkout_url}`);
-// Redirect user to checkout_url
+const topup = await client.createTopup('scale-1000');
+console.log(`Pay $${topup.amount_usd}, get $${topup.total_credited_usd}`);
+// Pay $1000, get $1100
+// Redirect user to topup.checkout_url
 ```
 
 ```python [Python]
-result = client.create_topup("topup-500")
+result = client.create_topup("scale-1000")
 print(f"Complete purchase: {result['checkout_url']}")
 ```
 
 ```go [Go]
-result, _ := client.CreateTopup("topup-500")
+result, _ := client.CreateTopup("scale-1000")
 fmt.Printf("Complete purchase: %s\n", result.CheckoutURL)
 ```
 
@@ -2009,9 +2077,14 @@ fmt.Printf("Complete purchase: %s\n", result.CheckoutURL)
 curl -X POST https://apis.fotohub.app/v1/billing/topup \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"package": "topup-500"}'
+  -d '{"package": "scale-1000"}'
 ```
 :::
+
+Send `{"amount_usd": 2500}` instead of `package` for a custom amount between $10
+and $15,000; `package` comes back `null` and the bonus is computed from the
+ladder. Either way the bonus is **recomputed from the amount actually captured**
+at payment, so a Stripe-side adjustment cannot desync it from the ladder.
 
 ### Get Transactions
 
@@ -2153,18 +2226,30 @@ Manage subscription tiers, compare plans, and handle enterprise applications.
 getTierCatalog(): Promise<TierCatalog>
 ```
 
-Returns all available tiers with features and limits. Subscription tiers keep
-their monthly price in PLN (`price_monthly`); the response's top-level
-`currency: "USD"` refers to the pay-as-you-go wallet and overage charges,
-not to `price_monthly`.
+Returns every tier with its features and limits. Nothing on it has a price: the
+API is prepaid, so a tier is a **rate-limit definition**, not a product. Every
+row carries `price_monthly: null` (or `0` on pay-as-you-go) and
+`purchasable: false`, and the response states it outright:
+
+```json
+{
+  "currency": "USD",
+  "payg_currency": "USD",
+  "billing_cycle": "prepaid",
+  "subscriptions_retired": true,
+  "overage_policy": "None. The API is prepaid: every call is charged to your wallet at the provider's own rate, and a call that would exceed your balance is declined with HTTP 402 instead of being billed."
+}
+```
 
 ::: code-group
 ```typescript [TypeScript]
 const catalog = await client.getTierCatalog();
 for (const tier of [...catalog.payg, ...catalog.subscriptions]) {
+  // Print the limits, not a price — there is no price to print.
   console.log(
     `${tier.name}: ${tier.limits.rpm} rpm, ` +
-    `${tier.price_monthly} ${tier.price_currency}/mo`
+    `${tier.limits.concurrent_jobs} concurrent, ` +
+    `${tier.limits.storage_gb} GB`
   );
 }
 ```
@@ -2172,13 +2257,15 @@ for (const tier of [...catalog.payg, ...catalog.subscriptions]) {
 ```python [Python]
 catalog = client.get_tier_catalog()
 for tier in [*catalog["payg"], *catalog["subscriptions"]]:
-    print(f"{tier['name']}: {tier['limits']['rpm']} rpm, {tier['price_monthly']} {tier['price_currency']}/mo")
+    lim = tier["limits"]
+    print(f"{tier['name']}: {lim['rpm']} rpm, {lim['concurrent_jobs']} concurrent, {lim['storage_gb']} GB")
 ```
 
 ```go [Go]
 catalog, _ := client.GetTierCatalog()
 for _, tier := range append(catalog.Payg, catalog.Subscriptions...) {
-    fmt.Printf("%s: %d rpm, %.0f %s/mo\n", tier.Name, tier.Limits.RPM, tier.PriceMonthly, tier.PriceCurrency)
+    fmt.Printf("%s: %d rpm, %d concurrent, %d GB\n",
+        tier.Name, tier.Limits.RPM, tier.Limits.ConcurrentJobs, tier.Limits.StorageGB)
 }
 ```
 
@@ -2188,12 +2275,20 @@ curl -X GET https://apis.fotohub.app/v1/tiers/catalog \
 ```
 :::
 
-::: tip payg vs. subscriptions
-The response has no flat `tiers` array — pay-as-you-go tiers (auto-resolved
-from your wallet balance) and paid subscriptions arrive as two separate
-arrays, `payg` and `subscriptions`. Each entry's `price_currency` says whether
-its own `price_monthly` is USD or PLN; do not assume the payload's top-level
-`currency` (always `"USD"`, the wallet currency) applies to every row.
+::: tip Why `subscriptions` still exists
+The response has no flat `tiers` array — it arrives as two: `payg`, whose tier is
+resolved automatically from your wallet balance and lifetime spend, and
+`subscriptions`, which carries `subscriptions_retired: true`.
+
+Those `sub-*` rows are **not** on sale. They are still published because they are
+live rate-limit definitions: an account that held one before 2026-08-13 keeps
+being served its limits, so the numbers it is enforced against have to be
+readable. Each retired row states this per entry — `purchasable: false`,
+`legacy: true`, `upgrade_path: "wallet_topup"`. The one exception is
+`sub-enterprise`: never self-served, `upgrade_path: "contact_sales"`.
+
+To raise your limits, fund the wallet — see
+[Get Top-Up Packages](#get-top-up-packages).
 :::
 
 ### Get Current Tier
@@ -2241,10 +2336,24 @@ curl -X GET https://apis.fotohub.app/v1/tiers/current \
 compareTiers(): Promise<TierComparison>
 ```
 
-Returns every tier flattened into one comparison list. It does not mark which
-tier is yours — get that from [`getCurrentTier()`](#get-current-tier).
-`price_monthly` is in `comparison.currency` (`"PLN"`); only wallet spending is
-USD.
+Returns every tier flattened into one comparison list of limits. It does not mark
+which tier is yours — get that from [`getCurrentTier()`](#get-current-tier).
+
+There is no price column. `price_monthly` and `monthly_credits` were removed from
+this response on 2026-08-13 (they quoted 49/199/799 PLN for plans that cannot be
+bought), and the top level now says what the API actually charges:
+
+```json
+{
+  "currency": "USD",
+  "billing_model": "prepaid_wallet_usd",
+  "subscriptions_retired": true
+}
+```
+
+Each row carries `purchasable: false` plus an `upgrade_path` —
+`"wallet_topup"` for everything self-serve, `"contact_sales"` for
+`sub-enterprise`.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -2279,38 +2388,60 @@ curl -X GET https://apis.fotohub.app/v1/tiers/compare \
 ```
 :::
 
-### Subscribe to Tier
+### Subscribe to Tier — retired
 
 ```typescript
+/** @deprecated Retired 2026-08-13 — always throws. */
 subscribeTier(slug: string): Promise<{ checkout_url: string }>
 ```
 
-Initiates a tier subscription. Returns a Stripe checkout URL for payment.
+::: danger Removed as a product on 2026-08-13
+`POST /v1/tiers/subscribe` answers **HTTP 410** for every tier, and this method
+is a throwing stub kept only so upgrading the SDK gives you a compile-time
+deprecation instead of a `TypeError` with nothing pointing at the replacement.
+
+```json
+{
+  "error": "api_subscriptions_retired",
+  "use_instead": "POST /v1/tiers/wallet/topup"
+}
+```
+:::
+
+There are no paid API plans. Rate limits follow the prepaid wallet: top up more
+and the tier rises on its own, with no monthly commitment to cancel. The swap is
+in your favour — from $500 up a top-up earns a 5–20% volume bonus that a monthly
+fee never gave you.
 
 ::: code-group
 ```typescript [TypeScript]
-const { checkout_url } = await client.subscribeTier('sub-developer');
-console.log(`Subscribe: ${checkout_url}`);
-// Redirect user to checkout_url
+// Before: await client.subscribeTier('sub-developer');   // now throws (410)
+const topup = await client.createTopup('scale-1000');
+console.log(`Pay $${topup.amount_usd}, get $${topup.total_credited_usd}`);
 ```
 
 ```python [Python]
-result = client.subscribe_tier("sub-developer")
-print(f"Subscribe: {result.checkout_url}")
+# Before: client.subscribe_tier("sub-developer")   # now raises (410)
+result = client.create_topup("scale-1000")
+print(f"Complete purchase: {result['checkout_url']}")
 ```
 
 ```go [Go]
-result, _ := client.SubscribeTier("sub-developer")
-fmt.Printf("Subscribe: %s\n", result.CheckoutURL)
+// Before: client.SubscribeTier("sub-developer")   // now returns a 410 error
+result, _ := client.CreateTopup("scale-1000")
+fmt.Printf("Complete purchase: %s\n", result.CheckoutURL)
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/tiers/subscribe \
+curl -X POST https://apis.fotohub.app/v1/tiers/wallet/topup \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"slug": "sub-developer"}'
+  -d '{"amount_usd": 1000}'
 ```
 :::
+
+`sub-enterprise` is the one exception and was never bought this way: it is a
+contract, via `POST /v1/tiers/enterprise/apply`.
 
 ### Get Wallet
 
@@ -2353,29 +2484,44 @@ topupWallet(
 ): Promise<{
   checkout_url: string;
   amount_usd: number;
+  /** Volume bonus in extra spendable dollars; `0` below $500. */
+  bonus_usd: number;
+  /** `amount_usd + bonus_usd` — the balance increase on payment. */
+  total_credited_usd: number;
   pay_currency: string;
 }>
 ```
 
-Initiates a wallet top-up for the given amount in USD (minimum $10, maximum $15,000). Returns a Stripe checkout URL. Polish customers can add `pay_currency: 'pln'` to pay by BLIK/card/bank transfer in PLN while the wallet is still credited the USD amount. There is no bonus and nothing here is denominated in credits — the response's `bonus_credits` field, if present, is a deprecated leftover that is always `null`.
+Tops the wallet up by any amount between **$10** and **$15,000** — the package-free
+path, for a slider or a text field. Returns a Stripe checkout URL. Polish customers
+can add `pay_currency: 'pln'` to pay by BLIK/card/bank transfer in PLN while the
+wallet is still credited the USD amount.
+
+From $500 up the amount earns a **volume bonus** in extra spendable dollars, on the
+same ladder the packages use, so a custom $2,500 is credited $2,825 exactly as a
+$2,500 preset would be. `bonus_usd` and `total_credited_usd` are the quote;
+`total_credited_usd` is what the balance becomes. The response's `bonus_credits`
+field, if present, is a deprecated leftover that is always `null` — the bonus is
+dollars, and this product has no credits.
 
 ::: code-group
 ```typescript [TypeScript]
-const { checkout_url } = await client.topupWallet(100);
-console.log(`Pay: ${checkout_url}`);
-// Redirect user to checkout_url
+const topup = await client.topupWallet(1000);
+console.log(`Pay $${topup.amount_usd}, get $${topup.total_credited_usd}`);
+// Pay $1000, get $1100
+// Redirect user to topup.checkout_url
 
-// Pay in PLN via BLIK while still crediting $100 to the wallet
-const blik = await client.topupWallet(100, 'pln');
+// Pay in PLN via BLIK while still crediting USD to the wallet
+const blik = await client.topupWallet(1000, 'pln');
 ```
 
 ```python [Python]
-result = client.topup_wallet(100)
-print(f"Pay: {result['checkout_url']}")
+result = client.topup_wallet(1000)
+print(f"Pay: {result['checkout_url']} — credited ${result['total_credited_usd']}")
 ```
 
 ```go [Go]
-result, _ := client.TopupWallet(100)
+result, _ := client.TopupWallet(1000)
 fmt.Printf("Pay: %s\n", result.CheckoutURL)
 ```
 
@@ -2383,9 +2529,14 @@ fmt.Printf("Pay: %s\n", result.CheckoutURL)
 curl -X POST https://apis.fotohub.app/v1/tiers/wallet/topup \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"amount_usd": 100}'
+  -d '{"amount_usd": 1000}'
 ```
 :::
+
+The bonus is recomputed from the amount actually captured at payment, so the quote
+above can never disagree with the grant. Use
+[`getTopupPackageList()`](#get-the-package-list-with-the-bonus-ladder) to show the
+bonus **before** the customer commits.
 
 ### Apply for Enterprise
 
@@ -3246,7 +3397,8 @@ FOTOhub-specific endpoints, not this one.
 | `getTierCatalog()` | Get all tiers | `Promise<TierCatalog>` |
 | `getCurrentTier()` | Get your current tier | `Promise<TierInfo>` |
 | `compareTiers()` | Compare all tiers | `Promise<TierComparison>` |
-| `subscribeTier(tierSlug)` | Subscribe to tier | `Promise<{ checkout_url: string }>` |
+| ~~`subscribeTier(tierSlug)`~~ | **Retired 2026-08-13** — throws (410). Use `createTopup()` | `never` |
+| `getTopupPackageList()` | Packages + bonus ladder + bounds | `Promise<TopupPackageList>` |
 | `getWallet()` | Get wallet balance | `Promise<WalletInfo>` |
 | `topupWallet(amountUsd, payCurrency?)` | Top up wallet | `Promise<{ checkout_url: string }>` |
 | `applyEnterprise(application)` | Apply for enterprise | `Promise<{ id: string; status: string }>` |

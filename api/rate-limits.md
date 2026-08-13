@@ -35,28 +35,43 @@ Either condition promotes you: a balance you are *holding*, or money you have al
 *spent*. Dropping back below the balance threshold demotes you again unless lifetime
 spend keeps you there.
 
-### Subscription Tiers
+There is no "Free" tier: an account with an empty wallet is `payg-basic` at 30 rpm.
+The slugs are what `X-Tier` and the `tier` field return.
 
-::: info Wallet thresholds are USD, subscription prices are PLN
-PAYG tiers unlock on your **USD** wallet balance and lifetime spend. The API
-subscription plans below are still billed in PLN, because they are a Polish-entity
-subscription — but **everything you generate is still billed in USD from the wallet**.
-A plan buys throughput, not usage.
-:::
+### Enterprise
 
 | Tier | Slug | Price | Requests / Minute |
 |------|------|-------|------------------:|
-| Developer | `sub-developer` | 49 PLN/mo | 60 |
-| Startup | `sub-startup` | 199 PLN/mo | 300 |
-| Business | `sub-business` | 799 PLN/mo | 1,000 |
 | Enterprise | `sub-enterprise` | Custom | 5,000 |
 
-There is no "Free" tier: an account with no subscription and an empty wallet is
-`payg-basic` at 30 rpm. The slugs are what `X-Tier` and the `tier` field return —
-`sub-developer`, not `developer`.
+Above `payg-premium`, throughput is provisioned by sales. Apply at
+`POST /v1/tiers/enterprise/apply`; it cannot be self-served.
 
-Note that a `sub-developer` plan is **60 rpm, half of what `payg-standard` gives you
-for free** at a $25 balance. Check the numbers before subscribing for throughput.
+### Subscription tiers — retired
+
+**Paid API plans were retired on 2026-08-13.** `POST /v1/tiers/subscribe` now
+answers `410` with `{"error": "api_subscriptions_retired"}`, and every
+`sub-developer` / `sub-startup` / `sub-business` row reports
+`price_monthly: null` with `purchasable: false`.
+
+They were the wrong shape for a prepaid product, and the numbers said so:
+`sub-developer` was 49 PLN/mo for **60 rpm — half of what `payg-standard` gives
+you free** at a $25 balance. A plan never funded a single generation either, since
+every call has always been charged to the USD wallet.
+
+Throughput now follows the wallet, so a top-up is the only upgrade path — and from
+$500 up it also earns a
+[volume bonus of 5–20%](/api/billing#get-v1-billing-topup-packages) in extra
+spendable dollars, which a monthly fee never did.
+
+Accounts that held one of those plans before the cutover keep their limits, and
+the slugs still resolve in `X-Tier` and the `tier` field:
+
+| Retired tier | Slug | Requests / Minute |
+|------|------|------------------:|
+| Developer | `sub-developer` | 60 |
+| Startup | `sub-startup` | 300 |
+| Business | `sub-business` | 1,000 |
 
 ### Your Current Tier
 

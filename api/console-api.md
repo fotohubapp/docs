@@ -115,9 +115,9 @@ unlike `/console/stats`, which is pinned to 30 days.
     "avg_rpm_active": 2.53, "active_minutes": 43,
     "requests_last_60m": 1, "tokens_last_60m": 0,
     "requests_today": 53, "tokens_today": 90112,
-    "tier": "sub-business",
-    "limit_rpm": 1000, "limit_tpm": 2000000, "limit_daily_quota": 50000,
-    "pct_rpm": 1.3, "pct_tpm": 0.82, "pct_daily_quota": 0.11
+    "tier": "payg-premium",
+    "limit_rpm": 500, "limit_tpm": 500000, "limit_daily_quota": 10000,
+    "pct_rpm": 2.6, "pct_tpm": 3.28, "pct_daily_quota": 0.53
   }
 }
 ```
@@ -373,43 +373,71 @@ GET /v1/console/usage/realtime
 
 ```json
 {
-  "tier": "sub-developer",
+  "tier": "payg-standard",
+  "wallet": {
+    "balance_usd": 26.8412,
+    "currency": "USD",
+    "spent_this_month_usd": 3.4821,
+    "can_generate": true,
+    "topup_url": "https://fotohub.app/console/wallet"
+  },
   "credits": {
-    "available": 450,
-    "used_4h": 12.5,
-    "limit_4h": 200,
-    "remaining_4h": 187.5,
-    "used_period": 50,
-    "limit_period": 500,
-    "remaining_period": 450
+    "legacy_web_available": 450,
+    "reflects_api_usage": false,
+    "used_4h": 0,
+    "limit_4h": 500,
+    "remaining_4h": 500,
+    "used_period": 0,
+    "limit_period": 0,
+    "remaining_period": 0
   },
   "rate_limits": {
-    "rpm": 60,
-    "tpm": 50000,
-    "daily_quota": 500
+    "rpm": 120,
+    "tpm": 100000,
+    "daily_quota": 2000
   },
   "total_requests_30d": 1250,
   "status": "active"
 }
 ```
 
+::: warning Read `wallet.can_generate`, not the credit block
+The API is prepaid in US dollars. `wallet.balance_usd` is the only figure that
+decides whether a generation is accepted — at `0` every generation endpoint returns
+`402` with code `insufficient_funds` and nothing is charged.
+
+The `credits` block describes your **fotohub.app subscription**, a separate
+product. Credits cannot pay for an API call, which is why the field is named
+`legacy_web_available` rather than `available`. The four `used_*` / `remaining_*`
+counters are incremented only by web-app generations — hence
+`reflects_api_usage: false` — so on an API-only account they stay at `0`
+permanently, and on a PAYG tier `limit_period` is `0` because there is no monthly
+allowance to draw down. Do not build a throttle on them; use `rate_limits` and the
+wallet balance.
+:::
+
 ::: tip Limits are derived from `tier`, so they move together
 Every field under `rate_limits`, plus `limit_4h` and `limit_period`, is looked up
 from one table keyed by `tier` — they are never mixed between tiers. The values
-above are the real `sub-developer` row. If you are hardcoding expectations in a
+above are the real `payg-standard` row. If you are hardcoding expectations in a
 test, take all of them from the same tier or the response will not match.
 :::
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `tier` | string | Your account tier. Real values: `payg-basic`, `payg-standard`, `payg-premium`, `sub-developer`, `sub-startup`, `sub-business`, `sub-enterprise` (plus the legacy `free` / `starter` / `medium` / `professional` / `business` / `team` names on older accounts) |
-| `credits.available` | float | `profiles.ai_credits` — the standing credit balance, unrelated to the 4h/period windows below (those are usage counters, not a balance) |
-| `credits.used_4h` | float | Credits consumed in the last 4-hour window |
-| `credits.limit_4h` | float | Maximum credits allowed per 4-hour window |
-| `credits.remaining_4h` | float | Credits remaining in the current 4-hour window |
-| `credits.used_period` | float | Credits consumed in the current billing period |
-| `credits.limit_period` | float | Maximum credits allowed per billing period |
-| `credits.remaining_period` | float | Credits remaining in the current billing period |
+| `tier` | string | Your resolved account tier. Real values: `payg-basic`, `payg-standard`, `payg-premium`, `sub-enterprise`, plus the retired `sub-developer` / `sub-startup` / `sub-business` on accounts that held one of those plans before 2026-08-13 (and the legacy `free` / `starter` / `medium` / `professional` / `business` / `team` names on older accounts) |
+| `wallet.balance_usd` | float | Prepaid USD balance — the only figure that funds a call |
+| `wallet.spent_this_month_usd` | float | Month-to-date wallet spend, the same sum the spend cap enforces |
+| `wallet.can_generate` | boolean | `balance_usd > 0`. `false` means the next generation returns `402 insufficient_funds` |
+| `wallet.topup_url` | string | Where to send the user to add funds |
+| `credits.legacy_web_available` | float | `profiles.ai_credits` — the fotohub.app subscription balance. Cannot pay for an API call |
+| `credits.reflects_api_usage` | boolean | Always `false`: the counters below are written only by web-app generations |
+| `credits.used_4h` | float | Web credits consumed in the last 4-hour window |
+| `credits.limit_4h` | float | Maximum web credits per 4-hour window for this tier |
+| `credits.remaining_4h` | float | Web credits remaining in the current 4-hour window |
+| `credits.used_period` | float | Web credits consumed in the current billing period |
+| `credits.limit_period` | float | Maximum web credits per billing period. `0` on every PAYG tier |
+| `credits.remaining_period` | float | Web credits remaining in the current billing period |
 | `rate_limits.rpm` | integer | Requests per minute limit |
 | `rate_limits.tpm` | integer | Tokens per minute limit |
 | `rate_limits.daily_quota` | integer | Maximum daily requests |
@@ -1080,34 +1108,37 @@ GET /v1/billing/balance
 
 ```json
 {
-  "tier": "sub-developer",
-  "credits": {
-    "used_4h": 12,
-    "limit_4h": 200,
-    "remaining_4h": 188,
-    "used_period": 50,
-    "limit_period": 500,
-    "remaining_period": 450,
-    "bonus_remaining": 0
-  },
   "wallet": {
-    "balance": 33.63,
-    "currency": "USD",
-    "pending": 0,
-    "total_earned": 60.00,
-    "total_withdrawn": 0
+    "balance_usd": 33.63,
+    "pending_usd": 0,
+    "total_topped_up_usd": 60.00,
+    "currency": "USD"
   },
+  "spend": {
+    "this_month_usd": 4.12,
+    "monthly_limit_usd": 25.0,
+    "remaining_usd": 20.88,
+    "currency": "USD"
+  },
+  "billing_model": "prepaid_wallet_usd",
   "api_subscription": null,
   "overage": {
     "spent_this_month": 4.12,
     "hard_limit_usd": 25.0,
-    "remaining": 20.88
+    "remaining": 20.88,
+    "deprecated": "renamed to `spend`; a prepaid wallet has no overage"
   }
 }
 ```
 
-The wallet is USD. `credits.*` are credit counts, not money — 1 credit is worth
-$0.0536 if the operation falls through to wallet billing.
+There is no credit block here — the API is prepaid in USD and has no credit unit.
+`wallet.balance_usd` is what funds a call, and `total_topped_up_usd` includes any
+volume bonus that was credited.
+
+`api_subscription` is `null` on every account opened after 2026-08-13, when paid
+API plans were retired. `overage` is the old key name for `spend` with the same
+numbers, kept one release; "overage" is the wrong word for a prepaid account, where
+spending past the balance is declined rather than billed.
 
 ### Get Usage History
 
@@ -1274,8 +1305,9 @@ POST /v1/billing/topup
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `package` | string | Yes | One of `topup-50`, `topup-100`, `topup-250`, `topup-500`, `topup-1000`, `topup-5000` |
-| `pay_currency` | string | No | `usd` (default) or `pln` — changes only what Stripe charges; the wallet is always credited the USD amount |
+| `package` | string | No | One of `topup-50`, `topup-100`, `topup-250`, `topup-500`, `scale-500`, `scale-1000`, `scale-2000`, `scale-3000`, `scale-5000`, `scale-7500`, `scale-10000`, `scale-15000`. Provide this or `amount_usd` |
+| `amount_usd` | number | No | Custom amount, $10–$15,000, whole cents only. Earns the same volume bonus as a package of the same size. Provide this or `package` |
+| `pay_currency` | string | No | `usd` (default) or `pln` — changes only what Stripe charges; the wallet is always credited the same USD amount |
 
 **Response (200 OK):**
 
@@ -1283,10 +1315,17 @@ POST /v1/billing/topup
 {
   "checkout_url": "https://checkout.stripe.com/c/pay/cs_live_...",
   "package": {
-    "slug": "topup-500",
-    "name": "$120",
-    "amount_usd": 120
+    "slug": "scale-1000",
+    "name": "$1,000",
+    "amount_usd": 1000,
+    "bonus_usd": 100,
+    "total_usd": 1100,
+    "bonus_pct": 10,
+    "popular": true
   },
+  "amount_usd": 1000,
+  "bonus_usd": 100,
+  "total_credited_usd": 1100,
   "pay_currency": "usd"
 }
 ```
@@ -1294,26 +1333,43 @@ POST /v1/billing/topup
 The endpoint returns a Stripe Checkout URL — the balance moves only after the
 payment webhook lands, so there is no `new_balance` in this response.
 
-`amount_usd` is the only figure that moves money. When `pay_currency` is `pln`
-Stripe charges the złoty equivalent at that moment's rate, but the wallet is
-credited `amount_usd` either way, so a settlement rate that drifts by a few
-cents never desyncs your balance from what you were quoted.
+`package` is `null` when you send `amount_usd` instead of a slug. The top-level
+`amount_usd`, `bonus_usd` and `total_credited_usd` are populated on both paths, so
+read those.
 
-::: warning No bonus, no volume discount
-Earlier versions of this page showed `bonus_credits` and `discount_pct` on the
-package object. Neither field exists any more, and neither ever paid out: the
-top-up webhook credits `amount_usd` and nothing else. A prepaid USD wallet has
-no credits to grant. `POST /v1/tiers/wallet/topup` still returns
-`bonus_credits: null` for one release because shipped SDK builds type it — read
-it as "no such thing", not as "this package has no bonus".
+`amount_usd` is what Stripe charges and `total_credited_usd` is what the wallet
+receives. When `pay_currency` is `pln` Stripe charges the złoty equivalent at that
+moment's rate, but the credited USD figure is unaffected, so a settlement rate that
+drifts by a few cents never desyncs your balance from what you were quoted.
+
+::: tip From $500 up, the top-up earns a volume bonus
+`bonus_usd` is extra **real dollars** credited alongside the payment, in the same
+transaction, spendable on any operation and with no expiry. $1,000 credits $1,100;
+$15,000 credits $18,000. The ladder is 5% from $500, 10% from $1,000, 12% from
+$2,000, 13% from $3,000, 15% from $5,000, 17% from $7,500, 18% from $10,000 and 20%
+at $15,000 — published machine-readably as `bonus_tiers` on
+`GET /v1/billing/topup/packages`, ordered highest-first with the first match
+winning. Rungs do not stack and the bonus is floored to the cent, so $499 earns
+nothing.
+
+The `bonus_usd` in this response is a quote; the grant is recomputed server-side
+from the same ladder at capture, so nothing in the checkout metadata can raise it.
+Capture writes a `top_up` ledger row for the payment and a `top_up_bonus` row for
+the bonus.
 :::
 
-::: warning Package slugs are historical
-The slug numbers date from when packages were priced in PLN. The amounts are
-now USD and no longer match the slug: `topup-50` = **$15**, `topup-100` =
-**$25**, `topup-250` = **$60**, `topup-500` = **$120**, `topup-1000` =
-**$225**, `topup-5000` = **$1,000**. Read `amount_usd` from
+::: warning The four starter slugs are not their amounts
+Those slug numbers date from when packages were priced in PLN: `topup-50` =
+**$15**, `topup-100` = **$25**, `topup-250` = **$60**, `topup-500` = **$120**. The
+`scale-*` slugs do match their dollar amounts. `topup-1000` ($225) and
+`topup-5000` ($1,000) are retired from the list but still resolve, and earn
+whatever bonus their amount qualifies for. Read `amount_usd` / `total_usd` from
 `GET /v1/billing/topup/packages`, never the slug.
+
+There is no credit unit anywhere here. An earlier revision showed `bonus_credits`
+and `discount_pct` on the package object; neither ever paid out and both are gone.
+`POST /v1/tiers/wallet/topup` still returns `bonus_credits: null` for one release
+because shipped SDK builds type it — read `bonus_usd` instead.
 :::
 
 ---
@@ -1340,41 +1396,79 @@ Returns the authenticated user's current tier, limits, usage, and upgrade option
 
 ```json
 {
-  "tier": "sub-startup",
-  "name": "Startup",
-  "category": "subscription",
+  "tier": "payg-standard",
+  "name": "Pay-As-You-Go Standard",
+  "category": "payg",
   "limits": {
-    "rpm": 300,
-    "burst_4h": 1000,
-    "monthly_credits": 5000,
-    "concurrent_jobs": 20
+    "rpm": 120,
+    "burst_4h": 500,
+    "monthly_credits": 0,
+    "concurrent_jobs": 10,
+    "max_upload_mb": 100,
+    "storage_gb": 50,
+    "daily_quota": 2000,
+    "tpm": 100000
+  },
+  "access": {
+    "models": "all_standard",
+    "features": ["image_generation", "video_generation", "chat", "music",
+                 "voice", "analysis", "translate", "gabriel", "webhooks",
+                 "generate_3d"],
+    "priority": "normal"
   },
   "usage": {
     "used_4h": 45,
-    "used_period": 1230,
+    "used_period": 0,
     "requests_today": 89
   },
   "wallet": {
-    "balance_usd": 120.00,
+    "balance_usd": 26.84,
     "pending_usd": 0,
     "lifetime_spend": 180.00
-  }
+  },
+  "subscription": null,
+  "upgrade_options": [
+    {
+      "slug": "payg-premium",
+      "name": "Pay-As-You-Go Premium",
+      "category": "payg",
+      "price_monthly": 0,
+      "rpm": 500,
+      "monthly_credits": 0
+    }
+  ]
 }
 ```
 
-### Subscribe to Tier
+`monthly_credits` is `0` on every PAYG tier: there is no allowance to include,
+because the API is paid from the wallet. `wallet.lifetime_spend` is
+`total_earned_usd` — everything ever credited, volume bonuses included — and it is
+one of the two things that unlock a higher tier (see
+[Rate Limits](/api/rate-limits)). `subscription` is `null` on every account opened
+after paid plans were retired on 2026-08-13, and `upgrade_options` all carry
+`price_monthly: 0`, since the tiers activate from the wallet at no cost.
+
+### Subscribe to Tier — retired
 
 ```
 POST /v1/tiers/subscribe
 ```
 
-**Request Body:**
+**Retired 2026-08-13. Every request now returns `410`:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `tier` | string | Yes | Target tier: `sub-developer`, `sub-startup`, `sub-business` |
+```json
+{
+  "error": "api_subscriptions_retired",
+  "use_instead": "POST /v1/tiers/wallet/topup"
+}
+```
 
-Returns a Stripe checkout URL for the subscription payment.
+Paid API plans are gone. Rate limits follow your prepaid wallet balance instead,
+so a top-up is the upgrade path — and from $500 up it earns a
+[volume bonus](#top-up-the-wallet) in extra spendable dollars, which a monthly fee
+never did. `sub-developer` / `sub-startup` / `sub-business` still resolve for
+accounts that held one before the cutover, and all report `price_monthly: null`
+with `purchasable: false`. For above `payg-premium`, apply below.
 
 ### Enterprise Application
 
@@ -1409,23 +1503,40 @@ POST /v1/tiers/wallet/topup
 **Request Body (option A — package):**
 
 ```json
-{"package": "topup-500"}
+{"package": "scale-1000"}
 ```
 
-(`topup-500` is **$120** — see the slug warning under Top Up the Wallet.)
+(`scale-1000` charges **$1,000** and credits **$1,100**. Note that `topup-500` is
+**$120**, not $500 — see the slug warning under Top Up the Wallet.)
 
 **Request Body (option B — custom amount):**
 
 ```json
-{"amount_usd": 150}
+{"amount_usd": 2500}
 ```
 
 Optionally add `"pay_currency": "pln"` to pay via BLIK/card/bank in PLN while
 still crediting the same USD amount to the wallet.
 
+**Response (200 OK):**
+
+```json
+{
+  "checkout_url": "https://checkout.stripe.com/c/pay/cs_live_...",
+  "amount_usd": 2500,
+  "bonus_usd": 325,
+  "total_credited_usd": 2825,
+  "pay_currency": "usd",
+  "bonus_credits": null
+}
+```
+
 Returns a Stripe checkout URL for the payment. Minimum **$10**, maximum
-**$15,000** (contact sales above that). The legacy `amount_pln` key is still
-accepted during rollout but is interpreted as USD, not converted.
+**$15,000** (contact sales above that). A custom amount earns exactly the same
+volume bonus as a package of the same size — $2,500 is on the 13% rung, hence the
+`+$325`. `bonus_credits` is always `null` and deprecated: read `bonus_usd`. The
+legacy `amount_pln` key is still accepted during rollout but is interpreted as USD,
+not converted.
 
 ---
 

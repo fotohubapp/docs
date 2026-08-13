@@ -1475,15 +1475,18 @@ done
 
 :::
 
-### Rate Limit Tiers (PLN pricing)
+### Rate Limit Tiers
 
-| Tier | Price | Requests/Minute |
-|------|------:|:---------------:|
-| Free | 0 PLN/mo | 10 |
-| Developer | 49 PLN/mo | 60 |
-| Startup | 199 PLN/mo | 300 |
-| Business | 799 PLN/mo | 1,000 |
-| Enterprise | Custom | 5,000 |
+Every tier is free and activates automatically off your prepaid USD wallet — there is nothing to subscribe to. Paid API plans were retired on 2026-08-13.
+
+| Tier | Slug | Unlocks at | Requests/Minute |
+|------|------|-----------|:---------------:|
+| PAYG Basic | `payg-basic` | default | 30 |
+| PAYG Standard | `payg-standard` | $25 balance or $50 lifetime spend | 120 |
+| PAYG Premium | `payg-premium` | $120 balance or $500 lifetime spend | 500 |
+| Enterprise | `sub-enterprise` | by application | 5,000 |
+
+So a top-up is the upgrade path, and from $500 up it also earns a [volume bonus of 5–20%](/guides/pricing#top-up-packages-and-the-volume-bonus) in extra spendable dollars. See [Rate Limits](/api/rate-limits) for the retired `sub-*` slugs that older accounts still resolve to.
 
 ### Rate Limit Headers
 

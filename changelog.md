@@ -6,6 +6,79 @@ Track new models, features, and improvements to the FOTOhub API.
 
 ## August 2026
 
+### Wallet top-up packages & volume bonus <Badge type="tip" text="NEW" />
+
+Twelve fixed top-up packages, and every one from $500 up pays a volume bonus in
+**dollars credited to your wallet** — not credits, not a discount code.
+
+| Pay | Bonus | Credited |
+|---|---|---|
+| $15 / $25 / $60 / $120 | — | same |
+| $500 | +5% | $525 |
+| $1,000 | +10% | $1,100 |
+| $2,000 | +12% | $2,240 |
+| $3,000 | +13% | $3,390 |
+| $5,000 | +15% | $5,750 |
+| $7,500 | +17% | $8,775 |
+| $10,000 | +18% | $11,800 |
+| $15,000 | +20% | $18,000 |
+
+A custom `amount_usd` earns the same ladder — $2,500 lands on the $2,000 rung and
+is credited $2,800. The bonus is floored to the cent, so the figure quoted before
+checkout is never above the figure granted after it. Nothing expires: a topped-up
+balance stays until you spend it.
+
+Read the amount you actually received from **`total_credited_usd`** on the
+`POST /v1/tiers/wallet/topup` response, not from what you paid. (On the catalog,
+`GET /v1/billing/topup/packages`, the same figure per package is `total_usd` —
+that one is a quote, not a receipt.) The catalog is public, needs no key, and
+publishes the ladder itself as `bonus_tiers` alongside `min_usd: 10` and
+`max_usd: 15000`. See
+[Get Top-Up Packages](/sdk/typescript#get-top-up-packages).
+
+::: warning Package slugs are not amounts
+The four starter slugs are pre-USD names: `topup-50` is **$15**, `topup-100` is
+**$25**, `topup-250` is **$60**, `topup-500` is **$120**. The `scale-*` slugs do
+match their amounts (`scale-1000` = $1,000). Send the slug, never the amount, as
+`package`.
+:::
+
+### API subscriptions retired <Badge type="warning" text="BREAKING" />
+
+`POST /v1/tiers/subscribe` now answers **HTTP 410** for every tier, with
+`use_instead: "POST /v1/tiers/wallet/topup"`. There is no paid API plan any more —
+the API is prepaid in USD, and rate limits are derived from your wallet balance
+and lifetime spend.
+
+What this changes if you integrated against it:
+
+- **`GET /v1/billing/plans`** returns `{"plans": []}`. Still a 200; simply nothing
+  to iterate.
+- **`GET /v1/tiers/compare`** no longer carries `price_monthly` or
+  `monthly_credits` (they quoted PLN prices for plans nobody can buy). It now
+  states `currency: "USD"`, `billing_model: "prepaid_wallet_usd"`,
+  `subscriptions_retired: true`, and marks each row `purchasable: false` with an
+  `upgrade_path` of `"wallet_topup"` or, for `sub-enterprise`,
+  `"contact_sales"`.
+- **`GET /v1/tiers/catalog`** still publishes its `subscriptions` array, because
+  those rows are live **rate-limit definitions** for accounts that already held a
+  `sub-*` tier. They are flagged `purchasable: false`, `legacy: true`.
+- **`bonus_credits` → `bonus_usd`** on every top-up response. The field never
+  described credits; the wallet has only ever been in dollars.
+- **Out of funds is `402 insufficient_funds`**, carrying `required_usd`,
+  `balance_usd`, `shortfall_usd` and `charged: false` — a 402 moves no money and
+  calls no provider. See [402 Payment Required](/api/errors#_402-payment-required).
+
+To raise your limits, fund the wallet.
+
+::: tip Credit figures in older entries below
+Entries before this one price models in **credits**. That is the fotohub.app web
+app's unit and it does not apply to the API: an API call is charged in USD from
+the prepaid wallet at the provider's own rate, 1:1. A key holding web-app credits
+and a $0 wallet gets a 402. Current USD rates are on
+[Model Pricing](/api/models).
+:::
+
 ### Registered face deletion & retention <Badge type="tip" text="NEW" />
 
 A registered virtual portrait (`POST /v1/ai/assets/register`) is biometric data,

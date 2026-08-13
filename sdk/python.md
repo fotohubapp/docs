@@ -510,18 +510,24 @@ catalog = client.get_tier_catalog()
 for tier in catalog["payg"]:
     print(f"{tier['name']}: {tier['limits']['rpm']} rpm, no monthly fee")
 
+# Every entry now reports price_monthly None and purchasable False:
+# paid API plans were retired on 2026-08-13.
 for tier in catalog["subscriptions"]:
-    # Read price_currency per entry: PAYG thresholds are USD, subscription
-    # prices are still quoted in PLN.
-    print(f"{tier['name']}: {tier['limits']['rpm']} rpm, "
-          f"{tier['price_monthly']} {tier['price_currency']}/mo")
+    print(f"{tier['name']}: {tier['limits']['rpm']} rpm, not purchasable")
 ```
 
-### Subscribe to a Tier
+### Subscribe to a Tier — retired
+
+`subscribe_tier()` raises `FotoHubError` with `status_code=410`. Paid API plans are
+gone; rate limits follow the wallet, so top up instead — and from $500 up the
+top-up earns a volume bonus.
 
 ```python
-result = client.subscribe_tier("sub-developer")
-print(f"Checkout URL: {result['checkout_url']}")
+# Don't call this. It raises, and the message names the replacement.
+# result = client.subscribe_tier("sub-developer")
+
+# Do this instead:
+result = client.topup_wallet(1000)   # $1,000 charged, $1,100 credited
 ```
 
 ### Wallet Operations
@@ -533,13 +539,47 @@ print(f"Balance: ${wallet['balance']['available_usd']}")
 print(f"Spent this month: ${wallet['this_month']['spent_usd']}")
 
 # Top up ($10 minimum, $15,000 maximum)
-result = client.topup_wallet(100)
+result = client.topup_wallet(1000)
 print(f"Payment URL: {result['checkout_url']}")
+print(f"Charge: ${result['amount_usd']:,.2f}")
+print(f"Volume bonus: +${result['bonus_usd']:,.2f}")       # +$100.00
+print(f"Credited: ${result['total_credited_usd']:,.2f}")   # $1,100.00
 
 # Polish customers can pay by BLIK/card/bank in PLN while the
 # wallet is still credited the USD amount
-result = client.topup_wallet(100, pay_currency="pln")
+result = client.topup_wallet(1000, pay_currency="pln")
 ```
+
+### Top-Up Packages and the Volume Bonus
+
+From $500 up, a top-up earns extra **real dollars** — credited in the same
+transaction as the payment, spendable on any operation, no expiry. Quote the ladder
+instead of hardcoding it:
+
+```python
+import math
+
+ladder = client.get_topup_package_list()
+
+for pkg in ladder["packages"]:
+    if pkg["bonus_usd"]:
+        print(f"{pkg['slug']}: pay ${pkg['amount_usd']:,.0f} "
+              f"→ get ${pkg['total_usd']:,.0f} (+{pkg['bonus_pct']}%)")
+
+def bonus_for(amount_usd: float) -> float:
+    # bonus_tiers is ordered highest-first; the first match wins.
+    for tier in ladder["bonus_tiers"]:
+        if amount_usd >= tier["min_usd"]:
+            return math.floor(amount_usd * tier["pct"] * 100) / 100
+    return 0.0
+
+print(bonus_for(2500))   # 325.0 — a custom amount earns the same rung
+```
+
+`get_topup_packages()` returns just the `packages` list;
+`get_topup_package_list()` returns the whole envelope with `min_usd`, `max_usd` and
+`bonus_tiers`. Note the four starter slugs are not their amounts — `topup-50` is
+$15, `topup-500` is $120 — while the `scale-*` slugs do match.
 
 ### Enterprise Application
 
@@ -1247,16 +1287,21 @@ client.set_overage_limit(hard_limit_usd=0)
 # List packages
 packages = client.get_topup_packages()
 for pkg in packages:
-    print(f"{pkg['slug']}: ${pkg['amount_usd']}")
+    print(f"{pkg['slug']}: pay ${pkg['amount_usd']:,.0f} "
+          f"→ get ${pkg['total_usd']:,.0f}")
 
-# Purchase — the full amount lands in the wallet as spendable USD
-result = client.create_topup("topup-500")
+# Purchase — $1,000 charged, $1,100 credited (10% volume bonus)
+result = client.create_topup("scale-1000")
 print(f"Checkout: {result['checkout_url']}")
+print(f"Credited: ${result['total_credited_usd']:,.2f}")
 ```
 
-Packages run $15 / $25 / $60 / $120 / $225 / $1000. A top-up credits the wallet
-with exactly the dollars you paid — there is no bonus-credit conversion and
-nothing expires.
+Packages run $15 / $25 / $60 / $120, then $500 / $1,000 / $2,000 / $3,000 / $5,000 /
+$7,500 / $10,000 / $15,000. From $500 up, each earns a volume bonus in extra
+spendable dollars (5% → 20%), so $15,000 credits $18,000. Nothing expires, and there
+is no credit unit involved — the bonus is dollars. See
+[Top-Up Packages and the Volume Bonus](#top-up-packages-and-the-volume-bonus) for
+quoting a custom amount.
 
 ### Transaction History
 

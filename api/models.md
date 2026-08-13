@@ -1014,19 +1014,22 @@ Three tiers, and you move between them automatically as your account grows — t
 | Tier slug | RPM | Auto-activates at |
 |-----------|----:|-------------------|
 | `payg-basic` | 30 | default for every new account |
-| `payg-standard` | 120 | $25 wallet balance and $50 lifetime spend |
-| `payg-premium` | 500 | $120 wallet balance and $500 lifetime spend |
+| `payg-standard` | 120 | $25 wallet balance **or** $50 lifetime spend |
+| `payg-premium` | 500 | $120 wallet balance **or** $500 lifetime spend |
 
-### Subscriptions (throughput only)
+Either condition promotes you — a balance you are holding, or money you have already spent.
+
+### Enterprise
 
 | Tier slug | Name | Price/month | RPM | API keys | Support |
 |-----------|------|------------:|----:|---------:|---------|
-| `sub-developer` | Developer | 49 PLN | 60 | 5 | email |
-| `sub-startup` | Startup | 199 PLN | 300 | 20 | priority email |
-| `sub-business` | Business | 799 PLN | 1,000 | unlimited | dedicated, 99.9% SLA |
 | `sub-enterprise` | Enterprise | custom | 5,000 | unlimited | dedicated, SSO/SAML, custom infra |
 
-A subscription buys request throughput and support, not generations. `payg-premium` reaches a higher RPM than `sub-developer` and `sub-startup` at no monthly cost, so subscribe for the support and key limits, not for the rate.
+Above `payg-premium`, throughput is provisioned by sales — apply at `POST /v1/tiers/enterprise/apply`.
+
+### Subscriptions — retired
+
+**Paid API plans were retired on 2026-08-13**, and `POST /v1/tiers/subscribe` now answers `410`. They were the wrong shape for a prepaid product: `sub-developer` cost 49 PLN/mo for 60 RPM, **half of what `payg-standard` gives you free** at a $25 balance, and a plan never funded a single generation. Throughput now follows the wallet, so a top-up is the only upgrade path — and from $500 up it earns a [volume bonus of 5–20%](/guides/pricing#top-up-packages-and-the-volume-bonus) in extra spendable dollars. Accounts that held `sub-developer` (60 RPM), `sub-startup` (300) or `sub-business` (1,000) before the cutover keep those limits.
 
 ::: tip What is actually enforced
 **Requests per minute is the limit your calls hit.** Certain expensive endpoints carry their own tighter per-endpoint cap that applies regardless of tier — a `429` on video generation while you are far below your RPM is that cap, not a bug. Your rate-limit state is always readable from the `X-RateLimit-*` response headers.

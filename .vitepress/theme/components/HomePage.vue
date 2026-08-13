@@ -19,21 +19,64 @@ function getCoverUrl(path) {
   return `https://s1.fotohub.app/storage/v1/object/public/photos/${path}`
 }
 
-// Scroll-triggered reveal
+/**
+ * Scroll-triggered reveal.
+ *
+ * Deliberately a POSITION test on scroll, not an IntersectionObserver. Every
+ * revealed block starts at `opacity: 0`, so a missed callback is not a missed
+ * animation — it is permanently invisible content. IntersectionObserver only
+ * reports what was intersecting on the frames it happens to sample: scroll fast
+ * (wheel fling, anchor jump, scripted scroll) and sections that flew past
+ * between two frames never fire at all. That left everything from Capabilities
+ * down stuck at zero opacity.
+ *
+ * `top < innerHeight` is true for anything at or above the current scroll
+ * position, so once you have passed a section it stays eligible no matter how
+ * many frames were dropped getting there. The listener detaches itself once
+ * every block has been revealed.
+ */
 const revealed = ref(new Set())
 onMounted(() => {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        revealed.value.add(entry.target.dataset.reveal)
-        revealed.value = new Set(revealed.value)
-        observer.unobserve(entry.target)
-      }
-    })
-  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' })
+  let pending = [...document.querySelectorAll('[data-reveal]')]
 
-  document.querySelectorAll('[data-reveal]').forEach(el => observer.observe(el))
+  // Runs synchronously in the scroll handler, NOT inside requestAnimationFrame.
+  // Deferring to a frame drops checks whenever frames are coalesced (fast wheel
+  // fling, scripted scroll), and a dropped check on a one-shot reveal is
+  // permanently hidden content, so the few rects this costs are worth it: there
+  // are only nine observed elements and the list shrinks to zero as they reveal.
+  const check = () => {
+    const limit = window.innerHeight - 40
+    const hit = pending.filter(el => el.getBoundingClientRect().top < limit)
+    if (hit.length) {
+      hit.forEach(el => revealed.value.add(el.dataset.reveal))
+      revealed.value = new Set(revealed.value)
+      pending = pending.filter(el => !hit.includes(el))
+    }
+    if (!pending.length) {
+      window.removeEventListener('scroll', check)
+      window.removeEventListener('resize', check)
+    }
+  }
+
+  window.addEventListener('scroll', check, { passive: true })
+  window.addEventListener('resize', check, { passive: true })
+  check()
 })
+
+// ─── Install block: one card, three package managers, real copy-to-clipboard ───
+const installs = [
+  { id: 'python', label: 'Python', cmd: 'pip install fotohub' },
+  { id: 'node', label: 'Node', cmd: 'npm install fotohub' },
+  { id: 'cli', label: 'CLI', cmd: 'npm install -g fotohubapp-cli' }
+]
+const copied = ref('')
+async function copyCmd(item) {
+  try {
+    await navigator.clipboard.writeText(item.cmd)
+    copied.value = item.id
+    setTimeout(() => { if (copied.value === item.id) copied.value = '' }, 1400)
+  } catch { /* clipboard blocked (http, permissions) — the command stays selectable */ }
+}
 
 // ─── Static data ───
 const products = [
@@ -151,27 +194,46 @@ const features = [
   }
 ]
 
+/**
+ * The two in-house systems. They were styled exactly like S3 Storage in the
+ * capability grid, so nothing on the page said which parts of the platform are
+ * FOTOhub's own. They now carry a marker in the grid as well as the lead cells.
+ */
+const FLAGSHIP = ['Gabriel AI Orchestrator', 'IDA Q 1.0']
+
+/*
+ * Card imagery: each of these five is one photograph of the thing the card is
+ * about — the studio and the finished catalogue for "Use cases", a desk with the
+ * editor and the shipped app for "Showcase", one laptop and one returned image
+ * for "Quickstart", the physical bottle beside its four variants for "Image
+ * Generation", one client cabled to three tools for "MCP". The set they replaced
+ * was abstract gradient art, which told a developer nothing about the page.
+ *
+ * They are WebP at 2x the rendered box (1132x380 for the use-case visuals,
+ * 740x300 for the guide thumbs), not the 1.7-3.0 MB PNGs that were here before:
+ * 11 MB of decorative background-image for five strips no taller than 190 CSS px.
+ */
 const useCases = [
   {
     title: 'Use cases',
     description: 'Learn how teams are using FOTOhub API to automate content, build products, and ship faster.',
     button: 'Explore use cases',
     link: '/guides/best-practices',
-    image: 'https://static.fotohub.app/images/docs/usecase-ecommerce.png'
+    image: 'https://static.fotohub.app/images/docs/usecase-teams.webp'
   },
   {
     title: 'Showcase',
     description: 'Discover what developers are building with FOTOhub — integrations, apps, creative workflows.',
     button: 'Explore demos',
     link: '/integrations/overview',
-    image: 'https://static.fotohub.app/images/docs/showcase-creative-ai.png'
+    image: 'https://static.fotohub.app/images/docs/showcase-developers.webp'
   }
 ]
 
 const guides = [
-  { title: 'Quickstart', category: 'Getting Started', link: '/guides/quickstart', image: 'https://static.fotohub.app/images/docs/guide-quickstart.png' },
-  { title: 'Image Generation', category: 'Tutorials', link: '/guides/image-generation', image: 'https://static.fotohub.app/images/docs/guide-image-generation.png' },
-  { title: 'MCP Integration', category: 'Integrations', link: '/guides/mcp-integration', image: 'https://static.fotohub.app/images/docs/guide-mcp-integration.png' }
+  { title: 'Quickstart', category: 'Getting Started', link: '/guides/quickstart', image: 'https://static.fotohub.app/images/docs/guide-quickstart.webp' },
+  { title: 'Image Generation', category: 'Tutorials', link: '/guides/image-generation', image: 'https://static.fotohub.app/images/docs/guide-image-generation.webp' },
+  { title: 'MCP Integration', category: 'Integrations', link: '/guides/mcp-integration', image: 'https://static.fotohub.app/images/docs/guide-mcp-integration.webp' }
 ]
 
 const stats = [
@@ -188,16 +250,21 @@ const resources = [
   { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`, title: 'Status', description: 'Check the status of FOTOhub services', link: 'https://status.fotohub.app' },
   { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>`, title: 'Console', description: 'Manage your API keys and usage', link: 'https://fotohub.app/console' }
 ]
+
+/** Ticker copy is derived from the capability list — nothing invented. */
+const tickerWords = features.map(f => f.title)
 </script>
 
 <template>
   <div class="home-page">
-    <!-- Hero with animated gradient mesh -->
+    <!-- ───────── Hero ─────────
+         Left: the statement. Right: the one thing a developer actually needs in
+         the first screen — the install line, copyable. -->
     <section class="hero" data-reveal="hero">
-      <div class="hero-glow"></div>
-      <div class="hero-grid-bg"></div>
+      <div class="hero-rules" aria-hidden="true"></div>
       <div class="hero-split">
         <div class="hero-left" :class="{ 'is-visible': revealed.has('hero') }">
+          <p class="eyebrow"><span class="eyebrow-dot"></span>Developer platform</p>
           <h1 class="hero-title">Build with the full power<br>of generative AI</h1>
           <p class="hero-subtitle">One unified API for images, video, music, 3D, chat and agents — every modality behind a single key, SDK and bill. The docs, guides and references to ship with FOTOhub, fast.</p>
           <ul class="hero-points">
@@ -206,26 +273,77 @@ const resources = [
             <li><span class="hero-point-check">✓</span>Typed Python &amp; TypeScript SDKs — streaming and auto-retry built in</li>
           </ul>
         </div>
+
         <div class="hero-right" :class="{ 'is-visible': revealed.has('hero') }">
+          <div class="install-card">
+            <div class="install-head">
+              <span class="install-head-label">Install</span>
+              <span class="install-head-dots"><i></i><i></i><i></i></span>
+            </div>
+            <button
+              v-for="item in installs"
+              :key="item.id"
+              type="button"
+              class="install-row"
+              @click="copyCmd(item)"
+            >
+              <span class="install-lang">{{ item.label }}</span>
+              <code>{{ item.cmd }}</code>
+              <span class="install-copy">{{ copied === item.id ? 'copied' : 'copy' }}</span>
+            </button>
+            <a href="/guides/sdk-setup" class="install-foot">SDK setup guide &rarr;</a>
+          </div>
           <div class="hero-actions">
             <a href="/api/getting-started" class="btn-primary">Get started</a>
             <a href="/api/image-generation" class="btn-secondary">API Reference</a>
-          </div>
-          <div class="hero-install">
-            <code>pip install fotohub</code>
-            <span class="hero-install-sep"></span>
-            <code>npm install fotohub</code>
-            <span class="hero-install-sep"></span>
-            <code>npm install -g fotohubapp-cli</code>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Product Cards -->
+    <!-- ───────── In-house systems ─────────
+         Inverted cells: the only two blocks on the page rendered on ink, so the
+         platform's own models are unmistakably the loudest thing after the hero. -->
+    <section class="section proprietary" data-reveal="prop">
+      <div class="rule-head">
+        <span class="rule-no">01</span>
+        <span class="rule-line"></span>
+        <span class="rule-label">Built in-house</span>
+      </div>
+      <div class="prop-grid">
+        <a href="/api/gabriel-ai" class="prop-cell" :class="{ 'is-visible': revealed.has('prop') }">
+          <span class="prop-badge"><span class="prop-dot"></span>Orchestrator</span>
+          <span class="prop-name">Gabriel AI</span>
+          <span class="prop-desc">Natural-language routing to every model</span>
+          <span class="prop-arrow">&rarr;</span>
+        </a>
+        <a href="/api/ida-q" class="prop-cell prop-cell--cyan" :class="{ 'is-visible': revealed.has('prop') }">
+          <span class="prop-badge"><span class="prop-dot"></span>Proprietary Model</span>
+          <span class="prop-name">IDA Q 1.0</span>
+          <span class="prop-desc">Precision text rendering, in-house image generation</span>
+          <span class="prop-arrow">&rarr;</span>
+        </a>
+      </div>
+
+      <!-- Platform figures: a ruled row, not five boxes. -->
+      <dl class="stat-row">
+        <div v-for="(stat, i) in stats" :key="stat.label" class="stat-item" :class="{ 'is-visible': revealed.has('prop') }" :style="{ transitionDelay: `${120 + i * 70}ms` }">
+          <dt class="stat-value">{{ stat.value }}</dt>
+          <dd class="stat-label">{{ stat.label }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- ───────── Three ways in ───────── -->
     <section class="section products" data-reveal="products">
+      <div class="rule-head">
+        <span class="rule-no">02</span>
+        <span class="rule-line"></span>
+        <span class="rule-label">Three ways in</span>
+      </div>
       <div class="products-grid">
         <a v-for="(product, i) in products" :key="product.title" :href="product.link" class="product-card" :class="{ 'is-visible': revealed.has('products') }" :style="{ transitionDelay: `${i * 100}ms` }">
+          <span class="product-index">{{ String(i + 1).padStart(2, '0') }}</span>
           <div class="product-icon" v-html="product.icon"></div>
           <h3 class="product-title">{{ product.title }}</h3>
           <p class="product-desc">{{ product.description }}</p>
@@ -234,50 +352,48 @@ const resources = [
       </div>
     </section>
 
-    <!-- Stats Bar (Gabriel AI + IDA Q 1.0 on top, platform stats below) -->
-    <section class="stats-bar" data-reveal="stats">
-      <div class="stat-proprietary-row">
-        <a href="/api/gabriel-ai" class="stat-gabriel" :class="{ 'is-visible': revealed.has('stats') }">
-          <div class="stat-gabriel-glow"></div>
-          <span class="stat-gabriel-badge"><span class="stat-gabriel-dot"></span>Orchestrator</span>
-          <span class="stat-gabriel-name">Gabriel AI</span>
-          <span class="stat-gabriel-desc">Natural-language routing to every model</span>
-        </a>
-        <a href="/api/ida-q" class="stat-idaq" :class="{ 'is-visible': revealed.has('stats') }">
-          <div class="stat-idaq-glow"></div>
-          <span class="stat-idaq-badge"><span class="stat-idaq-dot"></span>Proprietary Model</span>
-          <span class="stat-idaq-name">IDA Q 1.0</span>
-          <span class="stat-idaq-desc">Precision text rendering, in-house image generation</span>
-        </a>
+    <!-- Ticker: horizontal movement between two vertical stacks. -->
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker-track">
+        <span v-for="(w, i) in [...tickerWords, ...tickerWords]" :key="`t${i}`" class="ticker-item">
+          {{ w }}<i>✳</i>
+        </span>
       </div>
-      <div class="stat-grid">
-        <div v-for="(stat, i) in stats" :key="stat.label" class="stat-item" :class="{ 'is-visible': revealed.has('stats') }" :style="{ transitionDelay: `${i * 80}ms` }">
-          <span class="stat-value">{{ stat.value }}</span>
-          <span class="stat-label">{{ stat.label }}</span>
-        </div>
-      </div>
-    </section>
+    </div>
 
-    <!-- Features Grid (all 12 capabilities) -->
+    <!-- ───────── Capabilities ─────────
+         A ruled index, not 13 identical rounded rectangles. Each row's own hue
+         only appears on hover, so the page never shows more than one accent. -->
     <section class="section features" data-reveal="features">
-      <div class="section-header">
-        <h2 class="section-title">Capabilities</h2>
+      <div class="rule-head">
+        <span class="rule-no">03</span>
+        <span class="rule-line"></span>
+        <span class="rule-label">Capabilities</span>
         <a href="/api/getting-started" class="view-all">View all APIs &rarr;</a>
       </div>
       <div class="features-grid">
-        <a v-for="(feat, i) in features" :key="feat.title" :href="feat.link" class="feature-card" :class="{ 'is-visible': revealed.has('features') }" :style="{ transitionDelay: `${i * 50}ms` }">
-          <div class="feature-icon-wrap" :style="{ '--accent': feat.accent }">
-            <div class="feature-icon" v-html="feat.icon" :style="{ color: feat.accent }"></div>
-          </div>
+        <a
+          v-for="(feat, i) in features"
+          :key="feat.title"
+          :href="feat.link"
+          class="feature-row"
+          :class="{ 'is-visible': revealed.has('features'), 'is-flagship': FLAGSHIP.includes(feat.title) }"
+          :style="{ '--accent': feat.accent, transitionDelay: `${i * 40}ms` }"
+        >
+          <span class="feature-no">{{ String(i + 1).padStart(2, '0') }}</span>
+          <div class="feature-icon" v-html="feat.icon"></div>
           <div class="feature-body">
-            <h4 class="feature-title">{{ feat.title }}</h4>
+            <h4 class="feature-title">
+              {{ feat.title }}
+              <span v-if="FLAGSHIP.includes(feat.title)" class="feature-flag">FOTOhub</span>
+            </h4>
             <p class="feature-desc">{{ feat.description }}</p>
           </div>
         </a>
       </div>
     </section>
 
-    <!-- Featured -->
+    <!-- ───────── Featured ───────── -->
     <section class="section featured" data-reveal="featured">
       <div class="featured-card" :class="{ 'is-visible': revealed.has('featured') }">
         <div class="featured-content">
@@ -292,8 +408,13 @@ const resources = [
       </div>
     </section>
 
-    <!-- Use Cases -->
+    <!-- ───────── Use cases / Showcase ───────── -->
     <section class="section use-cases" data-reveal="usecases">
+      <div class="rule-head">
+        <span class="rule-no">04</span>
+        <span class="rule-line"></span>
+        <span class="rule-label">In production</span>
+      </div>
       <div class="use-cases-grid">
         <div v-for="(uc, i) in useCases" :key="uc.title" class="use-case-card" :class="{ 'is-visible': revealed.has('usecases') }" :style="{ transitionDelay: `${i * 120}ms` }">
           <div class="use-case-visual" :style="{ backgroundImage: `url(${uc.image})` }"></div>
@@ -306,46 +427,55 @@ const resources = [
       </div>
     </section>
 
-    <!-- Blog Posts (Build-time loaded from Supabase) -->
+    <!-- ───────── Blog ─────────
+         A ruled list with small covers: three more image-top cards after the use
+         cases would have been the fourth identical grid in a row. -->
     <section class="section blog" v-if="blogPostsData && blogPostsData.length" data-reveal="blog">
-      <div class="section-header">
-        <h2 class="section-title">Latest from the blog</h2>
+      <div class="rule-head">
+        <span class="rule-no">05</span>
+        <span class="rule-line"></span>
+        <span class="rule-label">Latest from the blog</span>
         <a href="https://fotohub.app/news" class="view-all" target="_blank">View all &rarr;</a>
       </div>
-      <div class="blog-grid">
-        <a v-for="(post, i) in blogPostsData.slice(0, 3)" :key="post.slug" :href="`https://fotohub.app/news/${post.slug}`" target="_blank" class="blog-card" :class="{ 'is-visible': revealed.has('blog') }" :style="{ transitionDelay: `${i * 100}ms` }">
-          <div class="blog-cover" :style="getCoverUrl(post.cover_image) ? { backgroundImage: `url(${getCoverUrl(post.cover_image)})` } : { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }">
-            <span v-if="post.category" class="blog-tag">{{ post.category.name }}</span>
-          </div>
+      <div class="blog-list">
+        <a v-for="(post, i) in blogPostsData.slice(0, 3)" :key="post.slug" :href="`https://fotohub.app/news/${post.slug}`" target="_blank" class="blog-item" :class="{ 'is-visible': revealed.has('blog') }" :style="{ transitionDelay: `${i * 100}ms` }">
+          <div class="blog-cover" :style="getCoverUrl(post.cover_image) ? { backgroundImage: `url(${getCoverUrl(post.cover_image)})` } : { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }"></div>
           <div class="blog-body">
+            <div class="blog-meta-row">
+              <span v-if="post.category" class="blog-tag">{{ post.category.name }}</span>
+              <span class="blog-meta">{{ formatDate(post.created_at) }}</span>
+            </div>
             <h4 class="blog-title">{{ post.title }}</h4>
             <p class="blog-desc">{{ post.excerpt }}</p>
-            <span class="blog-meta">{{ formatDate(post.created_at) }}</span>
           </div>
+          <span class="blog-arrow">&rarr;</span>
         </a>
       </div>
     </section>
 
-    <!-- Guides Grid -->
+    <!-- ───────── Guides ───────── -->
     <section class="section guides" data-reveal="guides">
-      <div class="section-header">
-        <h2 class="section-title">Guides & tutorials</h2>
+      <div class="rule-head">
+        <span class="rule-no">06</span>
+        <span class="rule-line"></span>
+        <span class="rule-label">Guides &amp; tutorials</span>
         <a href="/guides/quickstart" class="view-all">View all &rarr;</a>
       </div>
       <div class="guides-grid">
         <a v-for="(guide, i) in guides" :key="guide.title" :href="guide.link" class="guide-card" :class="{ 'is-visible': revealed.has('guides') }" :style="{ transitionDelay: `${i * 100}ms` }">
           <div class="guide-thumb" :style="{ backgroundImage: `url(${guide.image})` }">
             <div class="guide-thumb-overlay"></div>
+            <span class="guide-category">{{ guide.category }}</span>
           </div>
           <div class="guide-text">
             <h4 class="guide-title">{{ guide.title }}</h4>
-            <span class="guide-category">{{ guide.category }}</span>
+            <span class="guide-go">&rarr;</span>
           </div>
         </a>
       </div>
     </section>
 
-    <!-- Resources -->
+    <!-- ───────── Resources ───────── -->
     <section class="section resources" data-reveal="resources">
       <div class="resources-grid">
         <a v-for="(res, i) in resources" :key="res.title" :href="res.link" class="resource-item" :class="{ 'is-visible': revealed.has('resources') }" :style="{ transitionDelay: `${i * 80}ms` }">
@@ -359,906 +489,978 @@ const resources = [
 </template>
 
 <style scoped>
+/*
+ * FOTOhub docs home — technical-editorial.
+ *
+ *   ink    the page's type + the two inverted in-house cells
+ *   edge   every hairline; the layout is drawn with rules, not with boxes
+ *   accent one hue, used in single-digit percentages of any view. A capability's
+ *          own colour is revealed on hover only, so the grid is never a pastel
+ *          confetti of thirteen unrelated tints.
+ *
+ * Depth comes from hairlines, ink inversion and tight type, not from a purple
+ * radial glow behind the hero (which every generated docs theme ships with).
+ */
 .home-page {
-  max-width: 1100px;
+  --ink: #0a0a0b;
+  --on-ink: #fafaf9;
+  --edge: rgba(10, 10, 11, 0.12);
+  --edge-soft: rgba(10, 10, 11, 0.06);
+  --accent: #7c3aed;
+  /* The accent at 8.5-10.5px (rule numbers, the FOTOhub flag, blog tags) needs
+     4.5:1, and #7c3aed only reaches 2.4:1 on white. Small type uses this darker
+     step; anything 24px+ or purely decorative keeps --accent. */
+  --accent-ink: #5b21b6;
+  --cyan: #0e7490;
+  --mono: var(--vp-font-family-mono);
+
+  max-width: 1180px;
   margin: 0 auto;
   padding: 0 24px;
 }
 
-/* ─── Keyframes ─── */
-@keyframes float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-20px) rotate(1deg); }
+.dark .home-page {
+  --ink: #f4f4f5;
+  --on-ink: #09090b;
+  /* A hairline at 14%/7% of near-white over #09090a is technically visible to a
+     colour picker and invisible to an eye: the whole layout is drawn with these
+     rules, so on the dark ground they carry the same job the borders and cards
+     carry elsewhere and have to be raised accordingly. */
+  --edge: rgba(244, 244, 245, 0.24);
+  --edge-soft: rgba(244, 244, 245, 0.13);
+  --accent: #a78bfa;
+  --accent-ink: #c4b5fd;
+  --cyan: #22d3ee;
 }
 
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.05); }
+/* ─── Shared motion ─── */
+@keyframes ticker-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
 }
 
-@keyframes grid-fade {
-  0% { opacity: 0; }
-  50% { opacity: 0.4; }
-  100% { opacity: 0; }
+/* ─── Mono label used everywhere a label is needed ─── */
+.eyebrow,
+.rule-label,
+.rule-no,
+.install-head-label,
+.install-lang,
+.install-copy,
+.stat-label,
+.prop-badge,
+.feature-no,
+.feature-flag,
+.featured-label,
+.guide-category,
+.blog-tag,
+.blog-meta,
+.product-index {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
+
+/* ─── Section rhythm ─── */
+.section { padding: 0 0 88px; }
+
+.rule-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+/* Section numbers are boxed; item numbers inside the lists are bare mono. Both
+   were the same violet mono digit before, which made a section header and a list
+   row read as the same rank a few inches apart. Shape carries the hierarchy now,
+   so it survives at any colour. */
+.rule-no {
+  flex-shrink: 0;
+  color: var(--ink);
+  font-size: 9.5px;
+  line-height: 1;
+  padding: 5px 6px 4px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+}
+
+.rule-line { flex: 1; height: 1px; background: var(--edge); }
+.rule-label { color: var(--vp-c-text-2); flex-shrink: 0; }
+
+.view-all {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-3);
+  text-decoration: none;
+  flex-shrink: 0;
+  padding-left: 16px;
+  border-left: 1px solid var(--edge);
+  transition: color 0.2s;
+}
+
+.view-all:hover { color: var(--ink); }
 
 /* ─── Hero ─── */
 .hero {
-  padding: 80px 0 72px;
   position: relative;
-  overflow: hidden;
+  padding: 76px 0 84px;
 }
 
-.hero-glow {
-  position: absolute;
-  top: -40%;
-  left: 0;
-  right: 0;
-  width: 100%;
-  height: 700px;
-  background: radial-gradient(ellipse 100% 80% at 50% 0%, rgba(124, 58, 237, 0.1) 0%, rgba(124, 58, 237, 0.04) 40%, transparent 70%);
-  animation: pulse-glow 6s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.dark .hero-glow {
-  background: radial-gradient(ellipse 100% 80% at 50% 0%, rgba(167, 139, 250, 0.12) 0%, rgba(124, 58, 237, 0.05) 40%, transparent 70%);
-}
-
-.hero-grid-bg {
+/* Two hairlines instead of a glow: they place the hero on a grid. */
+.hero-rules {
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(124, 58, 237, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(124, 58, 237, 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
-  animation: grid-fade 8s ease-in-out infinite;
   pointer-events: none;
-}
-
-.dark .hero-grid-bg {
-  background-image:
-    linear-gradient(rgba(167, 139, 250, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(167, 139, 250, 0.05) 1px, transparent 1px);
+  background-image: linear-gradient(90deg, var(--edge-soft) 1px, transparent 1px);
+  background-size: 33.333% 100%;
+  mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
 }
 
 .hero-split {
-  display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 40px;
-  align-items: center;
   position: relative;
+  display: grid;
+  grid-template-columns: 1.35fr 0.85fr;
+  gap: 56px;
+  align-items: start;
 }
 
-.hero-left {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.hero-left.is-visible { opacity: 1; transform: translateY(0); }
-
+.hero-left,
 .hero-right {
   opacity: 0;
-  transform: translateY(20px) translateX(20px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+  transform: translateY(18px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.hero-right.is-visible { opacity: 1; transform: translateY(0) translateX(0); }
+.hero-right { transition-delay: 0.14s; }
+.hero-left.is-visible,
+.hero-right.is-visible { opacity: 1; transform: translateY(0); }
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--vp-c-text-3);
+  margin: 0 0 22px;
+}
+
+.eyebrow-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dot-pulse 2.4s ease-in-out infinite;
+}
 
 .hero-title {
-  font-size: 42px;
+  font-size: clamp(38px, 5.4vw, 66px);
   font-weight: 800;
-  letter-spacing: -0.035em;
-  color: var(--vp-c-text-1);
-  margin: 0 0 14px;
-  line-height: 1.12;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  color: var(--ink);
+  margin: 0 0 20px;
 }
 
 .hero-subtitle {
-  font-size: 16px;
-  font-weight: 400;
+  font-size: 16.5px;
   line-height: 1.6;
   color: var(--vp-c-text-2);
-  margin: 0 0 20px;
+  margin: 0 0 24px;
+  max-width: 54ch;
 }
 
 .hero-points {
   list-style: none;
   padding: 0;
-  margin: 0 0 26px;
+  margin: 0 0 32px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 0;
 }
 
 .hero-points li {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-size: 14px;
   color: var(--vp-c-text-2);
+  padding: 11px 0;
+  border-top: 1px solid var(--edge-soft);
 }
+
+.hero-points li:last-child { border-bottom: 1px solid var(--edge-soft); }
+
+/* The checklist is the last thing in the left column now that the buttons moved
+   under the install card, so it no longer needs to clear anything below it. */
+.hero-left .hero-points { margin-bottom: 0; }
 
 .hero-point-check {
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--vp-c-brand-1);
-  background: var(--vp-c-brand-soft);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 4px;
 }
 
-.hero-install {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 22px;
-  flex-wrap: wrap;
-}
+/* Under the install card in the right column: the CTA now sits with the thing it
+   is a call to action for, instead of at the bottom of a column of prose. */
+.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.hero-actions .btn-primary,
+.hero-actions .btn-secondary { flex: 1 1 auto; justify-content: center; }
 
-.hero-install code {
-  font-family: var(--vp-font-family-mono);
-  font-size: 12.5px;
-  color: var(--vp-c-text-2);
-  background: var(--vp-c-bg-soft);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 8px;
-  padding: 6px 12px;
-}
-
-.hero-install-sep {
-  width: 1px;
-  height: 16px;
-  background: var(--vp-c-divider);
-}
-
-.hero-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  padding: 13px 28px;
-  background: var(--vp-c-text-1);
-  color: var(--vp-c-bg);
-  border-radius: 100px;
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  opacity: 0.88;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-}
-
+.btn-primary,
 .btn-secondary {
   display: inline-flex;
   align-items: center;
-  padding: 13px 28px;
-  background: var(--vp-c-bg);
-  color: var(--vp-c-text-1);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 100px;
+  padding: 13px 26px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   text-decoration: none;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  backdrop-filter: blur(8px);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--on-ink);
+  border: 1px solid var(--ink);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--ink) 60%, transparent);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--edge);
 }
 
 .btn-secondary:hover {
-  background: var(--vp-c-bg-soft);
-  border-color: var(--vp-c-brand-1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);
+  border-color: var(--ink);
+  transform: translateY(-2px);
 }
 
-/* ─── Hero Code Block ─── */
-.hero-code-window {
-  background: var(--vp-c-bg-alt);
-  border: 1px solid var(--vp-c-divider);
+/* ─── Install card ─── */
+.install-card {
+  /* Dropped so the card's head aligns nearer the H1's baseline rather than its
+     cap-height, which had the frame sitting visibly above the headline. */
+  margin-top: 20px;
+  border: 1px solid var(--edge);
   border-radius: 12px;
-  padding: 20px 24px;
+  background: var(--vp-c-bg-alt);
+  overflow: hidden;
+}
+
+.install-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--edge);
+  background: var(--vp-c-bg-soft);
+}
+
+.install-head-label { color: var(--vp-c-text-3); }
+.install-head-dots { display: flex; gap: 5px; }
+.install-head-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--edge); }
+
+.install-row {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid var(--edge-soft);
+  background: transparent;
   text-align: left;
-  font-family: var(--vp-font-family-mono);
-  font-size: 13px;
-  line-height: 1.7;
-  position: relative;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.18s;
+}
+
+.install-row:hover { background: var(--vp-c-bg-soft); }
+.install-lang { color: var(--vp-c-text-3); font-size: 9.5px; }
+
+.install-row code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink);
+  white-space: nowrap;
   overflow: hidden;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+  text-overflow: ellipsis;
 }
 
-.dark .hero-code-window {
-  background: #111118;
-  border-color: #1e1e2a;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+.install-copy {
+  color: var(--vp-c-text-3);
+  opacity: 0;
+  transition: opacity 0.18s, color 0.18s;
+  font-size: 9.5px;
 }
 
-.hero-code-dots {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 14px;
+.install-row:hover .install-copy { opacity: 1; }
+.install-row:hover .install-copy:not(:empty) { color: var(--accent); }
+
+.install-foot {
+  display: block;
+  padding: 13px 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+  text-decoration: none;
+  transition: color 0.2s, background 0.2s;
 }
 
-.hero-code-dots span {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--vp-c-divider);
-}
+.install-foot:hover { color: var(--accent); background: var(--vp-c-bg-soft); }
 
-.hero-code-window pre {
-  margin: 0;
-  padding: 0;
-  background: none;
-  overflow-x: auto;
-}
-
-.hero-code-window code {
-  color: var(--vp-c-text-1);
-  font-size: 13px;
-  white-space: pre;
-}
-
-.hero-code-window .hl-kw { color: #7c3aed; }
-.hero-code-window .hl-mod { color: var(--vp-c-text-1); }
-.hero-code-window .hl-param { color: #059669; }
-.hero-code-window .hl-str { color: #d97706; }
-.hero-code-window .hl-num { color: #0891b2; }
-.hero-code-window .hl-fn { color: #2563eb; }
-.hero-code-window .hl-cm { color: var(--vp-c-text-3); font-style: italic; }
-
-.dark .hero-code-window .hl-kw { color: #a78bfa; }
-.dark .hero-code-window .hl-param { color: #6ee7b7; }
-.dark .hero-code-window .hl-str { color: #fbbf24; }
-.dark .hero-code-window .hl-num { color: #67e8f9; }
-.dark .hero-code-window .hl-fn { color: #93c5fd; }
-
-/* ─── Stats Bar (Gabriel + IDA Q row on top, platform stats below) ─── */
-.stats-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-bottom: 80px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-  overflow: hidden;
-  background: var(--vp-c-divider);
-}
-
-/* Row placing Gabriel + IDA Q proprietary-model cells side by side */
-.stat-proprietary-row {
+/* ─── In-house cells (inverted) ─── */
+.prop-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: var(--vp-c-divider);
+  gap: 12px;
 }
 
-/* Gabriel lead cell */
-.stat-gabriel {
+.prop-cell {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  padding: 24px 28px;
+  gap: 8px;
+  padding: 30px 30px 32px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--on-ink);
   text-decoration: none;
   overflow: hidden;
-  background: linear-gradient(140deg, var(--vp-c-bg) 0%, var(--vp-c-brand-soft) 160%);
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s ease;
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(18px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.stat-gabriel.is-visible { opacity: 1; transform: translateY(0); }
-.stat-gabriel:hover { background: linear-gradient(140deg, var(--vp-c-bg-soft) 0%, var(--vp-c-brand-soft) 140%); }
+.prop-cell:nth-child(2) { transition-delay: 90ms; }
+.prop-cell.is-visible { opacity: 1; transform: translateY(0); }
 
-.stat-gabriel-glow {
-  position: absolute;
-  top: -70%;
-  right: -40%;
-  width: 240px;
-  height: 240px;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.16) 0%, transparent 65%);
-  border-radius: 50%;
-  animation: pulse-glow 6s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.stat-gabriel-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--vp-c-brand-1);
-  position: relative;
-  z-index: 1;
-}
-
-.stat-gabriel-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--vp-c-brand-1);
-  box-shadow: 0 0 6px var(--vp-c-brand-1);
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.stat-gabriel-name {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  color: var(--vp-c-text-1);
-  line-height: 1.05;
-  position: relative;
-  z-index: 1;
-}
-
-.stat-gabriel-desc {
-  font-size: 12.5px;
-  font-weight: 500;
-  line-height: 1.4;
-  color: var(--vp-c-text-3);
-  position: relative;
-  z-index: 1;
-}
-
-/* IDA Q 1.0 lead cell (same treatment as Gabriel, cyan accent) */
-.stat-idaq {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  padding: 24px 28px;
-  text-decoration: none;
-  overflow: hidden;
-  background: linear-gradient(140deg, var(--vp-c-bg) 0%, rgba(6, 182, 212, 0.08) 160%);
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s ease;
-  opacity: 0;
-  transform: translateY(16px);
-  transition-delay: 80ms;
-}
-
-.stat-idaq.is-visible { opacity: 1; transform: translateY(0); }
-.stat-idaq:hover { background: linear-gradient(140deg, var(--vp-c-bg-soft) 0%, rgba(6, 182, 212, 0.14) 140%); }
-
-.stat-idaq-glow {
-  position: absolute;
-  top: -70%;
-  right: -40%;
-  width: 240px;
-  height: 240px;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.18) 0%, transparent 65%);
-  border-radius: 50%;
-  animation: pulse-glow 6s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.stat-idaq-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #06b6d4;
-  position: relative;
-  z-index: 1;
-}
-
-.stat-idaq-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #06b6d4;
-  box-shadow: 0 0 6px #06b6d4;
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.stat-idaq-name {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  color: var(--vp-c-text-1);
-  line-height: 1.05;
-  position: relative;
-  z-index: 1;
-}
-
-.stat-idaq-desc {
-  font-size: 12.5px;
-  font-weight: 500;
-  line-height: 1.4;
-  color: var(--vp-c-text-3);
-  position: relative;
-  z-index: 1;
-}
-
-/* Stats grid (nested) */
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1px;
-  background: var(--vp-c-divider);
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 28px 16px;
-  background: var(--vp-c-bg);
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease;
-  opacity: 0;
-  transform: translateY(16px);
-}
-
-.stat-item.is-visible { opacity: 1; transform: translateY(0); }
-.stat-item:hover { background: var(--vp-c-bg-soft); }
-
-.stat-value {
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--vp-c-text-1);
-  line-height: 1;
-}
-
-.stat-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--vp-c-text-3);
-}
-
-/* ─── Section common ─── */
-.section { padding: 0 0 80px; }
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
-.section-title { font-size: 22px; font-weight: 700; color: var(--vp-c-text-1); margin: 0; letter-spacing: -0.02em; }
-.view-all { font-size: 13px; font-weight: 500; color: var(--vp-c-text-3); text-decoration: none; transition: all 0.2s; padding: 6px 12px; border-radius: 100px; border: 1px solid transparent; }
-.view-all:hover { color: var(--vp-c-brand-1); border-color: var(--vp-c-brand-soft); background: var(--vp-c-brand-soft); }
-
-/* ─── Product Cards ─── */
-.products-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-
-.product-card {
-  padding: 32px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-  background: var(--vp-c-bg);
-  text-decoration: none;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  overflow: hidden;
-  opacity: 0;
-  transform: translateY(24px);
-}
-
-.product-card.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.product-card::before {
+/* Hairline field inside the ink cell — texture without an image. */
+.prop-cell::before {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 16px;
-  padding: 1px;
-  background: linear-gradient(135deg, transparent, rgba(124, 58, 237, 0.3), transparent);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.product-card:hover::before { opacity: 1; }
-
-.product-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 60px rgba(124, 58, 237, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04);
-  border-color: transparent;
-}
-
-.dark .product-card:hover {
-  box-shadow: 0 20px 60px rgba(124, 58, 237, 0.12), 0 4px 16px rgba(0, 0, 0, 0.3);
-}
-
-.product-icon { margin-bottom: 20px; color: var(--vp-c-text-2); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-.product-card:hover .product-icon { transform: scale(1.1) rotate(-3deg); }
-.product-title { font-size: 18px; font-weight: 700; color: var(--vp-c-text-1); margin: 0 0 8px; letter-spacing: -0.01em; }
-.product-desc { font-size: 14px; line-height: 1.6; color: var(--vp-c-text-2); margin: 0; }
-.product-arrow { position: absolute; bottom: 28px; right: 28px; font-size: 18px; color: var(--vp-c-text-3); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); opacity: 0; transform: translateX(-8px); }
-.product-card:hover .product-arrow { opacity: 1; transform: translateX(0); color: var(--vp-c-brand-1); }
-
-/* ─── Features Grid ─── */
-.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-
-.feature-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px 20px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 12px;
-  background: var(--vp-c-bg);
-  text-decoration: none;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  overflow: hidden;
-  opacity: 0;
-  transform: translateY(16px);
-}
-
-.feature-card.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.feature-card::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.03), transparent);
-  transition: left 0.5s ease;
-}
-
-.feature-card:hover::after { left: 100%; }
-
-.feature-card:hover {
-  border-color: color-mix(in srgb, var(--accent, #7c3aed) 25%, transparent);
-  background: var(--vp-c-bg-soft);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-}
-
-.dark .feature-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-}
-
-.feature-icon-wrap {
-  flex-shrink: 0;
-  margin-top: 2px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent, #7c3aed) 8%, transparent);
-  transition: all 0.25s;
-}
-
-.feature-card:hover .feature-icon-wrap {
-  background: color-mix(in srgb, var(--accent, #7c3aed) 14%, transparent);
-  transform: scale(1.05);
-}
-
-.feature-icon { flex-shrink: 0; }
-.feature-body { min-width: 0; }
-.feature-title { font-size: 13px; font-weight: 600; color: var(--vp-c-text-1); margin: 0 0 3px; }
-.feature-desc { font-size: 12px; line-height: 1.45; color: var(--vp-c-text-2); margin: 0; }
-
-/* ─── Featured ─── */
-.featured-card {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 40px;
-  align-items: center;
-  padding: 48px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 20px;
-  background: linear-gradient(135deg, var(--vp-c-bg) 0%, var(--vp-c-bg-soft) 100%);
-  position: relative;
-  overflow: hidden;
-  opacity: 0;
-  transform: translateY(24px);
-  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.featured-card.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.featured-card::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.06) 0%, transparent 60%);
-  border-radius: 50%;
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--on-ink) 8%, transparent) 1px, transparent 1px);
+  background-size: 22px 100%;
+  opacity: 0.7;
   pointer-events: none;
 }
 
-.featured-label { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--vp-c-brand-1); margin-bottom: 12px; padding: 4px 10px; background: var(--vp-c-brand-soft); border-radius: 100px; }
-.featured-title { font-size: 24px; font-weight: 700; color: var(--vp-c-text-1); margin: 0 0 12px; letter-spacing: -0.02em; }
-.featured-desc { font-size: 14px; line-height: 1.7; color: var(--vp-c-text-2); margin: 0 0 20px; max-width: 480px; }
-.featured-link { font-size: 14px; font-weight: 600; color: var(--vp-c-brand-1); text-decoration: none; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px; }
-.featured-link:hover { gap: 8px; }
+.prop-cell::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.prop-cell:hover::after { transform: scaleX(1); }
+.prop-cell--cyan::after { background: var(--cyan); }
+
+/* 62% of the ink colour put ORCHESTRATOR / PROPRIETARY MODEL at ~3.6:1 — under
+   the 4.5:1 a 10.5px label needs, and these two labels are what identify the
+   cells as ours. Same for the descriptions below them. */
+.prop-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: color-mix(in srgb, var(--on-ink) 78%, transparent);
+}
+
+.prop-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dot-pulse 2.4s ease-in-out infinite;
+}
+
+.prop-cell--cyan .prop-dot { background: var(--cyan); }
+
+.prop-name {
+  position: relative;
+  font-size: clamp(28px, 3.2vw, 38px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.prop-desc {
+  position: relative;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--on-ink) 82%, transparent);
+  max-width: 34ch;
+}
+
+.prop-arrow {
+  position: absolute;
+  right: 26px;
+  bottom: 26px;
+  font-size: 17px;
+  color: color-mix(in srgb, var(--on-ink) 50%, transparent);
+  transform: translateX(-6px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.prop-cell:hover .prop-arrow { opacity: 1; transform: translateX(0); }
+
+/* ─── Stat row ─── */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin: 12px 0 0;
+  border-top: 1px solid var(--edge);
+}
+
+.stat-item {
+  padding: 22px 18px 4px 0;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-item + .stat-item { padding-left: 20px; border-left: 1px solid var(--edge-soft); }
+.stat-item.is-visible { opacity: 1; transform: translateY(0); }
+
+.stat-value {
+  font-size: clamp(24px, 2.6vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  margin: 9px 0 0;
+  color: var(--vp-c-text-3);
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+
+/* ─── Products ─── */
+.products-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--edge); }
+
+.product-card {
+  position: relative;
+  padding: 30px 28px 56px;
+  border-bottom: 1px solid var(--edge);
+  text-decoration: none;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s;
+}
+
+.product-card + .product-card { border-left: 1px solid var(--edge); }
+.product-card.is-visible { opacity: 1; transform: translateY(0); }
+.product-card:hover { background: var(--vp-c-bg-soft); }
+
+.product-index { position: absolute; top: 30px; right: 26px; color: var(--vp-c-text-3); }
+.product-icon { margin-bottom: 22px; color: var(--vp-c-text-2); transition: color 0.25s, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+.product-card:hover .product-icon { color: var(--accent); transform: translateY(-2px); }
+.product-title { font-size: 19px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); margin: 0 0 9px; }
+.product-desc { font-size: 14px; line-height: 1.6; color: var(--vp-c-text-2); margin: 0; max-width: 32ch; }
+
+.product-arrow {
+  position: absolute;
+  bottom: 24px;
+  left: 28px;
+  font-size: 17px;
+  color: var(--accent);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.product-card:hover .product-arrow { opacity: 1; transform: translateX(0); }
+
+/* ─── Ticker ─── */
+.ticker {
+  position: relative;
+  overflow: hidden;
+  /* The band is a separator, so it needs air on both sides of the rules as well
+     as between them: at 16px the 26px type sat almost on the hairlines and the
+     whole strip read as a squeezed row of the section above it. */
+  margin: 12px 0 96px;
+  padding: 28px 0;
+  border-top: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker-slide 46s linear infinite;
+}
+
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 26px;
+  padding-right: 26px;
+  font-size: clamp(18px, 2.4vw, 26px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  /* 22% measured 1.65:1 — the words were decoration you could not read. 46%
+     cleared the large-text threshold on paper but still looked washed out beside
+     the ink type above it; 58% keeps the band recessive without reading as a
+     rendering fault. */
+  color: color-mix(in srgb, var(--ink) 58%, transparent);
+  white-space: nowrap;
+}
+
+.ticker-item i { font-style: normal; font-size: 12px; color: var(--accent); }
+
+/* ─── Capabilities index ─── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 0;
+  border-top: 1px solid var(--edge);
+}
+
+.feature-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px 26px 1fr;
+  align-items: start;
+  gap: 14px;
+  padding: 18px 22px 18px 0;
+  border-bottom: 1px solid var(--edge-soft);
+  text-decoration: none;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), background 0.22s;
+}
+
+.feature-row:nth-child(even) { padding-left: 22px; border-left: 1px solid var(--edge-soft); }
+
+/* 13 capabilities in two columns leaves the last one stranded beside a hole.
+   An odd final row spans the full width instead, so the index always closes on a
+   complete line — and it keeps working if a 14th capability is ever added. */
+.feature-row:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.feature-row:last-child:nth-child(odd) .feature-desc { max-width: 76ch; }
+
+.feature-row.is-visible { opacity: 1; transform: translateY(0); }
+.feature-row:hover { background: var(--vp-c-bg-soft); }
+
+/* The accent bar is the only place a capability's own hue appears. */
+.feature-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-row:hover::before { transform: scaleY(1); }
+
+.feature-no { color: var(--vp-c-text-3); padding-top: 4px; font-size: 9.5px; }
+.feature-icon { color: var(--vp-c-text-3); transition: color 0.22s; }
+.feature-row:hover .feature-icon { color: var(--accent); }
+.feature-body { min-width: 0; }
+
+.feature-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.feature-flag {
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: var(--accent-ink);
+  padding: 2px 6px;
+  /* Keyed off --accent-ink, not --accent. Both flags are supposed to be the same
+     mark, but each row sets its own --accent inline for the hover bar, so the
+     border inherited IDA Q's cyan and Gabriel's violet — two different badges
+     for one label. */
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 34%, transparent);
+  border-radius: 4px;
+}
+
+.feature-desc { font-size: 12.5px; line-height: 1.55; color: var(--vp-c-text-2); margin: 0; }
+.feature-row.is-flagship .feature-no { color: var(--accent-ink); }
+
+/* ─── Featured ───
+   Ruled, not carded. As a rounded 18px panel on a tinted fill it was the only
+   floating container left on a page that draws everything else with hairlines,
+   so it read as a leftover from the previous design rather than an emphasis. */
+.featured-card {
+  display: grid;
+  grid-template-columns: 1fr 0.78fr;
+  gap: 44px;
+  align-items: center;
+  padding: 40px 0;
+  border-top: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.featured-card.is-visible { opacity: 1; transform: translateY(0); }
+
+.featured-label {
+  display: inline-block;
+  color: var(--accent-ink);
+  margin-bottom: 14px;
+  padding-left: 26px;
+  position: relative;
+}
+
+.featured-label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 18px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.featured-title { font-size: clamp(24px, 2.8vw, 32px); font-weight: 700; letter-spacing: -0.035em; color: var(--ink); margin: 0 0 14px; line-height: 1.05; }
+.featured-desc { font-size: 14.5px; line-height: 1.65; color: var(--vp-c-text-2); margin: 0 0 22px; max-width: 52ch; }
+
+.featured-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--edge);
+  padding-bottom: 3px;
+  transition: gap 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.featured-link:hover { gap: 12px; color: var(--accent); border-color: var(--accent); }
 
 .featured-visual {
-  height: 200px;
-  border-radius: 14px;
+  aspect-ratio: 4 / 3;
+  /* Square, like the band it now sits in. A 12px radius + hairline ring was left
+     over from when the whole block was a rounded card, so the image read as a
+     card floating inside a ruled section. */
   overflow: hidden;
   background-size: cover;
   background-position: center;
   position: relative;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.featured-card:hover .featured-visual { transform: scale(1.02) rotate(0.5deg); }
+.featured-card:hover .featured-visual { transform: scale(1.015); }
+
+/* The Gabriel render is a bright violet orb on black. On the light page that is
+   the intended focal point; on the dark page the same luminance next to #09090a
+   blooms and pulls the eye off the heading, so it is pulled back to match. */
+.dark .featured-visual { filter: brightness(0.82) saturate(0.9); }
+.dark .featured-card:hover .featured-visual { filter: brightness(1) saturate(1); }
 
 .featured-visual-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, transparent 60%);
-  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--edge);
 }
 
-/* ─── Use Cases ─── */
+/* ─── Use cases ─── */
 .use-cases-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
 
 .use-case-card {
-  display: grid;
-  grid-template-columns: 1fr;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-  background: var(--vp-c-bg);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--edge);
+  border-radius: 14px;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(18px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s;
 }
 
-.use-case-card.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.use-case-card:hover {
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.06);
-  transform: translateY(-3px);
-  border-color: var(--vp-c-brand-soft);
-}
-
-.dark .use-case-card:hover { box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3); }
+.use-case-card.is-visible { opacity: 1; transform: translateY(0); }
+.use-case-card:hover { border-color: var(--ink); }
 
 .use-case-visual {
   width: 100%;
-  height: 160px;
-  overflow: hidden;
+  height: 190px;
   background-size: cover;
   background-position: center;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  filter: saturate(0.85);
 }
 
-.use-case-card:hover .use-case-visual { transform: scale(1.04); }
+.use-case-card:hover .use-case-visual { transform: scale(1.03); filter: saturate(1); }
 
-.use-case-content { padding: 24px 28px; }
-.use-case-title { font-size: 17px; font-weight: 700; color: var(--vp-c-text-1); margin: 0 0 8px; letter-spacing: -0.01em; }
-.use-case-desc { font-size: 14px; line-height: 1.6; color: var(--vp-c-text-2); margin: 0 0 16px; }
+.use-case-content { padding: 26px 28px 28px; }
+.use-case-title { font-size: 19px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); margin: 0 0 9px; }
+.use-case-desc { font-size: 14px; line-height: 1.6; color: var(--vp-c-text-2); margin: 0 0 18px; }
 
 .btn-dark {
   display: inline-flex;
   align-items: center;
   padding: 10px 20px;
-  background: var(--vp-c-text-1);
-  color: var(--vp-c-bg);
-  border-radius: 100px;
+  background: var(--ink);
+  color: var(--on-ink);
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s;
 }
 
-.btn-dark:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+.btn-dark:hover { transform: translateY(-2px); box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--ink) 60%, transparent); }
 
-/* ─── Blog ─── */
-.blog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+/* ─── Blog list ─── */
+.blog-list { border-top: 1px solid var(--edge); }
 
-.blog-card {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 14px;
-  overflow: hidden;
+.blog-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 132px 1fr 28px;
+  align-items: center;
+  gap: 26px;
+  padding: 20px 4px;
+  border-bottom: 1px solid var(--edge-soft);
   text-decoration: none;
-  background: var(--vp-c-bg);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(14px);
+  transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), background 0.22s;
 }
 
-.blog-card.is-visible { opacity: 1; transform: translateY(0); }
-
-.blog-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
-  border-color: var(--vp-c-brand-soft);
-}
-
-.dark .blog-card:hover { box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
-.blog-card:hover .blog-title { color: var(--vp-c-brand-1); }
-.blog-card:hover .blog-cover { transform: scale(1.05); }
+.blog-item.is-visible { opacity: 1; transform: translateY(0); }
+.blog-item:hover { background: var(--vp-c-bg-soft); }
 
 .blog-cover {
-  position: relative;
-  width: 100%;
-  height: 160px;
+  width: 132px;
+  height: 82px;
+  border-radius: 8px;
   background-size: cover;
   background-position: center;
+  border: 1px solid var(--edge);
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.blog-tag {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-radius: 100px;
-}
+.blog-item:hover .blog-cover { transform: scale(1.03); }
 
-.blog-body { padding: 18px 20px 20px; display: flex; flex-direction: column; flex: 1; }
-.blog-title { font-size: 15px; font-weight: 600; color: var(--vp-c-text-1); margin: 0 0 8px; line-height: 1.35; transition: color 0.2s; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.blog-desc { font-size: 13px; color: var(--vp-c-text-2); margin: 0 0 12px; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: 1; }
-.blog-meta { font-size: 12px; color: var(--vp-c-text-3); font-weight: 500; }
+.blog-meta-row { display: flex; align-items: center; gap: 12px; margin-bottom: 7px; }
+.blog-tag { color: var(--accent-ink); }
+.blog-meta { color: var(--vp-c-text-3); }
+.blog-title { font-size: 16px; font-weight: 650; letter-spacing: -0.02em; color: var(--ink); margin: 0 0 6px; line-height: 1.3; }
+.blog-desc { font-size: 13px; color: var(--vp-c-text-2); margin: 0; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.blog-arrow { font-size: 16px; color: var(--vp-c-text-3); opacity: 0; transform: translateX(-6px); transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+.blog-item:hover .blog-arrow { opacity: 1; transform: translateX(0); color: var(--accent); }
 
-/* ─── Guides Grid ─── */
-.guides-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+/* ─── Guides ─── */
+.guides-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 
 .guide-card {
-  border: 1px solid var(--vp-c-divider);
+  border: 1px solid var(--edge);
   border-radius: 14px;
   overflow: hidden;
   text-decoration: none;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(18px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s;
 }
 
-.guide-card.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.guide-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
-  border-color: var(--vp-c-brand-soft);
-}
-
-.dark .guide-card:hover { box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
+.guide-card.is-visible { opacity: 1; transform: translateY(0); }
+.guide-card:hover { border-color: var(--ink); }
 
 .guide-thumb {
+  position: relative;
   width: 100%;
-  height: 140px;
+  height: 150px;
   background-size: cover;
   background-position: center;
-  position: relative;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  filter: saturate(0.85);
 }
 
-.guide-card:hover .guide-thumb { transform: scale(1.05); }
+.guide-card:hover .guide-thumb { transform: scale(1.04); filter: saturate(1); }
 
+/* The category label sits on top of an arbitrary photograph, so the scrim has to
+   be dark enough to guarantee its contrast rather than merely "look" moody: at
+   0.55 the label landed on a light patch of one thumbnail at 1:1. */
 .guide-thumb-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.3) 100%);
-  opacity: 0;
-  transition: opacity 0.3s;
+  background: linear-gradient(180deg, transparent 34%, rgba(0, 0, 0, 0.82) 100%);
 }
 
-.guide-card:hover .guide-thumb-overlay { opacity: 1; }
+.guide-category {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
 
-.guide-text { padding: 16px 20px; }
-.guide-title { font-size: 14px; font-weight: 600; color: var(--vp-c-text-1); margin: 0 0 4px; }
-.guide-category { font-size: 12px; color: var(--vp-c-text-3); font-weight: 500; }
+.guide-text { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; }
+.guide-title { font-size: 15px; font-weight: 650; letter-spacing: -0.02em; color: var(--ink); margin: 0; }
+.guide-go { font-size: 15px; color: var(--vp-c-text-3); transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), color 0.22s; }
+.guide-card:hover .guide-go { transform: translateX(4px); color: var(--accent); }
 
 /* ─── Resources ─── */
-.resources { border-top: 1px solid var(--vp-c-divider); padding: 64px 0 40px; }
-.resources-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
+.resources { border-top: 1px solid var(--edge); padding: 52px 0 40px; }
+.resources-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
 
 .resource-item {
-  text-align: center;
+  padding: 6px 24px 6px 0;
   text-decoration: none;
-  padding: 24px 16px;
-  border-radius: 14px;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(14px);
+  transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.resource-item.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
+.resource-item + .resource-item { padding-left: 24px; border-left: 1px solid var(--edge-soft); }
+.resource-item.is-visible { opacity: 1; transform: translateY(0); }
 
-.resource-item:hover {
-  background: var(--vp-c-bg-soft);
-  transform: translateY(-3px);
-}
-
-.resource-item:hover .resource-title { color: var(--vp-c-brand-1); }
-.resource-item:hover .resource-icon { transform: scale(1.15); color: var(--vp-c-brand-1); }
-
-.resource-icon { display: flex; justify-content: center; margin-bottom: 14px; color: var(--vp-c-text-3); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-.resource-title { font-size: 14px; font-weight: 600; color: var(--vp-c-text-1); margin: 0 0 4px; transition: color 0.2s; }
+.resource-icon { color: var(--vp-c-text-3); margin-bottom: 14px; transition: color 0.25s, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.resource-item:hover .resource-icon { color: var(--accent); transform: translateY(-2px); }
+.resource-title { font-size: 14.5px; font-weight: 650; letter-spacing: -0.02em; color: var(--ink); margin: 0 0 5px; transition: color 0.2s; }
+.resource-item:hover .resource-title { color: var(--accent); }
 .resource-desc { font-size: 13px; color: var(--vp-c-text-2); line-height: 1.5; margin: 0; }
 
-/* ─── Responsive ─── */
-@media (max-width: 768px) {
-  .hero { padding: 50px 0 40px; }
-  .hero-split { grid-template-columns: 1fr; gap: 32px; }
-  .hero-title { font-size: 30px; }
-  .hero-subtitle { font-size: 15px; }
-  .stats-bar { margin-bottom: 56px; }
-  .stat-proprietary-row { grid-template-columns: 1fr; }
-  .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .stat-value { font-size: 26px; }
-  .stat-gabriel { padding: 22px 24px; }
-  .stat-gabriel-name { font-size: 21px; }
-  .stat-idaq { padding: 22px 24px; }
-  .stat-idaq-name { font-size: 21px; }
-  .products-grid { grid-template-columns: 1fr; }
-  .features-grid { grid-template-columns: 1fr; }
-  .use-cases-grid { grid-template-columns: 1fr; }
-  .use-case-visual { height: 120px; }
-  .featured-card { grid-template-columns: 1fr; padding: 28px; gap: 24px; }
-  .featured-visual { height: 140px; }
-  .blog-grid { grid-template-columns: 1fr; }
-  .guides-grid { grid-template-columns: 1fr; }
-  .resources-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
-  .section { padding: 0 0 56px; }
+/* ─── Touch / no-hover ───
+   Everything that carries meaning on hover has to have a resting state too. On a
+   phone the capability index was 13 typographically identical rows and the copy
+   affordance on the install card never appeared at all. */
+@media (hover: none) {
+  .install-copy { opacity: 1; }
+
+  /* Resting accent bar, alternating so consecutive rows stay distinguishable
+     without painting thirteen unrelated tints at full strength. */
+  .feature-row::before { transform: scaleY(1); opacity: 0.55; }
+  .feature-row:nth-child(even)::before { opacity: 0.28; }
+  .feature-icon { color: var(--vp-c-text-2); }
+  .product-arrow,
+  .prop-arrow,
+  .blog-arrow { opacity: 1; transform: none; }
 }
 
-@media (min-width: 769px) and (max-width: 1023px) {
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none; }
+  .eyebrow-dot,
+  .prop-dot { animation: none; }
+  .hero-left,
+  .hero-right,
+  .prop-cell,
+  .stat-item,
+  .product-card,
+  .feature-row,
+  .featured-card,
+  .use-case-card,
+  .blog-item,
+  .guide-card,
+  .resource-item {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 1023px) {
+  .hero-split { grid-template-columns: 1fr; gap: 40px; }
   .products-grid { grid-template-columns: repeat(2, 1fr); }
-  .features-grid { grid-template-columns: repeat(2, 1fr); }
-  .blog-grid { grid-template-columns: repeat(2, 1fr); }
+  .product-card:nth-child(3) { border-left: none; }
   .guides-grid { grid-template-columns: repeat(2, 1fr); }
-  .resources-grid { grid-template-columns: repeat(2, 1fr); }
+  .resources-grid { grid-template-columns: repeat(2, 1fr); row-gap: 28px; }
+  .resource-item:nth-child(3) { padding-left: 0; border-left: none; }
+  .featured-card { grid-template-columns: 1fr; gap: 28px; padding: 34px; }
+}
+
+@media (max-width: 768px) {
+  .home-page { padding: 0 18px; }
+  .hero { padding: 44px 0 52px; }
+  .hero-rules { display: none; }
+  .hero-title { font-size: clamp(31px, 8.4vw, 42px); }
+  .hero-subtitle { font-size: 15.5px; }
+  .section { padding: 0 0 60px; }
+  .rule-head { flex-wrap: wrap; gap: 12px; }
+  .view-all { padding-left: 0; border-left: none; }
+  .prop-grid { grid-template-columns: 1fr; }
+  .prop-cell { padding: 24px 22px 26px; }
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+  .stat-item { padding: 18px 14px 14px 0; border-top: 1px solid var(--edge-soft); }
+  .stat-item:nth-child(odd) { padding-left: 0; border-left: none; }
+  .stat-item:nth-child(1), .stat-item:nth-child(2) { border-top: none; }
+  /* Five figures in two columns strand the fifth next to a gap. It spans the pair
+     instead, which also reads as the summary figure it is. */
+  .stat-item:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  /* At 390px the three-column install row squeezed the command into an ellipsis
+     ("npm install -g fotohubapp…"). The command IS the content, so the label
+     moves above it and the code gets the full width. */
+  .install-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'lang copy' 'cmd cmd';
+    row-gap: 6px;
+  }
+  .install-lang { grid-area: lang; }
+  .install-copy { grid-area: copy; opacity: 1; }
+  .install-row code { grid-area: cmd; font-size: 13px; overflow-wrap: anywhere; white-space: normal; text-overflow: clip; }
+  .products-grid { grid-template-columns: 1fr; }
+  .product-card + .product-card { border-left: none; }
+  /* Mobile shrinks the type below the 24px large-text threshold, so the tint has
+     to come up with it to keep 4.5:1. */
+  .ticker { margin: 8px 0 60px; padding: 20px 0; }
+  .ticker-item { color: color-mix(in srgb, var(--ink) 72%, transparent); }
+  .features-grid { grid-template-columns: 1fr; }
+  .feature-row:nth-child(even) { padding-left: 0; border-left: none; }
+  .use-cases-grid { grid-template-columns: 1fr; }
+  .use-case-visual { height: 150px; }
+  .featured-card { padding: 26px; }
+  .blog-item { grid-template-columns: 96px 1fr; gap: 16px; align-items: start; }
+  .blog-cover { width: 96px; height: 68px; }
+  .blog-arrow { display: none; }
+  .guides-grid { grid-template-columns: 1fr; }
+  .resources-grid { grid-template-columns: 1fr; row-gap: 0; }
+  .resource-item { padding: 20px 0; border-top: 1px solid var(--edge-soft); }
+  .resource-item + .resource-item { padding-left: 0; border-left: none; }
 }
 </style>

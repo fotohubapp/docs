@@ -358,11 +358,16 @@ phone case" | xargs -P 4 -I {} curl -s -X POST \
 
 ### Volume Savings
 
-There is no volume discount and no bonus on a top-up: **$25 deposited is $25
-spendable**, at every package size. What a larger balance does buy is throughput —
-the pay-as-you-go tiers activate off wallet balance or lifetime spend, with no
-subscription — and Enterprise contracts, which are priced individually
-([contact sales](mailto:sales@fotohub.app)).
+**Top up $500 or more and you get extra dollars.** The volume bonus is the one
+real discount on this API: pay $1,000 and $1,100 lands in the wallet, pay $15,000
+and $18,000 does. It is credited in the same transaction as the payment, spends on
+any operation at the same per-unit price, and does not expire. At the top rung that
+is a 16.7% effective discount on everything you generate.
+
+Below $500 there is no bonus: $25 deposited is $25 spendable. A larger balance also
+buys throughput, since the pay-as-you-go tiers activate off wallet balance or
+lifetime spend at no cost. Above $15,000, Enterprise contracts are priced
+individually ([contact sales](mailto:sales@fotohub.app)).
 
 ---
 
@@ -370,30 +375,43 @@ subscription — and Enterprise contracts, which are priced individually
 
 `GET /v1/billing/topup/packages` is the authoritative list:
 
-| Package slug | Amount credited | Unlocks |
-|-------------|----------------:|---------|
-| `topup-50` | $15 | — |
-| `topup-100` | $25 | PAYG Standard: 120 rpm, 10 concurrent jobs, 100 MB uploads |
-| `topup-250` | $60 | (Standard) |
-| `topup-500` | $120 | PAYG Premium: 500 rpm, 30 concurrent jobs, 500 MB uploads |
-| `topup-1000` | $225 | (Premium) |
-| `topup-5000` | $1,000 | (Premium) |
+| Package slug | You pay | Bonus | Credited | Unlocks |
+|-------------|--------:|------:|---------:|---------|
+| `topup-50` | $15 | — | $15 | — |
+| `topup-100` | $25 | — | $25 | PAYG Standard: 120 rpm, 10 concurrent jobs, 100 MB uploads |
+| `topup-250` | $60 | — | $60 | (Standard) |
+| `topup-500` | $120 | — | $120 | PAYG Premium: 500 rpm, 30 concurrent jobs, 500 MB uploads |
+| `scale-500` | $500 | +$25 (5%) | $525 | (Premium) |
+| **`scale-1000`** | **$1,000** | **+$100 (10%)** | **$1,100** | (Premium) |
+| `scale-2000` | $2,000 | +$240 (12%) | $2,240 | (Premium) |
+| `scale-3000` | $3,000 | +$390 (13%) | $3,390 | (Premium) |
+| `scale-5000` | $5,000 | +$750 (15%) | $5,750 | (Premium) |
+| `scale-7500` | $7,500 | +$1,275 (17%) | $8,775 | (Premium) |
+| `scale-10000` | $10,000 | +$1,800 (18%) | $11,800 | (Premium) |
+| **`scale-15000`** | **$15,000** | **+$3,000 (20%)** | **$18,000** | (Premium) |
 
-The two thresholds are $25 and $120 of balance, and the package amounts land
-exactly on them — `topup-100` puts you in Standard, `topup-500` in Premium. A
+The two tier thresholds are $25 and $120 of balance, and the small package amounts
+land exactly on them — `topup-100` puts you in Standard, `topup-500` in Premium. A
 lifetime spend of $50 or $500 reaches the same tiers without holding the balance.
 
-::: warning Slug names are historical, and there is no bonus
-The slugs still read `topup-50` … `topup-5000` from the pre-USD pricing and no
-longer match the amount — send the **slug** and read `amount_usd` from the
-packages endpoint rather than parsing the number out of the slug.
+The bonus depends on the money, not the package: a custom `amount_usd` of `2500`
+earns the same 13% as any $2,500 preset. Rungs do not stack and the bonus is
+floored to the cent, so a $499 top-up earns nothing — aim at the round numbers, and
+quote from `bonus_tiers` (highest threshold first, first match wins) rather than
+hardcoding the ladder.
 
-Earlier revisions of this page advertised bonus credits ("+250 credits, 5%") per
-package. That grant never existed: the checkout wrote it into Stripe metadata and
-the webhook credited only the dollar amount, so a $15 top-up has always added
-exactly $15. The claim has been removed rather than corrected, because there are no
-credits in this product to grant. If volume pricing returns it will be extra
-**dollars** on the balance.
+::: warning The starter slug names are not their amounts
+`topup-50` charges **$15**, `topup-100` **$25**, `topup-250` **$60**,
+`topup-500` **$120** — historical names from the pre-USD pricing. The `scale-*`
+slugs do match their dollar amounts. Send the **slug** and read `amount_usd` /
+`total_usd` from the packages endpoint rather than parsing a number out of a slug.
+
+`topup-1000` ($225) and `topup-5000` ($1,000) are retired from the list but still
+resolve, and now earn whatever bonus their amount qualifies for.
+
+The bonus is **dollars**, not credits. An earlier revision of this page advertised
+bonus *credits* per package; nothing ever granted those, and this API has no credit
+unit at all. `bonus_usd` is the real thing, and the webhook really does credit it.
 :::
 
 ---

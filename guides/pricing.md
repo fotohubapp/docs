@@ -320,16 +320,58 @@ spend, with no subscription:
 | PAYG Standard | $25 balance or $50 lifetime spend | 120 | 10 | 100 MB |
 | PAYG Premium | $120 balance or $500 lifetime spend | 500 | 30 | 500 MB |
 
-Paid API plans raise the limits further and add support commitments:
+Above that, Enterprise is provisioned by sales:
 
-| Plan | Price | RPM | Concurrent jobs | Support |
+| Tier | Price | RPM | Concurrent jobs | Support |
 |------|-------|----:|----------------:|---------|
-| Developer | 49 PLN/mo | 60 | 5 | Email |
-| Startup | 199 PLN/mo | 300 | 20 | Priority |
-| Business | 799 PLN/mo | 1000 | 50 | Dedicated, 99.9% SLA |
 | Enterprise | Custom | 5000 | 200 | Custom SLA |
 
-Plan subscriptions are billed in PLN because they are a Polish-entity
-subscription. **Everything you generate is still billed in USD from the wallet**
-— a plan buys throughput, not usage. See [Rate Limits](/api/rate-limits) for the
-burst windows and the `X-RateLimit-*` headers.
+Apply at `POST /v1/tiers/enterprise/apply` — it cannot be self-served.
+
+**Paid API plans were retired on 2026-08-13.** There is nothing to subscribe to
+and nothing to cancel: every tier is free, and it unlocks on your own wallet. So
+the only way to raise your limits is to top up — which is also the cheaper one,
+since from $500 up a top-up earns a
+[volume bonus of 5–20%](#top-up-packages-and-the-volume-bonus) in extra spendable
+dollars that a monthly fee never gave you.
+
+See [Rate Limits](/api/rate-limits) for the burst windows and the
+`X-RateLimit-*` headers.
+
+## Top-Up Packages and the Volume Bonus
+
+Fund the wallet with a package or any custom amount between **$10** and
+**$15,000**. From $500 up, the top-up earns a **volume bonus** — extra real
+dollars credited in the same transaction as the payment, spendable on any
+operation, with no expiry:
+
+| Slug | You pay | Bonus | Credited to wallet |
+|------|--------:|------:|-------------------:|
+| `topup-50` | $15 | — | $15 |
+| `topup-100` | $25 | — | $25 |
+| `topup-250` | $60 | — | $60 |
+| `topup-500` | $120 | — | $120 |
+| `scale-500` | $500 | +$25 (5%) | $525 |
+| **`scale-1000`** | **$1,000** | **+$100 (10%)** | **$1,100** |
+| `scale-2000` | $2,000 | +$240 (12%) | $2,240 |
+| `scale-3000` | $3,000 | +$390 (13%) | $3,390 |
+| `scale-5000` | $5,000 | +$750 (15%) | $5,750 |
+| `scale-7500` | $7,500 | +$1,275 (17%) | $8,775 |
+| `scale-10000` | $10,000 | +$1,800 (18%) | $11,800 |
+| **`scale-15000`** | **$15,000** | **+$3,000 (20%)** | **$18,000** |
+
+The bonus is a function of the money, not of the package: typing `2500` into a
+custom top-up earns the same 13% as any $2,500 preset would. Rungs do not stack —
+only the highest one at or below your amount applies — and the bonus is floored to
+the cent, so a $499 top-up earns nothing. Aim at the round numbers.
+
+::: warning The four starter slugs are not their amounts
+`topup-50` charges **$15**, `topup-100` **$25**, `topup-250` **$60** and
+`topup-500` **$120** — historical names from the pre-USD PLN pricing. The
+`scale-*` slugs do match their dollar amounts. Read `amount_usd` and `total_usd`
+from `GET /v1/billing/topup/packages` rather than hardcoding any of it.
+:::
+
+Above $15,000, apply at `POST /v1/tiers/enterprise/apply` for invoicing. See
+[Billing](/api/billing#get-v1-billing-topup-packages) for the full endpoint
+contract and the machine-readable bonus ladder.
