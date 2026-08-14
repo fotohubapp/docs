@@ -640,15 +640,23 @@ Worth knowing rather than discovering:
 
 ## Endpoint reference
 
+Anything marked "API key or JWT" works with an `fh_live_*` key, so the whole
+buy-then-deliver flow can be scripted without a browser session. The rows marked
+"JWT only" are console operations and will answer `401` to an API key.
+
 | Method | Path | Auth |
 |---|---|---|
-| `POST` | `/v1/storage/s3/buy` | JWT |
-| `GET` | `/v1/storage/s3/buckets` | JWT |
-| `GET` | `/v1/storage/s3/buckets/{id}` | JWT |
-| `GET` | `/v1/storage/s3/buckets/{id}/aliases` | JWT |
-| `POST` | `/v1/storage/s3/buckets/{id}/aliases` | JWT |
-| `PATCH` | `/v1/storage/s3/buckets/{id}/aliases/{alias}` | JWT |
-| `DELETE` | `/v1/storage/s3/buckets/{id}/aliases/{alias}` | JWT |
+| `POST` | `/v1/storage/s3/buy` | API key or JWT |
+| `GET` | `/v1/storage/s3/buckets` | API key or JWT |
+| `GET` | `/v1/storage/s3/buckets/{id}` | API key or JWT |
+| `POST` | `/v1/storage/s3/estimate` | API key or JWT |
+| `GET` | `/v1/storage/s3/regions` | API key or JWT |
+| `GET` | `/v1/storage/s3/pricing` | API key or JWT |
+| `GET` | `/v1/storage/s3/buckets/{id}/aliases` | API key or JWT |
+| `POST` | `/v1/storage/s3/buckets/{id}/aliases` | API key or JWT |
+| `PATCH` | `/v1/storage/s3/buckets/{id}/aliases/{alias}` | API key or JWT |
+| `DELETE` | `/v1/storage/s3/buckets/{id}/aliases/{alias}` | API key or JWT |
+| `DELETE` | `/v1/storage/s3/buckets/{id}` | JWT only |
 | `GET` | `/v1/destinations` | JWT |
 | `POST` | `/v1/destinations` | JWT |
 | `PATCH` | `/v1/destinations/{id}` | JWT |
@@ -662,6 +670,8 @@ Worth knowing rather than discovering:
 
 ## See also
 
+- [Buy Storage & Generate via API](/guides/api-storage-and-generation) — the same
+  flow end to end using only an API key, with a runnable script
 - [S3 Cloud Storage](/api/storage) — the full bucket API: objects, multipart,
   versioning, lifecycle, CORS, replication
 - [Webhooks](/guides/webhooks) — get told when a generation finishes
