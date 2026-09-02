@@ -4,6 +4,61 @@ Track new models, features, and improvements to the FOTOhub API.
 
 ---
 
+## September 2026
+
+### Story Studio scene renders are priced per model <Badge type="warning" text="BREAKING" />
+
+`POST /v1/story/step/videos` starts one clip per storyboard frame — on any of nine
+models, at any length from 3 to 15 seconds, for up to six scenes — and used to
+charge one flat **$0.535906** for all of it. That figure covered a four-scene story
+on `seedance-1-5` and nothing else: the same request consumes $4.66 on
+`seedance-2-5`, and the largest one the route accepts (six 15-second scenes on 2.5)
+consumes **$20.86**.
+
+Scene renders are now billed at the provider's own rate — per model, per second,
+per scene — from the same table [`/v1/ai/generate/video`](/api/video-generation)
+bills from:
+
+| `video_model` | Per 5 s scene | 4-scene story |
+|---|---:|---:|
+| `seedance-1-5` | 0.130680 | 0.522720 |
+| `seedance-2-0-mini` *(default)* | 0.381150 | 1.524600 |
+| `veo-3-1-fast` | 0.320000 | 1.280000 |
+| `wan` / `happyhorse` | 0.500000 | 2.000000 |
+| `seedance-2-0-fast` | 0.609840 | 2.439360 |
+| `seedance-2-0-pro` | 0.762300 | 3.049200 |
+| `veo-3-1` | 0.800000 | 3.200000 |
+| `seedance-2-5` | 1.165230 | 4.660920 |
+
+What to change in an integration:
+
+- **`video_model` now decides your bill.** Read `cost_usd` off the step 4 response
+  rather than assuming a fixed line item, and pick `seedance-1-5` if price is the
+  constraint — it is 3x cheaper than the default and 9x cheaper than `seedance-2-5`.
+- **`story_step_videos` is no longer a price key** and has left `GET /v1/pricing`.
+  The ledger now labels each charge `story_step_videos:<model>`, so a charge names
+  the model that caused it. `story_step` (0.267953), `story_regenerate` (0.160772)
+  and `story_full` (1.607717) are unchanged.
+- **A duration snaps down onto the model's own ladder.** `duration_per_scene: 5`
+  on a Veo model is a four-second clip, billed as four seconds — Veo renders 4, 6
+  or 8 and nothing else.
+- **You are only charged for scenes that render.** A scene whose keyframe failed in
+  step 3 is never submitted and never quoted; anything the provider refuses is
+  refunded against the same operation the moment step 4 returns.
+  `POST /v1/story/generate` charges its estimate up front and reports any refund in
+  a new `event: billing` frame carrying `refunded_usd`, `scenes_rendered` and
+  `scenes_requested`.
+- **`POST /v1/story/step/poll-videos`** — new, free, and the only way to get real
+  clip URLs out of the step path. Poll it until `pending` is `0` before calling
+  step 5 or 6.
+
+Nine models are now selectable (`seedance`, `seedance-2-0-mini`, `-fast`, `-pro`,
+`seedance-2-5`, `seedance-1-5`, `veo-3-1-fast`, `veo-3-1`, `wan`, `happyhorse`).
+`hailuo` is retired — still accepted so live integrations do not start failing, but
+it renders on the default model. Full reference: [Story Studio](/api/story-studio).
+
+---
+
 ## August 2026
 
 ### Wallet top-up packages & volume bonus <Badge type="tip" text="NEW" />

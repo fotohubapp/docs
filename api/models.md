@@ -285,8 +285,16 @@ Both are refused with `400` before authentication, so nothing is charged. OpenAI
 |----------|------|-------------|------|
 | `mai-image-2.5-flash` | MAI-Image 2.5 Flash | 0.022 | per image, flat across 1K/2K/4K |
 | `mai-image-2.5` | MAI-Image 2.5 | 0.037 | per image, flat across 1K/2K/4K |
+| `mai-image-2.5-pro` | MAI-Image 2.5 Pro | 0.053 | per image, flat across 1K/2K/4K |
 
-**Use case:** Azure AI flagship image models with prompt rewriting. Both are flat-rated, so resolution costs nothing extra — the cheapest way to get a large render on the platform after `gemini-3.1-flash-lite-image`.
+**Use case:** Azure AI flagship image models with prompt rewriting. All three are flat-rated, so resolution costs nothing extra — the cheapest way to get a large render on the platform after `gemini-3.1-flash-lite-image`. `-pro` adds the strongest photorealism of the family, object and character consistency across a scene, and spatial reasoning.
+
+::: warning One image per request
+The whole MAI-Image family returns exactly **one** image per request. `num_images` above 1 is
+clamped to 1 and billed as 1 — it is not an error, but ask for more by making more requests.
+Output is always PNG, and the total pixel count is capped at 1,048,576 (1024x1024); either
+side may exceed 1024 as long as the product stays under the cap, and neither may go below 768.
+:::
 
 ### BytePlus — SeedDream
 
@@ -947,12 +955,38 @@ See [Shorts & Clips](/api/shorts-clips) for full API reference.
 
 ## Story Studio
 
-| Operation | Price (USD) |
-|-----------|------------:|
-| `story_regenerate` | 0.160772 |
-| `story_step` | 0.267953 |
-| `story_step_videos` | 0.535906 |
-| `story_full` | 1.607717 |
+The pipeline steps are our own GPU time and are flat per request. The scene clips are not: they are rendered by the same providers as [`/v1/ai/generate/video`](#video-generation-models), at the same rates, so step 4 is charged **per model, per second, per scene**.
+
+| Operation | Price (USD) | Covers |
+|-----------|------------:|--------|
+| `story_regenerate` | 0.160772 | one character or one keyframe, redone |
+| `story_step` | 0.267953 | one step — concept, characters, frames, voice-over or final compose |
+| `story_full` | 1.607717 | the orchestration in `POST /v1/story/generate` — **the clips are extra** |
+| `story_step_videos:<model>` | per model, below | the renders started by `POST /v1/story/step/videos` |
+| `story_full_videos:<model>` | per model, below | the same renders, started by `POST /v1/story/generate` |
+| `/v1/story/step/poll-videos` | free | step 4 already paid for the render |
+
+### Scene renders
+
+Per scene, at 720p — every story scene renders at 720p.
+
+| `video_model` | Per 5 s scene | 4-scene story | Lengths it renders |
+|---------------|--------------:|--------------:|--------------------|
+| `seedance-1-5` | 0.130680 | 0.522720 | 5, 6, 7, 8, 9, 10 s |
+| `seedance-2-0-mini` *(default)* | 0.381150 | 1.524600 | 4, 5, 6, 8, 10, 11, 12, 15 s |
+| `seedance-2-0-fast` | 0.609840 | 2.439360 | 4, 5, 6, 8, 10, 11, 12, 15 s |
+| `seedance-2-0-pro` | 0.762300 | 3.049200 | 4, 5, 6, 8, 10, 11, 12, 15 s |
+| `seedance-2-5` | 1.165230 | 4.660920 | 4, 5, 6, 8, 10, 12, 15, 20, 25, 30 s |
+| `veo-3-1-fast` | 0.320000 | 1.280000 | 4, 6, 8 s |
+| `veo-3-1` | 0.800000 | 3.200000 | 4, 6, 8 s |
+| `wan` | 0.500000 | 2.000000 | 4, 5, 6, 7, 8, 9, 10 s |
+| `happyhorse` | 0.500000 | 2.000000 | 3, 4, 5, 6, 7, 8, 9, 10, 12, 15 s |
+
+A requested duration snaps **down** onto that ladder, so `duration_per_scene: 5` on a Veo model is a four-second clip billed as four seconds. Scenes with no keyframe are never submitted and never charged, and anything the renderer refuses is refunded against the same operation.
+
+::: warning The flat render fee is gone — changed 2026-09-02
+`story_step_videos` used to be one figure, $0.535906, for any number of scenes on any model. It covered a four-scene story on `seedance-1-5` and nothing else: the same request costs $4.66 on `seedance-2-5`, and the largest one the route accepts — six 15-second scenes — costs $20.86. Renders are now billed at the provider's own rate, like every other video in this API.
+:::
 
 ---
 

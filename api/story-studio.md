@@ -1,1084 +1,771 @@
 # Story Studio
 
-AI-powered multi-scene video story generation. Create complete narrative videos from a single prompt — Story Studio handles concept development, character design, storyboard creation, video generation, voice-over narration, and final composition automatically.
+Multi-scene narrative video from one prompt. Story Studio writes the story, designs the cast, draws a keyframe for every scene, renders each scene as a clip, narrates it and composes the finished MP4 — as one streaming call, or as eight separate calls you can review between.
 
-::: info Pipeline Architecture
-Story Studio uses a **6-step sequential pipeline** with Server-Sent Events (SSE) streaming for real-time progress. You can run the full pipeline in one call or execute individual steps for granular control.
+::: info Six steps, two ways to drive them
+`POST /v1/story/generate` runs the whole pipeline and streams progress as Server-Sent Events. The `/v1/story/step/*` endpoints run the same six steps one at a time, so your users can approve a concept, redraw a character or swap a video model before you pay for the expensive part.
+:::
+
+::: warning Scene renders are priced per model, per second — changed 2026-09-02
+Step 4 used to cost one flat $0.535906 no matter what it rendered. It now costs what the clips cost: each scene is charged at its model's own per-second rate, the same rate `/v1/ai/generate/video` bills, and only for the scenes that are actually submitted. A four-scene story ranges from **$0.52** to **$4.66** depending on the model you pick, so `video_model` is now the field that decides your bill. See [What it costs](#what-it-costs).
 :::
 
 ## Pipeline Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        STORY STUDIO PIPELINE                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌──────────┐   ┌────────────┐   ┌──────────┐   ┌──────────────────┐  │
-│  │ Step 1   │   │  Step 2    │   │ Step 3   │   │     Step 4       │  │
-│  │ Concept  │──▶│ Characters │──▶│  Frames  │──▶│  Video Gen       │  │
-│  │ (3 cr)   │   │  (5 cr)    │   │ (5 cr)   │   │  (10 cr)         │  │
-│  └──────────┘   └────────────┘   └──────────┘   └──────────────────┘  │
-│                                                          │              │
-│                                                          ▼              │
-│                  ┌──────────────────┐   ┌──────────────────────────┐   │
-│                  │     Step 6       │   │        Step 5             │   │
-│                  │  Final Compose   │◀──│      Voice-Over           │   │
-│                  │    (4 cr)        │   │       (3 cr)              │   │
-│                  └──────────────────┘   └──────────────────────────┘   │
-│                          │                                              │
-│                          ▼                                              │
-│                  ┌──────────────────┐                                   │
-│                  │   Final Video    │                                   │
-│                  │   (MP4 output)   │                                   │
-│                  └──────────────────┘                                   │
-│                                                                         │
-│  Total: 30 credits for full pipeline                                    │
-└─────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           STORY STUDIO PIPELINE                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌────────────┐   ┌──────────────┐   ┌────────────┐   ┌──────────────────┐ │
+│  │  Step 1    │   │   Step 2     │   │  Step 3    │   │     Step 4       │ │
+│  │  Concept   │──▶│  Characters  │──▶│  Frames    │──▶│  Scene clips     │ │
+│  │ $0.267953  │   │  $0.267953   │   │ $0.267953  │   │  provider rate   │ │
+│  └────────────┘   └──────────────┘   └────────────┘   └──────────────────┘ │
+│                                                                │            │
+│                                                                ▼            │
+│                    ┌──────────────────┐   ┌────────────────────────────┐   │
+│                    │     Step 6       │   │         Step 5             │   │
+│                    │  Final compose   │◀──│       Voice-over           │   │
+│                    │   $0.267953      │   │       $0.267953            │   │
+│                    └──────────────────┘   └────────────────────────────┘   │
+│                            │                                                │
+│                            ▼                                                │
+│                    ┌──────────────────┐                                     │
+│                    │   Final MP4      │  final_video_url                    │
+│                    └──────────────────┘                                     │
+│                                                                             │
+│  Steps 1-3, 5, 6 are our own GPU time — flat.                               │
+│  Step 4 is a third-party invoice — per model, per second, per scene.         │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Step Breakdown
-
-| Step | Name | Credits | Description |
-|------|------|---------|-------------|
-| 1 | **Concept** | 3 | Generates story structure: title, synopsis, scene breakdowns, mood, pacing |
-| 2 | **Characters** | 5 | Creates consistent character designs with descriptions and reference images |
-| 3 | **Frames** | 5 | Generates storyboard frames — visual keyframes for each scene |
-| 4 | **Videos** | 10 | Produces video clips for each scene using the selected video model |
-| 5 | **Voice-Over** | 3 | Generates narration audio with timing synchronization |
-| 6 | **Final** | 4 | Composites all elements into the finished video with transitions and audio |
+| Step | Endpoint | What it produces | Price |
+|------|----------|------------------|------:|
+| 1 | `/step/concept` | title, summary, cast, scene-by-scene narration and visual prompts | 0.267953 |
+| 2 | `/step/characters` | one reference image per character, in the story's style | 0.267953 |
+| 3 | `/step/frames` | one storyboard keyframe per scene, using those references | 0.267953 |
+| 4 | `/step/videos` | starts one clip per keyframe | [per model](#scene-render-prices) |
+| — | `/step/poll-videos` | render status, and the clip URLs once ready | free |
+| 5 | `/step/voiceover` | narration audio per scene | 0.267953 |
+| 6 | `/step/final` | the composed MP4 with crossfades and mixed audio | 0.267953 |
 
 ---
 
-## Full Pipeline (SSE Streaming)
+## What it costs
 
-Run the complete 6-step pipeline with real-time progress updates via Server-Sent Events.
+Everything is charged in **USD from your prepaid wallet balance** — the API has no credits and no plan that includes generations. See [Billing](/api/billing).
 
-### Endpoint
+| Price key | USD | Applies to |
+|-----------|----:|------------|
+| `story_step` | 0.267953 | each of steps 1, 2, 3, 5, 6 |
+| `story_regenerate` | 0.160772 | `POST /regenerate/character`, `POST /regenerate/frame` |
+| `story_full` | 1.607717 | the orchestration in `POST /generate` — **the clips are extra** |
+| `story_step_videos:<model>` | [see below](#scene-render-prices) | the scene renders started by step 4 |
+| `story_full_videos:<model>` | [see below](#scene-render-prices) | the same renders, when started by `POST /generate` |
+
+The model-suffixed keys are what appears on your [wallet ledger](/api/billing#ledger) and in `GET /v1/usage`, so a charge names the model that caused it.
+
+### Scene render prices
+
+Each scene is priced on its own, at the model's rate for the length that model actually renders. Prices are for a 720p clip — every story scene renders at 720p.
+
+| `video_model` | Provider | Per 5 s scene | 4-scene story | Per 8 s scene | Lengths it renders |
+|---------------|----------|--------------:|--------------:|--------------:|--------------------|
+| `seedance-1-5` | ByteDance | 0.130680 | **0.522720** | 0.208440 | 5, 6, 7, 8, 9, 10 s |
+| `seedance-2-0-mini` *(default)* | ByteDance | 0.381150 | **1.524600** | 0.607950 | 4, 5, 6, 8, 10, 11, 12, 15 s |
+| `seedance-2-0-fast` | ByteDance | 0.609840 | **2.439360** | 0.972720 | 4, 5, 6, 8, 10, 11, 12, 15 s |
+| `seedance-2-0-pro` | ByteDance | 0.762300 | **3.049200** | 1.215900 | 4, 5, 6, 8, 10, 11, 12, 15 s |
+| `seedance-2-5` | ByteDance | 1.165230 | **4.660920** | 1.858590 | 4, 5, 6, 8, 10, 12, 15, 20, 25, 30 s |
+| `veo-3-1-fast` | Google | 0.320000 | **1.280000** | 0.640000 | 4, 6, 8 s |
+| `veo-3-1` | Google | 0.800000 | **3.200000** | 1.600000 | 4, 6, 8 s |
+| `wan` (Wan 2.6) | Alibaba | 0.500000 | **2.000000** | 0.800000 | 4, 5, 6, 7, 8, 9, 10 s |
+| `happyhorse` (HappyHorse 1.1) | Alibaba | 0.500000 | **2.000000** | 0.800000 | 3, 4, 5, 6, 7, 8, 9, 10, 12, 15 s |
+
+::: tip A duration snaps **down** onto that ladder
+Veo renders 4, 6 or 8 seconds and nothing else, so `duration_per_scene: 5` on a Veo model is a **four-second** clip and is billed as four seconds. Ask for 7 seconds and you get 6. Below a model's floor you get its shortest step. This is the same rule the renderer applies, so the length you are billed for is always the length that exists.
+:::
+
+Worked examples, all at 720p:
+
+| Request | Renders | Total |
+|---------|---------|------:|
+| 4 scenes × 5 s, `seedance-1-5` | 4 × 5 s | 0.522720 |
+| 4 scenes × 5 s, default `seedance-2-0-mini` | 4 × 5 s | 1.524600 |
+| 4 scenes × 5 s, `veo-3-1-fast` | 4 × 4 s | 1.280000 |
+| 6 scenes × 15 s, `seedance-2-0-mini` | 6 × 15 s | 6.822900 |
+| 6 scenes × 15 s, `seedance-2-5` — the largest request accepted | 6 × 15 s | 20.858580 |
+
+Add the pipeline fees to those figures: **$1.339765** if you run the five flat steps yourself, or **$1.607717** if you let `POST /generate` orchestrate them.
+
+### You are charged only for scenes that render
+
+Step 4 quotes the scenes it is about to submit and settles down — never up — against what the renderer actually started:
+
+- **A scene with no keyframe is never quoted.** If step 3 lost two of four scenes (a content filter, a provider error), step 4 charges for two.
+- **A scene the renderer refuses is refunded.** The charge lands first because the wallet gates the provider call, then the difference comes back the moment step 4 returns. It appears on the ledger as an `api_refund` against the same operation.
+- **Polling is free.** Step 4 already paid for the render; `/step/poll-videos` costs nothing however many times you call it.
+- **`POST /generate` estimates, then settles.** Its response is a stream, so it charges for the scenes you asked for up front and refunds any it did not render, reporting that in a [`billing` event](#billing-event).
+
+---
+
+## Full pipeline (SSE streaming)
 
 ```
 POST /v1/story/generate
 ```
 
-**Authentication:** Bearer token (API key)
-**Billing:** 30 credits (full pipeline)
-**Response:** `text/event-stream` (SSE)
+**Auth:** `Authorization: Bearer fh_live_...` — key needs the `video` scope
+**Billing:** `story_full` ($1.607717) + [the scene renders](#scene-render-prices)
+**Response:** `text/event-stream`
+**Rate limit:** 3 requests/min
+**Runtime:** typically 4–12 minutes; the stream is open the whole time
 
-### Request Parameters
+### Request
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `prompt` | string | **Yes** | — | Story description. Be specific about theme, setting, tone, and desired outcome. Max 2000 characters. |
-| `style` | string | No | `"cinematic"` | Visual style preset. See supported styles below. |
-| `video_model` | string | No | `"veo-3.1-generate-001"` | Video generation model for scene clips. |
-| `num_scenes` | integer | No | `4` | Number of scenes in the story. Range: 2–8. |
-| `duration` | integer | No | `60` | Target total duration in seconds. Range: 15–180. |
-| `aspect_ratio` | string | No | `"16:9"` | Output aspect ratio: `"16:9"`, `"9:16"`, `"1:1"`. |
-| `voice` | string | No | `"narrator-male-1"` | Voice preset for narration. See voice options below. |
-| `language` | string | No | `"en"` | Narration language: `"en"`, `"pl"`, `"de"`, `"fr"`, `"es"`, `"it"`, `"pt"`, `"ja"`, `"ko"`, `"zh"`. |
-| `music_style` | string | No | `"auto"` | Background music style. `"auto"` matches story mood. Options: `"epic"`, `"ambient"`, `"upbeat"`, `"dramatic"`, `"none"`. |
-| `character_consistency` | boolean | No | `true` | Maintain visual consistency of characters across scenes. |
-| `seed` | integer | No | random | Seed for reproducible generation. |
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `prompt` | string | **required** | What the story is about. 3–2000 characters. |
+| `style` | string | planner's choice | Free text — `cinematic`, `anime`, `watercolour`, `3D cartoon`, `pixel art`, `documentary`. Folded into the planner's brief and reused for every character and frame. |
+| `num_scenes` | integer | `4` | 2–6. |
+| `duration_per_scene` | integer | `5` | 3–15 seconds, [snapped down](#scene-render-prices) onto the model's ladder. |
+| `video_model` | string | `seedance` | See [Video models](#video-models). |
+| `voice` | string | default narrator | Numeric voice id from the FOTOhub voice catalogue. Omit it for the built-in multilingual narrator. |
+| `language` | string | `en` | `en`, `pl` or `de` — the language the story and narration are written in. |
+| `aspect_ratio` | string | `16:9` | `16:9`, `9:16` or `1:1`. |
 
-### SSE Event Format
-
-The response stream emits events in standard SSE format:
-
-```
-event: step_start
-data: {"step": 1, "name": "concept", "message": "Generating story concept..."}
-
-event: step_progress
-data: {"step": 1, "progress": 50, "message": "Developing scene structure..."}
-
-event: step_complete
-data: {"step": 1, "name": "concept", "result": {...}}
-
-event: step_start
-data: {"step": 2, "name": "characters", "message": "Designing characters..."}
-
-...
-
-event: complete
-data: {"story_id": "story_abc123", "video_url": "https://...", "credits_used": 30}
-
-event: error
-data: {"step": 3, "code": "generation_failed", "message": "Frame generation failed", "retry": true}
+```bash
+curl -N -X POST "https://apis.fotohub.app/v1/story/generate" \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "A lighthouse keeper on the Baltic coast befriends a storm petrel that returns every autumn",
+    "style": "watercolour",
+    "num_scenes": 4,
+    "duration_per_scene": 5,
+    "video_model": "seedance-2-0-mini",
+    "language": "en",
+    "aspect_ratio": "16:9"
+  }'
 ```
 
-### Event Types
+### Events
 
-| Event | Description |
-|-------|-------------|
-| `step_start` | A pipeline step has begun processing |
-| `step_progress` | Progress update within a step (0–100) |
-| `step_complete` | Step finished with result data |
-| `complete` | Full pipeline finished — contains final video URL |
-| `error` | An error occurred — includes `retry` flag indicating if the step can be retried |
+Four event names come down the wire. Branch on the event name and on `data.status` — new fields get added, so ignore what you do not know.
 
-### Full Pipeline Response (final `complete` event)
+| Event | When | Payload |
+|-------|------|---------|
+| `pipeline` | opens and closes the run | `{"step": 0, "status": "started", "total_steps": 6}`, then `{"status": "completed"}` or `{"status": "failed", "error": "..."}` |
+| `step` | every state change in steps 1–6 | `{"step": 1-6, "name": ..., "status": ..., "data": ...}` |
+| `stream` | while step 1 is being written | `{"step": 1, "chunk": "...json fragment..."}` — the concept token by token |
+| `billing` | only if money came back | see [below](#billing-event) |
+
+`name` is `story_concept`, `characters`, `frames`, `videos`, `voiceover` or `final_video`. `status` is `started`, `progress`, `processing`, `polling`, `completed`, `failed` or `skipped`.
+
+```
+event: pipeline
+data: {"step":0,"status":"started","total_steps":6}
+
+event: step
+data: {"step":1,"name":"story_concept","status":"started"}
+
+event: stream
+data: {"step":1,"chunk":"{\"title\": \"The Petrel and the Lamp\", \"summary\":"}
+
+event: step
+data: {"step":1,"name":"story_concept","status":"completed","data":{"title":"The Petrel and the Lamp","scenes":[...]}}
+
+event: step
+data: {"step":2,"name":"characters","status":"progress","index":0,"total":2,"item":{"name":"Antoni","description":"...","image_url":"https://...","role":"Main character"}}
+
+event: step
+data: {"step":3,"name":"frames","status":"progress","index":2,"total":4,"item":{"scene_number":3,"title":"The Storm","frame_url":"","frame_error":"content filter","visual_prompt":"..."}}
+
+event: step
+data: {"step":4,"name":"videos","status":"processing","data":[{"scene_number":1,"video_task_id":"cgt-2026...","video_status":"processing","video_error":""}]}
+
+event: step
+data: {"step":4,"name":"videos","status":"polling","data":[{"scene_number":1,"video_status":"processing","video_url":""}]}
+
+event: step
+data: {"step":6,"name":"final_video","status":"completed","data":{"status":"completed","final_video_url":"https://s1.fotohub.app/storage/v1/object/public/...","title":"The Petrel and the Lamp","duration":20}}
+
+event: pipeline
+data: {"status":"completed"}
+```
+
+The finished film is `final_video_url` in the **step 6 `completed`** event. There is no separate `complete` event and no `story_id`: the pipeline is stateless, which is why the step endpoints pass objects back and forth instead of an id.
+
+Per-item progress matters on steps 2 and 3 — they generate one character and one frame at a time, and an item can fail on its own. `frame_error` on a `progress` or `completed` item is the reason a keyframe is missing; that scene will be skipped in step 4 and you will not be charged for it.
+
+### `billing` event
+
+Emitted only when the settle-up moved money — i.e. fewer scenes rendered than you were quoted for.
+
+```
+event: billing
+data: {"billing":{"cost_usd":1.14345,"refunded_usd":0.38115,"scenes_rendered":3,"scenes_requested":4,"currency":"USD"}}
+```
+
+`cost_usd` is the final total for the whole request, `story_full` included.
+
+### When it fails
+
+The wallet is debited and the status line is already `200` before the first byte, so a mid-stream failure is reported in the stream, not as an HTTP error:
+
+```
+data: {"error":"Story engine returned HTTP 502","refunded":true,"cost_usd":0}
+```
+
+- **Nothing was produced** → the whole request is refunded and `refunded` is `true`.
+- **Some scenes were produced, then the stream broke** → you get `"partial": true, "refunded": false` and a message saying so. Clips were rendered on hardware we paid for; contact support if the output is unusable.
+
+---
+
+## Step endpoints
+
+Each step returns its output under the name the next step takes it back in, so responses chain into requests with no remapping. Every billed response carries the same money block:
 
 ```json
 {
-  "story_id": "story_7f3k9m2x",
-  "video_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/final.mp4",
-  "thumbnail_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/thumb.jpg",
-  "credits_used": 30,
-  "duration": 62,
-  "scenes": [
-    {
-      "index": 0,
-      "title": "The Discovery",
-      "video_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/scene_0.mp4",
-      "frame_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/frame_0.jpg",
-      "narration": "In a world where memories could be traded like currency..."
-    }
-  ],
-  "characters": [
-    {
-      "id": "char_01",
-      "name": "Elena",
-      "description": "A determined memory archivist in her 30s with silver-streaked dark hair",
-      "reference_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/char_01.png"
-    }
-  ],
-  "metadata": {
-    "style": "cinematic",
-    "video_model": "veo-3.1-generate-001",
-    "aspect_ratio": "16:9",
-    "seed": 847291,
-    "generation_time_ms": 142000
+  "cost_usd": 0.267953,
+  "currency": "USD",
+  "billing": {
+    "cost_usd": 0.267953,
+    "balance_usd": 41.882,
+    "currency": "USD",
+    "method": "wallet",
+    "model": "prepaid"
   }
 }
 ```
 
----
-
-## Individual Step Endpoints
-
-Use these endpoints for granular control over the pipeline — ideal for interactive workflows where users review and modify output between steps.
-
-### Step 1: Concept
-
-Generate the story concept including title, synopsis, scene structure, and narrative arc.
+### Step 1 — Concept
 
 ```
 POST /v1/story/step/concept
 ```
 
-**Billing:** 3 credits
+**Billing:** `story_step` — $0.267953 · **Rate limit:** 10/min
 
-#### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `prompt` | string | **Yes** | — | Story description and requirements. |
-| `style` | string | No | `"cinematic"` | Visual style for the story. |
-| `num_scenes` | integer | No | `4` | Target number of scenes (2–8). |
-| `duration` | integer | No | `60` | Target duration in seconds. |
-| `language` | string | No | `"en"` | Language for script and narration text. |
-
-#### Response
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `prompt` | string | **required** | 3–2000 characters. |
+| `style` | string | planner's choice | Free text. |
+| `num_scenes` | integer | `4` | 2–6. |
+| `duration_per_scene` | integer | `5` | 3–15 s, written onto every scene. |
+| `language` | string | `en` | `en`, `pl`, `de`. |
+| `aspect_ratio` | string | `16:9` | Recorded on every scene and used when the clips are rendered. |
 
 ```json
 {
-  "story_id": "story_7f3k9m2x",
-  "credits_used": 3,
+  "step": "concept",
+  "cost_usd": 0.267953,
+  "currency": "USD",
+  "billing": { "...": "..." },
   "concept": {
-    "title": "The Memory Market",
-    "synopsis": "In a near-future city, a memory archivist discovers that someone is stealing childhood memories from the elderly to sell to the wealthy elite.",
-    "tone": "suspenseful, thought-provoking",
-    "setting": "Neo-Tokyo, 2084",
-    "scenes": [
+    "title": "The Petrel and the Lamp",
+    "summary": "A lighthouse keeper and a returning storm petrel keep each other's company across four autumns.",
+    "language": "en",
+    "style": "watercolour",
+    "mood": "heartwarming",
+    "target_audience": "all ages",
+    "estimated_duration_seconds": 20,
+    "characters": [
       {
-        "index": 0,
-        "title": "The Discovery",
-        "description": "Elena notices patterns in the memory bank — certain memories are being systematically erased.",
-        "duration": 15,
-        "mood": "mysterious",
-        "narration_text": "In a world where memories could be traded like currency, Elena was one of the few who still believed some things were priceless."
-      },
-      {
-        "index": 1,
-        "title": "The Investigation",
-        "description": "She traces the missing memories to a high-end auction house in the upper city.",
-        "duration": 15,
-        "mood": "tense",
-        "narration_text": "The trail led upward — past the neon sprawl and into the chrome towers where the city's elite conducted their secret trade."
+        "name": "Antoni",
+        "description": "A weathered keeper in his sixties, oilskin coat, grey stubble, kind eyes",
+        "role": "Main character",
+        "voice_traits": "warm male voice, slow, gravelly"
       }
     ],
-    "characters_needed": [
-      {"role": "protagonist", "description": "Memory archivist, determined, mid-30s"},
-      {"role": "antagonist", "description": "Wealthy collector, charming but ruthless"}
+    "scenes": [
+      {
+        "scene_number": 1,
+        "title": "First Light",
+        "narration": "Every autumn the same bird came back to the same window.",
+        "narration_en": "Every autumn the same bird came back to the same window.",
+        "dialogue": [{ "character": "Antoni", "line": "You are late this year.", "line_en": "You are late this year." }],
+        "visual_prompt": "Watercolour, dawn, a stone lighthouse on a grey Baltic shore...",
+        "video_prompt": "Slow push in on the lantern room as the light turns",
+        "duration": 5,
+        "aspect_ratio": "16:9"
+      }
     ]
   }
 }
 ```
 
----
+Pass the whole `concept` object back, unmodified, to every later step. It carries the style and the per-scene duration and aspect ratio the renderer reads.
 
-### Step 2: Characters
-
-Generate consistent character designs based on the story concept.
+### Step 2 — Characters
 
 ```
 POST /v1/story/step/characters
 ```
 
-**Billing:** 5 credits
+**Billing:** `story_step` — $0.267953 · **Rate limit:** 10/min
 
-#### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `story_id` | string | **Yes** | — | Story ID from Step 1. |
-| `characters` | array | No | — | Override character descriptions. If omitted, uses `characters_needed` from concept. |
-| `characters[].role` | string | Yes | — | Character role: `"protagonist"`, `"antagonist"`, `"supporting"`. |
-| `characters[].description` | string | Yes | — | Detailed visual description. |
-| `characters[].age` | string | No | — | Age range: `"child"`, `"teen"`, `"young-adult"`, `"adult"`, `"elderly"`. |
-| `characters[].gender` | string | No | — | `"male"`, `"female"`, `"non-binary"`. |
-| `style` | string | No | inherited | Override visual style from concept. |
-
-#### Response
+| Field | Type | Notes |
+|-------|------|-------|
+| `concept` | object | **required** — step 1's `concept`, unmodified. |
+| `style` | string | Overrides the concept's style. Omit it to keep the cast consistent with the frames. |
 
 ```json
 {
-  "story_id": "story_7f3k9m2x",
-  "credits_used": 5,
+  "step": "characters",
+  "cost_usd": 0.267953,
+  "currency": "USD",
+  "billing": { "...": "..." },
   "characters": [
     {
-      "id": "char_01",
-      "role": "protagonist",
-      "name": "Elena Vasquez",
-      "description": "A determined memory archivist in her mid-30s with silver-streaked dark hair pulled into a practical bun, warm brown eyes behind round wireframe glasses, wearing a navy utility coat with holographic ID patches.",
-      "reference_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/char_01.png",
-      "consistency_embedding": "emb_char01_7f3k9m2x"
-    },
-    {
-      "id": "char_02",
-      "role": "antagonist",
-      "name": "Marcus Chen",
-      "description": "A refined collector in his 50s with slicked-back silver hair, sharp features, and a tailored pearl-gray suit with subtle luminescent threading.",
-      "reference_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/char_02.png",
-      "consistency_embedding": "emb_char02_7f3k9m2x"
+      "name": "Antoni",
+      "description": "A weathered keeper in his sixties...",
+      "role": "Main character",
+      "image_url": "https://s1.fotohub.app/storage/v1/object/public/generated/..."
     }
-  ]
+  ],
+  "characters_failed": ["Petrel"]
 }
 ```
 
----
+`characters_failed` names the characters whose reference image did not come back — their `image_url` is `""`. Redo one with [`/regenerate/character`](#regenerate-a-character) for $0.160772 instead of paying for the step again. If *no* character was produced the call is refunded and returns an error instead.
 
-### Step 3: Frames
-
-Generate storyboard keyframes for each scene.
+### Step 3 — Frames
 
 ```
 POST /v1/story/step/frames
 ```
 
-**Billing:** 5 credits
+**Billing:** `story_step` — $0.267953 · **Rate limit:** 10/min
 
-#### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `story_id` | string | **Yes** | — | Story ID from previous steps. |
-| `scene_overrides` | array | No | — | Override specific scene descriptions before frame generation. |
-| `scene_overrides[].index` | integer | Yes | — | Scene index to override. |
-| `scene_overrides[].description` | string | Yes | — | Updated scene description. |
-| `resolution` | string | No | `"1080p"` | Frame resolution: `"720p"`, `"1080p"`, `"4k"`. |
-
-#### Response
+| Field | Type | Notes |
+|-------|------|-------|
+| `concept` | object | **required** — step 1's `concept`. |
+| `characters` | array | **required** — step 2's `characters`, so the frames keep the same cast. |
+| `style` | string | Overrides the concept's style. |
 
 ```json
 {
-  "story_id": "story_7f3k9m2x",
-  "credits_used": 5,
+  "step": "frames",
+  "cost_usd": 0.267953,
+  "currency": "USD",
+  "billing": { "...": "..." },
   "frames": [
     {
-      "scene_index": 0,
-      "frame_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/frame_0.jpg",
-      "composition_notes": "Wide shot of Elena at her workstation, holographic memory fragments floating around her. Cool blue lighting with warm amber accents from the data streams.",
-      "camera_direction": "slow push-in"
+      "scene_number": 1,
+      "title": "First Light",
+      "narration": "Every autumn the same bird came back to the same window.",
+      "visual_prompt": "Watercolour, dawn, a stone lighthouse...",
+      "duration": 5,
+      "aspect_ratio": "16:9",
+      "frame_url": "https://s1.fotohub.app/storage/v1/object/public/generated/..."
     },
     {
-      "scene_index": 1,
-      "frame_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/frame_1.jpg",
-      "composition_notes": "Low angle shot looking up at the chrome auction house tower, neon reflections in rain-slicked streets below.",
-      "camera_direction": "tilt up"
+      "scene_number": 3,
+      "title": "The Storm",
+      "frame_url": "",
+      "frame_error": "Image generation was blocked by the content filter",
+      "duration": 5
     }
-  ]
+  ],
+  "frames_failed": [3]
 }
 ```
 
----
+`frames_failed` lists the **scene numbers** with no keyframe, and each of those frames carries the reason in `frame_error`. Two useful things follow:
 
-### Step 4: Videos
+- Feed those numbers straight to [`/regenerate/frame`](#regenerate-a-frame) — it takes `scene_number` for exactly this reason.
+- If you go on to step 4 anyway, frameless scenes are skipped and **not charged**.
 
-Generate video clips for each scene using AI video models.
+### Step 4 — Scene clips
 
 ```
 POST /v1/story/step/videos
 ```
 
-**Billing:** 10 credits
+**Billing:** [per model, per second, per scene](#scene-render-prices) · **Rate limit:** 10/min
 
-#### Parameters
+Starts one render per keyframe and returns as soon as the jobs are accepted — the clips are **not** ready yet.
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `story_id` | string | **Yes** | — | Story ID from previous steps. |
-| `video_model` | string | No | `"veo-3.1-generate-001"` | Video generation model. See supported models below. |
-| `scene_indices` | array | No | all | Specific scene indices to generate. Useful for regenerating individual scenes. |
-| `motion_intensity` | string | No | `"medium"` | Camera/subject motion: `"low"`, `"medium"`, `"high"`. |
-| `fps` | integer | No | `24` | Frames per second: `24`, `30`. |
-
-#### Supported Video Models
-
-| Model | Provider | Best For | Max Duration |
-|-------|----------|----------|--------------|
-| `veo-3.1-generate-001` | Google | Photorealistic, native audio, up to 4K | 8s per clip |
-| `seedance-2-0-pro` | ByteDance | Fast generation, good motion | 15s per clip |
-| `wan2.2-t2v-plus` | Alibaba | Artistic styles, anime | 15s per clip |
-| `hailuo-o2` | MiniMax | Cinematic quality, smooth motion | 10s per clip |
-
-#### Response
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `concept` | object | **required** | Step 1's `concept`. |
+| `frames` | array | **required** | Step 3's `frames`, unmodified. |
+| `video_model` | string | `seedance` | See [Video models](#video-models). Decides the bill. |
+| `duration_per_scene` | integer | per scene | Overrides the length of **every** scene. 3–15 s. |
+| `aspect_ratio` | string | per scene | Overrides the ratio of every scene. |
 
 ```json
 {
-  "story_id": "story_7f3k9m2x",
-  "credits_used": 10,
+  "step": "videos",
+  "cost_usd": 1.1434500,
+  "currency": "USD",
+  "billing": { "...": "..." },
   "videos": [
     {
-      "scene_index": 0,
-      "video_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/scene_0.mp4",
-      "duration": 5.2,
-      "model_used": "veo-3.1-generate-001"
+      "scene_number": 1,
+      "duration": 5,
+      "video_task_id": "cgt-20260902...",
+      "video_status": "processing",
+      "video_model": "seedance-2-0-mini",
+      "video_provider": "byteplus",
+      "video_url": ""
     },
     {
-      "scene_index": 1,
-      "video_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/scene_1.mp4",
-      "duration": 5.0,
-      "model_used": "veo-3.1-generate-001"
+      "scene_number": 3,
+      "video_status": "skipped",
+      "video_error": "No keyframe for this scene"
     }
   ]
 }
 ```
 
----
+`cost_usd` above is three 5-second Seedance 2.0 Mini renders — the fourth scene had no keyframe, so it was neither submitted nor charged. Keep the `videos` array: the `video_task_id` on each scene is how you poll.
 
-### Step 5: Voice-Over
+If not a single render could be submitted, the whole call is refunded and returns an error.
 
-Generate narration audio synchronized to scene timing.
+### Poll the renders
+
+```
+POST /v1/story/step/poll-videos
+```
+
+**Billing:** free · **Rate limit:** 10/min
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `videos` | array | **required** — step 4's `videos`, carrying their task ids. |
+
+```json
+{
+  "step": "poll_videos",
+  "videos": [
+    {
+      "scene_number": 1,
+      "video_status": "completed",
+      "video_url": "https://s1.fotohub.app/storage/v1/object/public/generated/scene_1.mp4",
+      "duration": 5
+    }
+  ],
+  "pending": 0
+}
+```
+
+Poll every 10–15 seconds until `pending` is `0`, then pass the returned `videos` to step 5 or 6. A clip takes roughly 40 seconds to 4 minutes depending on the model and its length. `pending` counts scenes that are neither `completed`, `failed` nor `skipped`.
+
+### Step 5 — Voice-over
 
 ```
 POST /v1/story/step/voiceover
 ```
 
-**Billing:** 3 credits
+**Billing:** `story_step` — $0.267953 · **Rate limit:** 10/min
 
-#### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `story_id` | string | **Yes** | — | Story ID from previous steps. |
-| `voice` | string | No | `"narrator-male-1"` | Voice preset identifier. |
-| `language` | string | No | `"en"` | Narration language. |
-| `speed` | float | No | `1.0` | Speech speed multiplier (0.75–1.5). |
-| `narration_overrides` | array | No | — | Override narration text for specific scenes. |
-| `narration_overrides[].scene_index` | integer | Yes | — | Scene index. |
-| `narration_overrides[].text` | string | Yes | — | Custom narration text. |
-
-#### Voice Presets
-
-| Voice ID | Description |
-|----------|-------------|
-| `narrator-male-1` | Deep, authoritative male narrator |
-| `narrator-male-2` | Warm, conversational male voice |
-| `narrator-female-1` | Clear, professional female narrator |
-| `narrator-female-2` | Soft, intimate female voice |
-| `narrator-dramatic` | Theatrical, expressive delivery |
-| `narrator-documentary` | Neutral, informative tone |
-
-#### Response
+| Field | Type | Notes |
+|-------|------|-------|
+| `concept` | object | **required** — step 1's `concept`; its `language` picks the narrator. |
+| `scenes` | array | **required** — the scenes from step 3 or from polling. Each scene's `narration` is what gets spoken. |
+| `voice` | string | Numeric voice id, or omit for the default multilingual narrator. |
 
 ```json
 {
-  "story_id": "story_7f3k9m2x",
-  "credits_used": 3,
-  "voiceover": {
-    "full_audio_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/narration.mp3",
-    "segments": [
-      {
-        "scene_index": 0,
-        "audio_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/narr_0.mp3",
-        "text": "In a world where memories could be traded like currency...",
-        "start_time": 0.0,
-        "end_time": 4.8,
-        "duration": 4.8
-      },
-      {
-        "scene_index": 1,
-        "audio_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/narr_1.mp3",
-        "text": "The trail led upward — past the neon sprawl...",
-        "start_time": 5.2,
-        "end_time": 10.1,
-        "duration": 4.9
-      }
-    ],
-    "total_duration": 48.6
-  }
+  "step": "voiceover",
+  "cost_usd": 0.267953,
+  "currency": "USD",
+  "billing": { "...": "..." },
+  "scenes": [
+    {
+      "scene_number": 1,
+      "narration": "Every autumn the same bird came back to the same window.",
+      "video_url": "https://.../scene_1.mp4",
+      "audio_url": "https://.../scene_1_narration.mp3",
+      "duration": 5
+    }
+  ]
 }
 ```
 
----
+Every scene gains an `audio_url`; pass these scenes straight to step 6, which mixes each one over its own clip. A scene with empty `narration` gets no audio and is not an error.
 
-### Step 6: Final Composition
-
-Composite all elements (video clips, voice-over, background music, transitions) into the final video.
+### Step 6 — Final composition
 
 ```
 POST /v1/story/step/final
 ```
 
-**Billing:** 4 credits
+**Billing:** `story_step` — $0.267953 · **Rate limit:** 10/min
 
-#### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `story_id` | string | **Yes** | — | Story ID from previous steps. |
-| `music_style` | string | No | `"auto"` | Background music: `"epic"`, `"ambient"`, `"upbeat"`, `"dramatic"`, `"none"`, `"auto"`. |
-| `transition` | string | No | `"crossfade"` | Scene transition type: `"crossfade"`, `"cut"`, `"fade-black"`, `"dissolve"`, `"wipe"`. |
-| `transition_duration` | float | No | `0.5` | Transition duration in seconds (0.2–2.0). |
-| `music_volume` | float | No | `0.3` | Background music volume relative to narration (0.0–1.0). |
-| `add_subtitles` | boolean | No | `false` | Burn subtitles into the video. |
-| `subtitle_style` | string | No | `"minimal"` | Subtitle style: `"minimal"`, `"bold"`, `"karaoke"`, `"cinematic"`. |
-| `output_format` | string | No | `"mp4"` | Output format: `"mp4"`, `"webm"`. |
-| `output_quality` | string | No | `"1080p"` | Output resolution: `"720p"`, `"1080p"`, `"4k"`. |
-
-#### Response
+| Field | Type | Notes |
+|-------|------|-------|
+| `concept` | object | **required** — step 1's `concept`. |
+| `videos` | array | **required** — scenes from step 5 (or step 4 + polling), carrying `video_url` and optionally `audio_url`. |
+| `voiceover_url` | string | One narration track for the whole story. Ignored when the scenes already carry their own `audio_url`. |
+| `music_url` | string | Reserved — the composer does not mix a music bed yet, so this has no effect. |
+| `transitions` | string | Reserved — the composer always crossfades. |
 
 ```json
 {
-  "story_id": "story_7f3k9m2x",
-  "credits_used": 4,
-  "video_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/final.mp4",
-  "thumbnail_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/thumb.jpg",
-  "duration": 62,
-  "file_size_mb": 48.2,
-  "resolution": "1920x1080",
-  "metadata": {
-    "scenes_count": 4,
-    "transition": "crossfade",
-    "music_style": "ambient",
-    "has_subtitles": false,
-    "total_generation_time_ms": 142000
-  }
+  "step": "final",
+  "cost_usd": 0.267953,
+  "currency": "USD",
+  "billing": { "...": "..." },
+  "status": "completed",
+  "final_video_url": "https://s1.fotohub.app/storage/v1/object/public/generated/story_final.mp4",
+  "title": "The Petrel and the Lamp",
+  "duration": 20
 }
 ```
 
----
+`duration` is the sum of the scene durations. Scenes with no `video_url` are left out; if none of them has one, the call is refunded and returns an error.
 
-## Regeneration Endpoints
-
-Regenerate individual elements without re-running the full pipeline.
-
-### Regenerate Character
+### Regenerate a character
 
 ```
 POST /v1/story/regenerate/character
 ```
 
-**Billing:** 3 credits
+**Billing:** `story_regenerate` — $0.160772 · **Rate limit:** 10/min
 
-#### Parameters
+| Field | Type | Notes |
+|-------|------|-------|
+| `concept` | object | **required** — step 1's `concept`. |
+| `character_index` | integer | **required** — 0-based index into the concept's `characters`. |
+| `style` | string | Overrides the concept's style. Omit it to keep the cast consistent. |
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `story_id` | string | **Yes** | — | Story ID. |
-| `character_id` | string | **Yes** | — | Character ID to regenerate (e.g., `"char_01"`). |
-| `description` | string | No | — | Updated character description. Uses original if omitted. |
-| `style_hints` | string | No | — | Additional style guidance for the regeneration. |
+An index past the end of the cast is a `400` naming how many characters the concept actually has, and is not charged.
 
-#### Response
-
-```json
-{
-  "story_id": "story_7f3k9m2x",
-  "credits_used": 3,
-  "character": {
-    "id": "char_01",
-    "role": "protagonist",
-    "name": "Elena Vasquez",
-    "description": "A determined memory archivist in her mid-30s...",
-    "reference_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/char_01_v2.png",
-    "consistency_embedding": "emb_char01_7f3k9m2x_v2",
-    "version": 2
-  }
-}
-```
-
-### Regenerate Frame
+### Regenerate a frame
 
 ```
 POST /v1/story/regenerate/frame
 ```
 
-**Billing:** 3 credits
+**Billing:** `story_regenerate` — $0.160772 · **Rate limit:** 10/min
 
-#### Parameters
+| Field | Type | Notes |
+|-------|------|-------|
+| `concept` | object | **required** — step 1's `concept`. |
+| `scene_number` | integer | 1-based, exactly as returned in `frames_failed`. |
+| `frame_index` | integer | 0-based alternative. Send one or the other. |
+| `characters` | array | **required** — step 2's `characters`, so the redraw keeps the same cast. |
+| `style` | string | Overrides the concept's style. |
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `story_id` | string | **Yes** | — | Story ID. |
-| `scene_index` | integer | **Yes** | — | Scene index to regenerate the frame for. |
-| `description` | string | No | — | Updated scene description for the frame. |
-| `camera_direction` | string | No | — | Override camera direction: `"push-in"`, `"pull-out"`, `"pan-left"`, `"pan-right"`, `"tilt-up"`, `"tilt-down"`, `"static"`, `"orbit"`. |
-
-#### Response
-
-```json
-{
-  "story_id": "story_7f3k9m2x",
-  "credits_used": 3,
-  "frame": {
-    "scene_index": 1,
-    "frame_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/frame_1_v2.jpg",
-    "composition_notes": "Updated composition with lower camera angle...",
-    "camera_direction": "tilt-up",
-    "version": 2
-  }
-}
-```
-
----
-
-## Visual Styles
-
-| Style | Description | Best For |
-|-------|-------------|----------|
-| `cinematic` | Film-quality lighting, depth of field, color grading | Drama, thriller, narrative |
-| `anime` | Japanese animation style with bold colors and expressions | Fantasy, action, youth content |
-| `cartoon` | Stylized 2D/3D with vibrant colors | Children's content, comedy, explainers |
-| `documentary` | Naturalistic, observational, muted tones | Educational, corporate, non-fiction |
-| `fantasy` | Ethereal lighting, magical elements, rich environments | World-building, epic narratives |
-| `scifi` | Futuristic, neon accents, high-tech environments | Tech stories, space, cyberpunk |
-
----
-
-## Pricing
-
-| Endpoint | Credits | USD Equivalent |
-|----------|---------|----------------|
-| Full pipeline (`/v1/story/generate`) | 30 | $1.61 |
-| Step 1: Concept | 3 | $0.1608 |
-| Step 2: Characters | 5 | $0.2680 |
-| Step 3: Frames | 5 | $0.2680 |
-| Step 4: Videos | 10 | $0.5359 |
-| Step 5: Voice-Over | 3 | $0.1608 |
-| Step 6: Final Composition | 4 | $0.2144 |
-| Regenerate Character | 3 | $0.1608 |
-| Regenerate Frame | 3 | $0.1608 |
-
-The USD column is the wallet price charged once your included credits are exhausted, at $0.0536
-per credit. While credits cover the call, `billing.usd_charged` is `0`.
-
-::: tip Cost Optimization
-Running steps individually costs the same total (30 credits) as the full pipeline. The advantage is creative control — you can review and adjust between steps without paying extra.
+::: warning `scene_number`, not `frame_index`, when looping over `frames_failed`
+`frames_failed` reports scene **numbers** (1-based). Feeding those into `frame_index` (0-based) silently redraws the neighbouring scene.
 :::
 
 ---
 
-## Code Examples
+## Video models
 
-### Python SDK
+`video_model` accepts the ids below on `POST /generate` and `POST /step/videos`. The short aliases track the current release of each family, so `seedance` will point at a newer version over time; pin the explicit id if you need the price to stay put.
 
-#### Full Pipeline with SSE Streaming
+| Value | Renders on | Notes |
+|-------|-----------|-------|
+| `seedance` | Seedance 2.0 Mini | Default. Cheapest per second of the 2.0 family. |
+| `seedance-2-0-mini` | Seedance 2.0 Mini | |
+| `seedance-2-0-fast` | Seedance 2.0 Fast | |
+| `seedance-2-0-pro` | Seedance 2.0 Pro | |
+| `seedance-2-5` | Seedance 2.5 | Best motion; renders up to 30 s (a story scene is capped at 15). |
+| `seedance-1-5` | Seedance 1.5 Pro | By far the cheapest option; 5 s floor. |
+| `veo`, `veo-3-1-fast` | Veo 3.1 Fast | 4, 6 or 8 seconds only. |
+| `veo-3-1` | Veo 3.1 | 4, 6 or 8 seconds only. |
+| `wan`, `wan-2-6` | Wan 2.6 | Strong on stylised and illustrated looks. |
+| `happyhorse`, `happyhorse-1-1` | HappyHorse 1.1 | API-only — not offered in the dashboard. |
+| `hailuo` | Seedance 2.0 Mini | **Retired.** Still accepted so live integrations do not start failing, but it renders on the default model. |
 
-```python
-from fotohub import FotoHub
+Anything else is a `422` before you are charged. Story clips are always rendered **silent** at 720p — the narration is mixed in step 6, so a model's own audio track would only talk over it.
 
-client = FotoHub(api_key="fh_live_your_api_key")
+## Styles, languages and voices
 
-# Full pipeline with streaming progress
-story = client.story.generate(
-    prompt="A detective in 1920s Paris investigates a series of art thefts "
-           "from the Louvre, only to discover the paintings are being replaced "
-           "with forgeries that contain hidden messages.",
-    style="cinematic",
-    video_model="veo-3.1-generate-001",
-    num_scenes=4,
-    duration=60,
-    voice="narrator-male-1",
-    language="en",
-    music_style="dramatic"
-)
-
-# Stream progress events
-for event in story.stream():
-    if event.type == "step_start":
-        print(f"Starting: {event.data['name']}")
-    elif event.type == "step_progress":
-        print(f"  Progress: {event.data['progress']}%")
-    elif event.type == "step_complete":
-        print(f"  Completed: {event.data['name']}")
-    elif event.type == "complete":
-        print(f"Video ready: {event.data['video_url']}")
-    elif event.type == "error":
-        print(f"  Error: {event.data['message']}")
-```
-
-#### Step-by-Step with Review
-
-```python
-from fotohub import FotoHub
-
-client = FotoHub(api_key="fh_live_your_api_key")
-
-# Step 1: Generate concept
-concept = client.story.step_concept(
-    prompt="A tiny robot discovers emotions for the first time in a junkyard",
-    style="cartoon",
-    num_scenes=5,
-    duration=90
-)
-print(f"Title: {concept.concept['title']}")
-print(f"Scenes: {len(concept.concept['scenes'])}")
-
-# Step 2: Generate characters
-characters = client.story.step_characters(
-    story_id=concept.story_id
-)
-for char in characters.characters:
-    print(f"  {char['name']}: {char['description']}")
-
-# Regenerate a character if needed
-updated_char = client.story.regenerate_character(
-    story_id=concept.story_id,
-    character_id="char_01",
-    description="A small rusty robot with one blue LED eye and one broken eye, "
-                "antenna bent at an angle, covered in moss and wildflowers"
-)
-
-# Step 3: Generate storyboard frames
-frames = client.story.step_frames(
-    story_id=concept.story_id
-)
-
-# Step 4: Generate video clips
-videos = client.story.step_videos(
-    story_id=concept.story_id,
-    video_model="wan",
-    motion_intensity="medium"
-)
-
-# Step 5: Add voice-over narration
-voiceover = client.story.step_voiceover(
-    story_id=concept.story_id,
-    voice="narrator-female-2",
-    speed=0.9
-)
-
-# Step 6: Final composition
-final = client.story.step_final(
-    story_id=concept.story_id,
-    music_style="ambient",
-    transition="crossfade",
-    add_subtitles=True,
-    subtitle_style="cinematic"
-)
-
-print(f"Final video: {final.video_url}")
-print(f"Duration: {final.duration}s")
-print(f"Total credits: 30")
-```
+- **`style`** is free text, forwarded to the planner and reused for every character image and keyframe. `cinematic`, `anime`, `watercolour`, `3D cartoon`, `pixel art`, `documentary`, `claymation` all work; so does a sentence. Omit it and the planner picks one that fits the story.
+- **`language`** is `en`, `pl` or `de` — the language the story, the dialogue and the narration are written in. Anything else is a `422`.
+- **`aspect_ratio`** is `16:9`, `9:16` or `1:1`, applied to keyframes and clips alike.
+- **`voice`** must be a numeric voice id from the FOTOhub voice catalogue. Omit it and the story is narrated by our own multilingual engine, which picks a narrator for the story's language — that is the recommended path and the one that does not depend on a third-party TTS provider. A non-numeric id is ignored, not an error.
 
 ---
 
-### TypeScript SDK
+## Rate limits, scopes and timeouts
 
-#### Full Pipeline with SSE Streaming
+| | |
+|---|---|
+| `POST /v1/story/generate` | 3 requests/min |
+| every `POST /v1/story/step/*`, `POST /v1/story/regenerate/*` | 10 requests/min |
+| API key scope | `video` |
+| Longest single call | step 4 and `/generate` hold the connection for up to 15 minutes |
 
-```typescript
-import { FotoHub } from "fotohub";
+Read your remaining budget from the `X-RateLimit-*` response headers. See [Rate limits](/api/rate-limits).
 
-const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
+## Errors and refunds
 
-async function generateStory() {
-  const stream = await client.story.generate({
-    prompt:
-      "A street musician in Tokyo discovers their melody can make plants grow, " +
-      "transforming the concrete jungle into a garden paradise.",
-    style: "anime",
-    videoModel: "wan",
-    numScenes: 4,
-    duration: 60,
-    voice: "narrator-female-1",
-    language: "en",
-    musicStyle: "upbeat",
-  });
+Story Studio follows the [standard error envelope](/api/errors) — branch on the HTTP status, and read `detail`.
 
-  for await (const event of stream) {
-    switch (event.type) {
-      case "step_start":
-        console.log(`Starting: ${event.data.name}`);
-        break;
-      case "step_progress":
-        console.log(`  Progress: ${event.data.progress}%`);
-        break;
-      case "step_complete":
-        console.log(`  Done: ${event.data.name}`);
-        break;
-      case "complete":
-        console.log(`Video: ${event.data.video_url}`);
-        console.log(`Credits: ${event.data.credits_used}`);
-        break;
-      case "error":
-        console.error(`Error at step ${event.data.step}: ${event.data.message}`);
-        break;
-    }
-  }
-}
+| Status | Means | Charged? |
+|-------:|-------|----------|
+| `402` | Not enough wallet balance for this step or these renders. `detail` carries `required_usd`, `balance_usd` and `shortfall_usd`. | no |
+| `422` | A field the pipeline would have rejected — unknown `video_model`, `language` outside `en/pl/de`, `num_scenes` above 6. Validated before billing. | no |
+| `400` | An index that is not in the concept you sent. | no |
+| `424` / `502` | The renderer could not be reached, or answered with an error. | refunded |
+| `500` | Includes a model we cannot price — the renders are refused rather than billed at a guess. | no |
+| `503` | Story Studio is unavailable. | no |
 
-generateStory();
-```
-
-#### Step-by-Step with Review
-
-```typescript
-import { FotoHub } from "fotohub";
-
-const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
-
-async function createStoryStepByStep() {
-  // Step 1: Concept
-  const concept = await client.story.stepConcept({
-    prompt: "A grandmother teaches her granddaughter ancient recipes that hold family secrets",
-    style: "documentary",
-    numScenes: 4,
-    duration: 75,
-  });
-
-  console.log(`Story: ${concept.concept.title}`);
-
-  // Step 2: Characters
-  const characters = await client.story.stepCharacters({
-    storyId: concept.storyId,
-  });
-
-  // Step 3: Frames
-  const frames = await client.story.stepFrames({
-    storyId: concept.storyId,
-  });
-
-  // Regenerate a frame with different composition
-  const newFrame = await client.story.regenerateFrame({
-    storyId: concept.storyId,
-    sceneIndex: 2,
-    cameraDirection: "push-in",
-  });
-
-  // Step 4: Videos
-  const videos = await client.story.stepVideos({
-    storyId: concept.storyId,
-    videoModel: "hailuo",
-    motionIntensity: "low",
-  });
-
-  // Step 5: Voice-over
-  const voiceover = await client.story.stepVoiceover({
-    storyId: concept.storyId,
-    voice: "narrator-female-2",
-    language: "en",
-  });
-
-  // Step 6: Final
-  const final = await client.story.stepFinal({
-    storyId: concept.storyId,
-    musicStyle: "ambient",
-    transition: "dissolve",
-    addSubtitles: true,
-    outputQuality: "1080p",
-  });
-
-  console.log(`Final video: ${final.videoUrl}`);
-}
-
-createStoryStepByStep();
-```
+Every step refunds itself if it produced nothing usable: no characters, no frames, no submitted render, no composed file. A step that produced *something* keeps its charge and reports the failures per item (`characters_failed`, `frames_failed`, `frame_error`, `video_error`) so you can redo just those.
 
 ---
 
-### cURL Examples
+## End-to-end example
 
-#### Full Pipeline (SSE Streaming)
+The step path, in the order the objects flow. `jq` keeps the responses on disk so each call can pass the previous one back.
 
 ```bash
-curl -N -X POST https://apis.fotohub.app/v1/story/generate \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{
-    "prompt": "A lonely lighthouse keeper on a remote island receives mysterious messages in bottles that predict the future",
-    "style": "cinematic",
-    "video_model": "veo-3.1-generate-001",
+API="https://apis.fotohub.app/v1/story"
+AUTH="Authorization: Bearer $FOTOHUB_API_KEY"
+JSON="Content-Type: application/json"
+
+# 1. Concept — $0.267953
+curl -s -X POST "$API/step/concept" -H "$AUTH" -H "$JSON" -d '{
+  "prompt": "A lighthouse keeper befriends a storm petrel that returns every autumn",
+  "style": "watercolour", "num_scenes": 4, "duration_per_scene": 5, "language": "en"
+}' > concept.json
+
+# 2. Characters — $0.267953
+jq '{concept: .concept}' concept.json > /tmp/req.json
+curl -s -X POST "$API/step/characters" -H "$AUTH" -H "$JSON" -d @/tmp/req.json > characters.json
+jq '.characters_failed' characters.json          # [] is what you want
+
+# 3. Frames — $0.267953
+jq -s '{concept: .[0].concept, characters: .[1].characters}' concept.json characters.json > /tmp/req.json
+curl -s -X POST "$API/step/frames" -H "$AUTH" -H "$JSON" -d @/tmp/req.json > frames.json
+jq '.frames_failed' frames.json                  # scene numbers to redraw, if any
+
+# 4. Start the clips — 4 x 5 s on the default model = $1.524600
+jq -s '{concept: .[0].concept, frames: .[1].frames, video_model: "seedance-2-0-mini"}' \
+   concept.json frames.json > /tmp/req.json
+curl -s -X POST "$API/step/videos" -H "$AUTH" -H "$JSON" -d @/tmp/req.json > videos.json
+jq '.cost_usd' videos.json                       # what the renders actually cost
+
+# 5. Poll until nothing is pending — free
+until [ "$(jq '.pending' videos.json)" = "0" ]; do
+  sleep 15
+  jq '{videos: .videos}' videos.json > /tmp/req.json
+  curl -s -X POST "$API/step/poll-videos" -H "$AUTH" -H "$JSON" -d @/tmp/req.json > videos.json
+done
+
+# 6. Narration — $0.267953
+jq -s '{concept: .[0].concept, scenes: .[1].videos}' concept.json videos.json > /tmp/req.json
+curl -s -X POST "$API/step/voiceover" -H "$AUTH" -H "$JSON" -d @/tmp/req.json > voiceover.json
+
+# 7. Compose — $0.267953
+jq -s '{concept: .[0].concept, videos: .[1].scenes}' concept.json voiceover.json > /tmp/req.json
+curl -s -X POST "$API/step/final" -H "$AUTH" -H "$JSON" -d @/tmp/req.json | jq '.final_video_url'
+```
+
+The same flow in Python, with the polling loop written out:
+
+```python
+import time
+import requests
+
+API = "https://apis.fotohub.app/v1/story"
+H = {"Authorization": "Bearer fh_live_your_api_key"}
+
+
+def step(path: str, body: dict) -> dict:
+    r = requests.post(f"{API}/{path}", json=body, headers=H, timeout=900)
+    r.raise_for_status()
+    return r.json()
+
+
+concept = step("step/concept", {
+    "prompt": "A lighthouse keeper befriends a storm petrel that returns every autumn",
+    "style": "watercolour",
     "num_scenes": 4,
-    "duration": 60,
-    "voice": "narrator-male-1",
-    "music_style": "dramatic"
-  }'
+    "duration_per_scene": 5,
+    "language": "en",
+})["concept"]
+
+characters = step("step/characters", {"concept": concept})["characters"]
+frames = step("step/frames", {"concept": concept, "characters": characters})
+
+if frames["frames_failed"]:
+    # $0.160772 per redraw, instead of $0.267953 for the whole step
+    for scene_number in frames["frames_failed"]:
+        step("regenerate/frame", {
+            "concept": concept,
+            "scene_number": scene_number,
+            "characters": characters,
+        })
+
+videos = step("step/videos", {
+    "concept": concept,
+    "frames": frames["frames"],
+    "video_model": "seedance-2-0-mini",   # the field that decides the bill
+})
+print(f"renders cost ${videos['cost_usd']}")
+
+while True:
+    poll = step("step/poll-videos", {"videos": videos["videos"]})
+    videos["videos"] = poll["videos"]
+    if not poll["pending"]:
+        break
+    time.sleep(15)
+
+narrated = step("step/voiceover", {"concept": concept, "scenes": videos["videos"]})
+final = step("step/final", {"concept": concept, "videos": narrated["scenes"]})
+print(final["final_video_url"], f"{final['duration']}s")
 ```
 
-Output (streamed):
+Streaming the one-call version:
+
+```python
+import json
+import requests
+
+with requests.post(
+    "https://apis.fotohub.app/v1/story/generate",
+    json={
+        "prompt": "A lighthouse keeper befriends a storm petrel that returns every autumn",
+        "style": "watercolour",
+        "num_scenes": 4,
+        "duration_per_scene": 5,
+        "video_model": "seedance-2-0-mini",
+    },
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+    stream=True,
+    timeout=1200,
+) as r:
+    r.raise_for_status()
+    event = None
+    for line in r.iter_lines(decode_unicode=True):
+        if not line:
+            continue
+        if line.startswith("event: "):
+            event = line[7:]
+        elif line.startswith("data: "):
+            data = json.loads(line[6:])
+            if event == "step" and data.get("status") in ("started", "completed", "failed"):
+                print(f"step {data['step']} {data['name']}: {data['status']}")
+            if event == "step" and data["name"] == "final_video" and data.get("status") == "completed":
+                print("film:", data["data"]["final_video_url"])
+            if event == "billing":
+                b = data["billing"]
+                print(f"refunded ${b['refunded_usd']} — {b['scenes_rendered']}/{b['scenes_requested']} scenes rendered")
+            if event is None and "error" in data:
+                print("failed:", data["error"], "refunded:", data.get("refunded"))
 ```
-event: step_start
-data: {"step": 1, "name": "concept", "message": "Generating story concept..."}
 
-event: step_progress
-data: {"step": 1, "progress": 30, "message": "Building narrative structure..."}
-
-event: step_progress
-data: {"step": 1, "progress": 80, "message": "Refining scene breakdowns..."}
-
-event: step_complete
-data: {"step": 1, "name": "concept", "result": {"title": "Messages from Tomorrow", "scenes": [...]}}
-
-event: step_start
-data: {"step": 2, "name": "characters", "message": "Designing characters..."}
-
-...
-
-event: complete
-data: {"story_id": "story_7f3k9m2x", "video_url": "https://s1.fotohub.app/storage/v1/object/public/stories/story_7f3k9m2x/final.mp4", "credits_used": 30}
-```
-
-#### Individual Steps
-
-```bash
-# Step 1: Concept
-curl -X POST https://apis.fotohub.app/v1/story/step/concept \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Two rival chefs compete in a cooking battle with supernatural ingredients",
-    "style": "anime",
-    "num_scenes": 5,
-    "duration": 90
-  }'
-
-# Step 2: Characters (using story_id from Step 1)
-curl -X POST https://apis.fotohub.app/v1/story/step/characters \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "story_id": "story_7f3k9m2x"
-  }'
-
-# Step 3: Frames
-curl -X POST https://apis.fotohub.app/v1/story/step/frames \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "story_id": "story_7f3k9m2x"
-  }'
-
-# Step 4: Videos
-curl -X POST https://apis.fotohub.app/v1/story/step/videos \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "story_id": "story_7f3k9m2x",
-    "video_model": "wan",
-    "motion_intensity": "high"
-  }'
-
-# Step 5: Voice-Over
-curl -X POST https://apis.fotohub.app/v1/story/step/voiceover \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "story_id": "story_7f3k9m2x",
-    "voice": "narrator-dramatic",
-    "speed": 1.1
-  }'
-
-# Step 6: Final Composition
-curl -X POST https://apis.fotohub.app/v1/story/step/final \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "story_id": "story_7f3k9m2x",
-    "music_style": "epic",
-    "transition": "crossfade",
-    "add_subtitles": true,
-    "subtitle_style": "bold",
-    "output_quality": "1080p"
-  }'
-
-# Regenerate a character
-curl -X POST https://apis.fotohub.app/v1/story/regenerate/character \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "story_id": "story_7f3k9m2x",
-    "character_id": "char_02",
-    "description": "A flamboyant rival chef with a tall white hat, fiery red apron, and mischievous grin"
-  }'
-
-# Regenerate a frame
-curl -X POST https://apis.fotohub.app/v1/story/regenerate/frame \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "story_id": "story_7f3k9m2x",
-    "scene_index": 3,
-    "camera_direction": "orbit"
-  }'
-```
+::: tip The SDKs do not wrap Story Studio yet
+`fotohub` for Python and TypeScript covers images, video, audio and chat. Story Studio is HTTP-only for now — the requests above are the whole contract.
+:::
 
 ---
 
-## Use Cases
+## Notes and limits
 
-### Marketing Videos
-
-Generate branded short-form video content for product launches, campaigns, and social media ads.
-
-```python
-story = client.story.generate(
-    prompt="A sleek smartwatch transforms the daily routine of a busy professional — "
-           "from morning workout tracking to seamless meeting reminders, "
-           "ending with a sunset notification to relax. Product: TechWear Pro.",
-    style="cinematic",
-    video_model="veo-3.1-generate-001",
-    num_scenes=4,
-    duration=30,
-    aspect_ratio="9:16",
-    voice="narrator-male-2",
-    music_style="upbeat"
-)
-```
-
-### Social Media Content
-
-Create vertical short-form stories optimized for Instagram Reels, TikTok, and YouTube Shorts.
-
-```python
-story = client.story.generate(
-    prompt="5 surprising facts about deep ocean creatures, "
-           "each fact revealed with dramatic underwater visuals",
-    style="documentary",
-    video_model="hailuo",
-    num_scenes=5,
-    duration=45,
-    aspect_ratio="9:16",
-    voice="narrator-dramatic",
-    music_style="ambient"
-)
-```
-
-### Educational Content
-
-Produce explainer videos and educational narratives for courses, tutorials, and training materials.
-
-```python
-story = client.story.generate(
-    prompt="How photosynthesis works: follow a single photon of light "
-           "from the sun into a leaf cell, through the chloroplast, "
-           "and witness the chemical transformation that feeds all life on Earth.",
-    style="documentary",
-    video_model="veo-3.1-generate-001",
-    num_scenes=6,
-    duration=120,
-    voice="narrator-female-1",
-    language="en",
-    music_style="ambient"
-)
-```
-
-### Creative Storytelling
-
-Bring original stories to life for entertainment, portfolio pieces, or personal projects.
-
-```python
-story = client.story.generate(
-    prompt="A paper crane left on a park bench comes to life at midnight "
-           "and embarks on a journey to find the child who folded it, "
-           "flying over a sleeping city illuminated by streetlamps and stars.",
-    style="anime",
-    video_model="wan",
-    num_scenes=5,
-    duration=90,
-    voice="narrator-female-2",
-    music_style="ambient",
-    character_consistency=True
-)
-```
-
----
-
-## Error Handling
-
-### Error Response Format
-
-```json
-{
-  "error": {
-    "code": "insufficient_credits",
-    "message": "This request requires 30 credits but your balance is 12.",
-    "required_credits": 30,
-    "current_balance": 12
-  }
-}
-```
-
-### Common Error Codes
-
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `insufficient_credits` | 402 | Not enough credits for the requested operation. |
-| `invalid_story_id` | 404 | Story ID not found or expired (stories expire after 24 hours). |
-| `step_dependency` | 400 | Attempted to run a step before its prerequisite completed. |
-| `generation_failed` | 500 | Video or image generation failed. Retry is usually safe. |
-| `model_unavailable` | 503 | Selected video model is temporarily unavailable. |
-| `rate_limited` | 429 | Too many concurrent story generations. Max 3 concurrent per account. |
-| `invalid_scene_index` | 400 | Scene index out of range for this story. |
-| `content_filtered` | 400 | Prompt was rejected by content safety filters. |
-
-### SSE Error Events
-
-When an error occurs during streaming, you receive an `error` event instead of a `step_complete`:
-
-```
-event: error
-data: {"step": 4, "code": "generation_failed", "message": "Video generation timed out for scene 2", "retry": true}
-```
-
-If `retry` is `true`, you can call the individual step endpoint to retry just that step without re-running the full pipeline.
-
----
-
-## Rate Limits
-
-| Tier | Concurrent Stories | Requests/min |
-|------|-------------------|--------------|
-| Free | 1 | 5 |
-| Pro | 3 | 20 |
-| Business | 10 | 60 |
-| Enterprise | Unlimited | Custom |
-
----
-
-## Best Practices
-
-1. **Write detailed prompts** — Include setting, characters, mood, and narrative arc. Vague prompts produce generic results.
-
-2. **Choose the right model** — Use `veo-3.1-generate-001` for photorealistic content with native audio, `wan2.2-t2v-plus` for anime/artistic styles, `hailuo-o2` for cinematic smooth motion, `seedance-2-0-pro` for fast iteration.
-
-3. **Use step-by-step for production** — The individual step endpoints let you review and adjust at each stage, resulting in higher quality output.
-
-4. **Regenerate selectively** — If one character or frame is not right, regenerate just that element (3 credits) instead of re-running the full pipeline (30 credits).
-
-5. **Match duration to content** — Shorter stories (15–30s) work best for social media. Longer stories (60–180s) suit educational and narrative content.
-
-6. **Leverage character consistency** — Keep `character_consistency: true` (default) to ensure characters look the same across all scenes.
+- **The pipeline is stateless.** There is no story id and nothing is stored server-side between steps: what you hold in `concept`, `frames` and `videos` *is* the story. Keep them.
+- **`POST /generate` also files a copy in your gallery.** Character images, keyframes, scene clips and the finished film are copied into the account's private library (`/dashboard/files`) as that run streams. The step endpoints do not — they return the generated-asset URLs and leave storage to you.
+- **Steps 2 and 3 work item by item** and tolerate individual failures. A story that lost one of four keyframes still composes — from three scenes, charged for three renders.
+- **Step 4 returns before the clips exist.** Calling step 5 or 6 with unpolled scenes composes empty clips; wait for `pending: 0`.
+- **`music_url` and `transitions` are accepted and ignored.** The composer crossfades and mixes narration only; add a music bed yourself with [Video editing](/api/video-editing) or generate one with [`/v1/ai/generate/music`](/api/music-audio).
+- **Concurrency** is bounded by the 3/min limit on `/generate` and by each provider's own queue; a `429` on step 4 while you are under your RPM is the provider's cap, not ours.
