@@ -452,7 +452,7 @@ POST /v1/story/step/poll-videos
 }
 ```
 
-Poll every 10–15 seconds until `pending` is `0`, then pass the returned `videos` to step 5 or 6. A clip takes roughly 40 seconds to 4 minutes depending on the model and its length. `pending` counts scenes that are neither `completed`, `failed` nor `skipped`.
+Poll every 10–15 seconds until `pending` is `0`, then pass the returned `videos` to step 5 or 6. How long a clip takes depends on the model, its length and the provider's queue; `POST /generate` gives a render up to 10 minutes before it moves on without it. `pending` counts scenes that are neither `completed`, `failed` nor `skipped`.
 
 ### Step 5 — Voice-over
 
