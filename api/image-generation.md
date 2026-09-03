@@ -309,9 +309,17 @@ replacement (`gpt-image-1` and `gpt-image-1.5` respectively), and nothing is cha
 |----------|------|-------------|-------|
 | `mai-image-2.5-flash` | MAI-Image 2.5 Flash | 0.022 | flat; budget/fast |
 | `mai-image-2.5` | MAI-Image 2.5 | 0.037 | flat; up to 1024x1024 |
+| `mai-image-2.5-pro` | MAI-Image 2.5 Pro | 0.108544 | flat; best photorealism and consistency |
 
-These two are the only models besides the GPT Image family that receive your `width` and
-`height` verbatim rather than just deriving a price tier from them.
+These three are the only models besides the GPT Image family that receive your `width` and
+`height` verbatim rather than just deriving a price tier from them. Both must be at least
+768, and `width * height` must not exceed 1,048,576 — either side may pass 1024 as long as
+the product stays under the cap (768x1365 is valid). Output is always PNG.
+
+::: warning One image per request
+MAI returns exactly **one** image per request. `num_images` above 1 is clamped to 1 and
+billed as 1, so ask for more by making more requests.
+:::
 
 ### BytePlus SeedDream
 
@@ -1300,6 +1308,7 @@ A comprehensive overview of all available image models with their capabilities, 
 | `gpt-image-2` | OpenAI | 4096x4096 | 2/5 | 5/5 | 0.006 | 0.211 | Highest OpenAI fidelity, best text rendering |
 | `mai-image-2.5-flash` | Microsoft | 1024x1024 | 4/5 | 3/5 | 0.022 | 0.022 | Budget/fast Azure AI model |
 | `mai-image-2.5` | Microsoft | 1024x1024 | 3/5 | 4/5 | 0.037 | 0.037 | Azure AI flagship, prompt rewriting |
+| `mai-image-2.5-pro` | Microsoft | 1024x1024 | 2/5 | 5/5 | 0.108544 | 0.108544 | Best MAI photorealism, object/character consistency |
 | `seedream-5-0-260128` | BytePlus | 4096x4096 | 4/5 | 5/5 | 0.0315 | 0.0315 | **Recommended** — best value, flat price at 4K |
 | `seedream-4-5-251128` | BytePlus | 4096x4096 | 3/5 | 4/5 | 0.036 | 0.036 | Excellent detail, flat price |
 | `seedream-4-0-250828` | BytePlus | 4096x4096 | 4/5 | 4/5 | 0.03 | 0.03 | Budget-friendly, flat price |

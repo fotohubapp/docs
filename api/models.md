@@ -285,9 +285,13 @@ Both are refused with `400` before authentication, so nothing is charged. OpenAI
 |----------|------|-------------|------|
 | `mai-image-2.5-flash` | MAI-Image 2.5 Flash | 0.022 | per image, flat across 1K/2K/4K |
 | `mai-image-2.5` | MAI-Image 2.5 | 0.037 | per image, flat across 1K/2K/4K |
-| `mai-image-2.5-pro` | MAI-Image 2.5 Pro | 0.053 | per image, flat across 1K/2K/4K |
+| `mai-image-2.5-pro` | MAI-Image 2.5 Pro | 0.108544 | per image, flat across 1K/2K/4K |
 
-**Use case:** Azure AI flagship image models with prompt rewriting. All three are flat-rated, so resolution costs nothing extra — the cheapest way to get a large render on the platform after `gemini-3.1-flash-lite-image`. `-pro` adds the strongest photorealism of the family, object and character consistency across a scene, and spatial reasoning.
+**Use case:** Azure AI flagship image models with prompt rewriting. All three are flat-rated, so resolution costs nothing extra — `-flash` and the standard tier are among the cheapest large renders on the platform. `-pro` adds the strongest photorealism of the family, object and character consistency across a scene, and spatial reasoning, and Microsoft charges 2.9x the standard tier for it.
+
+::: warning `mai-image-2.5-pro` is $0.108544, not $0.053 — changed 2026-09-03
+Pro shipped against an estimate, because Microsoft published no price for the MAI family at the time. It now publishes the meter: image output is $106.00 per 1M tokens and a 1024x1024 render is 1024 output tokens, so one image is **$0.108544**. If your integration hard-codes the old figure to forecast spend, double it. Nothing else in the family moved, and the credit price on fotohub.app is unchanged.
+:::
 
 ::: warning One image per request
 The whole MAI-Image family returns exactly **one** image per request. `num_images` above 1 is

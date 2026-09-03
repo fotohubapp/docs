@@ -6,6 +6,38 @@ Track new models, features, and improvements to the FOTOhub API.
 
 ## September 2026
 
+### MAI-Image 2.5 Pro is priced from Microsoft's meter <Badge type="warning" text="BREAKING" />
+
+`mai-image-2.5-pro` billed **$0.053** per image. That figure was an estimate: when
+the model shipped, Microsoft published no price for the MAI-Image family — the
+pricing page rendered `$-` and the retail price API exposed the meters under
+letter codes only.
+
+The meters are now published by name, and one render is
+**$0.108544** — 2.05x the estimate:
+
+| Meter | Rate | Per 1024x1024 image |
+|---|---:|---:|
+| Image 2.5 Pro image output | $106.00 / 1M tokens | 1024 tokens = **$0.108544** |
+| Image 2.5 Pro image input *(edits only)* | $8.00 / 1M tokens | 1024 tokens = $0.008192 |
+| Image 2.5 Pro text input | $5.00 / 1M tokens | ~$0.001 for a 200-token prompt |
+
+Only the image-output leg is charged: the prompt costs less than the wallet's
+smallest unit, and an edit is billed as a generation.
+
+- **`mai-image-2.5-pro` now costs $0.108544 per image from the USD wallet.** If you
+  hard-coded the old figure for forecasting, double it. `GET /v1/pricing` reports
+  it as `verified: true` — the rate is Microsoft's own list price, not a
+  conversion.
+- **`mai-image-2.5` ($0.037) and `mai-image-2.5-flash` ($0.022) are unchanged**, as
+  is the credit price of all three on fotohub.app.
+- **The whole family still returns one image per request** and still caps at
+  1,048,576 pixels, so the price is flat across `"1K"`, `"2K"` and `"4K"`.
+
+Pick `mai-image-2.5` when you want the family's look at a third of the cost — Pro
+buys photorealism, character consistency and spatial reasoning, and Microsoft
+charges 2.9x for it.
+
 ### Story Studio scene renders are priced per model <Badge type="warning" text="BREAKING" />
 
 `POST /v1/story/step/videos` starts one clip per storyboard frame — on any of nine
