@@ -133,7 +133,7 @@ curl -X POST https://apis.fotohub.app/sandbox/exec-python \
   "value": {
     "count": 6,
     "mean": 16.483333333333334,
-    "p95": 25.225
+    "p95": 25.325
   },
   "stdout": "Calculation complete.\n",
   "stderr": "",
