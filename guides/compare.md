@@ -27,25 +27,25 @@ Generating a single 1024x1024 image:
 
 | Provider | Model | Cost | Speed |
 |----------|-------|------|-------|
-| **FOTOhub** | Seedream 5.0 | ~$0.049 | ~2s |
-| **FOTOhub** | FLUX 2 Pro | ~$0.048 | ~4s |
+| **FOTOhub** | Seedream 5.0 | **$0.0315** | ~2s |
+| **FOTOhub** | FLUX 2 Pro (1K) | **$0.030** | ~4s |
 | Replicate | FLUX Pro | ~$0.055 | ~5s |
 | Stability | SD3 Medium | $0.035 | ~3s |
-| OpenAI | DALL-E 3 | $0.040 | ~8s |
+| OpenAI | GPT Image 1 Mini | $0.005 | ~3s |
 | fal.ai | FLUX Pro | $0.050 | ~4s |
 
 ::: info
-FOTOhub is competitive on price and often faster due to EU-local inference. Seedream models offer the best quality per dollar.
+FOTOhub bills at 1:1 pass-through provider pricing with zero platform margin. Seedream 5.0 at $0.0315 and FLUX 2 Pro (1K) at $0.030 provide industry-leading cost-efficiency.
 :::
 
 ## Video Generation (5s clip)
 
 | Provider | Model | Cost | Quality |
 |----------|-------|------|---------|
-| **FOTOhub** | Wan 2.2 Plus | ~$0.32 | Great |
-| **FOTOhub** | Veo 3.1 | ~$3.22 | Premium, native audio, up to 4K |
-| **FOTOhub** | Gemini Omni Flash | ~$1.61 | Native audio automatically, no surcharge |
-| **FOTOhub** | Grok Video 1.5 | ~$2.41 | Only generative model with built-in lip-sync |
+| **FOTOhub** | Wan 2.2 Plus | **$0.10** | Great ($0.02/s) |
+| **FOTOhub** | Veo 3.1 | **$1.00** | Premium, native audio, up to 4K ($0.20/s) |
+| **FOTOhub** | Gemini Omni Flash | **$0.507** | Native audio automatically ($0.1014/s) |
+| **FOTOhub** | Grok Video 1.5 | **$0.70** | Generative model with built-in lip-sync ($0.14/s) |
 | Replicate | Kling | ~$0.30 | Good |
 | Runway | Gen-3 | ~$0.50 | Premium |
 | Luma | Dream Machine | ~$0.30 | Good |

@@ -39,13 +39,14 @@ Automatically detects and segments the main subject, removing the background and
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/gpu-outputs/remover/a1b2c3d4e5f6.png",
-  "credits_used": 2,
+  "usd_charged": 0.107181,
+    "balance_usd": 49.892819,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 0.107181,
+    "balance_usd": 49.892819,
     "usd_charged": 0,
-    "pln_charged": 0
-  },
+      },
   "size_bytes": 1548290,
   "processing_time_ms": 2340
 }
@@ -150,13 +151,14 @@ Each point in the `points` array specifies a location and whether it belongs to 
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/gpu-outputs/remover/x9y8z7w6.png",
-  "credits_used": 4,
+  "usd_charged": 0.214362,
+    "balance_usd": 49.785638,
   "billing": {
-    "method": "credits",
-    "credits_used": 4,
+    "method": "wallet",
+    "usd_charged": 0.214362,
+    "balance_usd": 49.785638,
     "usd_charged": 0,
-    "pln_charged": 0
-  },
+      },
   "size_bytes": 2105384,
   "processing_time_ms": 3120,
   "parameters": {
@@ -273,13 +275,14 @@ Removes the background and replaces it with a new one in a single API call. Supp
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/gpu-outputs/remover/composed123.png",
   "transparent_url": "https://s1.fotohub.app/storage/v1/object/public/photos/gpu-outputs/remover/transparent456.png",
   "background_type": "color",
-  "credits_used": 4,
+  "usd_charged": 0.214362,
+    "balance_usd": 49.785638,
   "billing": {
-    "method": "credits",
-    "credits_used": 4,
+    "method": "wallet",
+    "usd_charged": 0.214362,
+    "balance_usd": 49.785638,
     "usd_charged": 0,
-    "pln_charged": 0
-  },
+      },
   "processing_time_ms": 4200
 }
 ```
@@ -392,13 +395,14 @@ Keeps the main subject in sharp focus while applying Gaussian blur to the backgr
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/gpu-outputs/remover/blurred789.jpg",
-  "credits_used": 2,
+  "usd_charged": 0.107181,
+    "balance_usd": 49.892819,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 0.107181,
+    "balance_usd": 49.892819,
     "usd_charged": 0,
-    "pln_charged": 0
-  },
+      },
   "blur_radius": 15,
   "processing_time_ms": 2800
 }
@@ -485,13 +489,14 @@ Adds a realistic shadow to a transparent PNG image. Supports natural (AI-detecte
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/gpu-outputs/remover/shadow456.png",
-  "credits_used": 2,
+  "usd_charged": 0.107181,
+    "balance_usd": 49.892819,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 0.107181,
+    "balance_usd": 49.892819,
     "usd_charged": 0,
-    "pln_charged": 0
-  },
+      },
   "shadow_type": "natural",
   "processing_time_ms": 1850
 }
@@ -567,244 +572,48 @@ curl -X POST "https://apis.fotohub.app/v1/images/add-shadow" \
 
 ## Pricing
 
-| Endpoint | Credits | USD |
-|----------|---------|-----|
-| Remove Background (auto) | 2 | $0.1072 |
-| Remove Background (advanced) | 4 | $0.2144 |
-| Replace Background | 4 | $0.2144 |
-| Blur Background | 2 | $0.1072 |
-| Add Shadow | 2 | $0.1072 |
+All operations are billed per image directly from your prepaid USD wallet at 1:1 self-hosted infrastructure rates:
+
+| Endpoint | Operation Key | Price (USD) | Unit |
+|----------|---------------|------------:|------|
+| `POST /v1/images/remove-background` | `remove_background` | $0.107181 | per image |
+| `POST /v1/images/remove-background/advanced` | `remove_background_advanced` | $0.214362 | per image |
+| `POST /v1/images/replace-background` | `replace_background` | $0.214362 | per image |
+| `POST /v1/images/blur-background` | `blur_background` | $0.107181 | per image |
+| `POST /v1/images/add-shadow` | `add_shadow` | $0.107181 | per image |
 
 **Billing notes:**
-- 1 credit = $0.0536
-- Credits are deducted before processing. If processing fails, credits are refunded automatically.
-- All operations are single-image (no batch endpoint). For batch processing, call the endpoint multiple times.
-- USD wallet billing is used when credits are exhausted, up to your overage limit.
+- Prepaid USD wallet only. Funds are debited upon successful execution.
+- If processing fails due to a system error, no charge is deducted from your balance.
+- All operations are single-image. For multi-image processing, call the endpoint concurrently.
 
 ## Rate Limits
 
-Rate limits depend on your subscription tier:
-
-### Per-Tier Limits
-
-| Endpoint | Free | Creator (29 PLN/mo) | Pro (79 PLN/mo) | Business (199 PLN/mo) | Enterprise |
-|----------|------|---------------------|-----------------|----------------------|------------|
-| `remove-background` | 5/min | 20/min | 60/min | 200/min | Custom |
-| `remove-background/advanced` | 5/min | 20/min | 60/min | 200/min | Custom |
-| `replace-background` | 3/min | 15/min | 50/min | 150/min | Custom |
-| `blur-background` | 5/min | 20/min | 60/min | 200/min | Custom |
-| `add-shadow` | 5/min | 20/min | 60/min | 200/min | Custom |
-
-### Monthly Credits Included
-
-| Tier | Monthly Credits | BG Removals (basic) | BG Removals (advanced) |
-|------|----------------|---------------------|------------------------|
-| Free | 50 | 25 | 12 |
-| Creator | 500 | 250 | 125 |
-| Pro | 2000 | 1000 | 500 |
-| Business | 8000 | 4000 | 2000 |
-| Enterprise | Custom | Custom | Custom |
-
-### Overage Pricing
-
-When monthly credits are exhausted, operations are billed from your USD wallet:
-
-| Operation | Credit Cost | USD Cost |
-|-----------|-------------|----------|
-| Remove Background (auto) | 2 cr | $0.1072 |
-| Remove Background (advanced) | 4 cr | $0.2144 |
-| Replace Background | 4 cr | $0.2144 |
-| Blur Background | 2 cr | $0.1072 |
-| Add Shadow | 2 cr | $0.1072 |
-
-**1 credit = $0.0536**
-
-### Burst Limits
-
-All tiers have a burst limit of 5x the per-minute rate for up to 10 seconds. Example: Pro tier can burst to 300 req/min for 10s before throttling to 60/min.
-
-### Rate Limit Headers
-
-Every response includes:
-
-```
-X-RateLimit-Limit: 60
-X-RateLimit-Remaining: 57
-X-RateLimit-Reset: 1719936000
-```
-
-Exceeding the limit returns HTTP 429 with a `Retry-After` header (seconds until reset).
-
-### Enterprise
-
-For higher limits, SLA guarantees, dedicated GPU capacity, and priority processing:
-- Email: sales@fotohub.app
-- Custom rate limits up to 2000 req/min
-- Guaranteed <2s processing time (P95)
-- Dedicated GPU model instance
-- Volume discounts starting at 50,000 operations/month
-
-## Supported Formats
-
-**Input:**
-- JPEG (.jpg, .jpeg)
-- PNG (.png) — with or without alpha channel
-- WebP (.webp)
-- Maximum file size: 50MB
-- Maximum dimensions: 8192x8192 pixels
-- Recommended: 4096x4096 or smaller for fastest processing
-
-**Output:**
-- PNG — preserves transparency (default for removal/shadow)
-- JPEG — smaller files, no transparency (default for blur)
-- WebP — best compression with transparency support
+| Endpoint | Free Tier | Standard Tier | Enterprise |
+|----------|-----------|---------------|------------|
+| `remove-background` | 5/min | 60/min | 200+/min |
+| `remove-background/advanced` | 5/min | 60/min | 200+/min |
+| `replace-background` | 3/min | 50/min | 150+/min |
+| `blur-background` | 5/min | 60/min | 200+/min |
+| `add-shadow` | 5/min | 60/min | 200+/min |
 
 ## Error Responses
 
-### 400 — Invalid Input
+| Code | Status | Description |
+|------|--------|-------------|
+| `bad_request` | 400 | Invalid image format, dimensions, or parameters |
+| `unauthorized` | 401 | Missing or invalid API key |
+| `insufficient_funds` | 402 | Wallet balance too low to cover operation |
+| `rate_limit_exceeded` | 429 | Request rate limit exceeded |
+| `internal_error` | 500 | Processing failed on GPU worker |
+
+### 402 — Insufficient Funds
+
+Returned when your prepaid USD wallet balance cannot cover the required operation price:
 
 ```json
 {
-  "detail": "Provide image_url or image (base64)"
+  "error": "insufficient_funds",
+  "detail": "Insufficient wallet balance. Required: $0.107181, available: $0.02. Top up your USD wallet at fotohub.app/billing"
 }
 ```
-
-### 402 — Insufficient Credits
-
-```json
-{
-  "detail": "Insufficient credits. Required: 2, available: 0. Top up at fotohub.app/billing"
-}
-```
-
-### 413 — Image Too Large
-
-```json
-{
-  "detail": "Image too large (max 50MB)"
-}
-```
-
-### 502 — Processing Failed
-
-```json
-{
-  "detail": "Background processing failed: segmentation error"
-}
-```
-
-### 503 — Service Unavailable
-
-```json
-{
-  "detail": "Background processing service unavailable"
-}
-```
-
-### 504 — Timeout
-
-```json
-{
-  "detail": "Background processing timed out"
-}
-```
-
-## Use Cases
-
-### E-commerce Product Photos
-
-Remove backgrounds from product images and replace with white/gradient for marketplace listings:
-
-```python
-from fotohub import FotoHub
-
-client = FotoHub(api_key="fh_live_your_api_key")
-
-product_urls = [
-    "https://example.com/product1.jpg",
-    "https://example.com/product2.jpg",
-    "https://example.com/product3.jpg",
-]
-
-for url in product_urls:
-    # White background for Amazon/eBay listings
-    result = client.images.replace_background(
-        image_url=url,
-        background="#ffffff",
-        output_format="jpeg",
-    )
-    print(f"Processed: {result.output_url}")
-```
-
-### Portrait Photography
-
-Create professional headshots with blurred or replaced backgrounds:
-
-```python
-# Blur for natural bokeh
-result = client.images.blur_background(
-    image_url="https://example.com/headshot.jpg",
-    blur_radius=25,
-    feather=4,
-)
-
-# Or replace with studio backdrop
-result = client.images.replace_background(
-    image_url="https://example.com/headshot.jpg",
-    background="Professional gray gradient studio backdrop with soft rim lighting",
-    background_type="prompt",
-)
-```
-
-### Design Assets
-
-Create transparent PNGs with shadows for design compositions:
-
-```python
-# Remove background
-transparent = client.images.remove_background(
-    image_url="https://example.com/object.jpg"
-)
-
-# Add shadow for realistic placement
-with_shadow = client.images.add_shadow(
-    image_url=transparent.output_url,
-    shadow_type="contact",
-    shadow_opacity=0.5,
-    shadow_blur=15,
-)
-```
-
----
-
-## SDK Reference
-
-### Python SDK
-
-```bash
-pip install fotohub
-```
-
-All background methods are under `client.images.*`:
-
-| Method | Endpoint |
-|--------|----------|
-| `client.images.remove_background()` | POST /v1/images/remove-background |
-| `client.images.remove_background_advanced()` | POST /v1/images/remove-background/advanced |
-| `client.images.replace_background()` | POST /v1/images/replace-background |
-| `client.images.blur_background()` | POST /v1/images/blur-background |
-| `client.images.add_shadow()` | POST /v1/images/add-shadow |
-
-### TypeScript SDK
-
-```bash
-npm install fotohub
-```
-
-| Method | Endpoint |
-|--------|----------|
-| `client.images.removeBackground()` | POST /v1/images/remove-background |
-| `client.images.removeBackgroundAdvanced()` | POST /v1/images/remove-background/advanced |
-| `client.images.replaceBackground()` | POST /v1/images/replace-background |
-| `client.images.blurBackground()` | POST /v1/images/blur-background |
-| `client.images.addShadow()` | POST /v1/images/add-shadow |

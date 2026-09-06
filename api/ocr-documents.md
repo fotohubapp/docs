@@ -2,6 +2,21 @@
 
 Extract text from images, analyze document layouts, process invoices, redact sensitive data, and batch-process documents at scale. FOTOhub's OCR pipeline combines high-accuracy text detection with intelligent document understanding for 40+ languages.
 
+::: danger Deprecation & Phantom Endpoints Notice
+The endpoints previously listed on this page:
+- `POST /v1/ai/document/ocr`
+- `POST /v1/ai/document/redact`
+- `POST /v1/ai/document/pdf-to-images`
+- `POST /v1/ai/document/batch`
+- `POST /v1/ai/document/export`
+- `POST /v1/ai/document/invoice`
+
+are deprecated non-functional routes. All production document processing is powered by AWS Textract at 1:1 pass-through USD pricing and documented on the canonical **[Document Intelligence](/api/document-intelligence)** page:
+1. `POST /v1/ai/document/detect-text` — High-accuracy OCR & line detection ($0.0015 / page)
+2. `POST /v1/ai/document/analyze` — Table and form field extraction ($0.015 / page)
+3. `POST /v1/ai/document/analyze-expense` — Invoice & receipt breakdown ($0.010 / page)
+:::
+
 | Feature | Endpoint | Credits | Description |
 |---------|----------|---------|-------------|
 | **OCR** | `POST /v1/ai/document/ocr` | 1 | Detect and extract text from images |

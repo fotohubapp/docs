@@ -63,10 +63,10 @@ Apply professional color grading to any image. Choose from cinematic presets use
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/processed/cg_a1b2c3d4.jpg",
-  "credits_used": 1,
+  "usd_charged": 1,
   "billing": {
-    "method": "credits",
-    "credits_used": 1,
+    "method": "wallet",
+    "usd_charged": 1,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -186,10 +186,10 @@ Automatic AI-powered enhancement that intelligently adjusts exposure, white bala
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/processed/enh_b2c3d4e5.jpg",
-  "credits_used": 1,
+  "usd_charged": 1,
   "billing": {
-    "method": "credits",
-    "credits_used": 1,
+    "method": "wallet",
+    "usd_charged": 1,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -273,10 +273,10 @@ Advanced AI noise reduction that removes grain, compression artifacts, and senso
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/processed/dn_c3d4e5f6.jpg",
-  "credits_used": 1,
+  "usd_charged": 1,
   "billing": {
-    "method": "credits",
-    "credits_used": 1,
+    "method": "wallet",
+    "usd_charged": 1,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -354,10 +354,10 @@ Automatically colorize black and white or grayscale images using deep learning. 
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/processed/col_d4e5f6g7.jpg",
-  "credits_used": 2,
+  "usd_charged": 2,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 2,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -440,10 +440,10 @@ Restore degraded, blurry, or low-resolution faces using state-of-the-art face re
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/processed/fr_e5f6g7h8.jpg",
-  "credits_used": 2,
+  "usd_charged": 2,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 2,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -539,10 +539,10 @@ Generate monocular depth maps from single images using state-of-the-art depth es
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/photos/processed/dm_f6g7h8i9.png",
-  "credits_used": 2,
+  "usd_charged": 2,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 2,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -642,10 +642,10 @@ Automatically tag images with descriptive labels using OpenAI's CLIP model. Retu
     { "label": "walking", "confidence": 0.68, "category": "activities" }
   ],
   "model_used": "clip-vit-large",
-  "credits_used": 1,
+  "usd_charged": 1,
   "billing": {
-    "method": "credits",
-    "credits_used": 1,
+    "method": "wallet",
+    "usd_charged": 1,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -738,10 +738,10 @@ Generate dense vector embeddings from images using CLIP. Returns a 512 or 768-di
   "dimensions": 768,
   "model_used": "clip-vit-large",
   "normalized": true,
-  "credits_used": 1,
+  "usd_charged": 1,
   "billing": {
-    "method": "credits",
-    "credits_used": 1,
+    "method": "wallet",
+    "usd_charged": 1,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -874,10 +874,10 @@ Available operation types: `color-grade`, `enhance`, `denoise`, `colorize`, `fac
     "succeeded": 2,
     "failed": 1
   },
-  "credits_used": 4,
+  "usd_charged": 4,
   "billing": {
-    "method": "credits",
-    "credits_used": 4,
+    "method": "wallet",
+    "usd_charged": 4,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -915,7 +915,7 @@ for item in result.results:
     else:
         print(f"Failed: {item.error}")
 
-print(f"Total credits: {result.credits_used}")
+print(f"Total credits: {result.usd_charged}")
 ```
 
 ```typescript [TypeScript SDK]

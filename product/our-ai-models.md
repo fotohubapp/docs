@@ -98,12 +98,12 @@ Every prompt passes through FOTOhub's own prompt engine before generation — au
 
 ### Pricing
 
-| Model | USD (API Wallet) | Credits (Web App) | Unit |
-|-------|------------------|-------------------|------|
-| IDA Q 1.0 | $0.027 | 0.5 | per request |
+| Model | Price (USD) | Unit | Meter |
+|-------|------------:|------|-------|
+| IDA Q 1.0 (`ida-q-image`) | **$0.00** | per request | Free (self-hosted EU GPU cluster) |
 
-::: tip Cost Advantage
-IDA Q 1.0 costs a fraction of Google's Nano Banana (Gemini Flash Image) and roughly 20x less than GPT Image 2 — a direct result of running on our own infrastructure with zero third-party licensing cost to pass through.
+::: tip Fully Free Self-Hosted Image Generation
+IDA Q 1.0 is engineered and hosted entirely on FOTOhub's dedicated European GPU cluster. Because there is zero third-party vendor licensing or per-inference cloud cost, generations are **100% free ($0.00)** and deduct nothing from your API wallet.
 :::
 
 ### API Access
@@ -179,14 +179,15 @@ IDA Music supports detailed structural tags for professional music production:
 
 ### Pricing
 
-| Duration | USD (API Wallet) | Credits (Web App) |
-|----------|------------------|-------------------|
-| ≤ 30 seconds | $0.27 | 5 |
-| 31–60 seconds | $0.54 | 10 |
-| > 60 seconds | $1.34 | 25 |
+IDA Music is billed **per started minute of generated audio**:
+
+| Engine | Model ID | USD / Minute | 30s Track | 60s Track | 120s Track |
+|--------|----------|-------------:|----------:|----------:|-----------:|
+| MiniMax Music | `minimax` | **$0.025** | $0.0125 | $0.025 | $0.050 |
+| IDA Cloud Music | `elevenlabs` | **$0.045** | $0.0225 | $0.045 | $0.090 |
 
 ::: tip Cost Advantage
-Running on our own infrastructure means: lower latency for European users, no external rate limits, and full control over output quality.
+Billed at exact provider rates ($0.025–$0.045 per minute) directly from your prepaid wallet. A complete 2-minute soundtrack costs just $0.05 on MiniMax or $0.09 on IDA Cloud Music, with zero platform markups.
 :::
 
 ### API Access
@@ -227,9 +228,12 @@ FOTOhub's proprietary voice synthesis system providing natural-sounding speech w
 
 ### Pricing
 
-| Model | USD (API Wallet) | Credits (Web App) | Per |
-|-------|------------------|-------------------|-----|
-| IDA Voice | $0.1072 | 2 | 1,000 characters |
+Billed **per 1,000 characters submitted**:
+
+| Voice Model Tier | Provider Alias | Price (USD) | Unit |
+|------------------|----------------|------------:|------|
+| IDA Voice Standard (`mars-flash`) | `google` | **$0.015** | per 1,000 characters |
+| IDA Voice Pro / Clone (`mars-pro`) | `elevenlabs` | **$0.030** | per 1,000 characters |
 
 ### API Access
 
@@ -254,9 +258,12 @@ Instant generation of sound effects and ambient audio from text descriptions.
 
 ### Pricing
 
-| USD (API Wallet) | Credits (Web App) | Per |
-|------------------|-------------------|-----|
-| $0.1608 | 3 | generation (any duration) |
+Billed **flat per generation** (any duration up to 30s):
+
+| SFX Engine | Price Key | Price (USD) | Unit |
+|------------|-----------|------------:|------|
+| ElevenLabs SFX | `elevenlabs-sfx` | **$0.015** | per request |
+| FOTOhub Studio SFX | `sfx-elevenlabs` | **$0.040193** | per request |
 
 ### API Access
 
@@ -311,8 +318,8 @@ All proprietary models run on FOTOhub's dedicated GPU cluster:
 
 | Capability | FOTOhub | Cloud-Only |
 |-----------|---------|------------|
-| Music generation (8 min) | $0.27–$1.34 ($0.03/min base) | $2–5 per track |
-| Voice synthesis | $0.1072/1K chars | $0.015–0.030/1K chars |
+| Music generation (8 min) | $0.20–$0.36 ($0.025–$0.045/min) | $2–5 per track |
+| Voice synthesis | $0.015–$0.030/1K chars | $0.015–$0.030/1K chars |
 | Intelligent routing | Free (Gabriel) | Not available |
 | Model selection | Automatic, 50+ models | Manual, 1 provider |
 | Prompt enhancement | Free, per-model optimized | Not available |

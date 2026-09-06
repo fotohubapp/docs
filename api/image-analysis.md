@@ -5,7 +5,7 @@ Extract structured information from images using AI-powered analysis. Detect obj
 | | |
 |---|---|
 | **Features** | 6 analysis types: labels, faces, nsfw, ocr, colors, objects |
-| **Cost** | 1 credit per analysis ($0.0161 from the wallet once credits are exhausted) |
+| **Cost** | $0.003 per analysis ($0.0161 from the wallet once credits are exhausted) |
 | **Latency** | 2-8 seconds depending on features selected |
 
 ---
@@ -19,7 +19,7 @@ POST /v1/ai/analyze/image
 ```
 
 **Authentication:** API Key (Bearer token)  
-**Billing:** 1 credit per request (flat rate regardless of features selected)
+**Billing:** $0.003 per request (flat rate regardless of features selected)
 
 ### Request Body Parameters
 
@@ -32,7 +32,7 @@ POST /v1/ai/analyze/image
 | `min_confidence` | number | No | `0` | Minimum confidence threshold (0.0-1.0), applied to `labels`, `objects` and `faces`. `nsfw` and `ocr` carry no numeric score, so the threshold does not apply to them. Default `0` returns everything the provider found. |
 
 ::: tip Fixed Cost
-Image analysis costs a flat **1 credit** per request ($0.0161 billed from your USD wallet once included credits are exhausted), regardless of how many features you select. Requesting every feature in a single call is therefore cheaper than making one call per feature.
+Image analysis costs a flat **$0.003** per request ($0.0161 billed from your USD wallet once included credits are exhausted), regardless of how many features you select. Requesting every feature in a single call is therefore cheaper than making one call per feature.
 :::
 
 ---
@@ -55,10 +55,12 @@ objects.
 
 ```json
 {
-  "credits_used": 1,
+  "usd_charged": 0.003,
+    "balance_usd": 49.997,
   "billing": {
-    "method": "credits",
-    "credits_used": 1,
+    "method": "wallet",
+    "usd_charged": 0.003,
+    "balance_usd": 49.997,
     "usd_charged": 0
   },
   "image_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/photo.jpg",
@@ -212,7 +214,7 @@ response = requests.post(
 )
 
 data = response.json()
-print(f"Credits used: {data['credits_used']}")
+print(f"Credits used: {data['billing']['usd_charged']}")
 
 # Access labels
 for label in data["labels"]:
@@ -438,7 +440,7 @@ POST /v1/ai/enhance-prompt
 ```
 
 **Authentication:** API Key (Bearer token)  
-**Billing:** 1 credit per request
+**Billing:** $0.003 per request
 
 ### Request Body Parameters
 
@@ -453,10 +455,12 @@ POST /v1/ai/enhance-prompt
 
 ```json
 {
-  "credits_used": 1,
+  "usd_charged": 0.003,
+    "balance_usd": 49.997,
   "billing": {
-    "method": "credits",
-    "credits_used": 1,
+    "method": "wallet",
+    "usd_charged": 0.003,
+    "balance_usd": 49.997,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -580,7 +584,7 @@ recognised feature name. Nothing is charged: validation runs before billing.
 { "detail": "Unknown features: sentiment. Supported: colors, faces, labels, landmarks, logos, nsfw, objects, ocr, safe_search, text" }
 ```
 
-### 402 — Insufficient Credits
+### 402 — Insufficient Funds
 
 Credits are exhausted and the wallet cannot cover the charge.
 

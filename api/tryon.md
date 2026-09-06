@@ -94,9 +94,10 @@ Only `person_image_url` plus one of `garment_image_url` / `garment_id` are stric
   "job_id": "7c1e9f42-3a5b-4d8e-9f01-2b3c4d5e6f70",
   "status": "queued",
   "category": "tops",
-  "credits_used": 2,
+  "usd_charged": 0.1286,
+    "balance_usd": 49.8714,
   "billing": {
-    "method": "credits",
+    "method": "wallet",
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -170,8 +171,8 @@ Identical in shape to a single-garment submit, with the outfit's cost and estima
   "job_id": "381e0971-c3e9-499c-b927-4bced6103160",
   "status": "queued",
   "category": "tops",
-  "credits_used": 3.0,
-  "billing": { "method": "credits", "usd_charged": 0, "pln_charged": 0 },
+  "usd_charged": 3.0,
+  "billing": { "method": "wallet", "usd_charged": 0, "pln_charged": 0 },
   "estimated_seconds": 16,
   "poll_url": "https://apis.fotohub.app/v1/ai/tryon/381e0971-c3e9-499c-b927-4bced6103160"
 }
@@ -467,7 +468,7 @@ const base = "https://apis.fotohub.app/v1/ai"
 
 type submitResp struct {
 	JobID            string  `json:"job_id"`
-	CreditsUsed      float64 `json:"credits_used"`
+	CreditsUsed      float64 `json:"usd_charged"`
 	EstimatedSeconds int     `json:"estimated_seconds"`
 	Detail           string  `json:"detail"`
 }

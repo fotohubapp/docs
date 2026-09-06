@@ -73,7 +73,7 @@ result = client.generate_image(
     model="seedream-5-0-260128"
 )
 print(f"Generated: {result.images[0].url}")
-print(f"Credits used: {result.credits_used}")
+print(f"Credits used: {result.usd_charged}")
 ```
 
 ---
@@ -167,7 +167,7 @@ Both SDKs throw typed exceptions you can catch:
 
 ::: code-group
 ```python [Python]
-from fotohub import FotoHub, RateLimitError, InsufficientCreditsError, AuthError
+from fotohub import FotoHub, RateLimitError, InsufficientFundsError, AuthError
 
 client = FotoHub()
 
@@ -177,11 +177,11 @@ except AuthError:
     print("Invalid API key")
 except RateLimitError as e:
     print(f"Rate limited — retry after {e.retry_after}s")
-except InsufficientCreditsError:
-    print("Top up credits at fotohub.app/billing")
+except InsufficientFundsError:
+    print("Top up USD wallet balance at fotohub.app/billing")
 ```
 ```typescript [TypeScript]
-import { FotoHub, RateLimitError, InsufficientCreditsError, AuthenticationError } from "fotohub";
+import { FotoHub, RateLimitError, InsufficientFundsError, AuthenticationError } from "fotohub";
 
 const client = new FotoHub({ apiKey: "..." });
 
@@ -192,8 +192,8 @@ try {
     console.error("Invalid API key");
   } else if (e instanceof RateLimitError) {
     console.error(`Rate limited — retry after ${e.retryAfter}s`);
-  } else if (e instanceof InsufficientCreditsError) {
-    console.error("Top up credits at fotohub.app/billing");
+  } else if (e instanceof InsufficientFundsError) {
+    console.error("Top up USD wallet balance at fotohub.app/billing");
   }
 }
 ```

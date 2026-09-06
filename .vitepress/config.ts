@@ -38,6 +38,8 @@ export default defineConfig({
       { text: 'SDKs', link: '/sdk/python' },
       { text: 'Integrations', link: '/integrations/overview' },
       { text: 'Guides', link: '/guides/quickstart' },
+      { text: 'Recipes', link: '/recipes/overview' },
+      { text: 'Compute', link: '/compute/overview' },
       { text: 'Product', link: '/product/our-ai-models' },
       { text: 'Status', link: 'https://status.fotohub.app' },
       {
@@ -109,6 +111,10 @@ export default defineConfig({
             { text: 'Console API', link: '/api/console-api' },
             { text: 'Billing & Pricing', link: '/api/billing' },
             { text: 'Webhooks', link: '/api/webhooks' },
+            { text: 'Output Destinations (BYOB)', link: '/api/destinations' },
+            { text: 'Brand Engine', link: '/api/brand-engine' },
+            { text: 'Social Studio', link: '/api/social-studio' },
+            { text: 'UGC Studio', link: '/api/ugc-studio' },
             { text: 'MCP Integration', link: '/api/mcp' },
             { text: 'Models Catalog', link: '/api/models' },
           ],
@@ -142,6 +148,7 @@ export default defineConfig({
             { text: 'n8n', link: '/integrations/n8n' },
             { text: 'Zapier & Make', link: '/integrations/zapier' },
             { text: 'MCP (AI Assistants)', link: '/integrations/mcp' },
+            { text: 'MCP IDE Setup (Cursor, Claude, Cline)', link: '/integrations/mcp-ide-setup' },
           ],
         },
       ],
@@ -153,6 +160,28 @@ export default defineConfig({
             { text: 'Gabriel AI Orchestrator', link: '/product/our-ai-models#gabriel-ai-orchestrator' },
             { text: 'IDA Q 1.0', link: '/product/our-ai-models#ida-q-1-0' },
             { text: 'IDA Music', link: '/product/our-ai-models#ida-music' },
+          ],
+        },
+      ],
+      '/recipes/': [
+        {
+          text: 'Multimodal Recipes',
+          items: [
+            { text: 'Overview & Blueprints', link: '/recipes/overview' },
+            { text: 'Video to Viral Shorts', link: '/recipes/video-to-shorts' },
+            { text: 'Lip-Sync Dubbing', link: '/recipes/lip-sync-dubbing' },
+            { text: '2D Photo to AR 3D', link: '/recipes/image-to-3d' },
+            { text: 'E-Commerce Catalog Automation', link: '/recipes/ecommerce-catalog-automation' },
+          ],
+        },
+      ],
+      '/compute/': [
+        {
+          text: 'Cloud Compute & Sandboxes',
+          items: [
+            { text: 'Compute Architecture & Pricing', link: '/compute/overview' },
+            { text: 'GPU & CPU Rental (EC2)', link: '/compute/gpu-rental' },
+            { text: 'Agent Sandboxes (Firecracker)', link: '/compute/agent-sandboxes' },
           ],
         },
       ],

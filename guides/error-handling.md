@@ -46,7 +46,7 @@ All FOTOhub API errors follow a consistent JSON structure:
 | `forbidden` | 403 | Key lacks permission | Upgrade key scope |
 | `not_found` | 404 | Resource doesn't exist | Verify resource ID |
 | `rate_limit_exceeded` | 429 | Too many requests | Wait `retry_after` seconds |
-| `insufficient_credits` | 402 | No credits or wallet balance | Top up at fotohub.app/billing |
+| `insufficient_funds` | 402 | No credits or wallet balance | Top up at fotohub.app/billing |
 | `content_policy` | 400 | Prompt violates policy | Modify prompt content |
 | `payload_too_large` | 413 | Request body > 10MB | Reduce image/file size |
 
@@ -71,7 +71,7 @@ from fotohub.exceptions import (
     ValidationError,
     AuthenticationError,
     RateLimitError,
-    InsufficientCreditsError,
+    InsufficientFundsError,
     ModelUnavailableError,
     ServerError,
 )
@@ -98,7 +98,7 @@ except RateLimitError as e:
     # 429 — slow down
     print(f"Rate limited. Retry after {e.retry_after}s")
 
-except InsufficientCreditsError:
+except InsufficientFundsError:
     # 402 — no balance
     print("Top up credits at fotohub.app/billing")
 
@@ -121,7 +121,7 @@ import {
   ValidationError,
   AuthenticationError,
   RateLimitError,
-  InsufficientCreditsError,
+  InsufficientFundsError,
   ModelUnavailableError,
   ServerError,
 } from "fotohub/errors";
@@ -141,7 +141,7 @@ try {
     console.error("Check your FOTOHUB_API_KEY");
   } else if (e instanceof RateLimitError) {
     console.error(`Rate limited. Retry after ${e.retryAfter}s`);
-  } else if (e instanceof InsufficientCreditsError) {
+  } else if (e instanceof InsufficientFundsError) {
     console.error("Top up at fotohub.app/billing");
   } else if (e instanceof ModelUnavailableError) {
     console.error(`Model ${e.model} unavailable, try fallback`);
@@ -843,11 +843,11 @@ def generate_with_fallback(prompt: str):
 ### Insufficient Credits (402) — Graceful Degradation
 
 ```python
-from fotohub.exceptions import InsufficientCreditsError
+from fotohub.exceptions import InsufficientFundsError
 
 try:
     result = client.generate_image(prompt="...", model="imagen-4-standard")
-except InsufficientCreditsError:
+except InsufficientFundsError:
     # Fall back to cheaper model
     result = client.generate_image(prompt="...", model="seedream-5-0-260128")
     # Notify user
@@ -879,7 +879,7 @@ except ServerError as e:
 
 ## Idempotency
 
-Retrying a request that charges credits risks paying for the same work twice —
+Retrying a non-idempotent request that charges your wallet risks paying for the same work twice —
 the dangerous case is a timeout or a `504` that arrives *after* the generation
 already started. The `X-Idempotency-Key` header closes that gap: a repeat with
 the same key within 24 hours returns the original response instead of running

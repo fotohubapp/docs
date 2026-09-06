@@ -3530,3 +3530,234 @@ wss://gpu.fotohub.app/shorts-engine/ws/shorts/{project_id}
 | `bold` | Large centered bold text | Motivational, hooks |
 | `minimal` | Small, clean, unobtrusive | Professional content |
 | `animated` | Motion graphics captions | Creative, trendy |
+
+## Asynchronous Clipping Pipeline (`/v1/shorts/clips/*`)
+
+For long-form video processing (podcasts, webinars, interviews, YouTube videos), the asynchronous clipping pipeline ingests the source, transcribes speech, detects viral moments, computes virality and retention scores, reframes to 9:16 vertical video, generates styled captions, cuts filler words, creates video covers, and renders finished clips in the background.
+
+Billed once per job at the `shorts_clip_job` rate (see [`GET /v1/pricing`](/api/billing)).
+
+---
+
+### Endpoints
+
+| Method | Endpoint | Description | Cost |
+|--------|----------|-------------|------|
+| `POST` | `/v1/shorts/clips` | Submit a clipping job (returns `202 Accepted` immediately) | `shorts_clip_job` rate |
+| `GET` | `/v1/shorts/clips` | List your jobs (paginated, newest first) | Free |
+| `GET` | `/v1/shorts/clips/{job_id}` | Retrieve job status, live progress, and rendered clips | Free |
+| `POST` | `/v1/shorts/clips/{job_id}/cancel` | Cancel a running clipping job | Free |
+| `GET` | `/v1/shorts/clips/events` | Webhook event schema & signature catalog | Free |
+| `POST` | `/v1/shorts/clips/webhook-test` | Send test payload to verify HMAC signature | Free |
+| `GET` | `/v1/shorts/clips/webhook-deliveries` | Audit log of recent webhook delivery attempts | Free |
+
+---
+
+### 1. Submit Clipping Job
+
+```
+POST /v1/shorts/clips
+```
+
+#### Parameters
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `source_url` | string | **Yes** | — | Public video URL or storage path. |
+| `source_type` | string | No | auto | `url`, `youtube`, `tiktok`, `instagram`, `vimeo`, `upload`, `fh_library`. |
+| `title` | string | No | `null` | Job title (max 200 chars). |
+| `language` | string | No | auto | ISO language code (e.g. `en`, `pl`, `es`). |
+| `max_clips` | integer | No | `10` | Maximum number of clips to extract (1 to 30). |
+| `min_duration` | integer | No | `15` | Minimum clip duration in seconds (5 to 180). |
+| `max_duration` | integer | No | `60` | Maximum clip duration in seconds (10 to 300). |
+| `aspect_ratio` | string | No | `"9:16"` | Target aspect ratio: `"9:16"`, `"1:1"`, `"4:5"`, `"16:9"`. |
+| `caption_style` | string | No | `"hormozi"` | Caption style: `"hormozi"`, `"beasty"`, `"clean"`, `"karaoke"`, `"minimal"`, `"neon"`, `"typewriter"`, `"bold"`, `"none"`. |
+| `captions` | boolean | No | `true` | Generate animated captions. |
+| `reframe` | boolean | No | `true` | Smart face-tracking vertical reframing. |
+| `hooks` | boolean | No | `true` | Extract title hooks and highlights. |
+| `covers` | boolean | No | `true` | Auto-generate cover thumbnails. |
+| `broll` | boolean | No | `false` | Insert contextual AI B-roll clips. |
+| `enhance_audio` | boolean | No | `true` | Studio sound clarity enhancement. |
+| `remove_filler` | boolean | No | `true` | Remove filler words ("um", "uh", pauses). |
+| `retention_model`| boolean | No | `true` | Score clips using AI virality and retention models. |
+| `webhook_url` | string | No | `null` | HTTPS endpoint called when job moves or finishes. |
+| `webhook_secret`| string | No | `null` | Secret used to compute HMAC-SHA256 signature in `X-FotoHub-Signature`. |
+| `webhook_events`| string[] | No | all | List of events to receive (default: all). |
+| `reference` | string | No | `null` | Client ID echoed in every webhook payload. |
+
+#### Response Example (`202 Accepted`)
+
+```json
+{
+  "operation": "clip_job",
+  "cost_usd": 0.35,
+  "job_id": "8f3b2c1a-4d5e-6f7a-8b9c-0d1e2f3a4b5c",
+  "status": "queued",
+  "reference": "episode-42",
+  "poll_url": "/api/v2/clipping/jobs/8f3b2c1a-4d5e-6f7a-8b9c-0d1e2f3a4b5c",
+  "webhook": true,
+  "estimated_clips": 10
+}
+```
+
+::: code-group
+
+```python [Python]
+import requests
+
+headers = {
+    "Authorization": "Bearer fh_live_YOUR_API_KEY",
+    "Content-Type": "application/json",
+}
+payload = {
+    "source_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "title": "Podcast Episode 42",
+    "max_clips": 5,
+    "caption_style": "hormozi",
+    "webhook_url": "https://myapp.com/webhooks/shorts",
+    "webhook_secret": "whsec_supersecretkey123456",
+    "reference": "ep-42",
+}
+
+resp = requests.post("https://apis.fotohub.app/v1/shorts/clips", headers=headers, json=payload)
+print(resp.status_code, resp.json())
+```
+
+```typescript [TypeScript]
+const resp = await fetch("https://apis.fotohub.app/v1/shorts/clips", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer fh_live_YOUR_API_KEY",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    source_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    title: "Podcast Episode 42",
+    max_clips: 5,
+    caption_style: "hormozi",
+    webhook_url: "https://myapp.com/webhooks/shorts",
+    webhook_secret: "whsec_supersecretkey123456",
+    reference: "ep-42",
+  }),
+});
+console.log(resp.status, await resp.json());
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"source_url":     "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+		"title":          "Podcast Episode 42",
+		"max_clips":      5,
+		"caption_style":  "hormozi",
+		"webhook_url":    "https://myapp.com/webhooks/shorts",
+		"webhook_secret": "whsec_supersecretkey123456",
+	}
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/shorts/clips", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	fmt.Println(resp.StatusCode, string(respBody))
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/shorts/clips \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "title": "Podcast Episode 42",
+    "max_clips": 5,
+    "caption_style": "hormozi",
+    "webhook_url": "https://myapp.com/webhooks/shorts",
+    "webhook_secret": "whsec_supersecretkey123456"
+  }'
+```
+
+:::
+
+---
+
+### 2. Poll Job Status & Clips
+
+```
+GET /v1/shorts/clips/{job_id}?clips=true
+```
+
+#### Response Example
+
+```json
+{
+  "job_id": "8f3b2c1a-4d5e-6f7a-8b9c-0d1e2f3a4b5c",
+  "status": "completed",
+  "running": false,
+  "steps_completed": ["ingest", "transcribe", "detect_scenes", "clip", "captions", "reframe", "render"],
+  "clip_count": 3,
+  "clips": [
+    {
+      "id": "clip_01",
+      "title": "Why compounding works",
+      "hook": "The biggest mistake people make in their 20s",
+      "start": 142.5,
+      "end": 185.0,
+      "duration": 42.5,
+      "virality_score": 94,
+      "retention_score": 88,
+      "blended_score": 91,
+      "cover_url": "https://s3point.fotohub.app/covers/clip_01.jpg",
+      "outputs": [
+        {
+          "url": "https://s3point.fotohub.app/renders/clip_01.mp4",
+          "aspect_ratio": "9:16",
+          "width": 1080,
+          "height": 1920,
+          "duration": 42.5,
+          "size_mb": 18.2
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 3. Webhook Delivery & Signature Verification
+
+When `webhook_url` is specified, FOTOhub sends HTTP `POST` requests when job events occur.
+
+#### Events
+- `shorts.job.started`: Pipeline processing started.
+- `shorts.clip.rendered`: A single clip finished rendering.
+- `shorts.job.completed`: All clips finished; includes full clip array and scores.
+- `shorts.job.failed`: Processing failed; includes error details and partial clips.
+
+#### Verifying Signatures
+If `webhook_secret` is configured, FOTOhub includes the header `X-FotoHub-Signature`:
+
+```python
+import hashlib, hmac
+
+expected_signature = hmac.new(
+    webhook_secret.encode("utf-8"),
+    raw_request_body_bytes,
+    hashlib.sha256
+).hexdigest()
+
+is_valid = hmac.compare_digest(expected_signature, request.headers["X-FotoHub-Signature"])
+```

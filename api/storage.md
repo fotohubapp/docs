@@ -2141,3 +2141,274 @@ Complete list of all S3 Enterprise endpoints:
 | GET | `/v1/storage/s3/buckets/{bucket_id}/inventory` | List inventory configs |
 | PUT | `/v1/storage/s3/buckets/{bucket_id}/inventory` | Create/update inventory |
 | DELETE | `/v1/storage/s3/buckets/{bucket_id}/inventory/{config_id}` | Delete inventory config |
+
+## Public Custom Domain Aliases (`*.s3point.fotohub.app`)
+
+A custom bucket alias provisions a public vanity hostname under `*.s3point.fotohub.app` (for example, `mybrand.s3point.fotohub.app`). It allows your users and web visitors to fetch generated assets or uploaded media via clean, anonymous HTTPS URLs without AWS SigV4 signatures.
+
+### Security Model
+- AWS Block Public Access remains **ON** on your underlying bucket; the bucket is never opened directly to the internet.
+- The `s3-gateway` signs incoming anonymous `GET` and `HEAD` requests using internal infrastructure credentials.
+- Anonymous access is restricted strictly to object keys starting with prefixes listed in `public_prefixes`.
+- Creating an alias starts with `public_prefixes: []` (publishing **nothing**). Going public requires an explicit, audited configuration. Root (`/`), empty (`""`), and wildcard (`*`) prefixes are prohibited to prevent accidental exposure of private bucket keys.
+
+### Tier Limits on Aliases
+
+| Plan Tier | Max Aliases per Bucket |
+|-----------|:----------------------:|
+| `free` | 1 |
+| `developer` / `starter` | 2 |
+| `startup` / `medium` | 3 |
+| `pro` / `professional` / `business` | 5 |
+| `enterprise` | 25 |
+
+---
+
+### Alias Endpoints
+
+#### 1. List Bucket Aliases
+
+```
+GET /v1/storage/s3/buckets/{bucket_id}/aliases
+```
+
+##### Response Example
+
+```json
+[
+  {
+    "id": "7b1c3e5a-8d2f-4a6c-9e1b-3f5a7c9d1e3f",
+    "alias": "marketing-assets",
+    "bucket_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "user_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+    "public_prefixes": ["public/", "campaigns/2026/"],
+    "status": "active",
+    "hostname": "marketing-assets.s3point.fotohub.app",
+    "public_base_url": "https://marketing-assets.s3point.fotohub.app",
+    "is_publicly_readable": true,
+    "created_at": "2026-08-10T14:30:00Z",
+    "updated_at": "2026-08-12T09:15:00Z"
+  }
+]
+```
+
+---
+
+#### 2. Create Alias
+
+Claim a single-label DNS alias under `s3point.fotohub.app`.
+
+```
+POST /v1/storage/s3/buckets/{bucket_id}/aliases
+```
+
+##### Parameters
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `alias` | string | **Yes** | — | Single DNS label: 3–63 chars, lowercase letters, digits, and hyphens. Dots and punycode (`xn--`) are not allowed. Reserved names (`api`, `admin`, `s3`, `gateway`, etc.) are blocked. |
+| `public_prefixes` | string[] | No | `[]` | List of allowed public folder prefixes (max 20). Defaults to empty for safety. |
+
+##### Request Example
+
+```json
+{
+  "alias": "media-production",
+  "public_prefixes": ["gallery/", "previews/"]
+}
+```
+
+::: code-group
+
+```python [Python]
+import requests
+
+headers = {
+    "Authorization": "Bearer fh_live_YOUR_API_KEY",
+    "Content-Type": "application/json",
+}
+resp = requests.post(
+    "https://apis.fotohub.app/v1/storage/s3/buckets/3fa85f64-5717-4562-b3fc-2c963f66afa6/aliases",
+    headers=headers,
+    json={"alias": "media-production", "public_prefixes": ["gallery/"]},
+)
+print(resp.status_code, resp.json())
+```
+
+```typescript [TypeScript]
+const resp = await fetch(
+  "https://apis.fotohub.app/v1/storage/s3/buckets/3fa85f64-5717-4562-b3fc-2c963f66afa6/aliases",
+  {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer fh_live_YOUR_API_KEY",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      alias: "media-production",
+      public_prefixes: ["gallery/"],
+    }),
+  }
+);
+console.log(await resp.json());
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"alias":           "media-production",
+		"public_prefixes": []string{"gallery/"},
+	}
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/storage/s3/buckets/3fa85f64-5717-4562-b3fc-2c963f66afa6/aliases", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(respBody))
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/storage/s3/buckets/3fa85f64-5717-4562-b3fc-2c963f66afa6/aliases \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "alias": "media-production",
+    "public_prefixes": ["gallery/"]
+  }'
+```
+
+:::
+
+---
+
+#### 3. Update Alias
+
+Modify published prefixes or toggle alias status (`active` or `disabled`).
+
+```
+PATCH /v1/storage/s3/buckets/{bucket_id}/aliases/{alias}
+```
+
+::: warning Empty Array vs Null
+Passing `"public_prefixes": []` unpublishes all prefixes immediately (safe revocation). Passing `null` or omitting the field leaves prefixes unchanged.
+:::
+
+---
+
+#### 4. Delete Alias
+
+```
+DELETE /v1/storage/s3/buckets/{bucket_id}/aliases/{alias}
+```
+
+---
+
+## Bucket Audit Logging
+
+Retrieve an immutable audit trail of operations executed against a bucket, including creation, lifecycle modifications, CORS/tag changes, credential rotation, alias updates, and deletion requests.
+
+```
+GET /v1/storage/s3/buckets/{bucket_id}/audit
+```
+
+Audit entries are preserved even after bucket deletion.
+
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | `50` | Number of entries to return (1 to 200). |
+| `offset` | integer | `0` | Number of entries to skip for pagination. |
+| `category` | string | `null` | Filter by category: `"bucket"`, `"object"`, `"alias"`, `"credential"`. |
+| `success_only` | boolean | `null` | `true` for successful operations only, `false` for failures only, omit for both. |
+
+#### Response Example
+
+```json
+{
+  "entries": [
+    {
+      "id": "91238472-1234-5678-abcd-ef0123456789",
+      "action": "alias_create",
+      "category": "alias",
+      "bucket_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "ip_address": "198.51.100.42",
+      "success": true,
+      "error_code": null,
+      "request_summary": {
+        "alias": "media-production",
+        "public_prefixes": ["gallery/"]
+      },
+      "created_at": "2026-09-06T15:00:00Z"
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "has_more": false
+}
+```
+
+::: code-group
+
+```python [Python]
+import requests
+
+headers = {"Authorization": "Bearer YOUR_JWT_TOKEN"}
+params = {"limit": 20, "category": "alias"}
+resp = requests.get(
+    "https://apis.fotohub.app/v1/storage/s3/buckets/3fa85f64-5717-4562-b3fc-2c963f66afa6/audit",
+    headers=headers,
+    params=params,
+)
+print(resp.json())
+```
+
+```typescript [TypeScript]
+const resp = await fetch(
+  "https://apis.fotohub.app/v1/storage/s3/buckets/3fa85f64-5717-4562-b3fc-2c963f66afa6/audit?limit=20&category=alias",
+  {
+    headers: { Authorization: "Bearer YOUR_JWT_TOKEN" },
+  }
+);
+console.log(await resp.json());
+```
+
+```go [Go]
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/storage/s3/buckets/3fa85f64-5717-4562-b3fc-2c963f66afa6/audit?limit=20", nil)
+	req.Header.Set("Authorization", "Bearer YOUR_JWT_TOKEN")
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(body))
+}
+```
+
+```bash [cURL]
+curl "https://apis.fotohub.app/v1/storage/s3/buckets/3fa85f64-5717-4562-b3fc-2c963f66afa6/audit?limit=20" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+:::

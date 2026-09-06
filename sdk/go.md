@@ -304,7 +304,7 @@ try {
 } catch (err) {
   if (err instanceof FotoHubError) {
     switch (err.code) {
-      case "insufficient_credits":
+      case "insufficient_funds":
         console.log(`Need more credits. Credits available: ${err.creditsAvailable}`);
         break;
       case "rate_limited":
@@ -346,8 +346,8 @@ func (e *FotoHubError) IsRetryable() bool {
 }
 
 // IsInsufficientCredits checks if the user ran out of credits.
-func (e *FotoHubError) IsInsufficientCredits() bool {
-    return e.Code == "insufficient_credits"
+func (e *FotoHubError) IsInsufficientFunds() bool {
+    return e.Code == "insufficient_funds"
 }
 
 // IsRateLimited checks if the request was rate limited.
@@ -372,7 +372,7 @@ func main() {
         var fhErr *FotoHubError
         if errors.As(err, &fhErr) {
             switch {
-            case fhErr.IsInsufficientCredits():
+            case fhErr.IsInsufficientFunds():
                 fmt.Printf("Top up your wallet. Code: %s\n", fhErr.Code)
             case fhErr.IsRateLimited():
                 fmt.Printf("Slow down. Retry after %d seconds\n", fhErr.RetryAfter)
@@ -394,7 +394,7 @@ func main() {
 ```bash [cURL]
 # Error responses return HTTP 4xx/5xx with JSON body:
 # HTTP 402:
-# {"code": "insufficient_credits", "message": "Not enough credits"}
+# {"code": "insufficient_funds", "message": "Not enough credits"}
 #
 # HTTP 429:
 # {"code": "rate_limited", "message": "Too many requests", "retry_after": 5}
@@ -1232,13 +1232,13 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
         fmt.Printf("[WEBHOOK] Generation failed: job=%s error=%s\n",
             data.JobID, data.Error)
 
-    case "credits.low":
+    case "wallet.low":
         var data CreditsData
         json.Unmarshal(event.Data, &data)
         fmt.Printf("[WEBHOOK] Credits low: %d remaining — %s\n",
             data.Remaining, data.Message)
 
-    case "credits.depleted":
+    case "wallet.depleted":
         fmt.Println("[WEBHOOK] CRITICAL: Credits depleted!")
 
     case "billing.charged":

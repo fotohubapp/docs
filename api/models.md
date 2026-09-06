@@ -428,6 +428,16 @@ T2V, I2V, and reference-to-video (≤3 images), 2-10s. Unlike Veo, audio is gene
 
 ### ByteDance — Seedance
 
+The per-second cost above is derived using the standard resolution tokens per frame.
+
+::: tip Video Input Discount (Video-to-Video Editing)
+When a request includes a video input (video-to-video editing or style transfer), BytePlus meters the render on a discounted token rate instead of the standard resolution lane:
+- `seedance-2-0-pro`: **$0.0043** / 1K tokens (approx. $0.0043/s) vs. $0.0070 standard
+- `seedance-2-0-fast`: **$0.0033** / 1K tokens (approx. $0.0033/s) vs. $0.0056 standard
+- `seedance-2-5`: **$0.0064** / 1K tokens (approx. $0.0064/s) vs. $0.0107 standard
+
+The token count formula remains identical (`tokens_per_frame × (fps × seconds + 1)`); only the per-token rate is discounted.
+:::
 Seedance is the one family **not** priced per second. BytePlus meters it by token count, which is computed from duration *and* resolution together, so a 720p clip is roughly 2.15x a 480p one rather than a fixed rate. All rates below are per 1K tokens and came from BytePlus's own invoice.
 
 | Model ID | Name | 480p /1K tok | 720p /1K tok | Higher | 5s @ 720p |
@@ -531,17 +541,13 @@ Its rate is $0.30/s at 720p, $0.50/s at 1024p and $0.70/s at 1080p — and 1080p
 | `grok-imagine-video` | Grok Video | 0.07 | 0.35 | T2V + I2V + video editing + reference-to-video |
 | `grok-imagine-video-1.5` | Grok Video 1.5 | 0.14 | 0.70 | I2V + editing + **lip-sync** (portrait + text → talking head), up to 1080p |
 
-### Other video models
+### Internal Pipeline Video Models
 
-Priced and callable, listed here for completeness rather than recommended.
+::: info Internal Story Studio Models
+The HappyHorse family (`happyhorse-1.0-t2v`, `happyhorse-1.0-i2v`, `happyhorse-1.1-t2v`, `happyhorse-1.1-i2v`) is internal to FOTOhub Story Studio pipelines only and is not exposed as a public `/v1/ai/generate/video` endpoint.
 
-| Model ID | Name | USD/s | 5s clip |
-|----------|------|------:|--------:|
-| `luma-ray-v2` | Luma Ray 2 | 0.032 | 0.16 |
-| `nova-reel` | Amazon Nova Reel | 0.048 | 0.24 |
-| `flash-avatar-generate` | Flash Avatar | 0.12 | 0.60 |
-| `happyhorse-1.0-t2v` / `-i2v` | HappyHorse 1.0 | 0.10 | 0.50 |
-| `happyhorse-1.1-t2v` / `-i2v` | HappyHorse 1.1 | 0.10 | 0.50 |
+*Note:* Deprecated third-party models `luma-ray-v2`, `nova-reel`, and `flash-avatar-generate` have been retired and are not available on the public API.
+:::
 
 **Recommended:** `veo-3.1-generate-001` — Highest quality, cinematic output with native audio.
 
@@ -747,16 +753,18 @@ Storage and GPU time are billed from the same prepaid wallet as generations — 
 
 ### Storage — per GB-month
 
-| Class | Price key | USD / GB / month |
-|-------|-----------|-----------------:|
-| Archive | `storage-archive` | 0.008039 |
-| Standard | `storage-standard` | 0.026795 |
-| Premium (SSD) | `storage-premium` | 0.080386 |
+All FOTOhub-managed buckets (`storage_buckets`) are hosted on **AWS S3 Standard in Frankfurt (`eu-central-1`)** at a flat pass-through list price of **$0.0245 / GB-month** (**$0.00003356 / GB-hour**), regardless of the storage class label (`standard`, `infrequent`, or `archive`).
 
-Storage is metered hourly and charged as a fraction of the month, so 5 GB of Standard held for 6 hours is `5 × 0.026795 × 6/720` = $0.0011. The charge appears on your usage feed as a storage line, and if the wallet is empty the meter stops rather than accruing a debt.
+| Class | Price key | USD / GB / month | USD / GB / hour | Storage Infrastructure |
+|-------|-----------|-----------------:|----------------:|------------------------|
+| Standard | `storage-standard` | $0.0245 | $0.00003356 | AWS S3 Standard (`eu-central-1`) |
+| Infrequent | `storage-infrequent` | $0.0245 | $0.00003356 | AWS S3 Standard (`eu-central-1`) |
+| Archive | `storage-archive` | $0.0245 | $0.00003356 | AWS S3 Standard (`eu-central-1`) |
+
+Storage is metered hourly and billed continuously from your prepaid USD wallet. Hourly storage is calculated from the monthly rate divided by 730 hours (`gb × hours × ($0.0245 / 730)`). For example, 5 GB of storage held for 6 hours costs `5 × 6 × 0.00003356` = **$0.00102**.
 
 ::: tip A provisioned bucket is billed from byte zero
-If you provision a bucket with a `gb_limit`, that limit is the **capacity you are paying for**, not a ceiling you grow into — an empty 100 GB Standard bucket still bills `100 × 0.026795` = $2.68/month. Provision the size you need.
+If you provision a bucket with a fixed `gb_limit`, that limit is the **capacity you are paying for**, not a ceiling you grow into — an empty 100 GB bucket bills `100 × $0.0245` = **$2.45/month**. For dynamic auto-scaling storage without provisioned ceilings, omit `gb_limit` to pay only for stored bytes.
 :::
 
 ### GPU compute — per request
@@ -779,28 +787,29 @@ Choosing the right model depends on your priorities: quality, speed, cost, or re
 
 ### Images — best quality
 
-- `imagen-4-ultra` — $0.160772/image, highest fidelity from Google
+- `imagen-4-ultra` — $0.160772/image, highest fidelity from Google (clamped to 2K)
 - `dola-seedream-5-0-pro-260628` — $0.048 at the standard leg, highest detail and prompt adherence
-- `gemini-3-pro-image-preview` — $0.134 at 1K **and** at 2K, so 2K is the same price as 1K
+- `gemini-3-pro-image` — $0.134 at 1K **and** at 2K, so 2K is the same price as 1K
 
 ### Images — best speed
 
 - `imagen-3-fast` — $0.020/image, optimized pipeline with good quality
-- `gpt-image-2-mini` — $0.005 at 1K, the fastest cheap option
+- `gpt-image-1-mini` — $0.005 at 1K, the fastest cheap option
 - `grok-imagine-image` — $0.02/image flat, no resolution grid to trip over
 
 ### Images — best value
 
 - `ida-q-image` — **$0.00**, self-hosted, nothing is deducted from your wallet
-- `gpt-image-2-mini` — $0.005 at 1K, cheapest invoiced image on the platform
+- `gpt-image-1-mini` — $0.005 at 1K, cheapest invoiced image on the platform
 - `gpt-image-2` — $0.006 at 1K
-- `kling-image-v2-1` — $0.012/image flat
+- `kling-v2-1` — $0.012/image flat
 
 ### Images — 4K output
 
-- `imagen-4-ultra` — native 4K at $0.160772
+- `gemini-3-pro-image` — native 4K at $0.24
 - `flux-2-pro` — 4K at $0.255, but note that is 8.5x its 1K price
 - SeedDream 4K: available on the 4-0/4-5/5-0 line; `dola-seedream-5-0-pro-260628` caps at 2K
+- *Note on Google Imagen:* Google Imagen models (`imagen-4-ultra`, `imagen-4-standard`, `imagen-3-standard`) do **not** support native 4K; all Imagen requests are clamped to 2K before generation.
 
 ### Video — best value
 

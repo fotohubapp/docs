@@ -1,614 +1,340 @@
-# Webhook Integration Guide
+# Webhook Integration & Verification Guide
 
-Build real-time integrations that react to FOTOhub events — no polling required.
+Build robust, real-time event-driven integrations that react to FOTOhub events without polling.
 
-::: info When to Use Webhooks
-Use webhooks instead of polling when you need to react to async events (video completion, credit alerts, billing). Webhooks reduce your API call volume, lower latency, and provide a push-based architecture for production systems.
-:::
-
-## Use Cases
-
-- **Progress tracking** — Notify users when async video generation completes
-- **Budget alerts** — Get warned before credits run out
-- **Audit logging** — Track all API key usage and billing events
-- **Automation** — Trigger downstream workflows on generation complete
-- **Batch monitoring** — Track progress of large batch jobs
+All webhook deliveries include an `X-FotoHub-Signature` header computed as an HMAC-SHA256 hex digest of the raw request payload.
 
 ---
 
-## Setup
+## Security Architecture
 
-### 1. Create an Endpoint
+```mermaid
+flowchart TD
+    A["FotoHub Engine Event"] --> B["Sign Payload (HMAC-SHA256(raw_bytes, secret))"]
+    B --> C["POST to Partner Endpoint (Header: X-FotoHub-Signature)"]
+    C --> D["Partner Gateway"]
+    D --> E{"1. Check Signature (Constant-Time Compare)"}
+    E -->|"Invalid"| F["Reject: 401 Unauthorized"]
+    E -->|"Valid"| G{"2. Replay Defense (abs(now - timestamp) < 300s)"}
+    G -->|"Stale / Future"| H["Reject: 400 Bad Request"]
+    G -->|"Fresh"| I{"3. Idempotency Check (Redis SETNX / SQL PK)"}
+    I -->|"Duplicate"| J["Acknowledge: 200 OK (Skip Duplicate)"]
+    I -->|"New Event"| K["Acknowledge: 200 OK & Dispatch Async Worker"]
+```
 
-Your server needs an HTTPS endpoint that accepts POST requests. Here are production-ready implementations:
+---
+
+## Production Verification Code Samples
 
 ::: code-group
-```python [Python]
-from flask import Flask, request, jsonify
+
+```python [Python (FastAPI)]
 import hmac
 import hashlib
+from datetime import datetime, timezone
+from fastapi import FastAPI, Request, HTTPException, status
+from pydantic import BaseModel
 
-app = Flask(__name__)
+app = FastAPI()
 WEBHOOK_SECRET = "whsec_your_secret_from_console"
+MAX_SKEW_SECONDS = 300  # 5-minute replay defense window
 
+class WebhookPayload(BaseModel):
+    event: str
+    timestamp: str
+    attempt: int
+    data: dict
 
-def verify_signature(payload: bytes, signature: str) -> bool:
-    """Verify webhook authenticity using HMAC-SHA256 over the raw body."""
+def verify_signature(raw_body: bytes, signature_header: str) -> bool:
+    if not signature_header:
+        return False
     expected = hmac.new(
-        WEBHOOK_SECRET.encode(),
-        payload,
-        hashlib.sha256,
+        WEBHOOK_SECRET.encode("utf-8"),
+        raw_body,
+        hashlib.sha256
     ).hexdigest()
+    return hmac.compare_digest(signature_header, expected)
 
-    return hmac.compare_digest(signature, expected)
-
-
-@app.route("/webhooks/fotohub", methods=["POST"])
-def handle_fotohub_webhook():
+@app.post("/webhooks/fotohub")
+async def handle_webhook(request: Request):
+    # Step 1: Read raw body bytes BEFORE JSON parsing
+    raw_body = await request.body()
     signature = request.headers.get("X-FotoHub-Signature", "")
 
-    # Verify signature
-    if not verify_signature(request.data, signature):
-        return jsonify({"error": "Invalid signature"}), 401
+    # Step 2: Constant-time signature verification
+    if not verify_signature(raw_body, signature):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid signature"
+        )
 
-    # Parse event
-    event = request.json
-    event_type = event["event"]
-    data = event["data"]
+    # Step 3: Parse JSON payload
+    payload = await request.json()
+    event_timestamp_str = payload.get("timestamp")
+    
+    # Step 4: Replay attack defense
+    try:
+        event_time = datetime.fromisoformat(event_timestamp_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        if abs((now - event_time).total_seconds()) > MAX_SKEW_SECONDS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Request timestamp outside 300s tolerance window"
+            )
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid timestamp format")
 
-    # Route to handler
-    if event_type == "generation.completed":
-        handle_generation_completed(data)
-    elif event_type == "generation.failed":
-        handle_generation_failed(data)
-    elif event_type == "credits.low":
-        send_alert(f"Credits low: {data['message']}")
-    elif event_type == "credits.depleted":
-        send_alert("CRITICAL: Credits depleted!")
-    elif event_type == "billing.charged":
-        log_billing(data)
+    # Step 5: Process event asynchronously (or push to queue)
+    event_type = payload.get("event")
+    data = payload.get("data")
+    print(f"Verified event {event_type} (attempt {payload.get('attempt')})")
 
-    # Return 200 quickly — process async if needed
-    return jsonify({"received": True}), 200
-
-
-def handle_generation_completed(data):
-    """Process completed generation."""
-    print(f"Completed: {data['type']} via {data['model']}")
-    if data["type"] == "video":
-        # Download or store the video URL
-        print(f"Video URL: {data.get('video_url')}")
-    elif data["type"] == "image":
-        print(f"Image URL: {data.get('image_url')}")
-
-
-def handle_generation_failed(data):
-    """Handle failed generation — maybe retry."""
-    print(f"Failed: {data['type']} via {data['model']} — {data.get('error')}")
-
-
-def send_alert(message):
-    """Send alert (Slack, email, etc.)."""
-    print(f"ALERT: {message}")
-
-
-def log_billing(data):
-    """Log billing event for audit."""
-    print(f"Charged: ${data['amount_usd']} via {data['method']}")
-
-
-if __name__ == "__main__":
-    app.run(port=3000)
+    return {"received": True}
 ```
-```typescript [TypeScript]
-import express from "express";
+
+```typescript [TypeScript (Express)]
+import express, { Request, Response } from "express";
 import crypto from "crypto";
 
 const app = express();
 const WEBHOOK_SECRET = "whsec_your_secret_from_console";
+const MAX_SKEW_SECONDS = 300;
 
-// Raw body needed for signature verification
+// IMPORTANT: capture raw body Buffer for HMAC verification
 app.use("/webhooks/fotohub", express.raw({ type: "application/json" }));
 
-function verifySignature(payload: Buffer, signature: string): boolean {
-  // HMAC-SHA256 over the raw body, hex, no prefix
-  const expected = crypto
+app.post("/webhooks/fotohub", (req: Request, res: Response) => {
+  const signature = req.headers["x-fotohub-signature"] as string;
+  const rawBody = req.body as Buffer;
+
+  if (!signature || !rawBody) {
+    return res.status(401).json({ error: "Missing signature or body" });
+  }
+
+  // 1. Calculate HMAC-SHA256
+  const expectedSignature = crypto
     .createHmac("sha256", WEBHOOK_SECRET)
-    .update(payload)
+    .update(rawBody)
     .digest("hex");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expected)
-  );
-}
+  // 2. Constant-time comparison
+  const isValid =
+    signature.length === expectedSignature.length &&
+    crypto.timingSafeEqual(
+      Buffer.from(signature, "utf-8"),
+      Buffer.from(expectedSignature, "utf-8")
+    );
 
-app.post("/webhooks/fotohub", (req, res) => {
-  const signature = req.headers["x-fotohub-signature"] as string;
-
-  if (!verifySignature(req.body, signature)) {
+  if (!isValid) {
     return res.status(401).json({ error: "Invalid signature" });
   }
 
-  const event = JSON.parse(req.body.toString());
-  const { event: eventType, data } = event;
+  const payload = JSON.parse(rawBody.toString("utf-8"));
 
-  switch (eventType) {
-    case "generation.completed":
-      console.log(`Completed: ${data.type} via ${data.model}`);
-      if (data.type === "video") {
-        console.log(`Video: ${data.video_url}`);
-      }
-      break;
-    case "generation.failed":
-      console.error(`Failed: ${data.error}`);
-      break;
-    case "credits.low":
-      sendAlert(`Credits low: ${data.message}`);
-      break;
-    case "credits.depleted":
-      sendAlert("CRITICAL: Credits depleted!");
-      break;
-    case "billing.charged":
-      console.log(`Charged: $${data.amount_usd}`);
-      break;
+  // 3. Replay attack defense
+  const eventTime = new Date(payload.timestamp).getTime();
+  const now = Date.now();
+  if (Math.abs(now - eventTime) > MAX_SKEW_SECONDS * 1000) {
+    return res.status(400).json({ error: "Timestamp skew exceeds 300s window" });
   }
 
-  // Return 200 immediately
-  res.json({ received: true });
+  // 4. Return 200 immediately
+  res.status(200).json({ received: true });
 });
 
-function sendAlert(message: string) {
-  console.log(`ALERT: ${message}`);
-  // Send to Slack, PagerDuty, email, etc.
-}
-
-app.listen(3000, () => console.log("Webhook server on :3000"));
+app.listen(3000, () => console.log("Webhook server listening on :3000"));
 ```
+
+```typescript [TypeScript (Next.js App Router)]
+// app/api/webhooks/fotohub/route.ts
+import { NextRequest, NextResponse } from "next/server";
+
+const WEBHOOK_SECRET = process.env.FOTOHUB_WEBHOOK_SECRET!;
+const MAX_SKEW_MS = 300 * 1000;
+
+export async function POST(req: NextRequest) {
+  const rawBody = await req.text();
+  const signature = req.headers.get("x-fotohub-signature");
+
+  if (!signature) {
+    return NextResponse.json({ error: "Missing signature" }, { status: 401 });
+  }
+
+  // Verify using Web Crypto API (Edge-compatible)
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(WEBHOOK_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const calculatedSigBuffer = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(rawBody)
+  );
+
+  const calculatedHex = Array.from(new Uint8Array(calculatedSigBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  // Timing safe equality
+  if (calculatedHex !== signature) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  const payload = JSON.parse(rawBody);
+
+  // Timestamp replay defense
+  const eventTime = new Date(payload.timestamp).getTime();
+  if (Math.abs(Date.now() - eventTime) > MAX_SKEW_MS) {
+    return NextResponse.json({ error: "Expired timestamp" }, { status: 400 });
+  }
+
+  return NextResponse.json({ received: true });
+}
+```
+
 ```go [Go]
 package main
 
 import (
-    "crypto/hmac"
-    "crypto/sha256"
-    "encoding/hex"
-    "encoding/json"
-    "fmt"
-    "io"
-    "net/http"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"io"
+	"math"
+	"net/http"
+	"time"
 )
 
 const webhookSecret = "whsec_your_secret_from_console"
+const maxSkewSeconds = 300.0
 
-type WebhookEvent struct {
-    Event     string                 `json:"event"`
-    Timestamp string                 `json:"timestamp"`
-    Attempt   int                    `json:"attempt"`
-    Data      map[string]interface{} `json:"data"`
+type WebhookEnvelope struct {
+	Event     string                 `json:"event"`
+	Timestamp string                 `json:"timestamp"`
+	Attempt   int                    `json:"attempt"`
+	Data      map[string]interface{} `json:"data"`
 }
 
-func verifySignature(payload []byte, signature string) bool {
-    // HMAC-SHA256 over the raw body
-    mac := hmac.New(sha256.New, []byte(webhookSecret))
-    mac.Write(payload)
-    expected := hex.EncodeToString(mac.Sum(nil))
-
-    return hmac.Equal([]byte(signature), []byte(expected))
+func verifySignature(rawBody []byte, signature string) bool {
+	mac := hmac.New(sha256.New, []byte(webhookSecret))
+	mac.Write(rawBody)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(signature), []byte(expected))
 }
 
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
-    body, err := io.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, "Bad request", 400)
-        return
-    }
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
 
-    signature := r.Header.Get("X-FotoHub-Signature")
+	sig := r.Header.Get("X-FotoHub-Signature")
+	if !verifySignature(rawBody, sig) {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
 
-    if !verifySignature(body, signature) {
-        http.Error(w, "Invalid signature", 401)
-        return
-    }
+	var env WebhookEnvelope
+	if err := json.Unmarshal(rawBody, &env); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
 
-    var event WebhookEvent
-    if err := json.Unmarshal(body, &event); err != nil {
-        http.Error(w, "Invalid JSON", 400)
-        return
-    }
+	// Replay defense
+	t, err := time.Parse(time.RFC3339, env.Timestamp)
+	if err != nil || math.Abs(time.Since(t).Seconds()) > maxSkewSeconds {
+		http.Error(w, "Timestamp outside 300s window", http.StatusBadRequest)
+		return
+	}
 
-    switch event.Event {
-    case "generation.completed":
-        fmt.Printf("Completed: %v via %v\n", event.Data["type"], event.Data["model"])
-    case "generation.failed":
-        fmt.Printf("Failed: %v\n", event.Data["error"])
-    case "credits.low":
-        fmt.Printf("ALERT: Credits low — %v\n", event.Data["message"])
-    case "credits.depleted":
-        fmt.Println("CRITICAL: Credits depleted!")
-    case "billing.charged":
-        fmt.Printf("Charged: $%v\n", event.Data["amount_usd"])
-    }
-
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(200)
-    json.NewEncoder(w).Encode(map[string]bool{"received": true})
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"received":true}`))
 }
 
 func main() {
-    http.HandleFunc("/webhooks/fotohub", webhookHandler)
-    fmt.Println("Webhook server on :3000")
-    http.ListenAndServe(":3000", nil)
+	http.HandleFunc("/webhooks/fotohub", webhookHandler)
+	http.ListenAndServe(":3000", nil)
 }
 ```
+
 ```bash [cURL]
-# Test your webhook endpoint locally
+# Test webhook endpoint locally with generated HMAC-SHA256 signature
+SECRET="whsec_your_secret_from_console"
+PAYLOAD='{"event":"generation.completed","timestamp":"'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'","attempt":1,"data":{"job_id":"job_123"}}'
+
+SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
+
 curl -X POST http://localhost:3000/webhooks/fotohub \
   -H "Content-Type: application/json" \
-  -H "X-FotoHub-Signature: test_signature" \
-  -d '{
-    "event": "generation.completed",
-    "timestamp": "2026-07-22T10:30:00Z",
-    "attempt": 1,
-    "data": {
-      "type": "image",
-      "model": "seedream-5-0-260128",
-      "image_url": "https://storage.fotohub.app/images/test.png"
-    }
-  }'
-```
-:::
-
-### 2. Register in Console
-
-Go to [Console → Webhooks](https://fotohub.app/console/webhooks):
-
-1. Click **Create Webhook**
-2. Enter your endpoint URL (must be HTTPS in production)
-3. Select events to subscribe to
-4. Save the signing secret displayed (starts with `whsec_`)
-
-### 3. Test
-
-Click the **Test** button next to your webhook. Check delivery logs for the response.
-
----
-
-## Event Payloads
-
-### generation.completed
-
-```json
-{
-  "event": "generation.completed",
-  "timestamp": "2026-07-22T10:30:00Z",
-  "attempt": 1,
-  "data": {
-    "job_id": "job_abc123",
-    "type": "image",
-    "model": "seedream-5-0-260128",
-    "image_url": "https://storage.fotohub.app/images/abc123.png",
-    "tokens": 16384,
-    "cost_usd": 0.049152,
-    "duration_ms": 3200
-  }
-}
+  -H "X-FotoHub-Signature: $SIGNATURE" \
+  -d "$PAYLOAD"
 ```
 
-### generation.failed
-
-```json
-{
-  "event": "generation.failed",
-  "timestamp": "2026-07-22T10:30:00Z",
-  "attempt": 1,
-  "data": {
-    "job_id": "job_def456",
-    "type": "video",
-    "model": "veo-3.1-generate-001",
-    "error": "Model timeout after 300s",
-    "error_code": "timeout"
-  }
-}
-```
-
-### credits.low
-
-```json
-{
-  "event": "credits.low",
-  "timestamp": "2026-07-22T10:30:00Z",
-  "attempt": 1,
-  "data": {
-    "operation": "generate_image:seedream-5-0-260128",
-    "message": "Credits exhausted, falling back to wallet billing."
-  }
-}
-```
-
-### credits.depleted
-
-```json
-{
-  "event": "credits.depleted",
-  "timestamp": "2026-07-22T10:30:00Z",
-  "attempt": 1,
-  "data": {
-    "operation": "generate_image:seedream-5-0-260128",
-    "needed_usd": 0.0492
-  }
-}
-
-`credits.depleted` means the wallet could not cover the charge either — the
-operation failed with HTTP 402 and nothing was billed.
-```
-
-### billing.charged
-
-```json
-{
-  "event": "billing.charged",
-  "timestamp": "2026-07-22T10:30:00Z",
-  "attempt": 1,
-  "data": {
-    "operation": "generate_video:seedance-2-0-pro",
-    "amount_usd": 0.7556,
-    "method": "wallet"
-  }
-}
-```
-
-`amount_usd` is what the wallet was actually debited. There is no separate
-budget event — cap your spend with `PUT /v1/billing/overage-limit`
-(`hard_limit_usd`) and watch `billing.charged` to track it.
-
----
-
-## Signature Verification
-
-Every webhook request includes:
-
-| Header | Description |
-|--------|-------------|
-| `X-FotoHub-Signature` | HMAC-SHA256 hex digest of the raw body (no `sha256=` prefix) |
-| `X-FotoHub-Event` | The event type |
-
-The signature is computed over the **raw request body only** — nothing is
-concatenated onto it. The send time is inside the payload as `timestamp`, so
-if you want a replay window, read it from the parsed JSON rather than a header.
-
-**Always verify signatures** — without verification, anyone could send fake events to your endpoint.
-
----
-
-## Local Development with ngrok
-
-Use ngrok to test webhooks locally during development:
-
-```bash
-# Install ngrok
-# macOS: brew install ngrok
-# Linux: snap install ngrok
-
-# Start your webhook server
-python app.py  # or npm start, go run main.go
-
-# In another terminal, create tunnel
-ngrok http 3000
-# Output: https://abc123.ngrok-free.app -> http://localhost:3000
-
-# Register the ngrok URL in FOTOhub console:
-# https://abc123.ngrok-free.app/webhooks/fotohub
-```
-
-::: warning
-ngrok URLs change on restart (free tier). For persistent development URLs, use `ngrok http 3000 --domain=your-domain.ngrok-free.app` (requires free ngrok account).
 :::
 
 ---
 
-## Production Best Practices
+## Idempotency Implementation
 
-### 1. Return 200 Immediately
+Webhooks may be retried across network interruptions. Always guarantee single-processing semantics using atomic locks or database constraints.
 
-Process events asynchronously. If your handler takes >5 seconds, FOTOhub times out and retries.
-
-```python
-from flask import Flask, request, jsonify
-import threading
-
-@app.route("/webhooks/fotohub", methods=["POST"])
-def webhook():
-    # Verify signature first
-    event = request.json
-
-    # Queue for async processing
-    threading.Thread(target=process_event, args=(event,)).start()
-
-    # Return immediately
-    return jsonify({"received": True}), 200
-
-
-def process_event(event):
-    """Heavy processing happens here, outside the request."""
-    # Download video, update database, send notifications, etc.
-    pass
-```
-
-### 2. Implement Idempotency
-
-Webhooks may be delivered more than once (`attempt` 2 and 3 are retries). The
-envelope has no delivery id, so deduplicate on `job_id` where the event has one:
+### Pattern 1: Redis `SETNX` (Recommended for high volume)
 
 ```python
 import redis
 
-r = redis.Redis()
+r = redis.Redis(host="localhost", port=6379, db=0)
 
-def process_webhook(event):
-    event_id = f"{event['event']}:{event['data'].get('job_id', event['timestamp'])}"
-
-    # Check if already processed
-    if r.setnx(f"webhook:processed:{event_id}", "1"):
-        r.expire(f"webhook:processed:{event_id}", 86400)  # 24h TTL
-        # Process the event
-        handle_event(event)
-    else:
-        # Already processed — skip
-        pass
+def is_duplicate_event(event_type: str, entity_id: str) -> bool:
+    key = f"fotohub:webhook:{event_type}:{entity_id}"
+    # Atomically sets the key only if it does not exist (24-hour TTL)
+    is_new = r.set(key, "processed", nx=True, ex=86400)
+    return not is_new
 ```
 
-### 3. Handle Retries Gracefully
+### Pattern 2: SQL Unique Constraint (Recommended for ACID pipelines)
 
-FOTOhub retries failed deliveries:
+```sql
+CREATE TABLE processed_webhooks (
+    event_id text PRIMARY KEY,
+    event_type text NOT NULL,
+    processed_at timestamptz DEFAULT now()
+);
 
-| Attempt | Delay | Total elapsed |
-|---------|-------|---------------|
-| 1 | Immediate | 0s |
-| 2 | 1s | 1s |
-| 3 (final) | 2s | 3s |
-
-The `attempt` field in the payload tells you which delivery you are handling.
-After attempt 3 the event is logged as undelivered — check the console for
-failed deliveries.
-
-### 4. Monitor Webhook Health
-
-Failed deliveries never disable your webhook automatically; it stays active
-until you toggle it off. That means a broken endpoint silently drops events, so:
-
-- Monitor your endpoint uptime
-- Set up health checks for your webhook server
-- Use a message queue (Redis, SQS) as a buffer between webhook receipt and processing
+-- When processing:
+INSERT INTO processed_webhooks (event_id, event_type)
+VALUES ('shorts.clip.rendered:clip_3821a9ef', 'shorts.clip.rendered')
+ON CONFLICT (event_id) DO NOTHING;
+-- Check affected rows: if 0, skip downstream processing.
+```
 
 ---
 
-## Reliability
+## Retry Schedules & Delivery Guarantees
 
-- **3 attempts** total, with exponential backoff (0s, 1s, 2s)
-- **5-second timeout** per attempt
-- **No auto-disable** — a failing webhook stays enabled until you disable it
-- **Delivery logs** available in Console for 30 days
-- After the final attempt the event is dropped, not queued
+FOTOhub delivers webhooks with automatic exponential backoff:
 
----
+| Attempt | Backoff Delay | Cumulative Time | Outcome on Failure |
+|:---|:---|:---|:---|
+| **Attempt 1** | Immediate | 0s | Retry if 5xx or connection timeout |
+| **Attempt 2** | 1 second | +1s | Retry if 5xx or connection timeout |
+| **Attempt 3** | 4 seconds | +5s | Marked as failed in delivery log |
 
-## Security Checklist
+> [!IMPORTANT]
+> **HTTP 4xx Non-Retry Policy**: If your endpoint returns an HTTP 4xx status code (e.g. 401 Unauthorized or 400 Bad Request), delivery fails immediately and will **not** be retried. Only 5xx server errors and network timeouts trigger retries.
 
-- [ ] Verify HMAC signature on every request
-- [ ] Check the payload's `timestamp` field to reject stale replays
-- [ ] Return 200 quickly (process async if needed)
-- [ ] Use HTTPS with a valid certificate (required in production)
-- [ ] Don't expose your webhook secret in client code
-- [ ] Implement idempotency to handle duplicate deliveries
-- [ ] Use a dedicated URL path (not your root `/`)
-- [ ] Rate-limit your webhook endpoint to prevent abuse
-- [ ] Log all webhook events for debugging
+### Querying Dead-Letter Logs
 
----
+If an endpoint is unreachable during a generation, you can query delivery logs via the API to inspect response codes and payload contents:
 
-## Subscribing to Events Programmatically
-
-::: code-group
-```python [Python]
-from fotohub import FotoHub
-
-client = FotoHub()
-
-# Create webhook subscription
-webhook = client.create_webhook(
-    url="https://your-app.com/webhooks/fotohub",
-    events=["generation.completed", "generation.failed", "credits.low"],
-)
-print(f"Webhook ID: {webhook.id}")
-print(f"Secret: {webhook.secret}")  # Store this securely
-
-# List webhooks
-webhooks = client.list_webhooks()
-for wh in webhooks:
-    print(f"  {wh.id}: {wh.url} ({', '.join(wh.events)})")
-
-# Delete webhook
-client.delete_webhook(webhook.id)
-```
-```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
-// Create webhook
-const webhook = await client.createWebhook({
-  url: "https://your-app.com/webhooks/fotohub",
-  events: ["generation.completed", "generation.failed", "credits.low"],
-});
-console.log(`ID: ${webhook.id}, Secret: ${webhook.secret}`);
-
-// List
-const webhooks = await client.listWebhooks();
-webhooks.forEach((wh) => console.log(`  ${wh.id}: ${wh.url}`));
-
-// Delete
-await client.deleteWebhook(webhook.id);
-```
-```go [Go]
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "os"
-)
-
-func main() {
-    // Create webhook
-    payload, _ := json.Marshal(map[string]interface{}{
-        "url":    "https://your-app.com/webhooks/fotohub",
-        "events": []string{"generation.completed", "generation.failed", "credits.low"},
-    })
-
-    req, _ := http.NewRequest("POST",
-        "https://apis.fotohub.app/v1/webhooks",
-        bytes.NewBuffer(payload))
-    req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
-    req.Header.Set("Content-Type", "application/json")
-
-    resp, _ := http.DefaultClient.Do(req)
-    defer resp.Body.Close()
-
-    var result struct {
-        ID     string `json:"id"`
-        Secret string `json:"secret"`
-    }
-    json.NewDecoder(resp.Body).Decode(&result)
-    fmt.Printf("Webhook ID: %s\nSecret: %s\n", result.ID, result.Secret)
-}
-```
-```bash [cURL]
-# Create webhook
-curl -X POST https://apis.fotohub.app/v1/webhooks \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://your-app.com/webhooks/fotohub",
-    "events": ["generation.completed", "generation.failed", "credits.low"]
-  }'
-
-# List webhooks
-curl -s https://apis.fotohub.app/v1/webhooks \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" | jq .
-
-# Delete webhook
-curl -X DELETE https://apis.fotohub.app/v1/webhooks/wh_abc123 \
+```bash
+curl -X GET "https://apis.fotohub.app/v1/webhooks/wh_98a12bc/deliveries?status=failed&limit=10" \
   -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
-:::
-
----
-
-## Related
-
-- [Video Generation Guide](/guides/video-generation) — Async jobs that emit webhooks
-- [Batch Processing Guide](/guides/batch-processing) — Webhook-based progress tracking
-- [Error Handling Guide](/guides/error-handling) — Handle webhook delivery failures
-- [Cost Optimization](/guides/cost-optimization) — Budget alerts via webhooks

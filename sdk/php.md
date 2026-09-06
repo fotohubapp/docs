@@ -29,7 +29,7 @@ $result = $client->generateImage(
 );
 
 echo "Image: " . $result->urls[0] . "\n";
-echo "Cost: " . $result->creditsUsed . " credits\n";
+echo "Cost: " . $result->usdCharged . " credits\n";
 ```
 
 ## Client Initialization
@@ -87,7 +87,7 @@ $result = $client->generateImage(
 
 echo $result->urls[0];          // Image URL
 echo $result->model;            // Model used
-echo $result->creditsUsed;      // Credits charged
+echo $result->usdCharged;      // Credits charged
 ```
 
 ### With Options
@@ -115,7 +115,7 @@ class ImageResult {
     public readonly array $urls;
     public readonly string $model;
     public readonly ?int $seed;
-    public readonly int $creditsUsed;
+    public readonly int $usdCharged;
 }
 ```
 
@@ -162,7 +162,7 @@ class VideoJob {
     public readonly string $status;     // 'pending' | 'processing' | 'completed' | 'failed'
     public readonly ?string $videoUrl;
     public readonly ?int $progress;     // 0-100
-    public readonly int $creditsUsed;
+    public readonly int $usdCharged;
     
     public function isCompleted(): bool;
     public function isFailed(): bool;
@@ -357,10 +357,10 @@ $chatModels = $client->listModels(category: 'text');
 $balance = $client->getBalance();
 
 echo "Plan: " . $balance->plan . "\n";
-echo "Credits: " . $balance->creditsRemaining . " / " . $balance->creditsLimit . "\n";
+echo "Credits: " . $balance->availableUsd . " / " . $balance->creditsLimit . "\n";
 echo "Wallet: $" . $balance->walletBalance . "\n";
 
-if ($balance->hasCredits()) {
+if ($balance->hasFunds()) {
     // Proceed with generation
 }
 ```
@@ -370,11 +370,11 @@ if ($balance->hasCredits()) {
 ```php
 class BillingBalance {
     public readonly string $plan;
-    public readonly int $creditsRemaining;
+    public readonly int $availableUsd;
     public readonly int $creditsLimit;
     public readonly float $walletBalance;
     
-    public function hasCredits(): bool;
+    public function hasFunds(): bool;
 }
 ```
 
@@ -424,7 +424,7 @@ foreach ($result['items'] as $item) {
 use FotoHub\Exceptions\FotoHubException;
 use FotoHub\Exceptions\AuthenticationException;
 use FotoHub\Exceptions\RateLimitException;
-use FotoHub\Exceptions\InsufficientCreditsException;
+use FotoHub\Exceptions\InsufficientFundsException;
 use FotoHub\Exceptions\ValidationException;
 use FotoHub\Exceptions\ServerException;
 ```
@@ -435,7 +435,7 @@ use FotoHub\Exceptions\ServerException;
 use FotoHub\Client;
 use FotoHub\Exceptions\{
     AuthenticationException,
-    InsufficientCreditsException,
+    InsufficientFundsException,
     RateLimitException,
     ValidationException,
     FotoHubException
@@ -448,7 +448,7 @@ try {
         prompt: 'A landscape',
         model: 'seedream-5-0-260128'
     );
-} catch (InsufficientCreditsException $e) {
+} catch (InsufficientFundsException $e) {
     echo "Need more credits. Required: {$e->creditsRequired}, Available: {$e->creditsAvailable}\n";
 } catch (RateLimitException $e) {
     echo "Rate limited. Retry after: {$e->retryAfter}s\n";
@@ -469,7 +469,7 @@ try {
 | Exception | HTTP Status | When |
 |-----------|-------------|------|
 | `AuthenticationException` | 401 | Invalid API key |
-| `InsufficientCreditsException` | 402 | Not enough credits/balance |
+| `InsufficientFundsException` | 402 | Not enough credits/balance |
 | `ValidationException` | 422 | Invalid parameters |
 | `RateLimitException` | 429 | Too many requests |
 | `ServerException` | 5xx | Server error (auto-retried) |
@@ -515,7 +515,7 @@ class ProductController extends Controller
 
         return response()->json([
             'image_url' => $result->urls[0],
-            'credits_used' => $result->creditsUsed,
+            'credits_used' => $result->usdCharged,
         ]);
     }
 }
@@ -599,7 +599,7 @@ class ImageController extends AbstractController
 | `generateSfx(string $prompt, array $options = [])` | Generate sound effects | `array` |
 | `generateSpeech(string $text, array $options = [])` | Text-to-speech | `array` |
 | `transcribe(string $audioUrl, array $options = [])` | Transcribe audio | `TranscriptionResult` |
-| `chat(array $messages, array $options = [])` | Chat completion (credit-based) | `array` |
+| `chat(array $messages, array $options = [])` | Chat completion (OpenAI-compatible) | `array` |
 | `streamChat(array $messages, array $options = [])` | ⚠️ Broken — targets the non-streaming endpoint, so it yields zero chunks while still billing. Use cURL on `/v1/ai/agent/stream`. | `StreamResponse` |
 | `chatBedrock(array $messages, array $options = [])` | Chat via Bedrock models | `array` |
 | `analyzeImage(string $imageUrl, array $features = [])` | Analyze an image | `AnalysisResult` |

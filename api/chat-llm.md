@@ -61,7 +61,7 @@ separately -- a single blended number would misprice any workload that is not
 half prompt and half completion. A 25-token prompt with a 150-token answer on
 `gemini-flash` costs `25/1e6 * 20 + 150/1e6 * 166.7` = **0.0255 credits**.
 
-The exact amount charged comes back on every response in `billing.credits_used`,
+The exact amount charged comes back on every response in `billing.usd_charged`,
 with `billing.basis: "tokens"` confirming it was derived from real token counts.
 
 ### Available Models
@@ -83,10 +83,10 @@ own IDs in dot notation (`claude-sonnet-4.6`); those IDs are not accepted here.
   "object": "chat.completion",
   "created": 1719849600,
   "model": "gemini-flash",
-  "credits_used": 0.0255,
+  "usd_charged": 0.0255,
   "billing": {
-    "method": "credits",
-    "credits_used": 0.0255,
+    "method": "wallet",
+    "usd_charged": 0.0255,
     "usd_charged": 0,
     "basis": "tokens"
   },
@@ -182,8 +182,8 @@ attribute spend per request.
   "created": 1719849600,
   "model": "claude-sonnet-4.6",
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 2,
     "usd_charged": 0,
     "cost_breakdown": {
       "input_tokens": 150,
@@ -264,7 +264,7 @@ data: {"type":"text_delta","text":" the weather."}
 
 data: {"type":"tool_use","id":"toolu_01A","name":"get_weather","input":{"city":"Warsaw"}}
 
-data: {"type":"done","stop_reason":"tool_use","usage":{"input_tokens":150,"output_tokens":48,"total_tokens":198},"billing":{"method":"credits","credits_used":2,"usd_charged":0}}
+data: {"type":"done","stop_reason":"tool_use","usage":{"input_tokens":150,"output_tokens":48,"total_tokens":198},"billing":{"method":"credits","usd_charged":2,"usd_charged":0}}
 
 data: [DONE]
 ```
@@ -315,7 +315,7 @@ for line in response.iter_lines():
         print(f"\n[tool] {frame['name']}({frame['input']})")
     elif frame["type"] == "done":
         print(f"\nstop_reason={frame['stop_reason']} "
-              f"credits={frame['billing']['credits_used']} "
+              f"credits={frame['billing']['usd_charged']} "
               f"usd={frame['billing']['usd_charged']}")
     elif frame["type"] == "error":
         raise RuntimeError(frame["message"])
@@ -497,7 +497,7 @@ response = requests.post(url, json={
 data = response.json()
 print(data["choices"][0]["message"]["content"])
 print(f"Tokens used: {data['usage']['total_tokens']}")
-print(f"Credits used: {data['credits_used']}")
+print(f"Credits used: {data['usd_charged']}")
 ```
 
 ```typescript [TypeScript]
@@ -520,7 +520,7 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/chat/completions", 
 const data = await response.json();
 console.log(data.choices[0].message.content);
 console.log(`Tokens used: ${data.usage.total_tokens}`);
-console.log(`Credits used: ${data.credits_used}`);
+console.log(`Credits used: ${data.usd_charged}`);
 ```
 
 ```go [Go]
@@ -955,7 +955,7 @@ response = requests.post(url, json={
 
 data = response.json()
 print(data["choices"][0]["message"]["content"])
-print(f"Credits used: {data['credits_used']}")
+print(f"Credits used: {data['usd_charged']}")
 ```
 
 ```typescript [TypeScript]
@@ -987,7 +987,7 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/chat/completions", 
 
 const data = await response.json();
 console.log(data.choices[0].message.content);
-console.log(`Credits used: ${data.credits_used}`);
+console.log(`Credits used: ${data.usd_charged}`);
 ```
 
 ```go [Go]
@@ -1039,7 +1039,7 @@ func main() {
 	choices := data["choices"].([]interface{})
 	message := choices[0].(map[string]interface{})["message"].(map[string]interface{})
 	fmt.Println(message["content"])
-	fmt.Printf("Credits used: %.0f\n", data["credits_used"])
+	fmt.Printf("Credits used: %.0f\n", data["usd_charged"])
 }
 ```
 
@@ -1334,14 +1334,14 @@ parameters or on streaming, migrate to `/v1/ai/chat/claude` or
 }
 ```
 
-### 402 -- Insufficient Credits
+### 402 -- Insufficient Funds
 
 ```json
 {
   "error": {
     "type": "billing_error",
     "message": "Insufficient credits. Required: 2, available: 0",
-    "code": "insufficient_credits",
+    "code": "insufficient_funds",
     "credits_required": 2,
     "credits_available": 0
   }

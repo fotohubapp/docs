@@ -48,10 +48,10 @@ Convert a video to a different format, codec, resolution, or bitrate. Supports a
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/transcode_a1b2c3d4.mp4",
-  "credits_used": 1,
+  "usd_charged": 1,
   "billing": {
-    "method": "credits",
-    "credits_used": 1,
+    "method": "wallet",
+    "usd_charged": 1,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -179,10 +179,10 @@ Merge multiple video clips into a single video. Clips are concatenated in the or
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/merge_x9y8z7w6.mp4",
-  "credits_used": 2,
+  "usd_charged": 2,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 2,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -323,10 +323,10 @@ Change video playback speed or create slow-motion effects. Supports speed factor
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/speed_f5e4d3c2.mp4",
-  "credits_used": 2,
+  "usd_charged": 2,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 2,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -462,10 +462,10 @@ AI-powered video stabilization that removes camera shake and jitter. Uses deep l
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/stabilize_b1c2d3e4.mp4",
-  "credits_used": 3,
+  "usd_charged": 3,
   "billing": {
-    "method": "credits",
-    "credits_used": 3,
+    "method": "wallet",
+    "usd_charged": 3,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -600,10 +600,10 @@ Automatically transcribes speech in the video using AI speech recognition and em
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/subtitles_m4n5o6p7.mp4",
   "srt_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/subtitles_m4n5o6p7.srt",
   "vtt_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/subtitles_m4n5o6p7.vtt",
-  "credits_used": 3,
+  "usd_charged": 3,
   "billing": {
-    "method": "credits",
-    "credits_used": 3,
+    "method": "wallet",
+    "usd_charged": 3,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -769,10 +769,10 @@ Each effect in the array is an object with `type` and effect-specific parameters
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/effects_q8r7s6t5.mp4",
-  "credits_used": 2,
+  "usd_charged": 2,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 2,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -911,10 +911,10 @@ Add a text or image watermark to a video. Supports positioning, opacity, scaling
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/watermark_u4v3w2x1.mp4",
-  "credits_used": 2,
+  "usd_charged": 2,
   "billing": {
-    "method": "credits",
-    "credits_used": 2,
+    "method": "wallet",
+    "usd_charged": 2,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -1072,10 +1072,10 @@ AI-powered video upscaling using deep learning super-resolution. Increases resol
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/upscale_y1z2a3b4.mp4",
-  "credits_used": 4,
+  "usd_charged": 4,
   "billing": {
-    "method": "credits",
-    "credits_used": 4,
+    "method": "wallet",
+    "usd_charged": 4,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -1223,10 +1223,10 @@ AI analyzes your video content and automatically creates a polished edit. The AI
 ```json
 {
   "output_url": "https://s1.fotohub.app/storage/v1/object/public/videos/processed/director_c5d6e7f8.mp4",
-  "credits_used": 5,
+  "usd_charged": 5,
   "billing": {
-    "method": "credits",
-    "credits_used": 5,
+    "method": "wallet",
+    "usd_charged": 5,
     "usd_charged": 0,
     "pln_charged": 0
   },
@@ -1365,43 +1365,23 @@ curl -X POST "https://apis.fotohub.app/v1/video/ai-director" \
 
 ## Pricing
 
-| Endpoint | Credits | USD |
-|----------|---------|-----|
-| Transcode | 1 | $0.0536 |
-| Merge Videos | 2 | $0.1072 |
-| Change Speed | 2 | $0.1072 |
-| AI Stabilization | 3 | $0.1608 |
-| Generate Subtitles | 3 | $0.1608 |
-| Apply Effects | 2 | $0.1072 |
-| Add Watermark | 2 | $0.1072 |
-| AI Upscale | 4 | $0.2144 |
-| AI Director | 5 | $0.2680 |
+All video editing operations run on FOTOhub FFmpeg GPU nodes and are billed flat per operation in USD:
+
+| Operation | Price Key | USD Cost | Description |
+|-----------|-----------|---------:|-------------|
+| Transcode | `video_transcode` | $0.053591 | Format/codec conversion, resolution change |
+| Merge | `video_merge` | $0.107181 | Concatenate multiple video clips |
+| Speed | `video_speed` | $0.107181 | Speed adjustment (0.25x–4.0x) |
+| Stabilize | `video_stabilize` | $0.160772 | Video stabilization and jitter reduction |
+| Subtitles | `video_subtitles` | $0.160772 | Subtitle burn-in with styling |
+| Effects | `video_effects` | $0.107181 | Visual filters, color adjustments |
+| Watermark | `video_watermark` | $0.107181 | Logo/watermark overlay |
+| AI Upscale | `video_upscale` | $0.214362 | AI super-resolution (up to 4K) |
+| AI Director | `video_ai_director` | $0.267953 | Automated pacing, scene cuts, layout |
 
 **Billing notes:**
-- 1 credit = $0.0536 when billed from the wallet
-- Credits are deducted before processing. If processing fails, credits are refunded automatically.
-- Video duration does not affect credit cost — flat rate per operation.
-- Wallet (USD) billing is used when credits are exhausted, up to your overage limit.
-
-### Overage Pricing
-
-When monthly credits are exhausted, operations are billed from your USD wallet:
-
-| Operation | Credit Cost | USD Cost |
-|-----------|-------------|----------|
-| Transcode | 1 cr | $0.0536 |
-| Merge Videos | 2 cr | $0.1072 |
-| Change Speed | 2 cr | $0.1072 |
-| AI Stabilization | 3 cr | $0.1608 |
-| Generate Subtitles | 3 cr | $0.1608 |
-| Apply Effects | 2 cr | $0.1072 |
-| Add Watermark | 2 cr | $0.1072 |
-| AI Upscale | 4 cr | $0.2144 |
-| AI Director | 5 cr | $0.2680 |
-
-**1 credit = $0.0536 USD**
-
----
+- Billed directly from your prepaid USD wallet at 1:1 pass-through cost.
+- Video duration does not change the operation cost — flat rate per request.
 
 ## Rate Limits
 
@@ -1478,7 +1458,7 @@ Exceeding the limit returns HTTP 429 with a `Retry-After` header (seconds until 
 }
 ```
 
-### 402 — Insufficient Credits
+### 402 — Insufficient Funds
 
 ```json
 {
@@ -2059,7 +2039,7 @@ curl -s -X POST "https://apis.fotohub.app/v1/video/upscale" \
 - **Process at native resolution** until the final step. Avoid unnecessary upscale/downscale in intermediate operations.
 - **Use webhooks** instead of polling for long-running operations like AI Director or upscale to avoid holding open connections.
 
-### Reduce Credit Costs
+### Reduce API Costs
 
 - **Combine operations** — Use AI Director instead of separate stabilize + effects + speed + trim calls when you want AI-driven editing.
 - **Skip redundant transcodes** — If your source is already MP4/H.264 and you only need effects, skip the transcode step.

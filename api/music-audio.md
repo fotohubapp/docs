@@ -1451,3 +1451,303 @@ ever disagree.
 | 413 | `file_too_large` | Audio file exceeds 500MB. Compress or split before uploading. |
 | 422 | `unprocessable_audio` | File corrupted, unsupported codec, or no detectable speech. |
 | 429 | `rate_limit_exceeded` | Audio limits: 20 req/min (TTS/SFX), 10 req/min (music), 5 req/min (transcription/dubbing). |
+
+## Gemini Generative TTS (Vertex AI)
+
+Google Gemini generative speech model on Vertex AI. Features natural-language style direction ("read this cheerfully with an energetic tone"), multi-speaker dialogue scripts, and 30 prebuilt neural voices. Output format is 24 kHz mono WAV.
+
+Billed in USD from prepaid wallet based on Google's exact token rates. Audio output is billed at 25 audio tokens per second of speech.
+
+### Endpoints
+
+#### 1. List Gemini Models & Token Pricing
+
+```
+GET /v1/ai/tts/gemini/models
+```
+
+##### Response Example
+
+```json
+{
+  "models": [
+    {
+      "id": "gemini-2.5-flash-tts",
+      "name": "Gemini 2.5 Flash TTS",
+      "available": true,
+      "max_characters": 3000,
+      "price_usd_per_1m_text_tokens": "0.15",
+      "price_usd_per_1m_audio_tokens": "3.00",
+      "preview": false
+    },
+    {
+      "id": "gemini-2.5-pro-tts",
+      "name": "Gemini 2.5 Pro TTS",
+      "available": true,
+      "max_characters": 5000,
+      "price_usd_per_1m_text_tokens": "0.50",
+      "price_usd_per_1m_audio_tokens": "10.00",
+      "preview": false
+    }
+  ],
+  "configured": true,
+  "audio_tokens_per_second": 25
+}
+```
+
+---
+
+#### 2. List Gemini Voices
+
+```
+GET /v1/ai/tts/gemini/voices
+```
+
+Returns the 30 prebuilt Gemini voices (`Puck`, `Charon`, `Kore`, `Fenrir`, `Aoede`, `Leda`, `Zephyr`, etc.) and the maximum allowed speakers for multi-speaker synthesis (`max_speakers: 2`).
+
+---
+
+#### 3. Synthesize Speech with Gemini
+
+```
+POST /v1/ai/tts/gemini/synthesize
+```
+
+##### Request Parameters
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `text` | string | **Yes** | — | Text to synthesize. For dialogue, prefix lines with speaker names. |
+| `model` | string | No | `"gemini-2.5-flash-tts"` | Gemini TTS model ID. |
+| `voice` | string | No | `"Puck"` | Prebuilt voice name (used for single-speaker). |
+| `style` | string | No | `""` | Natural language performance instructions (e.g. `"calm and whispering"`, `"energetic podcast host"`). |
+| `speakers` | object[] | No | `null` | Array of `{speaker, voice}` mappings for dialogue (max 2 speakers). |
+| `temperature` | float | No | `1.0` | Sampling temperature (0.0 to 2.0). |
+
+##### Response
+Returns raw binary audio with `Content-Type: audio/wav`.
+Billing details are returned in custom headers:
+- `X-Cost-USD`: Dollar amount charged to wallet.
+- `X-Input-Tokens`: Text tokens processed.
+- `X-Audio-Tokens`: Audio tokens generated.
+- `X-Audio-Seconds`: Speech duration in seconds.
+- `X-Model`: Model used.
+- `X-Truncated`: `"1"` if audio hit output token ceiling, otherwise `"0"`.
+
+::: code-group
+
+```python [Python]
+import requests
+
+headers = {
+    "Authorization": "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+}
+payload = {
+    "text": "Welcome to FOTOhub. What would you like to build today?",
+    "voice": "Kore",
+    "style": "warm, welcoming and enthusiastic",
+}
+
+resp = requests.post(
+    "https://apis.fotohub.app/v1/ai/tts/gemini/synthesize",
+    headers=headers,
+    json=payload,
+)
+
+with open("welcome.wav", "wb") as f:
+    f.write(resp.content)
+
+print(f"Cost: ${resp.headers.get('X-Cost-USD')}, Duration: {resp.headers.get('X-Audio-Seconds')}s")
+```
+
+```typescript [TypeScript]
+const resp = await fetch("https://apis.fotohub.app/v1/ai/tts/gemini/synthesize", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    text: "Welcome to FOTOhub. What would you like to build today?",
+    voice: "Kore",
+    style: "warm, welcoming and enthusiastic",
+  }),
+});
+
+const audioBlob = await resp.blob();
+console.log(`Cost: $${resp.headers.get("X-Cost-USD")}`);
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+)
+
+func main() {
+	payload := map[string]string{
+		"text":  "Welcome to FOTOhub. What would you like to build today?",
+		"voice": "Kore",
+		"style": "warm, welcoming and enthusiastic",
+	}
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/tts/gemini/synthesize", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer YOUR_JWT_TOKEN")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+
+	out, _ := os.Create("welcome.wav")
+	defer out.Close()
+	io.Copy(out, resp.Body)
+	fmt.Printf("Cost: $%s\n", resp.Header.Get("X-Cost-USD"))
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/tts/gemini/synthesize \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Welcome to FOTOhub. What would you like to build today?",
+    "voice": "Kore",
+    "style": "warm, welcoming and enthusiastic"
+  }' \
+  --output welcome.wav
+```
+
+:::
+
+---
+
+## Azure Speech Neural TTS
+
+Microsoft Azure Speech Services with 700+ neural voices across 140 languages and dialects. Full support for SSML, emotion styles, speaking rate, pitch, and role-play voices.
+
+Billed in USD from wallet balance per 1,000 characters submitted (`tts-azure` rate).
+
+### Endpoints
+
+#### 1. List Azure Voices
+
+```
+GET /v1/ai/tts/azure/voices?language=pl-PL
+```
+
+##### Query Parameters
+- `language`: Optional locale prefix (e.g. `pl-PL`, `en-US`, `de-DE`).
+
+---
+
+#### 2. Synthesize with Azure
+
+```
+POST /v1/ai/tts/azure/synthesize
+```
+
+##### Request Parameters
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `text` | string | **Yes** | — | Plain text or `<speak>...</speak>` SSML markup (max 50,000 chars). |
+| `voice_id` | string | No | `"pl-PL-MarekNeural"` | Azure voice identifier. |
+| `output_format`| string | No | `"audio-24khz-96kbitrate-mono-mp3"` | Output format (`audio/mpeg` or `audio/wav`). |
+| `style` | string | No | `null` | Expressive style (e.g. `cheerful`, `sad`, `customerservice`, `newscast`). |
+| `rate` | string | No | `"0%"` | Speech rate adjustment (e.g. `"+10%"`, `"-15%"`). |
+| `pitch` | string | No | `"0%"` | Pitch adjustment (e.g. `"+5Hz"`, `"-2st"`). |
+
+##### Response Headers
+- `Content-Type`: `audio/mpeg` or `audio/wav`
+- `X-Cost-USD`: Dollar cost
+- `X-Characters`: Character count processed
+
+::: code-group
+
+```python [Python]
+import requests
+
+headers = {
+    "Authorization": "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+}
+payload = {
+    "text": "Cześć! Twoje zamówienie zostało pomyślnie zrealizowane.",
+    "voice_id": "pl-PL-AgnieszkaNeural",
+    "style": "cheerful",
+}
+resp = requests.post(
+    "https://apis.fotohub.app/v1/ai/tts/azure/synthesize",
+    headers=headers,
+    json=payload,
+)
+with open("order.mp3", "wb") as f:
+    f.write(resp.content)
+```
+
+```typescript [TypeScript]
+const resp = await fetch("https://apis.fotohub.app/v1/ai/tts/azure/synthesize", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    text: "Cześć! Twoje zamówienie zostało pomyślnie zrealizowane.",
+    voice_id: "pl-PL-AgnieszkaNeural",
+    style: "cheerful",
+  }),
+});
+const audioBlob = await resp.blob();
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+)
+
+func main() {
+	payload := map[string]string{
+		"text":     "Cześć! Twoje zamówienie zostało pomyślnie zrealizowane.",
+		"voice_id": "pl-PL-AgnieszkaNeural",
+		"style":    "cheerful",
+	}
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/tts/azure/synthesize", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer YOUR_JWT_TOKEN")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	out, _ := os.Create("order.mp3")
+	defer out.Close()
+	io.Copy(out, resp.Body)
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/tts/azure/synthesize \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Cześć! Twoje zamówienie zostało pomyślnie zrealizowane.",
+    "voice_id": "pl-PL-AgnieszkaNeural",
+    "style": "cheerful"
+  }' \
+  --output order.mp3
+```
+
+:::

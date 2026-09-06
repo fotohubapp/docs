@@ -2,6 +2,15 @@
 
 Clone any voice from a short audio sample and generate speech in 23 languages with full emotion control. Zero-shot voice cloning requires no fine-tuning — upload a 10-30 second reference clip and start generating immediately. Built on FOTOhub's proprietary IDA Voice engine running on dedicated GPU infrastructure.
 
+::: warning Production Availability Notice
+Custom zero-shot voice cloning from uploaded audio files (`POST /v1/ai/voice/clone`) is currently in private preview and not exposed on the public API gateway.
+
+For speech and audio production today, use the following active services:
+- **[Voice Agents](/api/voice-agents)** (`/v1/voice/agents`): Realtime conversational agents with 26 prebuilt natural voices powered by xAI Grok Voice.
+- **[Gemini Generative TTS](/api/music-audio#gemini-generative-tts-vertex-ai)** (`/v1/ai/tts/gemini/synthesize`): 30 expressive voices with natural language style prompting and multi-speaker dialogue.
+- **[Azure Speech Neural TTS](/api/music-audio#azure-speech-neural-tts)** (`/v1/ai/tts/azure/synthesize`): 700+ neural voices across 140 languages with SSML emotion and role controls.
+:::
+
 | Capability | Description | Credits |
 |------------|-------------|---------|
 | **Voice Cloning** | Create a reusable voice from a reference audio clip | 2 |

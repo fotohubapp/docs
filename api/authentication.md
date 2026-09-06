@@ -202,15 +202,15 @@ response = requests.post(
     }
 )
 
-# Update IP whitelist on existing key
-response = requests.put(
-    "https://apis.fotohub.app/v1/auth/keys/key_abc123/ip-whitelist",
+# Update IP whitelist on existing key via PATCH
+response = requests.patch(
+    "https://apis.fotohub.app/v1/auth/keys/key_abc123",
     headers={
         "Authorization": "Bearer fh_live_your_admin_key",
         "Content-Type": "application/json"
     },
     json={
-        "allowed_ips": ["203.0.113.0/24", "198.51.100.42"]
+        "allowedIps": ["203.0.113.0/24", "198.51.100.42"]
     }
 )
 ```
@@ -286,92 +286,11 @@ Retry-After: 18
 
 See [Rate Limits](/api/rate-limits) for tier-specific limits and quotas.
 
-## JWT Authentication
+## Session & Browser Authentication
 
-For server-to-server integrations and advanced use cases, FOTOhub supports JWT (JSON Web Token) authentication. JWTs provide short-lived, self-contained credentials that are ideal for microservice architectures and automated workflows.
+For browser-based console integrations at [fotohub.app/console](https://fotohub.app/console), user sessions authenticate via Supabase Auth JWT tokens (`Authorization: Bearer <session_jwt>`). 
 
-### When to Use JWT vs API Key
-
-| Criteria | API Key | JWT |
-|----------|---------|-----|
-| Lifetime | Long-lived (until revoked) | Short-lived (1 hour default) |
-| Best for | Application backends, scripts | Microservices, CI/CD, automation |
-| Rotation | Manual rotation required | Automatic expiry, no rotation needed |
-| Scope | Static scopes set at creation | Dynamic claims per token |
-| Setup | Simple -- single header | Requires service account + signing |
-
-### JWT Token Exchange
-
-::: code-group
-
-```python [Python]
-import jwt
-import time
-import requests
-
-# Create a signed JWT using your service account credentials
-service_account_id = "sa_abc123def456"
-private_key = open("fotohub-service-account.pem").read()
-
-payload = {
-    "iss": service_account_id,
-    "sub": service_account_id,
-    "aud": "https://apis.fotohub.app",
-    "iat": int(time.time()),
-    "exp": int(time.time()) + 3600,  # 1 hour expiry
-    "scopes": ["images", "video"]
-}
-
-token = jwt.encode(payload, private_key, algorithm="RS256")
-
-# Exchange for access token
-response = requests.post(
-    "https://apis.fotohub.app/v1/auth/token",
-    json={
-        "grant_type": "service_account",
-        "assertion": token
-    }
-)
-
-access_token = response.json()["access_token"]
-
-# Use access token for API calls
-headers = {"Authorization": f"Bearer {access_token}"}
-```
-
-```typescript [TypeScript]
-import * as jwt from "jsonwebtoken";
-import fs from "fs";
-
-// Create a signed JWT using your service account credentials
-const serviceAccountId = "sa_abc123def456";
-const privateKey = fs.readFileSync("fotohub-service-account.pem");
-
-const token = jwt.sign(
-  {
-    iss: serviceAccountId,
-    sub: serviceAccountId,
-    aud: "https://apis.fotohub.app",
-    scopes: ["images", "video"],
-  },
-  privateKey,
-  { algorithm: "RS256", expiresIn: "1h" }
-);
-
-// Exchange for access token
-const response = await fetch("https://apis.fotohub.app/v1/auth/token", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    grant_type: "service_account",
-    assertion: token,
-  }),
-});
-
-const { access_token } = await response.json();
-```
-
-:::
+For server-to-server and automated backend workflows, use long-lived programmatic API keys (`fh_live_*`) or bucket-scoped tokens (`fhub_bkt_live_*`). Note that OAuth client-assertion exchange (`/v1/auth/token`) is not supported; pass your API key directly in the `Authorization` header.
 
 ## Security Best Practices
 
@@ -603,3 +522,462 @@ Retrieve all API keys for the authenticated account. Returns metadata only -- fu
   "has_more": false
 }
 ```
+
+## Update API Key
+
+Reconfigure an existing API key's name, description, rate limits, IP whitelist, referrer whitelist, scopes, retention period, or attached default output destination.
+
+```
+PATCH /v1/auth/keys/{key_id}
+```
+
+**Authentication:** JWT Bearer token required (`Authorization: Bearer <session_jwt>`). API keys cannot modify other API keys or themselves.
+
+### Request Parameters
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Optional new label for the key. |
+| `description` | string | Optional description. |
+| `rateLimitPerMinute` | integer | Max requests per minute (1 to 600). |
+| `allowedIps` | string[] | Array of allowed IPv4/IPv6 addresses or CIDR blocks. |
+| `allowedReferrers` | string[] | Array of allowed HTTP Referer header hosts. |
+| `scopes` | string[] | Array of API scopes (e.g., `["images", "video", "storage"]`). |
+| `retentionHours` | integer | Storage retention in hours (1 to 8760). |
+| `destinationId` | string (UUID) | Output destination to mirror generated files to. |
+| `keepLocalCopy` | boolean | When destination is set, also retain local copy for retention period. |
+| `clearRetention` | boolean | Set to `true` to remove retention limit (keep until deleted). |
+| `clearDestination` | boolean | Set to `true` to detach output destination. |
+
+::: note Retention Scope
+Retention settings apply denormalized at creation time to objects generated *after* this change is saved. Existing stored objects retain their original expiration timestamp.
+:::
+
+#### Request Example
+
+```json
+{
+  "name": "Production Worker Key (Updated)",
+  "rateLimitPerMinute": 120,
+  "allowedIps": ["198.51.100.4", "203.0.113.0/24"],
+  "retentionHours": 168,
+  "destinationId": "d8e3b5e1-64d8-4f24-9b55-d14c27a92288"
+}
+```
+
+::: code-group
+
+```python [Python]
+import requests
+
+headers = {
+    "Authorization": "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+}
+resp = requests.patch(
+    "https://apis.fotohub.app/v1/auth/keys/key_01928374",
+    headers=headers,
+    json={"rateLimitPerMinute": 120, "retentionHours": 168},
+)
+print(resp.json())
+```
+
+```typescript [TypeScript]
+const resp = await fetch("https://apis.fotohub.app/v1/auth/keys/key_01928374", {
+  method: "PATCH",
+  headers: {
+    Authorization: "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ rateLimitPerMinute: 120, retentionHours: 168 }),
+});
+console.log(await resp.json());
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"rateLimitPerMinute": 120,
+		"retentionHours":     168,
+	}
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("PATCH", "https://apis.fotohub.app/v1/auth/keys/key_01928374", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer YOUR_JWT_TOKEN")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(respBody))
+}
+```
+
+```bash [cURL]
+curl -X PATCH https://apis.fotohub.app/v1/auth/keys/key_01928374 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"rateLimitPerMinute": 120, "retentionHours": 168}'
+```
+
+:::
+
+---
+
+## Rotate API Key
+
+Issues a new secret token for an existing active key in a create-then-revoke transaction. All configuration settings (scopes, IP restrictions, rate limits, retention, destination, and per-model routing rules) are automatically preserved and cloned to the new key row before the old key is marked `revoked`.
+
+```
+POST /v1/auth/keys/{key_id}/rotate
+```
+
+**Authentication:** JWT Bearer token required (`Authorization: Bearer <session_jwt>`).
+
+#### Response Example
+
+```json
+{
+  "apiKey": "fh_live_a1b2c3d4e5f60718293a4b5c6d7e8f90",
+  "meta": {
+    "id": "key_01928399",
+    "rotated_from": "key_01928374",
+    "old_key_revoked": true,
+    "name": "Production Worker Key",
+    "expires_at": null,
+    "rate_limit_per_minute": 120,
+    "retention_hours": 168,
+    "destination_id": "d8e3b5e1-64d8-4f24-9b55-d14c27a92288",
+    "output_rules_copied": 2
+  }
+}
+```
+
+::: code-group
+
+```python [Python]
+import requests
+
+headers = {"Authorization": "Bearer YOUR_JWT_TOKEN"}
+resp = requests.post(
+    "https://apis.fotohub.app/v1/auth/keys/key_01928374/rotate",
+    headers=headers,
+)
+new_key_data = resp.json()
+print("New key:", new_key_data["apiKey"])
+```
+
+```typescript [TypeScript]
+const resp = await fetch("https://apis.fotohub.app/v1/auth/keys/key_01928374/rotate", {
+  method: "POST",
+  headers: { Authorization: "Bearer YOUR_JWT_TOKEN" },
+});
+const data = await resp.json();
+console.log("New key:", data.apiKey);
+```
+
+```go [Go]
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/auth/keys/key_01928374/rotate", nil)
+	req.Header.Set("Authorization", "Bearer YOUR_JWT_TOKEN")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(body))
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/auth/keys/key_01928374/rotate \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+:::
+
+---
+
+## Bucket-Scoped API Keys
+
+Mint an API key scoped strictly to a specific FOTOhub storage bucket. Bucket keys use the prefix `fhub_bkt_live_*` and cannot access AI generation models, billing, or other buckets.
+
+```
+POST /v1/auth/bucket-keys
+```
+
+**Authentication:** JWT Bearer token (`Authorization: Bearer <session_jwt>`). Requires API entitlement on account.
+
+#### Request Parameters
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `bucket_id` | string (UUID) | **Yes** | Storage bucket ID owned by caller. |
+| `name` | string | No | Label for the bucket key. |
+
+#### Response Example
+
+```json
+{
+  "apiKey": "fhub_bkt_live_9f8e7d6c5b4a31209876543210abcdef"
+}
+```
+
+::: code-group
+
+```python [Python]
+import requests
+
+headers = {
+    "Authorization": "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+}
+resp = requests.post(
+    "https://apis.fotohub.app/v1/auth/bucket-keys",
+    headers=headers,
+    json={"bucket_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "name": "Upload Bot Key"},
+)
+print(resp.json())
+```
+
+```typescript [TypeScript]
+const resp = await fetch("https://apis.fotohub.app/v1/auth/bucket-keys", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    bucket_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    name: "Upload Bot Key",
+  }),
+});
+console.log(await resp.json());
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]string{
+		"bucket_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+		"name":      "Upload Bot Key",
+	}
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/auth/bucket-keys", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer YOUR_JWT_TOKEN")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(respBody))
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/auth/bucket-keys \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bucket_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "name": "Upload Bot Key"
+  }'
+```
+
+:::
+
+---
+
+## Per-Model Output Routing Rules
+
+Output routing rules allow an API key to dispatch files generated by specific models (or wildcards) to different destinations and directory layouts.
+
+Each key can hold up to **25 routing rules**. Rules are evaluated in ascending order of `priority` (lowest number wins).
+
+```
+Precedence:
+1. `output` object in the request body (e.g. `{"bucket": "..."}`)
+2. Per-model routing rule on key (`model_pattern` glob match, lowest `priority` first)
+3. Default `destination_id` on the API key
+4. Default internal storage (`api-generations` private bucket with signed URL)
+```
+
+### 1. List Routing Rules
+
+```
+GET /v1/auth/keys/{key_id}/output-rules
+```
+
+#### Response Example
+
+```json
+{
+  "rules": [
+    {
+      "id": "rule_001",
+      "key_id": "key_01928374",
+      "model_pattern": "seedance-2-0-*",
+      "destination_id": "d8e3b5e1-64d8-4f24-9b55-d14c27a92288",
+      "path_template": "videos/{YYYY}/{MM}/{job_id}.{ext}",
+      "priority": 10,
+      "created_at": "2026-09-01T12:00:00Z",
+      "updated_at": "2026-09-01T12:00:00Z"
+    },
+    {
+      "id": "rule_002",
+      "key_id": "key_01928374",
+      "model_pattern": "flux-*",
+      "destination_id": "c7d2a4e0-53c7-4e13-8a44-c03b16a81177",
+      "path_template": "images/{date}/{name}.{ext}",
+      "priority": 20,
+      "created_at": "2026-09-02T10:00:00Z",
+      "updated_at": "2026-09-02T10:00:00Z"
+    }
+  ],
+  "limits": {
+    "max_rules": 25
+  }
+}
+```
+
+---
+
+### 2. Create Routing Rule
+
+```
+POST /v1/auth/keys/{key_id}/output-rules
+```
+
+#### Request Parameters
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `modelPattern` | string | **Yes** | — | Glob pattern matching model ID (e.g. `seedance-*`, `veo-2.0-*`, `*`). |
+| `destinationId` | string (UUID) | **Yes** | — | Output destination owned by caller. |
+| `pathTemplate` | string | No | `null` | Template using tokens: `{model}`, `{date}`, `{YYYY}`, `{MM}`, `{DD}`, `{HH}`, `{mm}`, `{ss}`, `{job_id}`, `{user_id}`, `{ext}`, `{name}`, `{index}`. |
+| `priority` | integer | No | `100` | Rule evaluation priority (0 to 100,000). Lowest wins. |
+
+::: code-group
+
+```python [Python]
+import requests
+
+headers = {
+    "Authorization": "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+}
+payload = {
+    "modelPattern": "veo-2.0-*",
+    "destinationId": "d8e3b5e1-64d8-4f24-9b55-d14c27a92288",
+    "pathTemplate": "veo/{YYYY}/{MM}/{job_id}.{ext}",
+    "priority": 10,
+}
+resp = requests.post(
+    "https://apis.fotohub.app/v1/auth/keys/key_01928374/output-rules",
+    headers=headers,
+    json=payload,
+)
+print(resp.json())
+```
+
+```typescript [TypeScript]
+const resp = await fetch("https://apis.fotohub.app/v1/auth/keys/key_01928374/output-rules", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer YOUR_JWT_TOKEN",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    modelPattern: "veo-2.0-*",
+    destinationId: "d8e3b5e1-64d8-4f24-9b55-d14c27a92288",
+    pathTemplate: "veo/{YYYY}/{MM}/{job_id}.{ext}",
+    priority: 10,
+  }),
+});
+console.log(await resp.json());
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload := map[string]interface{}{
+		"modelPattern":  "veo-2.0-*",
+		"destinationId": "d8e3b5e1-64d8-4f24-9b55-d14c27a92288",
+		"pathTemplate":  "veo/{YYYY}/{MM}/{job_id}.{ext}",
+		"priority":      10,
+	}
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/auth/keys/key_01928374/output-rules", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer YOUR_JWT_TOKEN")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(respBody))
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/auth/keys/key_01928374/output-rules \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "modelPattern": "veo-2.0-*",
+    "destinationId": "d8e3b5e1-64d8-4f24-9b55-d14c27a92288",
+    "pathTemplate": "veo/{YYYY}/{MM}/{job_id}.{ext}",
+    "priority": 10
+  }'
+```
+
+:::
+
+---
+
+### 3. Update & Delete Routing Rules
+
+```
+PATCH  /v1/auth/keys/{key_id}/output-rules/{rule_id}
+DELETE /v1/auth/keys/{key_id}/output-rules/{rule_id}
+```
+
+To update a rule, submit optional fields: `modelPattern`, `destinationId`, `pathTemplate`, `clearPathTemplate` (boolean), or `priority`.

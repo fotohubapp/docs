@@ -1,6 +1,15 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { data as blogPostsData } from '../blogPosts.data'
+import { data as bakedBlogPosts } from '../blogPosts.data'
+import { fetchLatestPosts } from '../blogFeed'
+
+/**
+ * "Latest from the blog" starts from the build-time snapshot so the section is in
+ * the static HTML, then refetches on mount. The data loader alone left the list
+ * frozen at whatever was published the day the docs were last built, which is a
+ * module that claims to show the latest and silently doesn't.
+ */
+const blogPosts = ref(bakedBlogPosts || [])
 
 function formatDate(dateStr) {
   const d = new Date(dateStr)
@@ -61,6 +70,18 @@ onMounted(() => {
   window.addEventListener('scroll', check, { passive: true })
   window.addEventListener('resize', check, { passive: true })
   check()
+})
+
+onMounted(async () => {
+  const fresh = await fetchLatestPosts()
+  if (!fresh.length) return
+  blogPosts.value = fresh
+
+  // The section is `v-if`'d on the list being non-empty, so if the build-time
+  // snapshot came back empty its node did not exist when the reveal pass above
+  // collected its targets — and every revealed block starts at opacity 0, so it
+  // would render and stay invisible. Mark it revealed as we fill it.
+  revealed.value = new Set(revealed.value).add('blog')
 })
 
 // ─── Install block: one card, three package managers, real copy-to-clipboard ───
@@ -260,13 +281,12 @@ const tickerWords = features.map(f => f.title)
     <!-- ───────── Hero ─────────
          Left: the statement. Right: the one thing a developer actually needs in
          the first screen — the install line, copyable. -->
-    <section class="hero" data-reveal="hero">
-      <div class="hero-rules" aria-hidden="true"></div>
+    <section class="hero">
       <div class="hero-split">
-        <div class="hero-left" :class="{ 'is-visible': revealed.has('hero') }">
+        <div class="hero-left">
           <p class="eyebrow"><span class="eyebrow-dot"></span>Developer platform</p>
-          <h1 class="hero-title">Build with the full power<br>of generative AI</h1>
-          <p class="hero-subtitle">One unified API for images, video, music, 3D, chat and agents — every modality behind a single key, SDK and bill. The docs, guides and references to ship with FOTOhub, fast.</p>
+          <h1 class="hero-title">Build with the full power of generative AI</h1>
+          <p class="hero-subtitle">Images, video, music, 3D, chat and agents behind one API key, one SDK and one bill.</p>
           <ul class="hero-points">
             <li><span class="hero-point-check">✓</span>200+ models from every major provider — one SDK, zero juggling</li>
             <li><span class="hero-point-check">✓</span>Chain image &rarr; video &rarr; audio in just a few lines</li>
@@ -274,11 +294,11 @@ const tickerWords = features.map(f => f.title)
           </ul>
         </div>
 
-        <div class="hero-right" :class="{ 'is-visible': revealed.has('hero') }">
+        <div class="hero-right">
           <div class="install-card">
             <div class="install-head">
               <span class="install-head-label">Install</span>
-              <span class="install-head-dots"><i></i><i></i><i></i></span>
+              <span class="install-head-hint">one line, any stack</span>
             </div>
             <button
               v-for="item in installs"
@@ -430,7 +450,7 @@ const tickerWords = features.map(f => f.title)
     <!-- ───────── Blog ─────────
          A ruled list with small covers: three more image-top cards after the use
          cases would have been the fourth identical grid in a row. -->
-    <section class="section blog" v-if="blogPostsData && blogPostsData.length" data-reveal="blog">
+    <section class="section blog" v-if="blogPosts.length" data-reveal="blog">
       <div class="rule-head">
         <span class="rule-no">05</span>
         <span class="rule-line"></span>
@@ -438,7 +458,7 @@ const tickerWords = features.map(f => f.title)
         <a href="https://fotohub.app/news" class="view-all" target="_blank">View all &rarr;</a>
       </div>
       <div class="blog-list">
-        <a v-for="(post, i) in blogPostsData.slice(0, 3)" :key="post.slug" :href="`https://fotohub.app/news/${post.slug}`" target="_blank" class="blog-item" :class="{ 'is-visible': revealed.has('blog') }" :style="{ transitionDelay: `${i * 100}ms` }">
+        <a v-for="(post, i) in blogPosts.slice(0, 3)" :key="post.slug" :href="`https://fotohub.app/news/${post.slug}`" target="_blank" class="blog-item" :class="{ 'is-visible': revealed.has('blog') }" :style="{ transitionDelay: `${i * 100}ms` }">
           <div class="blog-cover" :style="getCoverUrl(post.cover_image) ? { backgroundImage: `url(${getCoverUrl(post.cover_image)})` } : { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }"></div>
           <div class="blog-body">
             <div class="blog-meta-row">
@@ -610,20 +630,16 @@ const tickerWords = features.map(f => f.title)
 .view-all:hover { color: var(--ink); }
 
 /* ─── Hero ─── */
+/* The background rules are gone. Three vertical hairlines at thirds sat under a
+   1.35fr/0.85fr split, so they lined up with nothing on the page and read as a
+   pattern rather than as structure. One horizontal rule at the bottom does the
+   job they were meant to do: it hands the hero to the same hairline grid the
+   numbered sections below are drawn with. */
 .hero {
   position: relative;
-  padding: 76px 0 84px;
-}
-
-/* Two hairlines instead of a glow: they place the hero on a grid. */
-.hero-rules {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(90deg, var(--edge-soft) 1px, transparent 1px);
-  background-size: 33.333% 100%;
-  mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+  padding: 62px 0 64px;
+  margin-bottom: 44px;
+  border-bottom: 1px solid var(--edge-soft);
 }
 
 .hero-split {
@@ -634,16 +650,20 @@ const tickerWords = features.map(f => f.title)
   align-items: start;
 }
 
-.hero-left,
+/* The left column is deliberately NOT animated. This page is statically
+   generated, so a hero gated on `opacity: 0` until Vue hydrates and adds a
+   class means the first painted frame — the one that decides LCP — has no
+   headline in it. The install card is not an LCP candidate, so it is the only
+   half that gets an entrance, and it runs off the CSS parse rather than off a
+   scroll listener: nothing to miss, nothing to wait for. */
 .hero-right {
-  opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: hero-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
 }
 
-.hero-right { transition-delay: 0.14s; }
-.hero-left.is-visible,
-.hero-right.is-visible { opacity: 1; transform: translateY(0); }
+@keyframes hero-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
 
 .eyebrow {
   display: flex;
@@ -653,29 +673,40 @@ const tickerWords = features.map(f => f.title)
   margin: 0 0 22px;
 }
 
+/* Static. A pulsing dot in the first line of the page is a consumer-app tell,
+   and the same animation still runs on `.prop-dot` a screen below, where a live
+   indicator on the in-house systems actually means something. */
 .eyebrow-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: var(--accent);
-  animation: dot-pulse 2.4s ease-in-out infinite;
 }
 
+/* 800 at -0.045em and 0.98 line-height is a landing-page headline; this is the
+   front door of an API reference. Backing off to 700/-0.03em keeps the tight
+   editorial voice without the letters colliding at 58px. The hard <br> is gone
+   too: it broke after "power" at every width, including the ones where the line
+   had room. `balance` picks the break per viewport. */
 .hero-title {
-  font-size: clamp(38px, 5.4vw, 66px);
-  font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 0.98;
+  font-size: clamp(36px, 4.6vw, 58px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
   color: var(--ink);
-  margin: 0 0 20px;
+  margin: 0 0 18px;
+  text-wrap: balance;
 }
 
+/* Two sentences at 54ch rendered four lines deep and pushed the checklist — and
+   with it the fold — down the page. One sentence, one job: name the mechanism
+   the headline promises. */
 .hero-subtitle {
-  font-size: 16.5px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.62;
   color: var(--vp-c-text-2);
-  margin: 0 0 24px;
-  max-width: 54ch;
+  margin: 0 0 28px;
+  max-width: 46ch;
 }
 
 .hero-points {
@@ -703,18 +734,17 @@ const tickerWords = features.map(f => f.title)
    under the install card, so it no longer needs to clear anything below it. */
 .hero-left .hero-points { margin-bottom: 0; }
 
+/* The check used to sit in a rounded 16px box. Three boxed ticks stacked on
+   full-width hairlines read as a pricing-table feature matrix, which is the one
+   thing this block is not. The glyph alone carries it, so it takes the darker
+   accent step to hold 4.5:1 at this size. */
 .hero-point-check {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
+  width: 14px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-radius: 4px;
+  line-height: 1.4;
+  color: var(--accent-ink);
 }
 
 /* Under the install card in the right column: the CTA now sits with the thing it
@@ -779,8 +809,16 @@ const tickerWords = features.map(f => f.title)
 }
 
 .install-head-label { color: var(--vp-c-text-3); }
-.install-head-dots { display: flex; gap: 5px; }
-.install-head-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--edge); }
+
+/* Was three grey circles imitating a macOS titlebar — skeuomorphic chrome on a
+   block that is not a window. The space now says something true about the card. */
+.install-head-hint {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--vp-c-text-3);
+  opacity: 0.75;
+}
 
 .install-row {
   display: grid;
@@ -1384,10 +1422,8 @@ const tickerWords = features.map(f => f.title)
 /* ─── Reduced motion ─── */
 @media (prefers-reduced-motion: reduce) {
   .ticker-track { animation: none; }
-  .eyebrow-dot,
   .prop-dot { animation: none; }
-  .hero-left,
-  .hero-right,
+  .hero-right { animation: none; }
   .prop-cell,
   .stat-item,
   .product-card,
@@ -1416,9 +1452,8 @@ const tickerWords = features.map(f => f.title)
 
 @media (max-width: 768px) {
   .home-page { padding: 0 18px; }
-  .hero { padding: 44px 0 52px; }
-  .hero-rules { display: none; }
-  .hero-title { font-size: clamp(31px, 8.4vw, 42px); }
+  .hero { padding: 40px 0 44px; margin-bottom: 34px; }
+  .hero-title { font-size: clamp(30px, 8vw, 40px); letter-spacing: -0.025em; }
   .hero-subtitle { font-size: 15.5px; }
   .section { padding: 0 0 60px; }
   .rule-head { flex-wrap: wrap; gap: 12px; }
