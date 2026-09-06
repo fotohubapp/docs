@@ -177,11 +177,20 @@ export default defineConfig({
       ],
       '/compute/': [
         {
-          text: 'Cloud Compute & Sandboxes',
+          text: 'Dedicated Cloud Compute (EC2)',
           items: [
-            { text: 'Compute Architecture & Pricing', link: '/compute/overview' },
-            { text: 'GPU & CPU Rental (EC2)', link: '/compute/gpu-rental' },
-            { text: 'Agent Sandboxes (Firecracker)', link: '/compute/agent-sandboxes' },
+            { text: 'Architecture & Catalog', link: '/compute/overview' },
+            { text: 'GPU & CPU On-Demand Rental', link: '/compute/gpu-rental' },
+            { text: 'EBS Volumes & Custom AMIs', link: '/compute/volumes-storage' },
+            { text: 'Networking, Elastic IP & Route53', link: '/compute/networking-dns' },
+            { text: 'Cost Optimization & Spot', link: '/compute/cost-optimization' },
+          ],
+        },
+        {
+          text: 'Agent Compute & Sandboxes',
+          items: [
+            { text: 'Firecracker MicroVMs', link: '/compute/agent-sandboxes' },
+            { text: 'Autonomous Agent Tasks', link: '/compute/autonomous-agents' },
           ],
         },
       ],

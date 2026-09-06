@@ -2,7 +2,7 @@
 
 Spin up dedicated NVIDIA A10G and T4 GPU nodes or scalable CPU instances in seconds via API, SDK, or cURL.
 
-Rentals provide full root SSH access, persistent EBS volumes, customizable security groups, and automated software presets for ML inference (vLLM, ComfyUI, PyTorch) and backend services.
+Rentals provide full root SSH access, persistent EBS volumes, customizable security groups, automated software presets for ML inference (vLLM, ComfyUI, PyTorch), serial console logging, and dynamic status telemetry.
 
 ---
 
@@ -14,60 +14,90 @@ Rentals provide full root SSH access, persistent EBS volumes, customizable secur
 | Action | Endpoint | Description |
 |:---|:---|:---|
 | **Catalog** | `GET /catalog` | List real-time prices, availability zones, and specs |
+| **Eligibility** | `GET /instances/eligibility` | Verify account tier & wallet balance sufficiency |
 | **Estimate** | `POST /instances/estimate` | Calculate hourly and total costs prior to launching |
 | **Provision** | `POST /instances` | Spin up an on-demand or Spot instance |
-| **Lifecycle** | `POST /instances/{id}/start|stop|reboot|terminate` | Control machine power state |
+| **Instance Detail** | `GET /instances/{id}/full` | Inspect network IPs, storage attachments, and status |
+| **Power State** | `POST /instances/{id}/start|stop|reboot|terminate` | Control machine lifecycle state |
+| **Resize** | `POST /instances/{id}/resize` | Hot-swap instance type (e.g. `g4dn.xlarge` → `g5.2xlarge`) |
 | **SSH Key** | `GET /instances/{id}/ssh-key` | Download injected private SSH `.pem` key |
-| **Metrics** | `GET /instances/{id}/metrics` | Query CPU, GPU VRAM, disk IOPS, and network I/O |
-| **Volumes** | `PUT /instances/{id}/volumes/{vol_id}` | Live resize volume capacity and IOPS |
+| **Regenerate SSH** | `POST /instances/{id}/ssh-key/regenerate` | Re-inject fresh SSH credentials |
+| **Serial Console** | `GET /instances/{id}/console-output` | Real-time EC2 serial kernel output & boot log |
+| **CloudWatch Metrics** | `GET /instances/{id}/metrics` | Query CPU, GPU VRAM, disk IOPS, and network I/O |
+| **Status Checks** | `GET /instances/{id}/status-checks` | Query AWS System and Instance status checks |
+| **Run Script** | `POST /instances/{id}/run-script` | Execute remote shell script on running instance |
 
 ---
 
-## Provisioning an A10G Instance
+## Provisioning Guide: NVIDIA A10G with ComfyUI
+
+Deploy an NVIDIA A10G 24GB node (`g5.xlarge`) with Docker and NVIDIA Container Toolkit pre-installed, booting ComfyUI directly on port 8188:
 
 ::: code-group
 
 ```python [Python]
 from fotohub import FotoHub
-import os
+import os, time
 
 client = FotoHub(api_key=os.environ["FOTOHUB_API_KEY"])
 
-# 1. Provision an NVIDIA A10G (g5.xlarge) Spot instance with ComfyUI preset
-instance = client.post("/compute/v1/instances", {
-    "name": "sdxl-comfyui-worker",
+# 1. Preflight cost check
+estimate = client.post("/compute/v1/instances/estimate", {
+    "catalog_id": "g5.xlarge",
+    "spot_instance": True,
+    "root_volume_type": "gp3",
+    "root_volume_size_gb": 120,
+    "max_runtime_hours": 8
+})
+print(f"Hourly rate: ${estimate['estimate']['hourly_rate_usd']:.3f}/hr (Total 8h: ${estimate['estimate']['total_estimated_cost_usd']:.2f})")
+
+# 2. Provision instance
+instance_res = client.post("/compute/v1/instances", {
+    "name": "comfyui-flux-worker",
     "catalog_id": "g5.xlarge",
     "region": "eu-central-1",
     "availability_zone": "eu-central-1a",
-    "spot_instance": True,                 # 62% discount
-    "max_runtime_hours": 6,                # Auto-stop after 6 hours
+    "spot_instance": True,                 # ~62% discount
+    "max_runtime_hours": 8,                # Auto-stop after 8 hours
     "root_volume_type": "gp3",
-    "root_volume_size_gb": 120,            # 120 GB for model checkpoints
+    "root_volume_size_gb": 120,            # High-speed SSD for checkpoints
     "os_image": "ubuntu-2204-lts",
     "install_presets": ["docker", "python-ml"],
     "startup_script": """#!/bin/bash
-    # Pull ComfyUI container
     docker run -d --gpus all -p 8188:8188 --name comfyui \
+      --restart unless-stopped \
       -v /data/models:/workspace/ComfyUI/models \
       yanwk/comfyui-boot:latest
     """,
     "security_group_rules": [
-        {"protocol": "tcp", "port": 22, "cidr": "0.0.0.0/0", "description": "SSH"},
-        {"protocol": "tcp", "port": 8188, "cidr": "0.0.0.0/0", "description": "ComfyUI Web"}
-    ]
+        {"protocol": "tcp", "port": 22, "cidr": "0.0.0.0/0", "description": "SSH Access"},
+        {"protocol": "tcp", "port": 8188, "cidr": "0.0.0.0/0", "description": "ComfyUI Web Interface"}
+    ],
+    "labels": {"project": "image-gen", "environment": "production"}
 })
 
-instance_id = instance["instance"]["id"]
-print(f"Provisioning instance: {instance_id}")
+instance_id = instance_res["instance"]["id"]
+print(f"Instance requested: {instance_id}")
 
-# 2. Download private SSH key
-ssh_key_data = client.get(f"/compute/v1/instances/{instance_id}/ssh-key")
-with open("worker_key.pem", "w") as f:
-    f.write(ssh_key_data["private_key"])
-os.chmod("worker_key.pem", 0o400)
+# 3. Download SSH Private Key
+key_res = client.get(f"/compute/v1/instances/{instance_id}/ssh-key")
+key_path = "comfyui_worker.pem"
+with open(key_path, "w") as f:
+    f.write(key_res["private_key"])
+os.chmod(key_path, 0o400)
+print(f"Private key saved to {key_path}")
 
-print("Saved worker_key.pem. Connect with:")
-print(f"ssh -i worker_key.pem ubuntu@{instance['instance'].get('ip_address', '<PENDING_IP>')}")
+# 4. Wait for Public IP assignment
+while True:
+    details = client.get(f"/compute/v1/instances/{instance_id}")["instance"]
+    status = details["status"]
+    ip = details.get("ip_address")
+    print(f"Status: {status} | IP: {ip or 'assigning...'}")
+    if status == "running" and ip:
+        print(f"\nComfyUI live at: http://{ip}:8188")
+        print(f"SSH command: ssh -i {key_path} ubuntu@{ip}")
+        break
+    time.sleep(5)
 ```
 
 ```typescript [TypeScript]
@@ -76,34 +106,37 @@ import * as fs from "fs";
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
 
-async function rentGpuNode() {
-  // Provision g5.2xlarge with vLLM
+async function launchComfyUIWorker() {
+  // 1. Launch instance
   const res = await client.post("/compute/v1/instances", {
-    name: "vllm-qwen-inference",
-    catalog_id: "g5.2xlarge",
-    region: "eu-central-1",
-    spot_instance: false,                  // Dedicated on-demand
-    max_runtime_hours: 12,
+    name: "ts-comfyui-node",
+    catalog_id: "g5.xlarge",
+    spot_instance: true,
+    max_runtime_hours: 6,
     root_volume_type: "gp3",
-    root_volume_size_gb: 200,
+    root_volume_size_gb: 150,
     os_image: "ubuntu-2204-lts",
     install_presets: ["docker"],
+    security_group_rules: [
+      { protocol: "tcp", port: 22, cidr: "0.0.0.0/0", description: "SSH" },
+      { protocol: "tcp", port: 8188, cidr: "0.0.0.0/0", description: "ComfyUI" }
+    ],
     startup_script: `#!/bin/bash
-    docker run -d --gpus all -p 8000:8000 --ipc=host \
-      vllm/vllm-openai:latest \
-      --model Qwen/Qwen2.5-7B-Instruct --port 8000
-    `,
+    docker run -d --gpus all -p 8188:8188 --name comfyui \
+      yanwk/comfyui-boot:latest
+    `
   });
 
-  const instId = res.data.instance.id;
-  console.log("Instance requested:", instId);
+  const instanceId = res.data.instance.id;
+  console.log("Instance provisioned:", instanceId);
 
-  // Download SSH Key
-  const keyRes = await client.get(`/compute/v1/instances/${instId}/ssh-key`);
-  fs.writeFileSync("vllm_key.pem", keyRes.data.private_key, { mode: 0o400 });
+  // 2. Fetch SSH Key
+  const keyRes = await client.get(`/compute/v1/instances/${instanceId}/ssh-key`);
+  fs.writeFileSync("worker_key.pem", keyRes.data.private_key, { mode: 0o400 });
+  console.log("Saved worker_key.pem");
 }
 
-rentGpuNode();
+launchComfyUIWorker();
 ```
 
 ```go [Go]
@@ -118,18 +151,30 @@ import (
 	"os"
 )
 
+type ProvisionRequest struct {
+	Name             string                   `json:"name"`
+	CatalogID        string                   `json:"catalog_id"`
+	SpotInstance     bool                     `json:"spot_instance"`
+	MaxRuntimeHours  int                      `json:"max_runtime_hours"`
+	RootVolumeSizeGB int                      `json:"root_volume_size_gb"`
+	SecurityRules    []map[string]interface{} `json:"security_group_rules"`
+}
+
 func main() {
-	payload := map[string]interface{}{
-		"name":                "t4-inference-worker",
-		"catalog_id":          "g4dn.xlarge",
-		"spot_instance":       true,
-		"max_runtime_hours":   4,
-		"root_volume_size_gb": 100,
-		"os_image":            "ubuntu-2204-lts",
+	payload := ProvisionRequest{
+		Name:             "go-worker-a10g",
+		CatalogID:        "g5.xlarge",
+		SpotInstance:     true,
+		MaxRuntimeHours:  12,
+		RootVolumeSizeGB: 100,
+		SecurityRules: []map[string]interface{}{
+			{"protocol": "tcp", "port": 22, "cidr": "0.0.0.0/0"},
+			{"protocol": "tcp", "port": 8000, "cidr": "0.0.0.0/0"},
+		},
 	}
 
 	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/compute/v1/instances", bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/compute/v1/instances", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -139,23 +184,23 @@ func main() {
 	}
 	defer resp.Body.Close()
 
-	data, _ := io.ReadAll(resp.Body)
-	fmt.Println("Provisioning response:", string(data))
+	respBody, _ := io.ReadAll(resp.Body)
+	fmt.Println("Provisioning result:", string(respBody))
 }
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/instances \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "a10g-dev-machine",
+curl -X POST https://apis.fotohub.app/compute/v1/instances   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+    "name": "cli-a10g-node",
     "catalog_id": "g5.xlarge",
-    "region": "eu-central-1",
     "spot_instance": true,
-    "max_runtime_hours": 8,
+    "max_runtime_hours": 4,
+    "root_volume_type": "gp3",
     "root_volume_size_gb": 100,
-    "os_image": "ubuntu-2204-lts"
+    "security_group_rules": [
+      {"protocol": "tcp", "port": 22, "cidr": "0.0.0.0/0"},
+      {"protocol": "tcp", "port": 8188, "cidr": "0.0.0.0/0"}
+    ]
   }'
 ```
 
@@ -163,45 +208,71 @@ curl -X POST https://apis.fotohub.app/compute/v1/instances \
 
 ---
 
-## Volume Hot-Resizing & IOPS Modification
+## Provisioning Guide: Deploying vLLM LLM Engine
 
-Increase disk capacity or switch volume types without rebooting or unmounting filesystems:
+Deploy high-throughput inference for open-weights models (such as `Qwen/Qwen2.5-7B-Instruct` or `deepseek-ai/DeepSeek-R1-Distill-Qwen-8B`) with an OpenAI-compatible API endpoint:
 
 ```bash
-curl -X PUT https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934 \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "size_gb": 250,
-    "type": "gp3",
-    "iops": 4000
+curl -X POST https://apis.fotohub.app/compute/v1/instances   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+    "name": "vllm-openai-server",
+    "catalog_id": "g5.2xlarge",
+    "spot_instance": true,
+    "max_runtime_hours": 12,
+    "root_volume_type": "gp3",
+    "root_volume_size_gb": 200,
+    "security_group_rules": [
+      {"protocol": "tcp", "port": 22, "cidr": "0.0.0.0/0"},
+      {"protocol": "tcp", "port": 8000, "cidr": "0.0.0.0/0"}
+    ],
+    "startup_script": "#!/bin/bash
+docker run -d --gpus all -p 8000:8000 --ipc=host --name vllm vllm/vllm-openai:latest --model Qwen/Qwen2.5-7B-Instruct --port 8000"
+  }'
+```
+
+Once running, query the instance directly using standard OpenAI client libraries:
+
+```python
+from openai import OpenAI
+
+# Connect directly to your GPU node IP
+client = OpenAI(
+    base_url="http://<YOUR_INSTANCE_IP>:8000/v1",
+    api_key="none"
+)
+
+completion = client.chat.completions.create(
+    model="Qwen/Qwen2.5-7B-Instruct",
+    messages=[{"role": "user", "content": "Explain quantum computing in 3 sentences."}]
+)
+print(completion.choices[0].message.content)
+```
+
+---
+
+## Remote Script Execution (`POST /run-script`)
+
+Execute ad-hoc maintenance or orchestration scripts without opening an interactive SSH session:
+
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_9a8b7c/run-script   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+    "script": "nvidia-smi --query-gpu=name,temperature.gpu,utilization.gpu,memory.total,memory.used --format=csv,noheader"
   }'
 ```
 
 ---
 
-## Health Monitoring & Telemetry
+## CloudWatch Metrics & Health Telemetry
 
-Retrieve CloudWatch CPU utilization, GPU memory pressure, and network IOPS aggregated over time:
+Monitor hardware pressure, VRAM allocation, and network spikes in 5-minute aggregation buckets:
 
 ```bash
-curl -X GET "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/metrics?period=300&hours=2" \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY"
+curl -X GET "https://apis.fotohub.app/compute/v1/instances/inst_9a8b7c/metrics?period=300&hours=4"   -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
 
-Response:
-```json
-{
-  "instance_id": "inst_90f23b",
-  "period_seconds": 300,
-  "metrics": {
-    "cpu_utilization": [
-      {"timestamp": "2026-09-06T15:00:00Z", "value": 14.2},
-      {"timestamp": "2026-09-06T15:05:00Z", "value": 89.6}
-    ],
-    "network_in_bytes": [
-      {"timestamp": "2026-09-06T15:00:00Z", "value": 4129401}
-    ]
-  }
-}
+### Inspecting Serial Console Output
+
+When debugging boot failures, kernel panics, or cloud-init startup scripts:
+
+```bash
+curl -X GET "https://apis.fotohub.app/compute/v1/instances/inst_9a8b7c/logs?lines=50"   -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
