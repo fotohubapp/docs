@@ -181,16 +181,36 @@ export default defineConfig({
           items: [
             { text: 'Architecture & Catalog', link: '/compute/overview' },
             { text: 'GPU & CPU On-Demand Rental', link: '/compute/gpu-rental' },
-            { text: 'EBS Volumes & Custom AMIs', link: '/compute/volumes-storage' },
             { text: 'Networking, Elastic IP & Route53', link: '/compute/networking-dns' },
             { text: 'Cost Optimization & Spot', link: '/compute/cost-optimization' },
+            { text: 'Benchmarks & Platform Comparison', link: '/compute/benchmarks-comparison' },
+          ],
+        },
+        {
+          text: 'Storage & Data Pipelines',
+          items: [
+            { text: 'EBS Volumes & Snapshots', link: '/compute/volumes-storage' },
+            { text: 'S3 Cloud Storage', link: '/api/storage' },
+            { text: 'Output Destinations (BYOB)', link: '/api/destinations' },
+            { text: 'Delivery to Your Bucket Guide', link: '/guides/bucket-delivery' },
+          ],
+        },
+        {
+          text: 'Production Guides & Blueprints',
+          items: [
+            { text: 'Real-World Use Cases & Blueprints', link: '/compute/use-cases' },
+            { text: 'Self-Hosting LLMs (vLLM & Ollama)', link: '/compute/llm-inference' },
+            { text: 'Headless ComfyUI & Render Farms', link: '/compute/comfyui-pipelines' },
+            { text: 'LoRA & Model Fine-Tuning', link: '/compute/lora-finetuning' },
+            { text: 'Production Runbook & Troubleshooting', link: '/compute/troubleshooting' },
           ],
         },
         {
           text: 'Agent Compute & Sandboxes',
           items: [
-            { text: 'Firecracker MicroVMs', link: '/compute/agent-sandboxes' },
-            { text: 'Autonomous Agent Tasks', link: '/compute/autonomous-agents' },
+            { text: 'Firecracker MicroVMs Architecture', link: '/compute/agent-sandboxes' },
+            { text: 'Practical Sandbox Recipes', link: '/compute/sandbox-recipes' },
+            { text: 'Autonomous Agent Orchestration', link: '/compute/autonomous-agents' },
           ],
         },
       ],

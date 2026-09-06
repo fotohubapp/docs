@@ -1,39 +1,40 @@
 # Autonomous Agent Compute & Execution
 
-Execute complex multi-turn reasoning loops, autonomous coding workflows, web research tasks, and tool-augmented agent graphs backed by Claude Opus 4.6, DeepSeek, and Google Gemini.
+Deploy multi-turn reasoning loops, autonomous coding workflows, web intelligence agents, and tool-augmented workflows powered by Claude Opus 4.6, DeepSeek R1, and Google Gemini.
 
-The **Agent Compute Engine** (`server/agent-compute/` on port 8795) orchestrates dynamic tool calling, skill execution, persistent workspace file storage, real-time SSE streaming, and human-in-the-loop controls.
+The **Agent Compute Engine** (`server/agent-compute/` on port 8795) orchestrates dynamic tool calling, skill execution, persistent workspace file storage, real-time Server-Sent Events (SSE) streaming, and Human-in-the-Loop controls.
 
 ---
 
-## Agent Orchestration Graph
+## Agent Lifecycle State Machine
 
 ```mermaid
-flowchart TD
-    A["User Objective / Prompt"] --> B["Agent Orchestrator (Claude Opus 4.6)"]
-    B --> C{"Next Action Decision"}
+stateDiagram-v2
+    [*] --> created: POST /v1/tasks/create
+    created --> planning: Initialize Engine & Context
+    planning --> executing_step: Select Tool / Action
     
-    C -->|"Call Tool"| D["Tool Execution (Sandbox / Browser / Drive)"]
-    D --> E["Tool Output Captured"]
-    E --> B
+    executing_step --> tool_running: Dispatch to Sandbox / Web
+    tool_running --> evaluating_result: Tool Completed
+    evaluating_result --> executing_step: Next Step Needed
     
-    C -->|"Run Skill"| F["Skill Runner (Trigger Match)"]
-    F --> B
-
-    C -->|"Need Clarification / Approval"| G["Pause Task (Human-in-the-Loop)"]
-    G --> H["Client Responds via /respond"]
-    H --> B
-
-    C -->|"Complete"| I["Final Solution & Workspace Artifacts"]
+    executing_step --> awaiting_approval: Requires Human Clarification
+    awaiting_approval --> executing_step: POST /v1/tasks/{id}/respond
     
-    B -.->|"Real-Time Streaming"| J["SSE Event Stream (agent_delta, commentary)"]
+    evaluating_result --> completed: Goal Satisfied
+    executing_step --> failed: Unrecoverable Error
+    awaiting_approval --> cancelled: User Cancels
+    
+    completed --> [*]
+    failed --> [*]
+    cancelled --> [*]
 ```
 
 ---
 
 ## Launching an Autonomous Task
 
-Submit a multi-step project to the agent engine:
+Submit a multi-step objective with tool constraints, budget ceilings, and LLM selection:
 
 ::: code-group
 
@@ -43,22 +44,21 @@ import os
 
 client = FotoHub(api_key=os.environ["FOTOHUB_API_KEY"])
 
-# Dispatch autonomous task
 task = client.post("/v1/tasks/create", {
     "prompt": """
-    1. Scrape the latest top 10 trending AI papers on arXiv in multimodal generation.
-    2. Extract their titles, authors, and executive abstracts.
-    3. Generate a comparative Markdown report with an architectural taxonomy table.
-    4. Save the report to the workspace as /research/multimodal_trends_2026.md.
+    1. Scrape the top 5 trending open-source AI repositories on GitHub today.
+    2. Extract their stars, authors, primary languages, and architecture summaries.
+    3. Generate a comparative Markdown report with an executive taxonomy.
+    4. Save the file to /workspace/reports/ai_trends_weekly.md.
     """,
     "model": "claude-opus-4.6",
-    "skills": ["web_research", "document_generation"],
+    "skills": ["web_research", "document_generation", "code_interpreter"],
     "max_steps": 25,
     "budget_limit_usd": 2.50
 })
 
 task_id = task["task_id"]
-print(f"Task started: {task_id}")
+print(f"Task created: {task_id}")
 ```
 
 ```typescript [TypeScript]
@@ -66,25 +66,29 @@ import { FotoHub } from "fotohub";
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
 
-async function runResearchAgent() {
+async function dispatchAgent() {
   const res = await client.post("/v1/tasks/create", {
-    prompt: "Analyze the sales CSV in /data/sales.csv and produce an executive chart visualization.",
+    prompt: "Investigate customer error trace in /workspace/error.log, identify bug, and run unit tests to confirm fix.",
     model: "claude-opus-4.6",
-    max_steps: 15,
-    budget_limit_usd: 1.50
+    max_steps: 20,
+    budget_limit_usd: 1.50,
   });
 
-  console.log("Agent dispatched:", res.data.task_id);
+  console.log("Agent running with Task ID:", res.data.task_id);
 }
 
-runResearchAgent();
+dispatchAgent();
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/tasks/create   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+curl -X POST https://apis.fotohub.app/v1/tasks/create \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
     "prompt": "Build a responsive React landing page for a coffee brand and save to /workspace/coffee-landing",
     "model": "claude-opus-4.6",
-    "max_steps": 20
+    "max_steps": 20,
+    "budget_limit_usd": 2.00
   }'
 ```
 
@@ -94,101 +98,65 @@ curl -X POST https://apis.fotohub.app/v1/tasks/create   -H "Authorization: Beare
 
 ## Real-Time SSE Token & Thought Streaming
 
-Connect to `GET /v1/tasks/{task_id}/stream` to receive real-time updates as the agent reasons and executes tools:
+Connect to `GET /v1/tasks/{task_id}/stream` to receive real-time updates as the agent reasons, invokes tools, and generates artifacts:
 
-| SSE Event | Description | Payload Structure |
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as Frontend / SDK
+    participant Engine as Agent Compute Server
+    participant Sandbox as MicroVM Sandbox
+
+    Client->>Engine: GET /v1/tasks/{id}/stream
+    Engine-->>Client: event: task_status (planning)
+    Engine-->>Client: event: commentary ("Analyzing required packages...")
+    Engine-->>Client: event: tool_call (sandbox_python)
+    Engine->>Sandbox: Execute code
+    Sandbox-->>Engine: Execution OK (duration: 142ms)
+    Engine-->>Client: event: tool_result (output captured)
+    Engine-->>Client: event: agent_delta ("Based on the data...")
+    Engine-->>Client: event: done (Task finished successfully)
+```
+
+### SSE Event Stream Reference
+
+| Event Name | Description | Payload Data Structure |
 |:---|:---|:---|
-| **`agent_delta`** | Raw LLM token stream as generated | `{"delta": "Evaluating...", "seq": 12}` |
-| **`commentary`** | Strategic inner monologue / agent rationale | `{"message": "I will inspect the CSV structure first", "importance": "high"}` |
-| **`tool_call`** | Tool invocation announcement | `{"tool": "browser.navigate", "input": {"url": "https://arxiv.org"}}` |
-| **`tool_result`**| Tool completion payload | `{"tool": "browser.navigate", "status": "success", "duration_ms": 420}` |
-| **`task_progress`**| Completion estimation | `{"percent": 65, "step": 8, "status": "processing"}` |
-| **`task_paused`** | Waiting for user approval | `{"question": "Do you want to overwrite existing files?", "options": ["Yes", "No"]}` |
-| **`task_complete`**| Terminal success event | `{"summary": "Task complete", "artifacts": ["/research/trends.md"]}` |
-
-### Client Streaming Example
-
-```typescript
-import EventSource from "eventsource";
-
-const taskId = "task_01928374";
-const eventSource = new EventSource(
-  `https://apis.fotohub.app/v1/tasks/${taskId}/stream?token=${process.env.FOTOHUB_API_KEY}`
-);
-
-eventSource.addEventListener("agent_delta", (event) => {
-  const data = JSON.parse(event.data);
-  process.stdout.write(data.delta);
-});
-
-eventSource.addEventListener("commentary", (event) => {
-  const data = JSON.parse(event.data);
-  console.log(`\n[THOUGHT]: ${data.message}`);
-});
-
-eventSource.addEventListener("tool_call", (event) => {
-  const data = JSON.parse(event.data);
-  console.log(`\n[EXECUTING TOOL]: ${data.tool}`);
-});
-
-eventSource.addEventListener("task_complete", (event) => {
-  console.log("\nTask finished successfully!");
-  eventSource.close();
-});
-```
+| `task_status` | Status transition update | `{"status": "planning" | "executing_step" | "completed"}` |
+| `commentary` | Agent internal reasoning step | `{"thought": "Evaluating regression coefficients..."}` |
+| `tool_call` | Agent dispatched a tool | `{"tool": "sandbox_python", "args": {"code": "..."}}` |
+| `tool_result` | Tool output returned | `{"tool": "sandbox_python", "success": true, "output": {...}}` |
+| `agent_delta` | Streaming token fragment | `{"content": "Here is the summary table:\\n"}` |
+| `done` | Task completed | `{"task_id": "tsk_...", "total_steps": 12, "cost_usd": 0.42}` |
+| `error` | Failure event | `{"code": "budget_exceeded", "message": "Max budget reached"}` |
 
 ---
 
-## Human-in-the-Loop Control & Pausing
+## Human-in-the-Loop Controls
 
-When executing high-consequence actions (or when an agent explicitly triggers `ask_user`), the task automatically pauses.
+For sensitive operations (deploying to production, deleting files, committing financial transactions), the agent can pause and await explicit user authorization.
 
-### 1. Pausing a Running Task
-
+### 1. Pausing a Task
 ```bash
-curl -X POST https://apis.fotohub.app/v1/tasks/task_01928374/pause   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+curl -X POST https://apis.fotohub.app/v1/tasks/tsk_99a812df/pause \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
 
-### 2. Responding to the Agent
-
-Provide the user answer to unblock execution:
+### 2. Responding to Agent Clarifications
+When an agent reaches state `awaiting_approval`, submit your decision:
 
 ```bash
-curl -X POST https://apis.fotohub.app/v1/tasks/task_01928374/respond   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "response": "Use the 2026 Q3 data and focus on the European market."
+curl -X POST https://apis.fotohub.app/v1/tasks/tsk_99a812df/respond \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "approved": true,
+    "user_feedback": "Proceed with deploying the migration to the staging database."
   }'
 ```
 
-### 3. Multi-Turn Follow-Ups
-
-Continue iterating on a completed task without starting from scratch:
-
+### 3. Cancelling a Task
 ```bash
-curl -X POST https://apis.fotohub.app/v1/tasks/task_01928374/followup   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "prompt": "Now translate the executive summary into Polish and German."
-  }'
-```
-
----
-
-## Custom Skills Registry
-
-Register specialized agent skills that inject domain knowledge and custom scripts whenever trigger keywords are matched:
-
-```bash
-curl -X POST https://apis.fotohub.app/v1/skills/create   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "name": "shopify_catalog_sync",
-    "description": "Exports generated packshots and descriptions directly to Shopify stores",
-    "triggers": ["shopify", "storefront", "sync catalog"],
-    "system_prompt": "You have access to Shopify API tools. Always format product descriptions with standard H2 tags and bullet points."
-  }'
-```
-
----
-
-## Google Workspace Integrations
-
-Connect user Google Workspace accounts (via OAuth 2.0) to allow agents to interact with real-world documents:
-- **Gmail** (`/v1/integrations/google/gmail`): Draft, search, and send emails with human review gates.
-- **Google Calendar** (`/v1/integrations/google/calendar`): Schedule meetings and check availability.
-- **Google Drive** (`/v1/integrations/google/drive`): Ingest sheets and export generated artifacts.
+curl -X POST https://apis.fotohub.app/v1/tasks/tsk_99a812df/cancel \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY"
+```\n

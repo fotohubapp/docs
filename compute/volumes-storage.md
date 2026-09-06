@@ -127,7 +127,10 @@ Response:
 ### Launching Directly from Your Custom AMI
 
 ```bash
-curl -X POST https://apis.fotohub.app/compute/v1/instances   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+curl -X POST https://apis.fotohub.app/compute/v1/instances \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
     "name": "worker-from-golden",
     "catalog_id": "g5.xlarge",
     "spot_instance": true,
@@ -135,3 +138,90 @@ curl -X POST https://apis.fotohub.app/compute/v1/instances   -H "Authorization: 
     "root_volume_size_gb": 120
   }'
 ```
+
+---
+
+## Object Storage: FOTOhub S3 & BYOB Bucket Destinations
+
+While EBS block storage provides ultra-low latency NVMe mount points for active model training and inference execution, large-scale media assets, final image/video renders, and archive datasets belong in **Object Storage**.
+
+```mermaid
+flowchart LR
+    subgraph Compute Node (Frankfurt eu-central-1)
+        A["NVIDIA GPU / Worker"] <-->|High-IOPS Local NVMe| B["EBS gp3 Data Volume (/data/models)"]
+        A -->|Fast S3 Sync / Zero Egress| C["FOTOhub S3 Cloud Storage (s1.fotohub.app)"]
+        A -->|Direct Streaming Output| D["External Bucket Destinations (BYOB)"]
+    end
+
+    subgraph Destination Clouds
+        D --> E["AWS S3 (Customer Bucket)"]
+        D --> F["Cloudflare R2 (Zero Egress)"]
+        D --> G["Google Cloud Storage"]
+        D --> H["Supabase Storage"]
+    end
+```
+
+### 1. FOTOhub S3 Cloud Storage (`s1.fotohub.app`)
+
+FOTOhub provides fully managed, S3-compatible cloud object storage co-located in the same **Frankfurt (`eu-central-1`)** data centers as your compute instances:
+
+- **Flat Pricing:** **$0.0245 / GB-month** ($0.00003356 / GB-hour) — exactly matching AWS S3 Standard with zero markup.
+- **Zero Intra-Cluster Egress:** Data transfers between your FOTOhub compute instances and FOTOhub S3 storage incur **$0.00 egress fees**.
+- **Vanity Point Aliases:** Map custom subdomains (`*.s3point.fotohub.app`) or custom branded domains directly to your storage buckets.
+- **Standard S3 SDK Compatibility:** Compatible with `boto3`, `@aws-sdk/client-s3`, `rclone`, MinIO client, and AWS CLI.
+
+👉 **Full S3 API Reference:** See the [S3 Cloud Storage Documentation](/api/storage).
+
+#### Syncing Weights between EBS and FOTOhub S3 via AWS CLI
+
+Inside your compute instance, use standard S3 commands to backup or load model weights:
+
+```bash
+# Configure S3 credentials on instance
+aws configure set aws_access_key_id "fh_key_..."
+aws configure set aws_secret_access_key "fh_sec_..."
+aws configure set default.s3.endpoint_url "https://s1.fotohub.app"
+
+# Sync trained LoRA weights from local EBS to S3 bucket
+aws s3 sync /data/output/lora/ s3://my-models-bucket/loras/ --endpoint-url https://s1.fotohub.app
+
+# Download FLUX.1 checkpoint from S3 to local EBS
+aws s3 cp s3://my-models-bucket/checkpoints/flux1-dev.safetensors /data/models/checkpoints/ --endpoint-url https://s1.fotohub.app
+```
+
+---
+
+### 2. Bucket Destinations (Bring Your Own Bucket - BYOB)
+
+If your architecture already uses an external cloud provider (AWS S3, Cloudflare R2, Google Cloud Storage, or Supabase), FOTOhub can stream generation and compute artifacts **directly into your external bucket** without landing on intermediary servers.
+
+| Provider | Authentication Method | Supported Features |
+|:---|:---|:---|
+| **AWS S3** | IAM Access Keys or Role ARN | Bucket policies, KMS encryption, multipart upload |
+| **Cloudflare R2** | S3-Compatible API Tokens | Zero egress fees, global edge distribution |
+| **Google Cloud Storage** | HMAC Keys / Service Account | Standard, Nearline, and Coldline buckets |
+| **Supabase Storage** | S3 Access Keys | Direct asset linkage to Supabase PostgreSQL database |
+
+👉 **Full Destinations Guide:** See [Output Destinations (BYOB) Reference](/api/destinations) and [Delivery to Your Bucket Guide](/guides/bucket-delivery).
+
+#### Registering an External Bucket Destination via API
+
+```bash
+curl -X POST https://apis.fotohub.app/v1/storage/destinations \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "production-r2-media",
+    "provider": "cloudflare_r2",
+    "bucket_name": "prod-media-assets",
+    "region": "auto",
+    "endpoint_url": "https://<ACCOUNT_ID>.r2.cloudflarestorage.com",
+    "access_key_id": "r2_key_...",
+    "secret_access_key": "r2_secret_...",
+    "path_prefix": "renders/daily",
+    "is_default": true
+  }'
+```
+
+Once registered, any job dispatching to `/v1/ai/*` or `/compute/v1/*` can supply `"destination_id": "dest_..."` to automatically deliver output renders straight to your private cloud storage.
+

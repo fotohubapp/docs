@@ -1,90 +1,67 @@
-# Agent Sandboxes & Firecracker microVMs
+# Firecracker microVM Sandboxes & Virtual Workspaces
 
-Execute untrusted agent-generated code, shell scripts, and multi-step data processing tasks in high-isolation microVMs booted in under 200 milliseconds.
+Execute untrusted agent-generated code, statistical algorithms, and data processing tasks in high-isolation microVMs booted in under **200 milliseconds**.
 
-Managed by the **Agent Compute Engine** (`server/agent-compute/`), sandboxes isolate each tenant session using hardware-level KVM virtualization backed by AWS Firecracker with an automated Docker container fallback.
+Managed by the **Agent Compute Engine** (`server/agent-compute/` on port 8795), sandboxes isolate tenant code using hardware-assisted Linux KVM virtualization backed by AWS Firecracker, with automatic fallback to Docker cgroups v2.
 
 ---
 
-## Sandbox Architecture & Security Boundary
+## Sandbox Security Boundary & Vsock Architecture
+
+Traditional container sandboxes (Docker, LXC) share the host Linux kernel and rely purely on namespaces and cgroups, leaving them vulnerable to kernel privilege escalation and escape exploits.
+
+FOTOhub Sandboxes run inside genuine hardware microVMs created by the Linux KVM hypervisor:
 
 ```mermaid
 flowchart TD
-    subgraph Host Environment (Bare Metal KVM)
-        A["Agent Task Execution (POST /sandbox/exec-python)"] --> B["SandboxManager"]
-        B --> C{"KVM Available?"}
-        C -->|"Yes (Production Bare-Metal)"| D["Warm Firecracker Pool (CID 100+)"]
-        C -->|"No (Fallback Environment)"| E["Docker Container Sandbox (cgroups v2)"]
+    subgraph Host OS (Bare-Metal KVM Compute Node)
+        A["API Request (POST /sandbox/exec-python)"] --> B["SandboxManager"]
+        B --> C{"Pre-Warmed Pool Ready?"}
+        C -->|"Yes (p50: 142ms)"| D["Acquire Warm Firecracker VM"]
+        C -->|"No (p50: 210ms)"| E["Spawn New Firecracker Jailer"]
         
-        D --> F["vsock Channel (Guest Port 9999)"]
-        E --> F2["Local Pipe / Standard I/O"]
+        D & E --> F["Host virtio-vsock Channel (Port 9999)"]
     end
 
-    subgraph Firecracker microVM Jail (Guest Environment)
-        F --> G["Execution Guest Daemon"]
-        G --> H["Isolated Memory & vCPU (Max 2GB RAM / 1 vCPU)"]
-        G --> I["Seccomp BPF Syscall Filter"]
-        G --> J["Workspace Directory (/sandbox/workspace)"]
+    subgraph Firecracker MicroVM Jail (Hardware KVM Guest)
+        F --> G["Guest Execution Daemon (exec_daemon.py)"]
+        G --> H["Isolated vCPU & Memory (Max 2GB RAM / 1 vCPU)"]
+        G --> I["Seccomp BPF Syscall Filter (Blocks raw sockets)"]
+        G --> J["Workspace Directory Mount (/sandbox/workspace)"]
     end
 
-    subgraph Persistent Storage Layer
+    subgraph Persistent Storage
         J <--> K["User Persistent Workspace (/data/workspaces/{user_id})"]
     end
 
     G --> L["Result Envelope ({ok, value, stdout, stderr, duration_ms})"]
 ```
 
----
+### Core Security Guarantees
 
-## Core Security & Performance Guarantees
-
-1. **Sub-200ms Cold Starts**: The `SandboxManager` maintains a warm pool (`pool_size=3`) of pre-booted microVMs. When an execution request arrives, a VM is claimed instantaneously without the multi-second boot latency of traditional virtualization.
-2. **Vsock Communication (Zero TCP/IP Attack Surface)**: Host-to-guest communications flow strictly across Linux `virtio-vsock` (Context ID + Port 9999). The guest kernel has no virtual network interfaces, preventing Server-Side Request Forgery (SSRF) and local intranet scanning.
-3. **Seccomp BPF Syscall Filtering**: Blocks privilege escalation and prevents malicious kernel calls.
-4. **Persistent Virtual Workspace**: Files created or modified during execution persist in `/data/workspaces/{user_id}` and map directly to `/sandbox/workspace` across subsequent runs.
-5. **Deterministic Value Extraction**: Code results assigned to `result = ...` are serialized and parsed cleanly through sentinel stream delimiters (`__FOTOHUB_RESULT__`), preventing stdout noise from corrupting programmatic outputs.
+1. **Zero TCP/IP Attack Surface**: Host-to-guest communications flow strictly across Linux `virtio-vsock` (Context ID + Port 9999). The guest kernel contains **no virtual ethernet devices (`eth0`)**, preventing Server-Side Request Forgery (SSRF), internal intranet probing, and network flooding.
+2. **KVM Jailer Sandboxing**: Firecracker processes are locked inside an unprivileged jail using `chroot`, `unshare`, custom cgroups, and strict Seccomp filters that deny over 200 system calls.
+3. **Sub-200ms Cold Execution**: The `SandboxManager` maintains a dynamically replenished pool of pre-booted microVMs (`pool_size=3`), completely eliminating traditional VM startup delays.
+4. **Deterministic Sentinel Value Parsing**: Return values assigned to `result = ...` are extracted via atomic stream sentinels (`__FOTOHUB_RESULT__`), ensuring noisy stdout logs never corrupt programmatic JSON responses.
 
 ---
 
-## Executing Python Code in Sandboxes
+## Sandbox REST API Reference
 
-Send arbitrary Python code with structured input variables:
+### 1. Execute Python Code: `POST /sandbox/exec-python`
 
-### Endpoint: `POST /sandbox/exec-python`
-
-#### Headers
-- `Authorization: Bearer fh_live_...`
-- `Content-Type: application/json`
+Run arbitrary Python scripts with typed inputs and structured return values.
 
 #### Request Parameters
 
 | Parameter | Type | Required | Default | Description |
-|:---|:---|:---|:---|:---|
-| `code` | string | **Yes** | — | Python snippet to execute. Assign output to `result = ...`. |
+|:---|:---|:---:|:---:|:---|
+| `code` | string | **Yes** | — | Python code snippet. Assign final output to `result = ...`. |
 | `input` | object | No | `{}` | Key-value dictionary injected as the predefined global `input`. |
 | `timeout_s` | integer | No | `30` | Maximum execution time in seconds (1 to 120). |
 | `memory_mb` | integer | No | `512` | Memory ceiling in megabytes (up to 2048 MB). |
 
-#### Response Example
-
-```json
-{
-  "ok": true,
-  "value": {
-    "sample_count": 1000,
-    "mean": 50.04,
-    "std_dev": 9.98
-  },
-  "stdout": "Loaded 1,000 observations successfully.\nComputed standard summary metrics.\n",
-  "stderr": "",
-  "error": null,
-  "duration_ms": 142
-}
-```
-
----
-
-## Multi-Language SDK Examples
+#### Request Example
 
 ::: code-group
 
@@ -94,36 +71,23 @@ import os
 
 client = FotoHub(api_key=os.environ["FOTOHUB_API_KEY"])
 
-# Execute statistical analysis with structured inputs & outputs
-execution = client.post("/sandbox/exec-python", {
+response = client.post("/sandbox/exec-python", {
     "code": """
 import numpy as np
-
-# 'input' dictionary is automatically injected
-raw_data = input.get("values", [])
-arr = np.array(raw_data)
-
-mean_val = float(np.mean(arr))
-p95_val = float(np.percentile(arr, 95))
-
-# Assign final return object to 'result'
+data = np.array(input['measurements'])
 result = {
-    "count": len(arr),
-    "mean": round(mean_val, 2),
-    "p95": round(p95_val, 2)
+    "count": len(data),
+    "mean": float(np.mean(data)),
+    "p95": float(np.percentile(data, 95))
 }
-print(f"Calculated p95={result['p95']} across {result['count']} items")
-    """,
-    "input": {
-        "values": [12.4, 45.1, 89.3, 102.5, 4.2, 78.9, 120.4, 65.2]
-    },
-    "timeout_s": 15,
+print("Calculation complete.")
+""",
+    "input": {"measurements": [12.4, 15.8, 14.2, 28.5, 13.9, 14.1]},
+    "timeout_s": 10,
     "memory_mb": 512
 })
 
-print("Success:", execution["ok"])
-print("Returned Data:", execution["value"])
-print("Console Output:", execution["stdout"])
+print(response)
 ```
 
 ```typescript [TypeScript]
@@ -131,131 +95,123 @@ import { FotoHub } from "fotohub";
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
 
-async function executeSandboxCode() {
-  const response = await client.post("/sandbox/exec-python", {
+async function runSandbox() {
+  const res = await client.post("/sandbox/exec-python", {
     code: `
 import math
-
-radius = input.get("radius", 1.0)
-area = math.pi * (radius ** 2)
-circumference = 2 * math.pi * radius
-
-result = {"radius": radius, "area": round(area, 4), "circumference": round(circumference, 4)}
-print("Area calculated successfully.")
-    `,
-    input: { radius: 14.5 },
-    timeout_s: 10,
+radius = input['radius']
+result = {"circumference": 2 * math.pi * radius, "area": math.pi * (radius ** 2)}
+`,
+    input: { radius: 10 },
+    timeout_s: 5,
   });
 
-  console.log("Returned value:", response.data.value);
-  console.log("Stdout:", response.data.stdout);
+  console.log("Calculated:", res.data.value);
 }
 
-executeSandboxCode();
-```
-
-```go [Go]
-package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-)
-
-type ExecRequest struct {
-	Code     string                 `json:"code"`
-	Input    map[string]interface{} `json:"input"`
-	TimeoutS int                    `json:"timeout_s"`
-}
-
-func main() {
-	payload := ExecRequest{
-		Code: "import sys
-print('Python version:', sys.version)
-result = {'status': 'healthy'}
-",
-		Input: map[string]interface{}{"service": "analyzer"},
-		TimeoutS: 10,
-	}
-
-	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	respBytes, _ := io.ReadAll(resp.Body)
-	fmt.Println("Result:", string(respBytes))
-}
+runSandbox();
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/sandbox/exec-python   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "code": "result = {"sum": sum(input["numbers"])}; print("Done")",
-    "input": {"numbers": [10, 20, 30, 40, 50]},
-    "timeout_s": 5
+curl -X POST https://apis.fotohub.app/sandbox/exec-python \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "result = {\"sum\": sum(input[\"numbers\"])}",
+    "input": {"numbers": [10, 20, 30, 40]},
+    "timeout_s": 10
   }'
 ```
 
 :::
 
----
+#### Response Example
 
-## Virtual Workspace File Management
-
-Files placed into `/sandbox/workspace/` persist across executions and can be managed directly via REST:
-
-### 1. List Files in Workspace
-
-```bash
-curl -X GET https://apis.fotohub.app/v1/workspace/files   -H "Authorization: Bearer $FOTOHUB_API_KEY"
-```
-
-Response:
 ```json
 {
-  "files": [
-    {
-      "path": "distribution.csv",
-      "size_bytes": 14920,
-      "modified_at": "2026-09-06T15:20:00Z"
-    },
-    {
-      "path": "charts/retention.png",
-      "size_bytes": 184910,
-      "modified_at": "2026-09-06T15:22:15Z"
-    }
-  ]
+  "ok": true,
+  "value": {
+    "count": 6,
+    "mean": 16.483333333333334,
+    "p95": 25.225
+  },
+  "stdout": "Calculation complete.\n",
+  "stderr": "",
+  "error": null,
+  "duration_ms": 142
 }
 ```
 
-### 2. Upload Data into Workspace
+---
 
-Upload CSVs, images, or reference files for sandbox scripts to process:
+### 2. Execute Shell Commands: `POST /sandbox/exec-bash`
 
-```bash
-curl -X POST https://apis.fotohub.app/v1/workspace/upload   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -F "file=@./dataset.csv"   -F "path=data/dataset.csv"
-```
-
-### 3. Download Artifact from Workspace
-
-Download files generated by sandboxed scripts:
+Execute arbitrary bash commands, compile source code, or run test suites.
 
 ```bash
-curl -X GET https://apis.fotohub.app/v1/workspace/download/charts/retention.png   -H "Authorization: Bearer $FOTOHUB_API_KEY"   --output "retention_chart.png"
+curl -X POST https://apis.fotohub.app/sandbox/exec-bash \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "command": "python3 -m unittest discover -s /sandbox/workspace/tests",
+    "timeout_s": 30
+  }'
 ```
 
-### 4. Delete File from Workspace
+#### Response Example
+
+```json
+{
+  "ok": true,
+  "exit_code": 0,
+  "stdout": "Ran 12 tests in 0.045s\n\nOK\n",
+  "stderr": "",
+  "duration_ms": 185
+}
+```
+
+---
+
+### 3. Workspace File Management
+
+Files placed in `/sandbox/workspace` automatically persist between executions for the authenticated user.
+
+| Endpoint | Method | Description |
+|:---|:---|:---|
+| `/sandbox/workspace/files` | `GET` | List all files in the virtual workspace. |
+| `/sandbox/workspace/upload` | `POST` | Multipart upload a file into `/sandbox/workspace/{path}`. |
+| `/sandbox/workspace/download/{path}` | `GET` | Download a file generated by the sandbox. |
+| `/sandbox/workspace/reset` | `DELETE` | Purge all workspace files and reset to empty state. |
+
+#### Example: Uploading Data and Downloading Results
 
 ```bash
-curl -X DELETE https://apis.fotohub.app/v1/workspace/files/data/dataset.csv   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+# 1. Upload a CSV dataset to workspace
+curl -X POST https://apis.fotohub.app/sandbox/workspace/upload \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -F "file=@sales_2026.csv" \
+  -F "path=/sandbox/workspace/data/sales.csv"
+
+# 2. Process data in sandbox and generate output chart
+curl -X POST https://apis.fotohub.app/sandbox/exec-python \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "import pandas as pd; df = pd.read_csv(\"/sandbox/workspace/data/sales.csv\"); df.describe().to_csv(\"/sandbox/workspace/summary.csv\"); result = {\"rows\": len(df)}"
+  }'
+
+# 3. Download the generated summary CSV
+curl -X GET https://apis.fotohub.app/sandbox/workspace/download/summary.csv \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -o summary.csv
 ```
+
+---
+
+## Pre-Installed Scientific Libraries
+
+Every microVM runtime image includes optimized binaries for standard Python packages:
+- **Data & Math:** `numpy`, `pandas`, `scipy`, `sympy`, `scikit-learn`
+- **Visualization:** `matplotlib` (Agg headless), `seaborn`
+- **Text & Parsing:** `beautifulsoup4`, `lxml`, `regex`, `pypdf`, `pdfminer.six`
+- **Utilities:** `requests`, `pytz`, `dateutil`, `pillow` (PIL)\n

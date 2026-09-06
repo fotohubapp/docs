@@ -174,3 +174,23 @@ Every customer instance is deployed into dedicated network spaces with multi-lay
 2. **KMS-Encrypted Disk Storage**: Root and attached EBS volumes use XTS-AES-256 encryption at rest.
 3. **Automated SSH Ephemeral Keys**: Private keys are generated dynamically during provisioning, encrypted via KMS, and downloadable once via authenticated API.
 4. **Prepaid Wallet Continuous Enforcement**: Instances are continuously metered against your available USD balance. If your balance is exhausted, instances are gracefully stopped (`ec2.stop_instance`) rather than incurring runaway debt.
+
+---
+
+## Integrated Storage & Data Pipelines
+
+Compute is tightly integrated with FOTOhub's persistent block and object storage hierarchy:
+
+```mermaid
+flowchart LR
+    A["EC2 GPU Compute (eu-central-1)"] <-->|NVMe Mount| B["EBS gp3 Persistent Volumes"]
+    A <-->|Zero Egress S3 API| C["FOTOhub S3 Storage ($0.0245/GB-mo)"]
+    A -->|Direct Stream| D["BYOB External Destinations"]
+    D --> E["AWS S3 / Cloudflare R2 / GCS / Supabase"]
+```
+
+- **[EBS Persistent Volumes & Snapshots](/compute/volumes-storage)**: Attach high-IOPS NVMe disks up to 4 TB for persistent model weights (`/data/models`) and datasets. Hot-resize online without unmounting.
+- **[FOTOhub S3 Cloud Storage](/api/storage)**: Fully S3-compatible managed object storage in Frankfurt with flat $0.0245/GB-month pricing and **$0.00 intra-cluster egress**.
+- **[Output Destinations (BYOB)](/api/destinations)**: Stream rendered images, video edits, and 3D files directly into your own external buckets across AWS, Cloudflare R2, GCP, or Supabase.
+- **[Delivery to Your Bucket Guide](/guides/bucket-delivery)**: Step-by-step tutorial on connecting and verifying external S3/R2 storage with FOTOhub APIs.
+
