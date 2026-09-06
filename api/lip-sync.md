@@ -3,18 +3,18 @@
 Generate perfectly synchronized lip-synced videos by combining face video footage with any audio track. FOTOhub's Lip-Sync API supports three distinct engines optimized for different quality and speed requirements — from real-time previews to ultra-high-fidelity 4K production output.
 
 ::: info Overview
-The Lip-Sync API is asynchronous — submit a job and receive a `job_id` for polling or webhook delivery. All engines accept standard video and audio formats, and output MP4 or WebM with configurable resolution. Credits are charged per job regardless of input duration (within model limits).
+The Lip-Sync API is asynchronous — submit a job and receive a `job_id` for polling or webhook delivery. All engines accept standard video and audio formats, and output MP4 or WebM with configurable resolution. Requests are billed in USD from your prepaid wallet per job.
 :::
 
 ---
 
 ## Engine Comparison
 
-| Engine | Architecture | Max Resolution | Max Duration | Speed | Credits | Best For |
-|--------|-------------|---------------|--------------|-------|---------|----------|
-| `musetalk` | Real-time feed-forward | 512x512 | 60s | ~3s/frame | 8 | Real-time previews, drafts, social media |
-| `latentsync` | Diffusion-based | 1024x1024 | 30s | ~8s/frame | 15 | HD content, YouTube, presentations |
-| `facefusion` | Multi-stage pipeline | 3840x2160 (4K) | 120s | ~15s/frame | 20 | Film production, commercials, broadcast |
+| Engine | Architecture | Max Resolution | Max Duration | Speed | USD Price | Best For |
+|--------|-------------|---------------|--------------|-------|-----------|----------|
+| `musetalk` | Real-time feed-forward | 512x512 | 60s | ~3s/frame | $0.43 | Real-time previews, drafts, social media |
+| `latentsync` | Diffusion-based | 1024x1024 | 30s | ~8s/frame | $0.80 | HD content, YouTube, presentations |
+| `facefusion` | Multi-stage pipeline | 3840x2160 (4K) | 120s | ~15s/frame | $1.07 | Film production, commercials, broadcast |
 
 ### Engine Details
 

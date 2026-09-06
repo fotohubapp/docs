@@ -1,6 +1,6 @@
 # Token-Based Billing
 
-Some models (SeedDream image models, premium FOTOhub AI chat models) use token-based billing where cost scales with actual usage rather than fixed credits.
+Some models (SeedDream image models, premium FOTOhub AI chat models) use token-based billing where cost scales with actual output/token usage charged directly to your prepaid USD wallet.
 
 ## How It Works
 
@@ -60,10 +60,13 @@ Token-based responses include detailed cost breakdown:
 
 ```json
 {
+  "cost_usd": 0.049152,
+  "currency": "USD",
   "billing": {
-    "method": "token",
-    "credits_used": 2,
-    "usd_charged": 0,
+    "method": "wallet",
+    "cost_usd": 0.049152,
+    "balance_usd": 39.9508,
+    "currency": "USD",
     "cost_breakdown": {
       "output_tokens": 16384,
       "cost_usd": 0.049152,

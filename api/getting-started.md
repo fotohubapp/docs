@@ -76,7 +76,7 @@ response = requests.post(
 
 result = response.json()
 print(f"Image URL: {result['url']}")
-print(f"Credits used: {result['billing']['credits_used']}")
+print(f"Cost: ${result['billing']['cost_usd']}")
 ```
 
 ```typescript [TypeScript]
@@ -100,7 +100,7 @@ const response = await fetch(
 
 const result = await response.json();
 console.log(`Image URL: ${result.url}`);
-console.log(`Credits used: ${result.billing.credits_used}`);
+console.log(`Cost: $${result.billing.cost_usd}`);
 ```
 
 ```bash [cURL]
@@ -120,7 +120,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
 
 ### Step 3: Check Your Balance
 
-Verify your remaining credits and wallet balance to ensure you have sufficient funds for continued usage.
+Verify your wallet balance in Console or programmatically to ensure you have sufficient USD funds for continued usage.
 
 ::: code-group
 
@@ -131,8 +131,7 @@ response = requests.get(
 )
 
 balance = response.json()
-print(f"Credits remaining: {balance['credits']['remaining_period']}")
-print(f"Wallet balance: ${balance['wallet']['balance']}")
+print(f"Wallet balance: ${balance['wallet']['balance_usd']}")
 ```
 
 ```typescript [TypeScript]
@@ -146,8 +145,7 @@ const response = await fetch(
 );
 
 const balance = await response.json();
-console.log(`Credits remaining: ${balance.credits.remaining_period}`);
-console.log(`Wallet balance: $${balance.wallet.balance}`);
+console.log(`Wallet balance: $${balance.wallet.balance_usd}`);
 ```
 
 ```bash [cURL]
@@ -161,15 +159,14 @@ curl https://apis.fotohub.app/v1/billing/balance \
 
 ```json
 {
-  "tier": "starter",
-  "credits": {
-    "remaining_4h": 45,
-    "remaining_period": 890
-  },
   "wallet": {
-    "balance": 40.00,
+    "balance_usd": 40.00,
+    "pending_usd": 0.0,
+    "total_topped_up_usd": 60.0,
     "currency": "USD"
-  }
+  },
+  "billing_model": "prepaid_wallet_usd",
+  "api_subscription": null
 }
 ```
 
@@ -185,7 +182,7 @@ Authorization: Bearer fh_live_your_api_key_here
 
 | Prefix | Environment | Description |
 |--------|-------------|-------------|
-| `fh_live_` | Production | Full access, charges real credits/wallet |
+| `fh_live_` | Production | Full access, charges prepaid USD wallet |
 | `fh_test_` | Sandbox | Limited models, no billing charges |
 
 ### Required Headers
@@ -240,18 +237,14 @@ Every successful API response includes the requested data along with a `billing`
     "seed": 4281937562,
     "inference_time_ms": 3420
   },
+  "cost_usd": 0.0492,
+  "currency": "USD",
   "billing": {
-    "credits_used": 5,
-    "credits_remaining": 495,
-    "wallet_charged": 0.00,
-    "wallet_balance": 150.00,
-    "cost_breakdown": {
-      "base_cost": 4,
-      "resolution_multiplier": 1.0,
-      "steps_multiplier": 1.0,
-      "total": 5
-    },
-    "billing_mode": "credits"
+    "cost_usd": 0.0492,
+    "balance_usd": 149.9508,
+    "currency": "USD",
+    "method": "wallet",
+    "model": "prepaid"
   }
 }
 ```
@@ -274,21 +267,17 @@ Error responses follow a consistent structure with an `error` object:
 
 ## Billing Overview
 
-FOTOhub uses a dual-mode billing system designed for flexibility.
+FOTOhub's API uses a transparent **prepaid USD wallet**.
 
-### Credits (Prepaid)
+### Prepaid USD Wallet
 
-Monthly allowance included with your subscription tier. Credits are consumed first for every billable operation. Unused credits do not roll over to the next billing period.
+Every billed API request is charged directly against your USD wallet balance at the provider's own rate (1:1). Top up your wallet in [Console → Wallet](https://fotohub.app/console/wallet) via card, BLIK, or bank transfer.
 
-### Wallet (Pay-per-use)
-
-USD balance that acts as a fallback when credits are exhausted. Top up via card, BLIK, or bank transfer (a PLN checkout still credits the same USD amount). Charged at per-operation rates: provider cost x 1.5 margin.
-
-::: tip Billing Priority
-Credits are always deducted first. When your monthly credit allowance is exhausted, the system automatically falls back to your wallet balance. Some models (BytePlus SeedDream image models, premium FOTOhub AI chat models) use token-based billing where cost is calculated per input/output token rather than a fixed credit amount per operation.
+::: warning No API Credits
+The FOTOhub API is prepaid USD only: there are no API credits or free tiers. Subscription credits belong exclusively to the consumer web app (fotohub.app) and cannot fund API requests. At a $0 balance, all billed API endpoints return `402 Payment Required`.
 :::
 
-See [Billing & Pricing](/api/billing) for full details on credit costs per model, wallet top-up, and invoicing.
+See [Billing & Pricing](/api/billing) for full details on model pricing, wallet top-ups, and invoicing.
 
 ## Rate Limits
 
@@ -361,7 +350,7 @@ image = client.images.generate(
 )
 
 print(f"URL: {image.url}")
-print(f"Credits used: {image.billing.credits_used}")
+print(f"Cost: ${image.billing.cost_usd}")
 ```
 
 ```typescript [TypeScript]
@@ -380,7 +369,7 @@ const image = await client.images.generate({
 });
 
 console.log(`URL: ${image.url}`);
-console.log(`Credits used: ${image.billing.creditsUsed}`);
+console.log(`Cost: $${image.billing.costUsd}`);
 ```
 
 :::
@@ -397,10 +386,10 @@ console.log(`Credits used: ${image.billing.creditsUsed}`);
 ## Next Steps
 
 - [Authentication](/api/authentication) — Key types, scopes, rotation, and JWT auth
-- [Image Generation](/api/image-generation) — 25+ models, credit and token billing
+- [Image Generation](/api/image-generation) — 25+ models, per-image USD billing
 - [Video Generation](/api/video-generation) — Veo, Kling, Hailuo, Seedance
 - [Music & Audio](/api/music-audio) — IDA Music, sound effects, TTS
 - [Chat / LLM](/api/chat-llm) — Claude, GPT-4o, Gemini, DeepSeek
-- [Billing & Pricing](/api/billing) — Understand credits, tokens, wallet
+- [Billing & Pricing](/api/billing) — Prepaid USD wallet, rates, top-up
 - [Webhooks](/api/webhooks) — Real-time event notifications
 - [Error Handling](/api/errors) — Detailed error codes and troubleshooting

@@ -757,8 +757,8 @@ fotohub gen image "a cat" --json | jq '.images[0].url'
 fotohub models list --json | jq '.[] | select(.category == "image") | .id'
 
 # Check balance programmatically
-CREDITS=$(fotohub billing balance --json | jq '.credits_remaining')
-echo "Remaining: $CREDITS"
+BALANCE=$(fotohub billing balance --json | jq '.wallet.balance_usd')
+echo "Wallet Balance: \$$BALANCE"
 
 # Generate and immediately open
 URL=$(fotohub gen image "sunset" --json | jq -r '.images[0].url')

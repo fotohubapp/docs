@@ -42,7 +42,7 @@ response = client.chat(
 
 # chat() returns a plain dict, not an object -- index it.
 print(response["choices"][0]["message"]["content"])
-print(f"Credits: {response['credits_used']}")
+print(f"Cost: ${response.get('billing', {}).get('cost_usd', 0)}")
 ```
 ```typescript [TypeScript]
 import { FotoHub } from "fotohub";
@@ -58,12 +58,12 @@ const response = await client.chat({
 });
 
 console.log(response.choices[0].message.content);
+console.log(`Cost: $${response.billing?.cost_usd ?? 0}`);
 ```
 :::
 
-::: warning Do not rely on `usage` here
-`credits_used` is authoritative — billing on this endpoint is a flat per-request
-credit charge, so it is always populated.
+::: tip Billing block is authoritative
+`billing.cost_usd` is authoritative — billing on chat endpoints is metered by token counts charged directly to your prepaid USD wallet.
 
 `usage` is also present in the response, but it is passed straight through from
 the upstream provider and falls back to an empty object `{}` when the provider

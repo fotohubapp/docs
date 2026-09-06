@@ -455,28 +455,17 @@ curl -X POST "https://apis.fotohub.app/v1/ai/agent/stream" \
 
 Tokens are the fundamental unit of text processing for LLMs. A token is approximately 4 characters or 0.75 words in English. Both input (prompt) and output (completion) tokens are counted toward billing.
 
-### Credit-Based (OpenAI-Compatible Endpoint)
+### Token-Based USD Wallet Billing
 
-- Per-token pricing in credits (input and output rated separately)
-- Charges are fractional — a two-word reply costs a fraction of a credit
-- Billed **after** the completion, from the token counts the model reports, because
-  they are not knowable before the call. A request that exhausts your balance
-  mid-flight still returns that one completion before the next call gets a `402`
+- Per-token pricing in USD (input and output rated separately at 1:1 provider cost)
+- Billed directly from your prepaid USD wallet balance
+- Billed **after** the completion, from the token counts the model reports, because they are not knowable before the call
+- A pre-flight check validates that your wallet has available funds before dispatching to the provider
 - Nothing is charged if the provider errors, so there is no refund to wait for
-- The wallet charge, once credits run out, scales with token count too
-- `billing.basis` tells you which rate was applied: `tokens` normally, or
-  `flat_fallback` in the rare case a provider branch returns no usage figures
-
-### Token-Based (Premium Endpoint)
-
-- Per-token pricing (input + output separately)
-- Input tokens typically cheaper than output tokens
-- Exact cost shown in the `cost_breakdown` field
-- Minimum credit charge applies per request
-- Cost = (input_tokens x input_rate) + (output_tokens x output_rate)
+- Exact cost and remaining balance are returned in the `billing` object
 
 ::: tip Estimating Costs
-A typical conversational exchange (100-word prompt, 200-word response) uses approximately 75 input tokens + 150 output tokens = 225 total tokens. On `gemini-flash` that is 0.026 credits; on `claude-sonnet` 0.165 credits. On the premium endpoint, `claude-sonnet-4.6` works out to roughly $0.0037.
+A typical conversational exchange (100-word prompt, 200-word response) uses approximately 75 input tokens + 150 output tokens = 225 total tokens. On `gemini-flash` that costs ~$0.00003; on `claude-sonnet-4.6` it works out to roughly $0.0037.
 :::
 
 ---
@@ -574,7 +563,9 @@ func main() {
 
 	usage := data["usage"].(map[string]interface{})
 	fmt.Printf("Tokens used: %.0f\n", usage["total_tokens"])
-	fmt.Printf("Credits used: %.0f\n", data["credits_used"])
+	if b, ok := data["billing"].(map[string]interface{}); ok {
+		fmt.Printf("Cost: $%.6f\n", b["cost_usd"])
+	}
 }
 ```
 

@@ -42,7 +42,7 @@ User Input → Gabriel Orchestrator
 ### Key Features
 
 - **Dynamic Model Awareness** — Only recommends models that are currently healthy (checked every 60s)
-- **Cost Optimization** — Routes to the best quality-per-credit model for each task
+- **Cost Optimization** — Routes to the most cost-effective model for each task
 - **10 Function-Calling Tools** — Image, Video, Chat, Music, 3D, Editing, Brand, Tools, Workflows, Q&A
 - **Multi-language** — Natively handles PL, EN, DE, FR, ES + 25 more
 - **Zero Extra Cost** — Gabriel routing is free; you only pay for the downstream generation
@@ -98,9 +98,9 @@ Every prompt passes through FOTOhub's own prompt engine before generation — au
 
 ### Pricing
 
-| Model | Credits | USD (wallet fallback) | Unit |
-|-------|---------|-----------------------|------|
-| IDA Q 1.0 | 0.5 | $0.027 | per request |
+| Model | USD (API Wallet) | Credits (Web App) | Unit |
+|-------|------------------|-------------------|------|
+| IDA Q 1.0 | $0.027 | 0.5 | per request |
 
 ::: tip Cost Advantage
 IDA Q 1.0 costs a fraction of Google's Nano Banana (Gemini Flash Image) and roughly 20x less than GPT Image 2 — a direct result of running on our own infrastructure with zero third-party licensing cost to pass through.
@@ -179,11 +179,11 @@ IDA Music supports detailed structural tags for professional music production:
 
 ### Pricing
 
-| Duration | Credits | USD (wallet fallback) |
-|----------|---------|-----------------------|
-| ≤ 30 seconds | 5 | $0.27 |
-| 31–60 seconds | 10 | $0.54 |
-| > 60 seconds | 25 | $1.34 |
+| Duration | USD (API Wallet) | Credits (Web App) |
+|----------|------------------|-------------------|
+| ≤ 30 seconds | $0.27 | 5 |
+| 31–60 seconds | $0.54 | 10 |
+| > 60 seconds | $1.34 | 25 |
 
 ::: tip Cost Advantage
 Running on our own infrastructure means: lower latency for European users, no external rate limits, and full control over output quality.
@@ -227,9 +227,9 @@ FOTOhub's proprietary voice synthesis system providing natural-sounding speech w
 
 ### Pricing
 
-| Model | Credits | Per |
-|-------|---------|-----|
-| IDA Voice | 2 | 1,000 characters |
+| Model | USD (API Wallet) | Credits (Web App) | Per |
+|-------|------------------|-------------------|-----|
+| IDA Voice | $0.1072 | 2 | 1,000 characters |
 
 ### API Access
 
@@ -254,9 +254,9 @@ Instant generation of sound effects and ambient audio from text descriptions.
 
 ### Pricing
 
-| Credits | Per |
-|---------|-----|
-| 3 | generation (any duration) |
+| USD (API Wallet) | Credits (Web App) | Per |
+|------------------|-------------------|-----|
+| $0.1608 | 3 | generation (any duration) |
 
 ### API Access
 
@@ -311,8 +311,8 @@ All proprietary models run on FOTOhub's dedicated GPU cluster:
 
 | Capability | FOTOhub | Cloud-Only |
 |-----------|---------|------------|
-| Music generation (8 min) | 4 credits (~$0.30) | $2–5 per track |
-| Voice synthesis | 2 credits/1K chars | $0.015–0.030/1K chars |
+| Music generation (8 min) | $0.27–$1.34 ($0.03/min base) | $2–5 per track |
+| Voice synthesis | $0.1072/1K chars | $0.015–0.030/1K chars |
 | Intelligent routing | Free (Gabriel) | Not available |
 | Model selection | Automatic, 50+ models | Manual, 1 provider |
 | Prompt enhancement | Free, per-model optimized | Not available |

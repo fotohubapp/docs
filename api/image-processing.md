@@ -972,23 +972,22 @@ curl -X POST https://apis.fotohub.app/v1/images/batch \
 
 ## Pricing
 
-| Operation | Credits | USD Cost | Description |
-|-----------|---------|----------|-------------|
-| Color Grade | 1 | $0.0536 | Preset or manual color grading |
-| Enhance | 1 | $0.0536 | AI auto-enhancement |
-| Denoise | 1 | $0.0536 | AI noise reduction |
-| Colorize | 2 | $0.1072 | B&W to color |
-| Face Restore | 2 | $0.1072 | CodeFormer/GFPGAN face restoration |
-| Depth Map | 2 | $0.1072 | Monocular depth estimation |
-| CLIP Tag | 1 | $0.0536 | Auto-tagging with confidence scores |
-| CLIP Embed | 1 | $0.0536 | Vector embedding generation |
-| Batch | 1/image | $0.0536/image | Per-image cost, operations do not multiply cost |
+| Operation | USD Cost | Web App Credits | Description |
+|-----------|----------|-----------------|-------------|
+| Color Grade | $0.0536 | 1 | Preset or manual color grading |
+| Enhance | $0.0536 | 1 | AI auto-enhancement |
+| Denoise | $0.0536 | 1 | AI noise reduction |
+| Colorize | $0.1072 | 2 | B&W to color |
+| Face Restore | $0.1072 | 2 | CodeFormer/GFPGAN face restoration |
+| Depth Map | $0.1072 | 2 | Monocular depth estimation |
+| CLIP Tag | $0.0536 | 1 | Auto-tagging with confidence scores |
+| CLIP Embed | $0.0536 | 1 | Vector embedding generation |
+| Batch | $0.0536/image | 1/image | Per-image cost, operations do not multiply cost |
 
-USD amounts are the wallet fallback at **$0.0536 per credit**, billed only after
-your plan's monthly credit allowance is used up.
+API operations are charged directly in USD from your prepaid wallet balance at the rates shown above. Web app credits apply only to the consumer dashboard at fotohub.app.
 
 ::: info Batch Pricing
-Batch processing charges **1 credit per image** regardless of how many operations are in the pipeline. A batch of 10 images with 3 operations each costs 10 credits total, not 30.
+Batch processing charges **$0.0536 per image** regardless of how many operations are in the pipeline. A batch of 10 images with 3 operations each costs $0.536 total.
 :::
 
 ---

@@ -11,15 +11,15 @@ Side-by-side comparison of FOTOhub with common AI API providers.
 | Music generation | Yes | Limited | No | No | No |
 | 3D generation | Yes | Limited | No | No | Limited |
 | Chat/LLM | Yes | No | No | Yes | No |
-| Unified billing | Yes | Yes | Yes | Yes | Yes |
-| Fixed-price credits | Yes | No | Yes | No | No |
+| Unified prepaid wallet | Yes | Yes | Yes | Yes | Yes |
+| 1:1 Provider pricing | Yes | No | No | No | No |
 | Auto-failover | Yes | No | No | No | No |
 | Gabriel AI routing | Yes | No | No | No | No |
 | EU data residency | Yes | No | No | No | No |
 | Self-hosted option | Yes | No | No | No | No |
 | Webhooks | Yes | Yes | No | No | Yes |
 | SDK languages | 3 | 2 | 2 | 4 | 2 |
-| Free tier | 50 cr/mo | No | No | $5 once | No |
+| Free sandbox testing | Yes (fh_test_*) | No | No | $5 once | No |
 
 ## Price Comparison
 
@@ -27,8 +27,8 @@ Generating a single 1024x1024 image:
 
 | Provider | Model | Cost | Speed |
 |----------|-------|------|-------|
-| **FOTOhub** | Seedream 5.0 | ~$0.049 (2 cr) | ~2s |
-| **FOTOhub** | FLUX 2 Pro | ~$0.048 (1 cr) | ~4s |
+| **FOTOhub** | Seedream 5.0 | ~$0.049 | ~2s |
+| **FOTOhub** | FLUX 2 Pro | ~$0.048 | ~4s |
 | Replicate | FLUX Pro | ~$0.055 | ~5s |
 | Stability | SD3 Medium | $0.035 | ~3s |
 | OpenAI | DALL-E 3 | $0.040 | ~8s |
@@ -42,10 +42,10 @@ FOTOhub is competitive on price and often faster due to EU-local inference. Seed
 
 | Provider | Model | Cost | Quality |
 |----------|-------|------|---------|
-| **FOTOhub** | Wan 2.2 Plus | ~$0.32 (6 cr) | Great |
-| **FOTOhub** | Veo 3.1 | ~$3.22 (60 cr) | Premium, native audio, up to 4K |
-| **FOTOhub** | Gemini Omni Flash | ~$1.61 (30 cr) | Native audio automatically, no surcharge |
-| **FOTOhub** | Grok Video 1.5 | ~$2.41 (45 cr) | Only generative model with built-in lip-sync |
+| **FOTOhub** | Wan 2.2 Plus | ~$0.32 | Great |
+| **FOTOhub** | Veo 3.1 | ~$3.22 | Premium, native audio, up to 4K |
+| **FOTOhub** | Gemini Omni Flash | ~$1.61 | Native audio automatically, no surcharge |
+| **FOTOhub** | Grok Video 1.5 | ~$2.41 | Only generative model with built-in lip-sync |
 | Replicate | Kling | ~$0.30 | Good |
 | Runway | Gen-3 | ~$0.50 | Premium |
 | Luma | Dream Machine | ~$0.30 | Good |
@@ -97,7 +97,7 @@ result = client.gabriel_classify(
 
 ### 5. Predictable Pricing
 
-Credits-based billing means you know exactly what each operation costs. No surprise bills from token overages or cold-start charges.
+Prepaid USD wallet billing means you know exactly what each operation costs at 1:1 provider rates. No surprise monthly invoices, cold-start fees, or platform surcharges.
 
 ## Migration is Easy
 

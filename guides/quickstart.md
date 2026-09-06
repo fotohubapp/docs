@@ -4,7 +4,7 @@ Get up and running with FOTOhub in under 5 minutes.
 
 ## 1. Create an Account
 
-Sign up at [fotohub.app](https://fotohub.app). You get **50 free credits** on the Free tier (refreshed monthly).
+Sign up at [fotohub.app](https://fotohub.app) and top up your API prepaid wallet in [Console → Wallet](https://fotohub.app/console/wallet).
 
 ## 2. Generate an API Key
 
@@ -58,11 +58,11 @@ result = client.generate_image(
     model="seedream-5-0-260128"
 )
 print(f"Image: {result.images[0]}")
-print(f"Cost: ${result.billing.usd_charged}")
+print(f"Cost: ${result.billing.cost_usd}")
 
 # Check balance
 balance = client.get_balance()
-print(f"Credits remaining: {balance.credits.remaining_period}")
+print(f"Wallet balance: ${balance.wallet.balance_usd}")
 ```
 
 ## 6. Set Up Webhooks (Optional)
