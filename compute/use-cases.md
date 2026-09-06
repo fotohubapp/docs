@@ -20,17 +20,19 @@ Battle-tested architectural blueprints showing how high-growth startups, enterpr
 | **10**| **[E-Commerce 3D Mesh Generator](#10-e-commerce-3d-mesh-generator-farm)** | TripoSR + Quad Remesh | 1x A10G (`g5.xlarge`) Spot | **$0.012 / 3D model** | Single 2D photo to AR-ready GLB/USDZ interactive models |
 | **11**| **[Dynamic Video Ad Personalizer](#11-dynamic-video-ad-personalization-engine)** | MoviePy + NVENC + TTS | 2x T4 (`g4dn.2xlarge`) Spot | **$0.54 / hr** | 1,000 customized TikTok video variations generated per hour |
 | **12**| **[Multi-Agent Coding Swarm with CI](#12-multi-agent-coding-swarm-with-sandboxed-ci)** | Claude Opus + MicroVM CI | Agent Compute + Firecracker | **Per-commit billing** | Autonomous PR bug fixing with verified sandbox test runs |
+| **13**| **[Real-time LLM API Gateway](#13-real-time-llm-api-gateway)** | vLLM + ALB + ASG | g5.xlarge behind ALB | **$0.38 / hr** | OpenAI-compatible endpoint for internal teams with infinite scale |
+| **14**| **[Automated Video Dubbing Pipeline](#14-automated-video-dubbing-pipeline)** | Whisper + Lip-sync | 1x A10G + T4 | **$0.08 / min** | Batch processing 1000 videos/day with zero manual work |
+| **15**| **[Synthetic Data Generation](#15-synthetic-data-generation)** | SDXL + ControlNet | 4x A10G Spot | **$0.00048 / image** | 100k images at fractional cost for model training augmentation |
+| **16**| **[Multi-modal RAG System](#16-multi-modal-rag-system)** | C5 + Vector Search | c5.2xlarge + g4dn | **$0.35 / hr** | Enterprise document embedding and intelligent search capabilities |
+| **17**| **[Autonomous SEO Content Factory](#17-autonomous-seo-content-factory)** | FH Claw + ComfyUI | Agent Compute | **$2 / day** | Fully automated content drafting, image gen, and social publishing |
+| **18**| **[3D Product Asset Pipeline](#18-3d-product-asset-pipeline)** | TripoSR + Texture | 1x A10G (`g5.xlarge`) | **$0.012 / mesh** | 500 product meshes/day generated automatically from 2D images |
+| **19**| **[Real-time Translation & Transcription](#19-real-time-translation-transcription)** | Whisper + NLLB | 1x T4 (`g4dn.xlarge`) | **$0.015 / min** | 1000 hours/month of multilingual transcription pipeline |
 
 ---
 
 ## 1. Enterprise Private LLM Gateway
 
-### The Problem
-Financial institutions, legal firms, and healthcare providers cannot transmit sensitive patient or customer data to commercial cloud AI APIs hosted in the United States due to strict European GDPR (Article 44) and HIPAA regulations.
-
-### The Solution
-Deploy an open-weights model (`Qwen/Qwen2.5-7B-Instruct` or `deepseek-ai/DeepSeek-R1-Distill-Qwen-8B`) inside an isolated FOTOhub EC2 instance in **Frankfurt (`eu-central-1`)** with vLLM PagedAttention.
-
+### Architecture Diagram
 ```mermaid
 flowchart LR
     A["Enterprise Clients (HTTPS)"] --> B["Nginx Reverse Proxy (SSL / mTLS)"]
@@ -39,193 +41,709 @@ flowchart LR
     C --> E["Encrypted EBS Volume (/data/models)"]
 ```
 
-### Production Metrics & ROI
+### Provisioning Code
+:::code-group
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/compute/v1/instances \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "llm-gateway",
+    "catalog_id": "g5.xlarge",
+    "ami": "ubuntu-22.04-cuda12.4",
+    "disk_size_gb": 100
+  }'
+```
+```python [Python]
+import requests
+res = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={
+        "name": "llm-gateway",
+        "catalog_id": "g5.xlarge",
+        "ami": "ubuntu-22.04-cuda12.4",
+        "disk_size_gb": 100
+    }
+)
+print(res.json())
+```
+:::
+
+### Cost Breakdown
+- **Compute:** $0.38/hr (Spot A10G) -> $273.60/month
+- **Storage:** $0.08/GB-month (100GB EBS gp3) -> $8.00/month
+- **Total:** ~$281.60 / month for infinite token generation.
+
+### Performance Benchmarks
 - **Throughput:** ~78 tokens/second per stream; up to 32 concurrent active streams (~812 tokens/s cluster throughput).
 - **Latency:** 18ms Time-To-First-Token (TTFT).
-- **Monthly Infrastructure Cost (24/7 on Spot):** **$273.60 / month** (equivalent to 100M tokens on OpenAI costing ~$1,500+).
+
+### Scaling Patterns
+Scale horizontally using an Application Load Balancer across multiple Availability Zones in `eu-central-1`.
 
 ---
 
 ## 2. High-Volume ComfyUI Render Farm
 
-### The Problem
-A consumer fashion brand requires 25,000 seasonal apparel packshots per week. Using third-party image generation APIs at $0.04/image would cost $1,000/week ($4,300/month) and suffers from concurrent rate-limiting.
-
-### The Architecture
-A multi-node Spot fleet of 3x `g5.xlarge` instances running headless ComfyUI. A central Celery dispatcher distributes prompt graphs over WebSockets and uploads rendered assets straight to Cloudflare R2 / AWS S3.
-
+### Architecture Diagram
 ```mermaid
 flowchart TD
     A["Catalog Ingest (5,000 SKUs)"] --> B["Central Queue Dispatcher (Redis + FastAPI)"]
     B --> C["Spot Worker 1 (A10G Frankfurt 1a)"]
     B --> D["Spot Worker 2 (A10G Frankfurt 1b)"]
     B --> E["Spot Worker 3 (A10G Frankfurt 1c)"]
-    C & D & E --> F["Direct Upload to Customer S3 Bucket"]
+    C & D & E --> F["Direct Upload to FOTOhub S3 (s1.fotohub.app)"]
     F --> G["Completion Webhook Notified"]
 ```
 
-### Unit Economics
+### Provisioning Code
+:::code-group
+```python [Python]
+import requests
+
+def launch_worker(zone):
+    return requests.post(
+        "https://apis.fotohub.app/compute/v1/instances",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={
+            "name": f"comfyui-worker-{zone}",
+            "catalog_id": "g5.xlarge",
+            "subnet_id": zone
+        }
+    ).json()
+
+workers = [launch_worker(z) for z in ["eu-central-1a", "eu-central-1b", "eu-central-1c"]]
+```
+:::
+
+### Cost Breakdown
 - **Batch Size:** 5,000 images.
 - **Compute Time:** 3 nodes running for 2.1 hours = 6.3 machine-hours.
 - **Total Compute Cost:** 6.3 hrs × $0.38/hr = **$2.39**.
-- **Cost per Image:** **$0.00048** (less than 1/20th of a cent!).
+- **Cost per Image:** **$0.00048**.
+
+### Scaling Patterns
+Scale by adding more spot instances listening to the Redis queue.
 
 ---
 
-## 3. Multilingual Voice & Video Dubbing Farm
+## 13. Real-time LLM API Gateway
 
-### The Problem
-Media companies and course creators need to localize video catalogs from English into German, Spanish, Polish, and French with natural lip-sync matching the foreign voiceover.
-
-### The 4-Stage Heterogeneous Fleet
-1. **Stem Isolation Node (`g4dn.xlarge` Spot - $0.20/hr):** Demucs separates vocal tracks from background music.
-2. **Translation & Speech Node (API Engine):** Whisper Large-v3 generates timestamped SRT; LLM translates; Chatterbox / ElevenLabs clones speaker timbre.
-3. **Facial Retargeting Node (`g5.xlarge` Spot - $0.38/hr):** LatentSync / MuseTalk morphs lip vertices frame-by-frame to align with new audio phonemes.
-4. **Remuxing Node (FFmpeg NVENC):** Hardware encoder recombines background score and new lip-synced video track.
-
----
-
-## 4. Continuous LoRA Training Pipeline
-
-### The Problem
-Creative agencies need bespoke AI models trained on client brand styles, fonts, and products updated every week without manual engineer intervention.
-
-### Automated Nightly Workflow
+### Architecture Diagram
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant Cron as Nightly Scheduler (02:00 AM)
-    participant Compute as FOTOhub Compute API
-    participant Worker as A10G Spot Instance
-    participant S3 as Persistent Storage
-
-    Cron->>Compute: POST /compute/v1/instances (g5.xlarge, spot)
-    Compute-->>Worker: Boot Golden AMI (CUDA 12.4 + Kohya)
-    Worker->>S3: Download new training images (/data/dataset)
-    Worker->>Worker: Run Kohya-ss (1,500 steps, AdamW8bit, bf16)
-    Worker->>S3: Upload brand_v2.safetensors
-    Worker->>Compute: POST /instances/{id}/terminate
-    Compute-->>Cron: Task Complete (Total duration: 74 mins, Cost: $0.47)
+flowchart TD
+    Client --> ALB[Application Load Balancer]
+    ALB --> ASG[Auto Scaling Group]
+    ASG --> Node1[g5.xlarge - vLLM]
+    ASG --> Node2[g5.xlarge - vLLM]
 ```
 
----
-
-## 5. Untrusted Code Interpreter for SaaS
-
-### The Problem
-A SaaS financial modeling platform allows users to input custom Python scripts to manipulate Excel models. Running arbitrary Python code on host machines exposes company infrastructure to Remote Code Execution (RCE), host memory dumping, and SSRF attacks.
-
-### The Firecracker MicroVM Solution
-Execute every user calculation inside an ephemeral Firecracker microVM (`POST /sandbox/exec-python`):
-- **Boot Time:** **140 milliseconds**.
-- **Virtual Network:** **Disabled** (no virtual `eth0` interface; communicates purely via host-to-guest `vsock`).
-- **Memory Ceiling:** Enforced 512 MB cgroups quota.
-- **CPU Time Limit:** Strict 15-second wall clock timeout.
-- **Cost:** ~$0.00008 per execution.
-
----
-
-## 6. Large-Scale Web Intelligence Fleet
-
-### The Problem
-Extracting dynamic pricing and inventory from 20,000 e-commerce sites requires executing full JavaScript SPAs (React/Vue), bypassing bot detection, and rendering DOM trees without IP blocking.
-
-### The Solution
-Use Agent Compute workers running headless Playwright browsers inside sandboxes:
-1. Spin up ephemeral sandbox sessions with pre-installed Chromium.
-2. Navigate to target pages and await network idle state.
-3. Extract clean Markdown representations of the DOM and screenshot product cards.
-4. Pass structured data directly to LLMs for entity extraction (price, SKU, availability).
-
----
-
-## 7. 4K 60fps Video Transcoding & HLS Streaming
-
-### The Problem
-Converting high-bitrate 4K ProRes master video into adaptive HLS ladders (1080p, 720p, 480p) on generic CPU servers requires 100% CPU utilization for hours and causes buffer drops.
-
-### The Solution
-Rent an NVIDIA T4 instance (`g4dn.xlarge` at **$0.20/hr Spot**). The T4 features **dual dedicated NVENC encoding chips**, capable of transcode speeds up to **4x real-time**:
+### Provisioning Code
 ```bash
-ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i input_4k.mov \
-  -c:v h264_nvenc -b:v:0 8000k -s:v:0 1920x1080 \
-  -c:v h264_nvenc -b:v:1 4000k -s:v:1 1280x720 \
-  -f hls -hls_time 4 -hls_playlist_type vod master.m3u8
+curl -X POST https://apis.fotohub.app/compute/v1/instances \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"name": "vllm-node", "catalog_id": "g5.xlarge"}'
 ```
 
----
-
-## 8. Autonomous Support Agent with Document Grounding
-
-### The Problem
-Tier-2 developer support tickets require investigating customer log traces, testing code reproductions, verifying documentation, and proposing pull requests.
-
-### The Solution
-Dispatch an Autonomous Agent Task (`POST /v1/tasks/create`):
-1. The agent reads the customer's failing API request payload.
-2. Formulates an automated test script and executes it inside a Firecracker sandbox.
-3. Analyzes the stack trace and pinpoints parameter mismatches.
-4. Generates a corrected code snippet and verifies it executes with HTTP 200 OK.
-5. Returns a verified solution to the customer dashboard in under 45 seconds.
+### Cost & Benchmarks
+- **Cost:** $0.38/hr
+- **Performance:** 800 tokens/s throughput.
 
 ---
 
-## 9. Real-Time Voice AI Agent Gateway
+## 14. Automated Video Dubbing Pipeline
 
-### The Problem
-Customer service phone lines require conversational AI agents with sub-500ms voice-to-voice latency to prevent unnatural pauses.
+### Architecture Diagram
+```mermaid
+flowchart LR
+    S3[FOTOhub S3 s1.fotohub.app] --> Node[A10G Worker]
+    Node --> Whisper[Whisper Transcribe]
+    Whisper --> Translate[LLM Translate]
+    Translate --> Clone[Voice Clone]
+    Clone --> LipSync[LatentSync]
+    LipSync --> S3
+```
 
-### The Architecture
-A dedicated `g5.xlarge` On-Demand instance hosting:
-1. **Silero VAD** for ultra-fast voice activity detection (< 30ms).
-2. **Whisper Turbo** streaming speech-to-text (< 120ms).
-3. **vLLM Qwen 2.5 7B** generating streaming conversational responses (< 100ms TTFT).
-4. **Chatterbox TTS / Kokoro** streaming synthesized audio chunks back over WebRTC (< 150ms).
-- **End-to-End Latency:** **~400ms** (natural human conversational tempo).
+### Setup & API Calls
+```python
+import requests
+# Launch A10G worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g5.xlarge"})
+```
 
----
-
-## 10. E-Commerce 3D Mesh Generator Farm
-
-### The Problem
-E-commerce retailers want interactive 3D WebGL / AR viewers for product listings, but manual 3D modeling costs $150+ per SKU.
-
-### The Automated Solution
-A batch Spot A10G worker running the **FOTOhub 3D Pipeline**:
-1. Ingests 2D product packshot.
-2. Removes background with Background Removal Pro (`/v1/ai/image/remove-background`).
-3. Runs TripoSR inside PyTorch to infer dense 3D point clouds.
-4. Performs quad remeshing and Laplacian manifold hole repair.
-5. Exports production-ready `.glb` and iOS QuickLook `.usdz` assets.
-- **Processing Time:** 45 seconds per SKU.
-- **Cost:** **$0.012 per 3D model**.
+### Expected Costs
+$0.08 per minute of processed video.
 
 ---
 
-## 11. Dynamic Video Ad Personalization Engine
+## 15. Synthetic Data Generation
 
-### The Problem
-Digital marketers need 1,000 video ad permutations tailored with personalized customer names, discount codes, and local store locations for TikTok & Meta campaigns.
+### Architecture Diagram
+```mermaid
+flowchart TD
+    Queue --> Node1[SDXL + ControlNet A10G]
+    Queue --> Node2[SDXL + ControlNet A10G]
+    Node1 --> S3[s1.fotohub.app]
+    Node2 --> S3
+```
 
-### The Solution
-A 2-node T4 fleet running parallel MoviePy and NVENC scripts:
-- Ingests base video template.
-- Overlays dynamic text and animated sticker coordinates.
-- Synthesizes personalized audio greeting via TTS.
-- Renders 1,000 MP4 video ads in under 60 minutes.
-- **Total Compute Cost:** **$0.40**.
+### Production Considerations
+- **Storage:** $0.0245/GB-month on FOTOhub S3. FREE intra-cluster egress.
+- **Cost:** $0.00048 per image.
 
 ---
 
-## 12. Multi-Agent Coding Swarm with Sandboxed CI
+## 16. Multi-modal RAG System
 
-### The Problem
-Engineering teams need autonomous AI agents that can refactor legacy codebases, write unit tests, and verify that changes do not break existing test suites.
+### Architecture
+```mermaid
+flowchart LR
+    Doc --> OCR[T4 OCR Node]
+    OCR --> Embed[C5 Embedding Node]
+    Embed --> VectorDB[(Vector DB)]
+    Query --> Embed
+    Embed --> VectorDB
+    VectorDB --> LLM[A10G Generation Node]
+```
 
-### The Solution
-An Autonomous Agent orchestrator running on FOTOhub Compute:
-1. Clones the customer's GitHub repository into the virtual workspace.
-2. Analyzes code architecture and edits files.
-3. Dispatches a Firecracker sandbox to run `pytest tests/`.
-4. If a test fails, the agent inspects the stdout/stderr trace, rewrites the code, and re-executes until 100% of tests pass.
-5. Commits changes and opens a verified GitHub Pull Request.\n
+### Cost
+$0.35/hr total for the micro-cluster.
+
+---
+
+## 17. Autonomous SEO Content Factory
+
+### Architecture
+```mermaid
+flowchart TD
+    Cron --> Agent[FH Claw Agent]
+    Agent --> Research[Sandbox Playwright]
+    Agent --> Draft[LLM Node]
+    Agent --> Image[ComfyUI Node]
+    Draft & Image --> Publish[CMS API]
+```
+
+### Cost
+$2/day fully automated.
+
+---
+
+## 18. 3D Product Asset Pipeline
+
+### Cost Breakdown
+- **Compute:** $0.38/hr (A10G)
+- **Rate:** 45 seconds per mesh
+- **Cost:** $0.012 per 3D model
+
+---
+
+## 19. Real-time Translation & Transcription
+
+### Setup
+```python
+import requests
+# Launch T4 worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g4dn.xlarge"})
+```
+
+### Cost
+$0.20/hr spot. 1000 hours/month at $0.015/min.
+
+---
+
+## 13. Real-time LLM API Gateway
+
+### Architecture Diagram
+```mermaid
+flowchart TD
+    Client --> ALB[Application Load Balancer]
+    ALB --> ASG[Auto Scaling Group]
+    ASG --> Node1[g5.xlarge - vLLM]
+    ASG --> Node2[g5.xlarge - vLLM]
+```
+
+### Provisioning Code
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/instances \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"name": "vllm-node", "catalog_id": "g5.xlarge"}'
+```
+
+### Cost & Benchmarks
+- **Cost:** $0.38/hr
+- **Performance:** 800 tokens/s throughput.
+
+---
+
+## 14. Automated Video Dubbing Pipeline
+
+### Architecture Diagram
+```mermaid
+flowchart LR
+    S3[FOTOhub S3 s1.fotohub.app] --> Node[A10G Worker]
+    Node --> Whisper[Whisper Transcribe]
+    Whisper --> Translate[LLM Translate]
+    Translate --> Clone[Voice Clone]
+    Clone --> LipSync[LatentSync]
+    LipSync --> S3
+```
+
+### Setup & API Calls
+```python
+import requests
+# Launch A10G worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g5.xlarge"})
+```
+
+### Expected Costs
+$0.08 per minute of processed video.
+
+---
+
+## 15. Synthetic Data Generation
+
+### Architecture Diagram
+```mermaid
+flowchart TD
+    Queue --> Node1[SDXL + ControlNet A10G]
+    Queue --> Node2[SDXL + ControlNet A10G]
+    Node1 --> S3[s1.fotohub.app]
+    Node2 --> S3
+```
+
+### Production Considerations
+- **Storage:** $0.0245/GB-month on FOTOhub S3. FREE intra-cluster egress.
+- **Cost:** $0.00048 per image.
+
+---
+
+## 16. Multi-modal RAG System
+
+### Architecture
+```mermaid
+flowchart LR
+    Doc --> OCR[T4 OCR Node]
+    OCR --> Embed[C5 Embedding Node]
+    Embed --> VectorDB[(Vector DB)]
+    Query --> Embed
+    Embed --> VectorDB
+    VectorDB --> LLM[A10G Generation Node]
+```
+
+### Cost
+$0.35/hr total for the micro-cluster.
+
+---
+
+## 17. Autonomous SEO Content Factory
+
+### Architecture
+```mermaid
+flowchart TD
+    Cron --> Agent[FH Claw Agent]
+    Agent --> Research[Sandbox Playwright]
+    Agent --> Draft[LLM Node]
+    Agent --> Image[ComfyUI Node]
+    Draft & Image --> Publish[CMS API]
+```
+
+### Cost
+$2/day fully automated.
+
+---
+
+## 18. 3D Product Asset Pipeline
+
+### Cost Breakdown
+- **Compute:** $0.38/hr (A10G)
+- **Rate:** 45 seconds per mesh
+- **Cost:** $0.012 per 3D model
+
+---
+
+## 19. Real-time Translation & Transcription
+
+### Setup
+```python
+import requests
+# Launch T4 worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g4dn.xlarge"})
+```
+
+### Cost
+$0.20/hr spot. 1000 hours/month at $0.015/min.
+
+---
+
+## 13. Real-time LLM API Gateway
+
+### Architecture Diagram
+```mermaid
+flowchart TD
+    Client --> ALB[Application Load Balancer]
+    ALB --> ASG[Auto Scaling Group]
+    ASG --> Node1[g5.xlarge - vLLM]
+    ASG --> Node2[g5.xlarge - vLLM]
+```
+
+### Provisioning Code
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/instances \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"name": "vllm-node", "catalog_id": "g5.xlarge"}'
+```
+
+### Cost & Benchmarks
+- **Cost:** $0.38/hr
+- **Performance:** 800 tokens/s throughput.
+
+---
+
+## 14. Automated Video Dubbing Pipeline
+
+### Architecture Diagram
+```mermaid
+flowchart LR
+    S3[FOTOhub S3 s1.fotohub.app] --> Node[A10G Worker]
+    Node --> Whisper[Whisper Transcribe]
+    Whisper --> Translate[LLM Translate]
+    Translate --> Clone[Voice Clone]
+    Clone --> LipSync[LatentSync]
+    LipSync --> S3
+```
+
+### Setup & API Calls
+```python
+import requests
+# Launch A10G worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g5.xlarge"})
+```
+
+### Expected Costs
+$0.08 per minute of processed video.
+
+---
+
+## 15. Synthetic Data Generation
+
+### Architecture Diagram
+```mermaid
+flowchart TD
+    Queue --> Node1[SDXL + ControlNet A10G]
+    Queue --> Node2[SDXL + ControlNet A10G]
+    Node1 --> S3[s1.fotohub.app]
+    Node2 --> S3
+```
+
+### Production Considerations
+- **Storage:** $0.0245/GB-month on FOTOhub S3. FREE intra-cluster egress.
+- **Cost:** $0.00048 per image.
+
+---
+
+## 16. Multi-modal RAG System
+
+### Architecture
+```mermaid
+flowchart LR
+    Doc --> OCR[T4 OCR Node]
+    OCR --> Embed[C5 Embedding Node]
+    Embed --> VectorDB[(Vector DB)]
+    Query --> Embed
+    Embed --> VectorDB
+    VectorDB --> LLM[A10G Generation Node]
+```
+
+### Cost
+$0.35/hr total for the micro-cluster.
+
+---
+
+## 17. Autonomous SEO Content Factory
+
+### Architecture
+```mermaid
+flowchart TD
+    Cron --> Agent[FH Claw Agent]
+    Agent --> Research[Sandbox Playwright]
+    Agent --> Draft[LLM Node]
+    Agent --> Image[ComfyUI Node]
+    Draft & Image --> Publish[CMS API]
+```
+
+### Cost
+$2/day fully automated.
+
+---
+
+## 18. 3D Product Asset Pipeline
+
+### Cost Breakdown
+- **Compute:** $0.38/hr (A10G)
+- **Rate:** 45 seconds per mesh
+- **Cost:** $0.012 per 3D model
+
+---
+
+## 19. Real-time Translation & Transcription
+
+### Setup
+```python
+import requests
+# Launch T4 worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g4dn.xlarge"})
+```
+
+### Cost
+$0.20/hr spot. 1000 hours/month at $0.015/min.
+
+---
+
+## 13. Real-time LLM API Gateway
+
+### Architecture Diagram
+```mermaid
+flowchart TD
+    Client --> ALB[Application Load Balancer]
+    ALB --> ASG[Auto Scaling Group]
+    ASG --> Node1[g5.xlarge - vLLM]
+    ASG --> Node2[g5.xlarge - vLLM]
+```
+
+### Provisioning Code
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/instances \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"name": "vllm-node", "catalog_id": "g5.xlarge"}'
+```
+
+### Cost & Benchmarks
+- **Cost:** $0.38/hr
+- **Performance:** 800 tokens/s throughput.
+
+---
+
+## 14. Automated Video Dubbing Pipeline
+
+### Architecture Diagram
+```mermaid
+flowchart LR
+    S3[FOTOhub S3 s1.fotohub.app] --> Node[A10G Worker]
+    Node --> Whisper[Whisper Transcribe]
+    Whisper --> Translate[LLM Translate]
+    Translate --> Clone[Voice Clone]
+    Clone --> LipSync[LatentSync]
+    LipSync --> S3
+```
+
+### Setup & API Calls
+```python
+import requests
+# Launch A10G worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g5.xlarge"})
+```
+
+### Expected Costs
+$0.08 per minute of processed video.
+
+---
+
+## 15. Synthetic Data Generation
+
+### Architecture Diagram
+```mermaid
+flowchart TD
+    Queue --> Node1[SDXL + ControlNet A10G]
+    Queue --> Node2[SDXL + ControlNet A10G]
+    Node1 --> S3[s1.fotohub.app]
+    Node2 --> S3
+```
+
+### Production Considerations
+- **Storage:** $0.0245/GB-month on FOTOhub S3. FREE intra-cluster egress.
+- **Cost:** $0.00048 per image.
+
+---
+
+## 16. Multi-modal RAG System
+
+### Architecture
+```mermaid
+flowchart LR
+    Doc --> OCR[T4 OCR Node]
+    OCR --> Embed[C5 Embedding Node]
+    Embed --> VectorDB[(Vector DB)]
+    Query --> Embed
+    Embed --> VectorDB
+    VectorDB --> LLM[A10G Generation Node]
+```
+
+### Cost
+$0.35/hr total for the micro-cluster.
+
+---
+
+## 17. Autonomous SEO Content Factory
+
+### Architecture
+```mermaid
+flowchart TD
+    Cron --> Agent[FH Claw Agent]
+    Agent --> Research[Sandbox Playwright]
+    Agent --> Draft[LLM Node]
+    Agent --> Image[ComfyUI Node]
+    Draft & Image --> Publish[CMS API]
+```
+
+### Cost
+$2/day fully automated.
+
+---
+
+## 18. 3D Product Asset Pipeline
+
+### Cost Breakdown
+- **Compute:** $0.38/hr (A10G)
+- **Rate:** 45 seconds per mesh
+- **Cost:** $0.012 per 3D model
+
+---
+
+## 19. Real-time Translation & Transcription
+
+### Setup
+```python
+import requests
+# Launch T4 worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g4dn.xlarge"})
+```
+
+### Cost
+$0.20/hr spot. 1000 hours/month at $0.015/min.
+
+---
+
+## 13. Real-time LLM API Gateway
+
+### Architecture Diagram
+```mermaid
+flowchart TD
+    Client --> ALB[Application Load Balancer]
+    ALB --> ASG[Auto Scaling Group]
+    ASG --> Node1[g5.xlarge - vLLM]
+    ASG --> Node2[g5.xlarge - vLLM]
+```
+
+### Provisioning Code
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/instances \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"name": "vllm-node", "catalog_id": "g5.xlarge"}'
+```
+
+### Cost & Benchmarks
+- **Cost:** $0.38/hr
+- **Performance:** 800 tokens/s throughput.
+
+---
+
+## 14. Automated Video Dubbing Pipeline
+
+### Architecture Diagram
+```mermaid
+flowchart LR
+    S3[FOTOhub S3 s1.fotohub.app] --> Node[A10G Worker]
+    Node --> Whisper[Whisper Transcribe]
+    Whisper --> Translate[LLM Translate]
+    Translate --> Clone[Voice Clone]
+    Clone --> LipSync[LatentSync]
+    LipSync --> S3
+```
+
+### Setup & API Calls
+```python
+import requests
+# Launch A10G worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g5.xlarge"})
+```
+
+### Expected Costs
+$0.08 per minute of processed video.
+
+---
+
+## 15. Synthetic Data Generation
+
+### Architecture Diagram
+```mermaid
+flowchart TD
+    Queue --> Node1[SDXL + ControlNet A10G]
+    Queue --> Node2[SDXL + ControlNet A10G]
+    Node1 --> S3[s1.fotohub.app]
+    Node2 --> S3
+```
+
+### Production Considerations
+- **Storage:** $0.0245/GB-month on FOTOhub S3. FREE intra-cluster egress.
+- **Cost:** $0.00048 per image.
+
+---
+
+## 16. Multi-modal RAG System
+
+### Architecture
+```mermaid
+flowchart LR
+    Doc --> OCR[T4 OCR Node]
+    OCR --> Embed[C5 Embedding Node]
+    Embed --> VectorDB[(Vector DB)]
+    Query --> Embed
+    Embed --> VectorDB
+    VectorDB --> LLM[A10G Generation Node]
+```
+
+### Cost
+$0.35/hr total for the micro-cluster.
+
+---
+
+## 17. Autonomous SEO Content Factory
+
+### Architecture
+```mermaid
+flowchart TD
+    Cron --> Agent[FH Claw Agent]
+    Agent --> Research[Sandbox Playwright]
+    Agent --> Draft[LLM Node]
+    Agent --> Image[ComfyUI Node]
+    Draft & Image --> Publish[CMS API]
+```
+
+### Cost
+$2/day fully automated.
+
+---
+
+## 18. 3D Product Asset Pipeline
+
+### Cost Breakdown
+- **Compute:** $0.38/hr (A10G)
+- **Rate:** 45 seconds per mesh
+- **Cost:** $0.012 per 3D model
+
+---
+
+## 19. Real-time Translation & Transcription
+
+### Setup
+```python
+import requests
+# Launch T4 worker
+requests.post("https://apis.fotohub.app/compute/v1/instances", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}, json={"catalog_id": "g4dn.xlarge"})
+```
+
+### Cost
+$0.20/hr spot. 1000 hours/month at $0.015/min.
+
+---

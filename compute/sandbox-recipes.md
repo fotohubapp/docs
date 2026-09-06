@@ -6,466 +6,726 @@ All recipes execute via `POST /sandbox/exec-python` or `POST /sandbox/exec-bash`
 
 ---
 
-## Recipe Index
+## Sandbox API Reference
 
-1. **[Untrusted Pandas Data Cleaning & Aggregation](#recipe-1-untrusted-pandas-data-cleaning--aggregation)**
-2. **[Dynamic Matplotlib & Seaborn Chart Visualizer](#recipe-2-dynamic-matplotlib-chart-generator)**
-3. **[PDF & Invoice Field Extraction with Regex](#recipe-3-pdf--invoice-field-extraction)**
-4. **[Safe Python AST Code Linter & Security Audit](#recipe-4-safe-python-ast-code-linter)**
-5. **[Automated PyTest Unit Runner for Candidate Code](#recipe-5-automated-pytest-unit-runner)**
-6. **[HTML Web Intelligence & Table Parser](#recipe-6-html-web-intelligence--table-parser)**
-7. **[Audio Spectrogram & Metadata Analyzer](#recipe-7-audio-spectrogram--metadata-analyzer)**
-8. **[Multi-File Workspace Execution & Import](#recipe-8-multi-file-workspace-execution--import)**
+The sandbox environment provides a highly secure, ephemeral environment for executing untrusted code.
 
----
+### Endpoint
+`POST https://apis.fotohub.app/sandbox/exec-python`
 
-## Recipe 1: Untrusted Pandas Data Cleaning & Aggregation
-
-Safely compute summary statistics, filter rows, and calculate grouped aggregations on user-supplied CSV data without exposing host memory.
-
-### Python SDK Implementation
-
-```python
-from fotohub import FotoHub
-import os
-
-client = FotoHub(api_key=os.environ["FOTOHUB_API_KEY"])
-
-csv_data = """employee_id,department,salary,rating
-101,Engineering,115000,4.8
-102,Sales,85000,4.2
-103,Engineering,135000,4.9
-104,Marketing,78000,3.9
-105,Engineering,98000,4.1
-106,Sales,92000,4.6
-"""
-
-user_code = """
-import pandas as pd
-import io
-
-df = pd.read_csv(io.StringIO(input['csv_content']))
-
-# Perform aggregations
-grouped = df.groupby('department').agg(
-    headcount=('employee_id', 'count'),
-    mean_salary=('salary', 'mean'),
-    median_rating=('rating', 'median')
-).reset_index()
-
-# Format clean dictionary output
-result = {
-    "summary": grouped.to_dict(orient='records'),
-    "top_earner_dept": str(grouped.loc[grouped['mean_salary'].idxmax()]['department']),
-    "total_payroll": int(df['salary'].sum())
-}
-"""
-
-response = client.post("/sandbox/exec-python", {
-    "code": user_code,
-    "input": {"csv_content": csv_data},
-    "timeout_s": 10,
-    "memory_mb": 512
-})
-
-print("Aggregated Output:", response["value"])
-print(f"Executed in {response['duration_ms']}ms")
-```
-
-### Expected Response
-
+### Request Schema
 ```json
 {
-  "ok": true,
-  "value": {
-    "summary": [
-      {"department": "Engineering", "headcount": 3, "mean_salary": 116000.0, "median_rating": 4.8},
-      {"department": "Marketing", "headcount": 1, "mean_salary": 78000.0, "median_rating": 3.9},
-      {"department": "Sales", "headcount": 2, "mean_salary": 88500.0, "median_rating": 4.4}
-    ],
-    "top_earner_dept": "Engineering",
-    "total_payroll": 603000
-  },
-  "stdout": "",
-  "stderr": "",
-  "duration_ms": 146
+  "code": "string (Required) - The python code to execute",
+  "inputs": "dict (Optional) - Key-value pairs injected into the environment as `input` dict",
+  "timeout": "int (Optional) - Max execution time in seconds. Max 10.",
+  "memory_limit_mb": "int (Optional) - Memory limit in MB. Default 512."
 }
+```
+
+### Response Schema
+```json
+{
+  "ok": "bool - Whether execution succeeded without exceptions or timeouts",
+  "output": "string - Captured stdout / __FOTOHUB_RESULT__ value",
+  "error": "string|null - Traceback if an error occurred",
+  "execution_ms": "int - Wall time of execution",
+  "memory_mb": "int - Peak memory usage"
+}
+```
+
+### The `__FOTOHUB_RESULT__` Sentinel Pattern
+To cleanly extract data from a sandbox execution without relying on fragile stdout parsing, assign your final result dictionary to the special `__FOTOHUB_RESULT__` variable. The sandbox runtime will automatically serialize this variable and return it in the `output` field.
+
+```python
+# Inside sandbox:
+__FOTOHUB_RESULT__ = {"status": "success", "data": [1, 2, 3]}
 ```
 
 ---
 
-## Recipe 2: Dynamic Matplotlib Chart Generator
+## Security Boundaries & Limitations
+- **No network access:** All outbound and inbound network requests are dropped at the hypervisor level.
+- **No filesystem persistence:** The sandbox uses a `tmpfs` overlay. Everything is wiped instantly on exit.
+- **No environment leakage:** Host environment variables are completely scrubbed.
+- **Pre-installed Packages:** `numpy`, `pandas`, `scipy`, `PIL`, `sklearn`, `matplotlib`, `bs4`, `requests`, `httpx`.
 
-Render publication-quality charts (bar, line, scatter) in-memory inside the sandbox and return the image as a Base64-encoded PNG or raw SVG.
+---
 
-::: code-group
+## Pricing
+Sandboxes are billed strictly per-execution from your USD wallet. NO credits, NO PLN.
+**Cost:** $0.00008 / execution.
 
+---
+
+## Multi-Language Client Code
+
+:::code-group
 ```python [Python]
-from fotohub import FotoHub
-import base64
-import os
-
-client = FotoHub(api_key=os.environ["FOTOHUB_API_KEY"])
-
-chart_code = """
-import matplotlib
-matplotlib.use('Agg')  # Headless backend
-import matplotlib.pyplot as plt
-import numpy as np
-import io
-import base64
-
-labels = input['labels']
-values = input['values']
-title = input.get('title', 'Metric Distribution')
-
-fig, ax = plt.subplots(figsize=(8, 4.5), dpi=150)
-colors = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444']
-bars = ax.bar(labels, values, color=colors[:len(labels)], edgecolor='none', width=0.55)
-
-ax.set_title(title, fontsize=14, pad=15, weight='bold', color='#111827')
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.yaxis.grid(True, linestyle='--', alpha=0.5)
-
-# Save buffer
-buf = io.BytesIO()
-plt.tight_layout()
-plt.savefig(buf, format='png', bbox_inches='tight')
-buf.seek(0)
-
-# Return base64 string
-result = {
-    "mime": "image/png",
-    "base64": base64.b64encode(buf.getvalue()).decode('utf-8')
-}
-"""
-
-payload = {
-    "code": chart_code,
-    "input": {
-        "title": "Quarterly AI Inference Workload (GPU Hours)",
-        "labels": ["Q1 2026", "Q2 2026", "Q3 2026", "Q4 2026"],
-        "values": [1240, 2890, 5410, 9820]
-    },
-    "timeout_s": 15
-}
-
-res = client.post("/sandbox/exec-python", payload)
-
-# Decode image to disk
-img_bytes = base64.b64decode(res["value"]["base64"])
-with open("quarterly_workload.png", "wb") as f:
-    f.write(img_bytes)
-
-print("Chart saved! Generated in:", res["duration_ms"], "ms")
+import requests
+def run_sandbox(code, inputs=None):
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={"code": code, "inputs": inputs or {}}
+    )
+    return res.json()
 ```
-
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-import fs from "fs/promises";
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
-async function generateChart() {
-  const code = `
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import io, base64
-
-fig, ax = plt.subplots(figsize=(6, 4))
-ax.plot(input['x'], input['y'], color='#7c3aed', linewidth=2.5, marker='o')
-ax.set_title('Loss Curve Over Epochs')
-ax.grid(True, alpha=0.3)
-
-buf = io.BytesIO()
-plt.savefig(buf, format='png', bbox_inches='tight')
-result = {"base64": base64.b64encode(buf.getvalue()).decode('utf-8')}
-`;
-
-  const res = await client.post("/sandbox/exec-python", {
-    code,
-    input: {
-      x: [1, 2, 3, 4, 5],
-      y: [0.82, 0.45, 0.28, 0.19, 0.12],
+import fetch from "node-fetch";
+const runSandbox = async (code: string, inputs = {}) => {
+  const res = await fetch("https://apis.fotohub.app/sandbox/exec-python", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer fh_live_YOUR_API_KEY",
+      "Content-Type": "application/json"
     },
-    timeout_s: 15,
+    body: JSON.stringify({ code, inputs })
   });
-
-  const buffer = Buffer.from(res.data.value.base64, "base64");
-  await fs.writeFile("loss_curve.png", buffer);
-  console.log("Chart rendered in", res.data.duration_ms, "ms");
-}
-
-generateChart();
+  return res.json();
+};
 ```
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/sandbox/exec-python \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "print(1+1)"}'
+```
+```go [Go]
+package main
 
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func runSandbox(code string, inputs map[string]interface{}) {
+	url := "https://apis.fotohub.app/sandbox/exec-python"
+	payload := map[string]interface{}{"code": code, "inputs": inputs}
+	jsonValue, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonValue))
+	req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	res, _ := client.Do(req)
+	defer res.Body.Close()
+	fmt.Println("Sandbox executed")
+}
+```
 :::
 
 ---
 
-## Recipe 3: PDF & Invoice Field Extraction
+## 15 New Recipes
 
-Extract line items, tax rates, vendor names, and totals from unstructured text inside an isolated sandbox.
-
+### 1. Pandas DataFrame operations (filter, groupby, pivot)
 ```python
-invoice_raw_text = """
-ACME Cloud Services Inc.
-Invoice #INV-2026-8942
-Date: August 28, 2026
+code = '''
+import pandas as pd
+df = pd.DataFrame(inputs['data'])
+filtered = df[df['sales'] > 100]
+pivot = filtered.pivot_table(index='region', values='sales', aggfunc='sum')
+__FOTOHUB_RESULT__ = pivot.to_dict()
+'''
+```
 
-Bill To: FOTOhub Media Sp. z o.o.
-VAT ID: PL5252812345
-
-Items:
-1. Dedicated GPU Cluster (A10G)       - $380.00
-2. NVMe Storage Pool (500GB)          - $40.00
-3. Elastic Network Interface (Route53) - $15.00
-
-Subtotal: $435.00
-Tax (VAT 23%): $100.05
-Total Due: $535.05 USD
-"""
-
-parse_code = """
+### 2. Regular expression batch extraction from HTML/text
+```python
+code = '''
 import re
-
-text = input['raw_text']
-
-invoice_no = re.search(r'Invoice\s*#([A-Z0-9-]+)', text)
-date_str = re.search(r'Date:\s*([A-Za-z0-9,\s]+)', text)
-total_due = re.search(r'Total Due:\s*\$([0-9.,]+)', text)
-vat_id = re.search(r'VAT ID:\s*([A-Z0-9]+)', text)
-
-# Extract item rows
-item_matches = re.findall(r'\d+\.\s+(.+?)\s+-\s+\$([0-9.,]+)', text)
-items = [{"description": desc.strip(), "amount_usd": float(price)} for desc, price in item_matches]
-
-result = {
-    "invoice_number": invoice_no.group(1) if invoice_no else None,
-    "invoice_date": date_str.group(1).strip() if date_str else None,
-    "vat_id": vat_id.group(1) if vat_id else None,
-    "items": items,
-    "total_usd": float(total_due.group(1)) if total_due else 0.0
-}
-"""
-
-response = client.post("/sandbox/exec-python", {
-    "code": parse_code,
-    "input": {"raw_text": invoice_raw_text}
-})
-
-print("Parsed Invoice:", response["value"])
+text = inputs['text']
+emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
+__FOTOHUB_RESULT__ = {"emails": emails}
+'''
 ```
 
----
-
-## Recipe 4: Safe Python AST Code Linter
-
-Before running arbitrary user code in your production application, parse its Abstract Syntax Tree (AST) inside a sandbox to detect dangerous calls (`__import__`, `eval`, `subprocess`, socket manipulation, file overwriting):
-
+### 3. JSON Schema validation with jsonschema library
 ```python
-linter_code = """
-import ast
-
-untrusted_code = input['code']
-tree = ast.parse(untrusted_code)
-
-BANNED_MODULES = {'socket', 'subprocess', 'pty', 'shutil', 'os'}
-BANNED_FUNCS = {'eval', 'exec', 'compile', '__import__'}
-
-violations = []
-
-for node in ast.walk(tree):
-    # Check imports
-    if isinstance(node, ast.Import):
-        for alias in node.names:
-            if alias.name in BANNED_MODULES:
-                violations.append(f"Forbidden import: {alias.name} at line {node.lineno}")
-    elif isinstance(node, ast.ImportFrom):
-        if node.module in BANNED_MODULES:
-            violations.append(f"Forbidden from-import: {node.module} at line {node.lineno}")
-    # Check calls
-    elif isinstance(node, ast.Call):
-        if isinstance(node.func, ast.Name) and node.func.id in BANNED_FUNCS:
-            violations.append(f"Forbidden function call: {node.func.id}() at line {node.lineno}")
-
-result = {
-    "is_safe": len(violations) == 0,
-    "violations": violations
-}
-"""
-
-response = client.post("/sandbox/exec-python", {
-    "code": linter_code,
-    "input": {"code": "import os\nos.system('rm -rf /')"}
-})
-
-print(response["value"])
-# Output: {'is_safe': False, 'violations': ['Forbidden import: os at line 1']}
+code = '''
+from jsonschema import validate
+try:
+    validate(instance=inputs['data'], schema=inputs['schema'])
+    __FOTOHUB_RESULT__ = {"valid": True}
+except Exception as e:
+    __FOTOHUB_RESULT__ = {"valid": False, "error": str(e)}
+'''
 ```
 
----
-
-## Recipe 5: Automated PyTest Unit Runner
-
-Evaluate student assignments, job candidate submissions, or AI-generated code against a test suite in an isolated environment:
-
+### 4. Base64 encode/decode binary data
 ```python
-test_suite_code = """
-# Solution submitted by user
-solution_code = input['solution']
-
-# Complete script with unit tests
-test_script = f"""
-import unittest
-
-{solution_code}
-
-class TestSolution(unittest.TestCase):
-    def test_basic_reversal(self):
-        self.assertEqual(reverse_words("the sky is blue"), "blue is sky the")
-        
-    def test_multiple_spaces(self):
-        self.assertEqual(reverse_words("  hello   world  "), "world hello")
-        
-    def test_single_word(self):
-        self.assertEqual(reverse_words("fotohub"), "fotohub")
-
-suite = unittest.TestLoader().loadTestsFromTestCase(TestSolution)
-runner = unittest.TextTestRunner(verbosity=0)
-run_result = runner.run(suite)
-
-result = {
-    "tests_run": run_result.testsRun,
-    "passed": run_result.wasSuccessful(),
-    "failures": len(run_result.failures),
-    "errors": len(run_result.errors)
-}
-"""
-
-exec(test_script, globals())
-"""
-
-submission = """
-def reverse_words(s: str) -> str:
-    return " ".join(s.strip().split()[::-1])
-"""
-
-response = client.post("/sandbox/exec-python", {
-    "code": test_suite_code,
-    "input": {"solution": submission}
-})
-
-print("Grading Result:", response["value"])
-# Output: {'tests_run': 3, 'passed': True, 'failures': 0, 'errors': 0}
+code = '''
+import base64
+decoded = base64.b64decode(inputs['b64_str'])
+__FOTOHUB_RESULT__ = {"bytes_len": len(decoded)}
+'''
 ```
 
----
-
-## Recipe 6: HTML Web Intelligence & Table Parser
-
-Extract tabular data from complex web HTML using BeautifulSoup without installing dependencies on your host server:
-
+### 5. Time series smoothing with SciPy
 ```python
-html_doc = """
-<table class="market-data">
-  <thead><tr><th>Ticker</th><th>Price</th><th>Change</th></tr></thead>
-  <tbody>
-    <tr><td>NVDA</td><td>$124.50</td><td>+4.2%</td></tr>
-    <tr><td>AAPL</td><td>$228.10</td><td>-0.8%</td></tr>
-    <tr><td>MSFT</td><td>$445.20</td><td>+1.1%</td></tr>
-  </tbody>
-</table>
-"""
-
-scraper_code = """
-from bs4 import BeautifulSoup
-
-soup = BeautifulSoup(input['html'], 'html.parser')
-rows = []
-for tr in soup.select('table.market-data tbody tr'):
-    cols = [td.get_text(strip=True) for td in tr.find_all('td')]
-    if len(cols) == 3:
-        rows.append({
-            "ticker": cols[0],
-            "price_usd": float(cols[1].replace('$', '')),
-            "pct_change": float(cols[2].replace('%', ''))
-        })
-
-result = {"rows": rows, "count": len(rows)}
-"""
-
-response = client.post("/sandbox/exec-python", {
-    "code": scraper_code,
-    "input": {"html": html_doc}
-})
-
-print("Extracted Market Data:", response["value"])
+code = '''
+from scipy.signal import savgol_filter
+smoothed = savgol_filter(inputs['series'], window_length=5, polyorder=2)
+__FOTOHUB_RESULT__ = {"smoothed": smoothed.tolist()}
+'''
 ```
 
----
-
-## Recipe 7: Audio Spectrogram & Metadata Analyzer
-
-Analyze WAV/MP3 files for audio energy levels, duration, and silence intervals inside the sandbox:
-
+### 6. PDF text extraction with pdfplumber
 ```python
-audio_code = """
-import numpy as np
+code = '''
+import pdfplumber
 import io
+import base64
 
-# Assume input provides raw audio PCM samples
-samples = np.array(input['pcm_samples'], dtype=np.float32)
-sample_rate = input.get('sample_rate', 16000)
+pdf_bytes = base64.b64decode(inputs['pdf_b64'])
+with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+    text = "\n".join([page.extract_text() for page in pdf.pages])
+__FOTOHUB_RESULT__ = {"text": text}
+'''
+```
 
-duration_sec = len(samples) / sample_rate
-rms_energy = float(np.sqrt(np.mean(samples**2)))
-peak_amplitude = float(np.max(np.abs(samples)))
+### 7. Markdown to HTML conversion with markdown library
+```python
+code = '''
+import markdown
+html = markdown.markdown(inputs['md_text'])
+__FOTOHUB_RESULT__ = {"html": html}
+'''
+```
 
-# Detect clipping
-is_clipping = peak_amplitude >= 0.99
+### 8. Text similarity scoring with difflib.SequenceMatcher
+```python
+code = '''
+from difflib import SequenceMatcher
+ratio = SequenceMatcher(None, inputs['text1'], inputs['text2']).ratio()
+__FOTOHUB_RESULT__ = {"similarity": ratio}
+'''
+```
 
-result = {
-    "duration_seconds": round(duration_sec, 2),
-    "rms_energy": round(rms_energy, 4),
-    "peak_amplitude": round(peak_amplitude, 4),
-    "is_clipping": is_clipping
-}
-"""
+### 9. Bulk URL validation and status checking with httpx
+*(Note: requires explicit network mock or pre-fetched data, as network is blocked)*
+```python
+code = '''
+# Since network is blocked, we use this to parse and validate URL structures
+from urllib.parse import urlparse
+valid = [url for url in inputs['urls'] if urlparse(url).scheme in ('http', 'https')]
+__FOTOHUB_RESULT__ = {"valid_urls": valid}
+'''
+```
 
-# Test with synthetic sine wave
-t = np.linspace(0, 3, 16000 * 3)
-sine_wave = (0.75 * np.sin(2 * np.pi * 440 * t)).tolist()
+### 10. YAML to JSON conversion and validation
+```python
+code = '''
+import yaml
+parsed = yaml.safe_load(inputs['yaml_str'])
+__FOTOHUB_RESULT__ = {"json": parsed}
+'''
+```
 
-response = client.post("/sandbox/exec-python", {
-    "code": audio_code,
-    "input": {"pcm_samples": sine_wave[:10000], "sample_rate": 16000}
-})
+### 11. Cryptographic hash computation (SHA-256, MD5, BLAKE2)
+```python
+code = '''
+import hashlib
+h = hashlib.sha256(inputs['text'].encode()).hexdigest()
+__FOTOHUB_RESULT__ = {"sha256": h}
+'''
+```
 
-print("Audio Analysis:", response["value"])
+### 12. Number theory computations (primes, factorization)
+```python
+code = '''
+def is_prime(n):
+    if n < 2: return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0: return False
+    return True
+__FOTOHUB_RESULT__ = {"is_prime": is_prime(inputs['number'])}
+'''
+```
+
+### 13. Color palette extraction from image bytes
+```python
+code = '''
+from PIL import Image
+import io, base64
+
+img_bytes = base64.b64decode(inputs['image_b64'])
+img = Image.open(io.BytesIO(img_bytes)).convert("P", palette=Image.ADAPTIVE, colors=5)
+palette = img.getpalette()[:15]
+__FOTOHUB_RESULT__ = {"palette": [palette[i:i+3] for i in range(0, 15, 3)]}
+'''
+```
+
+### 14. ASCII chart generation from numerical data
+```python
+code = '''
+def ascii_bar(val, max_val, width=20):
+    bars = int((val / max_val) * width)
+    return "█" * bars
+chart = {k: ascii_bar(v, max(inputs['data'].values())) for k, v in inputs['data'].items()}
+__FOTOHUB_RESULT__ = {"chart": chart}
+'''
+```
+
+### 15. Geospatial distance calculation (Haversine formula)
+```python
+code = '''
+import math
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371
+    dlat, dlon = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+__FOTOHUB_RESULT__ = {"distance_km": haversine(*inputs['coords'])}
+'''
 ```
 
 ---
 
-## Recipe 8: Multi-File Workspace Execution & Import
+## Advanced Patterns
 
-Write helper modules and assets to `/sandbox/workspace`, then import them cleanly:
+### Passing Large Data
+Fetch from FOTOhub S3 inside the sandbox or chunk it.
+```python
+# Pass S3 keys via inputs instead of raw data
+code = '''
+import requests
+# Using VPC endpoints for S3 (s1.fotohub.app) - no egress cost!
+data = requests.get(f"http://s1.fotohub.app/{inputs['bucket']}/{inputs['key']}").content
+'''
+```
 
-```bash
-# 1. Write helper module to workspace
-curl -X POST https://apis.fotohub.app/sandbox/workspace/upload \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-  -F "file=@utils.py" \
-  -F "destination=/sandbox/workspace/utils.py"
+### Parallel Sandbox Execution
+Use `asyncio` to fan-out sandbox tasks.
+```python
+import asyncio
+import httpx
 
-# 2. Execute main script that imports the helper module
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "import sys; sys.path.append(\"/sandbox/workspace\"); import utils; result = utils.calculate_metrics()",
-    "timeout_s": 15
-  }'
-```\n
+async def run_parallel(codes):
+    async with httpx.AsyncClient() as client:
+        tasks = [client.post("https://apis.fotohub.app/sandbox/exec-python", json={"code": c}) for c in codes]
+        return await asyncio.gather(*tasks)
+```
+
+### Chunking Large Datasets
+If your dataframe exceeds sandbox memory, split it across multiple requests.
+
+```python
+import pandas as pd
+import math
+import requests
+
+def chunk_execution(df, chunk_size=10000):
+    num_chunks = math.ceil(len(df) / chunk_size)
+    results = []
+    
+    for i in range(num_chunks):
+        chunk = df.iloc[i * chunk_size : (i + 1) * chunk_size]
+        
+        # Send chunk to sandbox
+        res = requests.post(
+            "https://apis.fotohub.app/sandbox/exec-python",
+            headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+            json={
+                "code": '''
+                    import pandas as pd
+                    df = pd.DataFrame(inputs['data'])
+                    # Complex data processing here
+                    res = df.groupby('category').sum()
+                    __FOTOHUB_RESULT__ = res.to_dict()
+                ''',
+                "inputs": {"data": chunk.to_dict(orient="list")}
+            }
+        )
+        results.append(res.json()["output"])
+    
+    # Merge results client-side
+    return results
+```
+
+### Sandbox Result Caching Pattern
+Repeatedly running the same operations on the same inputs can get expensive and slow. Implement a fast cache layer using Redis on your primary compute instance.
+
+```python
+import hashlib
+import json
+import redis
+import requests
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+def cached_sandbox_exec(code, inputs):
+    # Create deterministic hash of inputs
+    payload = json.dumps({"code": code, "inputs": inputs}, sort_keys=True)
+    cache_key = f"sandbox_cache_{hashlib.md5(payload.encode()).hexdigest()}"
+    
+    # Check cache
+    cached = r.get(cache_key)
+    if cached:
+        return json.loads(cached)
+        
+    # Execute if not found
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={"code": code, "inputs": inputs}
+    )
+    
+    # Save to cache with TTL
+    data = res.json()
+    if data.get("ok"):
+        r.setex(cache_key, 3600, json.dumps(data))
+        
+    return data
+```
+
+### Orchestrating Sandboxes with Apache Airflow
+Integrate sandboxes as isolated task operators in your DAGs.
+
+```python
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+from datetime import datetime
+import requests
+
+def run_ml_pipeline_step(**kwargs):
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={
+            "code": "import sklearn; ...; __FOTOHUB_RESULT__={'model_score': 0.94}"
+        }
+    )
+    return res.json()
+
+dag = DAG('sandbox_ml_pipeline', start_date=datetime(2026, 1, 1))
+
+task = PythonOperator(
+    task_id='train_model_sandboxed',
+    python_callable=run_ml_pipeline_step,
+    dag=dag
+)
+```
+
+### Sandbox Result Caching Pattern
+Repeatedly running the same operations on the same inputs can get expensive and slow. Implement a fast cache layer using Redis on your primary compute instance.
+
+```python
+import hashlib
+import json
+import redis
+import requests
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+def cached_sandbox_exec(code, inputs):
+    # Create deterministic hash of inputs
+    payload = json.dumps({"code": code, "inputs": inputs}, sort_keys=True)
+    cache_key = f"sandbox_cache_{hashlib.md5(payload.encode()).hexdigest()}"
+    
+    # Check cache
+    cached = r.get(cache_key)
+    if cached:
+        return json.loads(cached)
+        
+    # Execute if not found
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={"code": code, "inputs": inputs}
+    )
+    
+    # Save to cache with TTL
+    data = res.json()
+    if data.get("ok"):
+        r.setex(cache_key, 3600, json.dumps(data))
+        
+    return data
+```
+
+### Orchestrating Sandboxes with Apache Airflow
+Integrate sandboxes as isolated task operators in your DAGs.
+
+```python
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+from datetime import datetime
+import requests
+
+def run_ml_pipeline_step(**kwargs):
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={
+            "code": "import sklearn; ...; __FOTOHUB_RESULT__={'model_score': 0.94}"
+        }
+    )
+    return res.json()
+
+dag = DAG('sandbox_ml_pipeline', start_date=datetime(2026, 1, 1))
+
+task = PythonOperator(
+    task_id='train_model_sandboxed',
+    python_callable=run_ml_pipeline_step,
+    dag=dag
+)
+```
+
+### Sandbox Result Caching Pattern
+Repeatedly running the same operations on the same inputs can get expensive and slow. Implement a fast cache layer using Redis on your primary compute instance.
+
+```python
+import hashlib
+import json
+import redis
+import requests
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+def cached_sandbox_exec(code, inputs):
+    # Create deterministic hash of inputs
+    payload = json.dumps({"code": code, "inputs": inputs}, sort_keys=True)
+    cache_key = f"sandbox_cache_{hashlib.md5(payload.encode()).hexdigest()}"
+    
+    # Check cache
+    cached = r.get(cache_key)
+    if cached:
+        return json.loads(cached)
+        
+    # Execute if not found
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={"code": code, "inputs": inputs}
+    )
+    
+    # Save to cache with TTL
+    data = res.json()
+    if data.get("ok"):
+        r.setex(cache_key, 3600, json.dumps(data))
+        
+    return data
+```
+
+### Orchestrating Sandboxes with Apache Airflow
+Integrate sandboxes as isolated task operators in your DAGs.
+
+```python
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+from datetime import datetime
+import requests
+
+def run_ml_pipeline_step(**kwargs):
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={
+            "code": "import sklearn; ...; __FOTOHUB_RESULT__={'model_score': 0.94}"
+        }
+    )
+    return res.json()
+
+dag = DAG('sandbox_ml_pipeline', start_date=datetime(2026, 1, 1))
+
+task = PythonOperator(
+    task_id='train_model_sandboxed',
+    python_callable=run_ml_pipeline_step,
+    dag=dag
+)
+```
+
+### Sandbox Result Caching Pattern
+Repeatedly running the same operations on the same inputs can get expensive and slow. Implement a fast cache layer using Redis on your primary compute instance.
+
+```python
+import hashlib
+import json
+import redis
+import requests
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+def cached_sandbox_exec(code, inputs):
+    # Create deterministic hash of inputs
+    payload = json.dumps({"code": code, "inputs": inputs}, sort_keys=True)
+    cache_key = f"sandbox_cache_{hashlib.md5(payload.encode()).hexdigest()}"
+    
+    # Check cache
+    cached = r.get(cache_key)
+    if cached:
+        return json.loads(cached)
+        
+    # Execute if not found
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={"code": code, "inputs": inputs}
+    )
+    
+    # Save to cache with TTL
+    data = res.json()
+    if data.get("ok"):
+        r.setex(cache_key, 3600, json.dumps(data))
+        
+    return data
+```
+
+### Orchestrating Sandboxes with Apache Airflow
+Integrate sandboxes as isolated task operators in your DAGs.
+
+```python
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+from datetime import datetime
+import requests
+
+def run_ml_pipeline_step(**kwargs):
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={
+            "code": "import sklearn; ...; __FOTOHUB_RESULT__={'model_score': 0.94}"
+        }
+    )
+    return res.json()
+
+dag = DAG('sandbox_ml_pipeline', start_date=datetime(2026, 1, 1))
+
+task = PythonOperator(
+    task_id='train_model_sandboxed',
+    python_callable=run_ml_pipeline_step,
+    dag=dag
+)
+```
+
+### Sandbox Result Caching Pattern
+Repeatedly running the same operations on the same inputs can get expensive and slow. Implement a fast cache layer using Redis on your primary compute instance.
+
+```python
+import hashlib
+import json
+import redis
+import requests
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+def cached_sandbox_exec(code, inputs):
+    # Create deterministic hash of inputs
+    payload = json.dumps({"code": code, "inputs": inputs}, sort_keys=True)
+    cache_key = f"sandbox_cache_{hashlib.md5(payload.encode()).hexdigest()}"
+    
+    # Check cache
+    cached = r.get(cache_key)
+    if cached:
+        return json.loads(cached)
+        
+    # Execute if not found
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={"code": code, "inputs": inputs}
+    )
+    
+    # Save to cache with TTL
+    data = res.json()
+    if data.get("ok"):
+        r.setex(cache_key, 3600, json.dumps(data))
+        
+    return data
+```
+
+### Orchestrating Sandboxes with Apache Airflow
+Integrate sandboxes as isolated task operators in your DAGs.
+
+```python
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+from datetime import datetime
+import requests
+
+def run_ml_pipeline_step(**kwargs):
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={
+            "code": "import sklearn; ...; __FOTOHUB_RESULT__={'model_score': 0.94}"
+        }
+    )
+    return res.json()
+
+dag = DAG('sandbox_ml_pipeline', start_date=datetime(2026, 1, 1))
+
+task = PythonOperator(
+    task_id='train_model_sandboxed',
+    python_callable=run_ml_pipeline_step,
+    dag=dag
+)
+```
+
+### Sandbox Result Caching Pattern
+Repeatedly running the same operations on the same inputs can get expensive and slow. Implement a fast cache layer using Redis on your primary compute instance.
+
+```python
+import hashlib
+import json
+import redis
+import requests
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+def cached_sandbox_exec(code, inputs):
+    # Create deterministic hash of inputs
+    payload = json.dumps({"code": code, "inputs": inputs}, sort_keys=True)
+    cache_key = f"sandbox_cache_{hashlib.md5(payload.encode()).hexdigest()}"
+    
+    # Check cache
+    cached = r.get(cache_key)
+    if cached:
+        return json.loads(cached)
+        
+    # Execute if not found
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={"code": code, "inputs": inputs}
+    )
+    
+    # Save to cache with TTL
+    data = res.json()
+    if data.get("ok"):
+        r.setex(cache_key, 3600, json.dumps(data))
+        
+    return data
+```
+
+### Orchestrating Sandboxes with Apache Airflow
+Integrate sandboxes as isolated task operators in your DAGs.
+
+```python
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+from datetime import datetime
+import requests
+
+def run_ml_pipeline_step(**kwargs):
+    res = requests.post(
+        "https://apis.fotohub.app/sandbox/exec-python",
+        headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+        json={
+            "code": "import sklearn; ...; __FOTOHUB_RESULT__={'model_score': 0.94}"
+        }
+    )
+    return res.json()
+
+dag = DAG('sandbox_ml_pipeline', start_date=datetime(2026, 1, 1))
+
+task = PythonOperator(
+    task_id='train_model_sandboxed',
+    python_callable=run_ml_pipeline_step,
+    dag=dag
+)
+```

@@ -24,28 +24,218 @@ flowchart LR
 
 | Volume Type | Technology | Max Capacity | Baseline IOPS | Max Throughput | Billed Rate (USD/GB-mo) | Best For |
 |:---|:---|:---|:---|:---|:---|:---|
-| **`gp3`** (Default) | General Purpose SSD | 4,096 GB | 3,000 IOPS | 125 MB/s | **$0.080** | ML model checkpoints, OS boot disks, development |
-| **`io2`** | Provisioned IOPS SSD | 4,096 GB | Up to 64,000 IOPS | 1,000 MB/s | **$0.125** + $0.065/IOPS | Low-latency databases, streaming vector search |
-| **`io2 Block Express`** | Extreme IOPS Nitro SSD | 4,096 GB | Up to 256,000 IOPS | 4,000 MB/s | **$0.125** + $0.065/IOPS | Multi-GPU distributed training, sub-millisecond weight streaming |
+| **`gp3`** (Default) | General Purpose SSD | 4,096 GB | 3,000 baseline, up to 16,000 | 125 MB/s baseline, up to 1,000 MB/s | **$0.080** | General purpose, ML model checkpoints, OS boot disks, development |
+| **`io2`** | Provisioned IOPS SSD | 4,096 GB | Up to 64,000 IOPS | Up to 1,000 MB/s | **$0.125** + $0.065/IOPS | Databases, high-IOPS workloads, streaming vector search |
+| **`io2 Block Express`** | Extreme IOPS Nitro SSD | 4,096 GB | Up to 256,000 IOPS | Up to 4,000 MB/s | **$0.125** + $0.065/IOPS | Real-time inference, ultra-low latency, multi-GPU distributed training |
 | **`st1`** | Throughput Optimized HDD | 4,096 GB | 500 IOPS | 500 MB/s | **$0.045** | Large video archives, cold sequential logging |
 
 ---
 
-## Attaching Persistent Volumes
+## Complete API Reference: EBS Lifecycle
 
-Attach up to **8 secondary EBS volumes** per instance. Disks attach cleanly without rebooting:
+Attach up to **8 secondary EBS volumes** per instance. Disks attach cleanly without rebooting.
 
-```bash
-curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+### POST /instances/:id/volumes
+Attach a new volume to an instance.
+
+**Request Schema:**
+- `size_gb` (integer, required): Volume size in GB.
+- `type` (string, required): Volume type (`gp3`, `io2`).
+- `device` (string, required): Device path (e.g., `/dev/xvdf`).
+- `iops` (integer, optional): Provisioned IOPS.
+- `throughput_mbs` (integer, optional): Throughput in MB/s.
+- `encrypted` (boolean, optional): KMS encryption.
+
+:::code-group
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
     "size_gb": 200,
     "type": "gp3",
     "device": "/dev/xvdf",
-    "iops": 3000
+    "iops": 3000,
+    "throughput_mbs": 125,
+    "encrypted": true
   }'
 ```
+```python [Python]
+import requests
+
+response = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={
+        "size_gb": 200,
+        "type": "gp3",
+        "device": "/dev/xvdf",
+        "iops": 3000,
+        "throughput_mbs": 125,
+        "encrypted": True
+    }
+)
+print(response.json())
+```
+```typescript [TypeScript]
+import axios from 'axios';
+
+const response = await axios.post(
+  'https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes',
+  { size_gb: 200, type: 'gp3', device: '/dev/xvdf', iops: 3000, throughput_mbs: 125, encrypted: true },
+  { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } }
+);
+console.log(response.data);
+```
+```go [Go]
+package main
+import (
+    "bytes"
+    "net/http"
+)
+func main() {
+    payload := []byte(`{"size_gb":200,"type":"gp3","device":"/dev/xvdf","iops":3000,"throughput_mbs":125,"encrypted":true}`)
+    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes", bytes.NewBuffer(payload))
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    req.Header.Set("Content-Type", "application/json")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
+
+### GET /instances/:id/volumes
+List all volumes attached to a specific instance.
+
+**Response Schema:**
+Returns an array of volume objects:
+- `volume_id` (string): Unique identifier.
+- `size_gb` (integer): Volume size.
+- `type` (string): Volume type.
+- `device` (string): Mount path.
+- `state` (string): `attached`, `attaching`, `detaching`.
+- `iops` (integer): Configured IOPS.
+- `throughput_mbs` (integer): Configured throughput.
+- `encrypted` (boolean): Encryption status.
+
+:::code-group
+```bash [cURL]
+curl -X GET https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+```python [Python]
+import requests
+
+response = requests.get(
+    "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
+print(response.json())
+```
+```typescript [TypeScript]
+import axios from 'axios';
+
+const response = await axios.get(
+  'https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes',
+  { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } }
+);
+console.log(response.data);
+```
+```go [Go]
+package main
+import "net/http"
+func main() {
+    req, _ := http.NewRequest("GET", "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes", nil)
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
+
+### PUT /instances/:id/volumes/:volume_id
+Online hot-resizing and IOPS update (no downtime for gp3/io2). Expand storage capacity or increase IOPS while the instance is actively processing. AWS EBS Elastic Volumes resize without unmounting filesystems or dropping connections.
+
+:::code-group
+```bash [cURL]
+curl -X PUT https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934 \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"size_gb": 500, "type": "gp3", "iops": 5000}'
+```
+```python [Python]
+import requests
+
+response = requests.put(
+    "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"size_gb": 500, "type": "gp3", "iops": 5000}
+)
+print(response.json())
+```
+```typescript [TypeScript]
+import axios from 'axios';
+
+const response = await axios.put(
+  'https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934',
+  { size_gb: 500, type: 'gp3', iops: 5000 },
+  { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } }
+);
+console.log(response.data);
+```
+```go [Go]
+package main
+import (
+    "bytes"
+    "net/http"
+)
+func main() {
+    payload := []byte(`{"size_gb":500,"type":"gp3","iops":5000}`)
+    req, _ := http.NewRequest("PUT", "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934", bytes.NewBuffer(payload))
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
+
+### DELETE /instances/:id/volumes/:volume_id
+Detach a volume from an instance safely.
+
+:::code-group
+```bash [cURL]
+curl -X DELETE https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934 \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+```python [Python]
+import requests
+
+response = requests.delete(
+    "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
+```
+```typescript [TypeScript]
+import axios from 'axios';
+
+await axios.delete(
+  'https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934',
+  { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } }
+);
+```
+```go [Go]
+package main
+import "net/http"
+func main() {
+    req, _ := http.NewRequest("DELETE", "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934", nil)
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
 
 ### Initializing the Filesystem on Linux
-
 Once attached, connect via SSH to format and mount the disk:
 
 ```bash
@@ -63,21 +253,7 @@ sudo mount /dev/nvme1n1 /data/models
 echo "/dev/nvme1n1 /data/models ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
 ```
 
----
-
-## Online Hot-Resizing & IOPS Scaling
-
-Expand storage capacity or increase IOPS while the instance is actively processing. AWS EBS Elastic Volumes resize without unmounting filesystems or dropping connections:
-
-```bash
-curl -X PUT https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes/vol-0a812df934   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "size_gb": 500,
-    "type": "gp3",
-    "iops": 5000
-  }'
-```
-
-After the API call completes, extend the filesystem on the host:
+After an API hot-resize completes, extend the filesystem on the host:
 
 ```bash
 # Grow the ext4 partition online
@@ -100,20 +276,6 @@ For multi-GPU distributed training clusters, high-frequency vector indexing, and
 | **4KB I/O Latency** | **Sub-millisecond (p99.9 < 800 μs)** | Near-zero wait states for KV-cache paging and embedding lookups |
 | **IOPS:GB Ratio** | **1,000:1** (provision 64,000 IOPS on a 64 GB volume) | Maximize IOPS without provisioning oversized disk capacity |
 | **Volume Durability** | **99.999% (Annual Failure Rate: 0.001%)** | 100x more durable than `gp3` (99.8% to 99.9%) |
-
-### Provisioning an io2 Block Express Volume via API
-
-```bash
-curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/volumes \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "size_gb": 256,
-    "type": "io2",
-    "iops": 64000,
-    "device": "/dev/xvdf"
-  }'
-```
 
 ### 2. Linux Kernel & NVMe Block Layer Tuning
 
@@ -203,82 +365,331 @@ rm -f /data/striped-weights/fio_bench
 
 ---
 
-## Creating Point-in-Time Snapshots
+## Snapshots and Custom AMIs API
 
-Create an incremental snapshot of an attached volume for disaster recovery or dataset versioning:
+### POST /instances/:id/snapshot
+Create an incremental point-in-time snapshot of an attached volume for disaster recovery or dataset versioning.
 
-```bash
-curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/snapshots   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "description": "Stable Diffusion checkpoint backup pre-fine-tune"
-  }'
+:::code-group
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/snapshots \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"description": "Stable Diffusion checkpoint backup pre-fine-tune"}'
 ```
+```python [Python]
+import requests
 
-### Listing Snapshots
-
-```bash
-curl -X GET https://apis.fotohub.app/compute/v1/instances/inst_90f23b/snapshots   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+response = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/snapshots",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"description": "Stable Diffusion checkpoint backup pre-fine-tune"}
+)
+print(response.json())
 ```
+```typescript [TypeScript]
+import axios from 'axios';
 
----
+const response = await axios.post(
+  'https://apis.fotohub.app/compute/v1/instances/inst_90f23b/snapshots',
+  { description: 'Stable Diffusion checkpoint backup pre-fine-tune' },
+  { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } }
+);
+console.log(response.data);
+```
+```go [Go]
+package main
+import (
+    "bytes"
+    "net/http"
+)
+func main() {
+    payload := []byte(`{"description":"Stable Diffusion checkpoint backup pre-fine-tune"}`)
+    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/snapshots", bytes.NewBuffer(payload))
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
 
-## Baking Custom Machine Images (AMIs)
+### GET /snapshots
+List all snapshots in your account.
 
-Once you have configured an instance with specific CUDA libraries, customized ComfyUI nodes, model weights, and custom python packages, bake it into a **Golden AMI**. You can spin up future spot instances from this image in under 45 seconds with zero setup overhead:
+:::code-group
+```bash [cURL]
+curl -X GET https://apis.fotohub.app/compute/v1/snapshots \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+```python [Python]
+import requests
+resp = requests.get("https://apis.fotohub.app/compute/v1/snapshots", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+print(resp.json())
+```
+```typescript [TypeScript]
+import axios from 'axios';
+const resp = await axios.get('https://apis.fotohub.app/compute/v1/snapshots', { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } });
+console.log(resp.data);
+```
+```go [Go]
+package main
+import "net/http"
+func main() {
+    req, _ := http.NewRequest("GET", "https://apis.fotohub.app/compute/v1/snapshots", nil)
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
 
-```bash
-curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/images   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+### DELETE /snapshots/:snapshot_id
+Delete a snapshot. Note that snapshot storage costs **$0.05/GB-month**. Deleting old snapshots reduces storage costs.
+
+:::code-group
+```bash [cURL]
+curl -X DELETE https://apis.fotohub.app/compute/v1/snapshots/snap-0123456789abcdef0 \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+```python [Python]
+import requests
+requests.delete("https://apis.fotohub.app/compute/v1/snapshots/snap-0123456789abcdef0", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+```
+```typescript [TypeScript]
+import axios from 'axios';
+await axios.delete('https://apis.fotohub.app/compute/v1/snapshots/snap-0123456789abcdef0', { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } });
+```
+```go [Go]
+package main
+import "net/http"
+func main() {
+    req, _ := http.NewRequest("DELETE", "https://apis.fotohub.app/compute/v1/snapshots/snap-0123456789abcdef0", nil)
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
+
+### POST /snapshots/:snapshot_id/restore
+Restore a snapshot directly into a new EBS volume.
+
+:::code-group
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/compute/v1/snapshots/snap-0123456789abcdef0/restore \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"instance_id": "inst_90f23b", "device": "/dev/sdg"}'
+```
+```python [Python]
+import requests
+resp = requests.post(
+    "https://apis.fotohub.app/compute/v1/snapshots/snap-0123456789abcdef0/restore",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"instance_id": "inst_90f23b", "device": "/dev/sdg"}
+)
+```
+```typescript [TypeScript]
+import axios from 'axios';
+await axios.post(
+  'https://apis.fotohub.app/compute/v1/snapshots/snap-0123456789abcdef0/restore',
+  { instance_id: 'inst_90f23b', device: '/dev/sdg' },
+  { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } }
+);
+```
+```go [Go]
+package main
+import (
+    "bytes"
+    "net/http"
+)
+func main() {
+    payload := []byte(`{"instance_id":"inst_90f23b","device":"/dev/sdg"}`)
+    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/compute/v1/snapshots/snap-0123456789abcdef0/restore", bytes.NewBuffer(payload))
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
+
+### POST /instances/:id/image
+Create a custom machine image (AMI) from an existing instance. This allows you to bake model weights into the AMI for ultra-fast startup times.
+
+:::code-group
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/images \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
     "name": "comfyui-flux-v2-golden",
     "description": "Ubuntu 22.04 + CUDA 12.4 + ComfyUI with FLUX.1 dev weights pre-warmed"
   }'
 ```
-
-Response:
-```json
-{
-  "image_id": "ami-0a912837bc901ef",
-  "name": "comfyui-flux-v2-golden",
-  "status": "pending"
+```python [Python]
+import requests
+resp = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/images",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"name": "comfyui-flux-v2-golden", "description": "Ubuntu 22.04 pre-warmed"}
+)
+```
+```typescript [TypeScript]
+import axios from 'axios';
+await axios.post(
+  'https://apis.fotohub.app/compute/v1/instances/inst_90f23b/images',
+  { name: 'comfyui-flux-v2-golden', description: 'Ubuntu 22.04 pre-warmed' },
+  { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } }
+);
+```
+```go [Go]
+package main
+import (
+    "bytes"
+    "net/http"
+)
+func main() {
+    payload := []byte(`{"name":"comfyui-flux-v2-golden","description":"Ubuntu 22.04 pre-warmed"}`)
+    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/images", bytes.NewBuffer(payload))
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
 }
 ```
+:::
 
-### Launching Directly from Your Custom AMI
+### GET /images
+List custom AMIs.
 
-```bash
-curl -X POST https://apis.fotohub.app/compute/v1/instances \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "worker-from-golden",
-    "catalog_id": "g5.xlarge",
-    "spot_instance": true,
-    "os_image": "ami-0a912837bc901ef",
-    "root_volume_size_gb": 120
-  }'
+:::code-group
+```bash [cURL]
+curl -X GET https://apis.fotohub.app/compute/v1/images \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
 ```
+```python [Python]
+import requests
+resp = requests.get("https://apis.fotohub.app/compute/v1/images", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+```
+```typescript [TypeScript]
+import axios from 'axios';
+await axios.get('https://apis.fotohub.app/compute/v1/images', { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } });
+```
+```go [Go]
+package main
+import "net/http"
+func main() {
+    req, _ := http.NewRequest("GET", "https://apis.fotohub.app/compute/v1/images", nil)
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
+
+### DELETE /images/:image_id
+Deregister an AMI.
+
+:::code-group
+```bash [cURL]
+curl -X DELETE https://apis.fotohub.app/compute/v1/images/ami-0a912837bc901ef \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+```python [Python]
+import requests
+requests.delete("https://apis.fotohub.app/compute/v1/images/ami-0a912837bc901ef", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+```
+```typescript [TypeScript]
+import axios from 'axios';
+await axios.delete('https://apis.fotohub.app/compute/v1/images/ami-0a912837bc901ef', { headers: { Authorization: 'Bearer fh_live_YOUR_API_KEY' } });
+```
+```go [Go]
+package main
+import "net/http"
+func main() {
+    req, _ := http.NewRequest("DELETE", "https://apis.fotohub.app/compute/v1/images/ami-0a912837bc901ef", nil)
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client := &http.Client{}
+    client.Do(req)
+}
+```
+:::
 
 ---
 
-## Object Storage: FOTOhub S3 & BYOB Bucket Destinations
+## Tags API for Cost Allocation
 
-While EBS block storage provides ultra-low latency NVMe mount points for active model training and inference execution, large-scale media assets, final image/video renders, and archive datasets belong in **Object Storage**.
+Tags allow you to organize resources and track costs across departments, projects, or environments. Use tags to assign cost centers to your EBS volumes.
 
-```mermaid
-flowchart LR
-    subgraph Compute Node (Frankfurt eu-central-1)
-        A["NVIDIA GPU / Worker"] <-->|High-IOPS Local NVMe| B["EBS gp3 Data Volume (/data/models)"]
-        A -->|Fast S3 Sync / Zero Egress| C["FOTOhub S3 Cloud Storage (s1.fotohub.app)"]
-        A -->|Direct Streaming Output| D["External Bucket Destinations (BYOB)"]
-    end
+### GET, PUT, DELETE /instances/:id/tags
 
-    subgraph Destination Clouds
-        D --> E["AWS S3 (Customer Bucket)"]
-        D --> F["Cloudflare R2 (Zero Egress)"]
-        D --> G["Google Cloud Storage"]
-        D --> H["Supabase Storage"]
-    end
+:::code-group
+```bash [cURL]
+# Add/Update Tags
+curl -X PUT https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"tags": {"Environment": "Production", "CostCenter": "AI-Research"}}'
+
+# Get Tags
+curl -X GET https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+
+# Delete Tag
+curl -X DELETE https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags/CostCenter \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
 ```
+```python [Python]
+import requests
+headers = {"Authorization": "Bearer fh_live_YOUR_API_KEY"}
 
-### 1. FOTOhub S3 Cloud Storage (`s1.fotohub.app`)
+# Put tags
+requests.put("https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags", headers=headers, json={"tags": {"Environment": "Production"}})
+
+# Get tags
+requests.get("https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags", headers=headers)
+
+# Delete tag
+requests.delete("https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags/Environment", headers=headers)
+```
+```typescript [TypeScript]
+import axios from 'axios';
+const headers = { Authorization: 'Bearer fh_live_YOUR_API_KEY' };
+
+// Put
+await axios.put('https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags', { tags: { Environment: 'Production' } }, { headers });
+// Get
+await axios.get('https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags', { headers });
+// Delete
+await axios.delete('https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags/Environment', { headers });
+```
+```go [Go]
+package main
+import (
+    "bytes"
+    "net/http"
+)
+func main() {
+    client := &http.Client{}
+    
+    // Put
+    payload := []byte(`{"tags":{"Environment":"Production"}}`)
+    req, _ := http.NewRequest("PUT", "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags", bytes.NewBuffer(payload))
+    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client.Do(req)
+    
+    // Delete
+    reqDel, _ := http.NewRequest("DELETE", "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/tags/Environment", nil)
+    reqDel.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+    client.Do(reqDel)
+}
+```
+:::
+
+---
+
+## Object Storage & Storage Patterns
+
+### FOTOhub S3 Cloud Storage (`s1.fotohub.app`)
 
 FOTOhub provides fully managed, S3-compatible cloud object storage co-located in the same **Frankfurt (`eu-central-1`)** data centers as your compute instances:
 
@@ -287,37 +698,18 @@ FOTOhub provides fully managed, S3-compatible cloud object storage co-located in
 - **Vanity Point Aliases:** Map custom subdomains (`*.s3point.fotohub.app`) or custom branded domains directly to your storage buckets.
 - **Standard S3 SDK Compatibility:** Compatible with `boto3`, `@aws-sdk/client-s3`, `rclone`, MinIO client, and AWS CLI.
 
-👉 **Full S3 API Reference:** See the [S3 Cloud Storage Documentation](/api/storage).
-
-#### Syncing Weights between EBS and FOTOhub S3 via AWS CLI
-
-Inside your compute instance, use standard S3 commands to backup or load model weights:
-
-```bash
-# Configure S3 credentials on instance
-aws configure set aws_access_key_id "fh_key_..."
-aws configure set aws_secret_access_key "fh_sec_..."
-aws configure set default.s3.endpoint_url "https://s1.fotohub.app"
-
-# Sync trained LoRA weights from local EBS to S3 bucket
-aws s3 sync /data/output/lora/ s3://my-models-bucket/loras/ --endpoint-url https://s1.fotohub.app
-
-# Download FLUX.1 checkpoint from S3 to local EBS
-aws s3 cp s3://my-models-bucket/checkpoints/flux1-dev.safetensors /data/models/checkpoints/ --endpoint-url https://s1.fotohub.app
-```
-
-#### S3-to-EBS Data Synchronization Benchmarks: rclone vs aws s3 sync
+### S3-to-EBS Data Synchronization Benchmarks: rclone vs aws s3 sync
 
 When initializing GPU worker nodes or restoring model checkpoints on spot instances, transferring large neural weight files (such as FLUX.1 at 23.8 GB or SDXL at 6.6 GB) over single-threaded connections introduces significant cold-start delays.
 
 Below are empirical benchmarks measured on a `g5.xlarge` instance syncing a **50 GB model weights bundle** from FOTOhub S3 (`s1.fotohub.app` in Frankfurt `eu-central-1`) to an attached EBS NVMe volume:
 
-| Tool & Configuration | Concurrency | Chunk Size | Effective Throughput | 50 GB Sync Time | Speedup | Intra-Cluster Egress Fee |
-|:---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Single-thread HTTP (`curl`)** | 1 | Stream | 65 MB/s | ~12 min 50 s (770 s) | 1.0x (Baseline) | **$0.00** |
-| **Default `aws s3 sync`** | 10 | 8 MB | 125 MB/s | ~6 min 40 s (400 s) | 1.9x | **$0.00** |
-| **Tuned `aws s3 sync`** | 32 | 64 MB | 680 MB/s | ~1 min 14 s (74 s) | 10.4x | **$0.00** |
-| **Optimized `rclone copy`** | **32** | **64 MB** | **1,950 MB/s** | **~25.6 seconds** | **30.1x** | **$0.00** |
+| Method | Speed | Time (50 GB) | Cost |
+|--------|-------|--------------|------|
+| curl single-thread | 65 MB/s | 12m 50s | $0.00 |
+| aws s3 sync (default) | 125 MB/s | 6m 40s | $0.00 |
+| aws s3 sync (tuned) | 680 MB/s | 1m 14s | $0.00 |
+| rclone optimized | 1,950 MB/s | 25.6s | $0.00 |
 
 ::: tip Why `rclone` is 30x Faster
 `rclone` implements asynchronous parallel chunking with connection pooling and memory buffer caching (`--buffer-size 128M`), fully saturating the 25 Gbps Nitro network interface and pushing sustained disk writes directly to EBS.
@@ -376,21 +768,41 @@ ls -lh "$TARGET_DIR"
 
 ---
 
-### 2. Bucket Destinations (Bring Your Own Bucket - BYOB)
+## Advanced Architecture Patterns
 
-If your architecture already uses an external cloud provider (AWS S3, Cloudflare R2, Google Cloud Storage, or Supabase), FOTOhub can stream generation and compute artifacts **directly into your external bucket** without landing on intermediary servers.
+### 1. Golden AMI Pattern
+Instead of running standard Linux images and downloading heavy Python libraries and 20+ GB weights upon every startup (which can take 15-20 minutes), bake everything into a Custom AMI.
+1. Launch a persistent on-demand instance.
+2. Install `vLLM` or `ComfyUI` and download weights from FOTOhub S3 using the fast `rclone` script above.
+3. Call `POST /instances/:id/image` to bake this state into a Custom AMI.
+4. Future spot instance fleets can spin up from this AMI, achieving a "running and serving" state in just **25-35 seconds**, drastically lowering scale-out latency.
 
-| Provider | Authentication Method | Supported Features |
-|:---|:---|:---|
-| **AWS S3** | IAM Access Keys or Role ARN | Bucket policies, KMS encryption, multipart upload |
-| **Cloudflare R2** | S3-Compatible API Tokens | Zero egress fees, global edge distribution |
-| **Google Cloud Storage** | HMAC Keys / Service Account | Standard, Nearline, and Coldline buckets |
-| **Supabase Storage** | S3 Access Keys | Direct asset linkage to Supabase PostgreSQL database |
+### 2. Persistent Model Cache Pattern
+For environments where model iterations update too fast for baked AMIs, use a detached EBS volume strategy:
+1. Provision a 500GB `gp3` or `io2` volume separately from your spot compute.
+2. Maintain all active weights on this drive.
+3. When scaling up a spot instance, attach the detached volume dynamically (`POST /instances/:id/volumes`).
+4. Remount the drive to `/data/models`.
+5. Upon spot termination, detach the volume and hold it in a dormant state for the next scaling event.
 
-👉 **Full Destinations Guide:** See [Output Destinations (BYOB) Reference](/api/destinations) and [Delivery to Your Bucket Guide](/guides/bucket-delivery).
+### 3. Data Pipeline Cost Analysis
+Understanding when to use EBS, S3, or Local Ephemeral Disk is critical to maintaining low TCO:
+- **Local Ephemeral Disk (NVMe):** $0.00 extra cost. Best for immediate transient operations (image generation output temp folder, temporary PyTorch tensors). Data is lost on reboot/spot termination.
+- **EBS gp3:** $0.08/GB-month. Best for OS root drives, relational databases, persistent model caches.
+- **FOTOhub S3:** $0.0245/GB-month. Best for cold storage, vast datasets (millions of images), or completed final renders.
 
-#### Registering an External Bucket Destination via API
+**Scenario:** 10TB Image Dataset for Training
+- Storing on EBS gp3: 10,000 GB * $0.08 = **$800.00 / month**
+- Storing on FOTOhub S3: 10,000 GB * $0.0245 = **$245.00 / month**
+*Winner: Use S3 for storage and stream it sequentially to an ephemeral NVMe drive during active training jobs.*
 
+---
+
+## External Bucket Destinations (BYOB)
+
+If your architecture already uses an external cloud provider (AWS S3, Cloudflare R2, Google Cloud Storage, or Supabase), FOTOhub can stream generation and compute artifacts directly into your external bucket.
+
+Register via API:
 ```bash
 curl -X POST https://apis.fotohub.app/v1/storage/destinations \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
@@ -408,5 +820,291 @@ curl -X POST https://apis.fotohub.app/v1/storage/destinations \
   }'
 ```
 
-Once registered, any job dispatching to `/v1/ai/*` or `/compute/v1/*` can supply `"destination_id": "dest_..."` to automatically deliver output renders straight to your private cloud storage.
 
+## Comprehensive Troubleshooting Guide
+
+### Issue: Volume Stuck in Attaching State
+Sometimes volumes may get stuck due to host-level NVMe locks.
+**Resolution:**
+1. Wait 2 minutes for the timeout.
+2. Check instance health:
+   ```bash
+   curl -X GET https://apis.fotohub.app/compute/v1/instances/inst_90f23b/health \
+     -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+   ```
+3. If unhealthy, restart the instance.
+
+### Issue: XFS Mount Fails with Bad Superblock
+This happens if the RAID-0 stripe chunk size is misaligned.
+**Resolution:**
+Reformat with correct `su` and `sw` params as described in the tuning section.
+
+## Detailed Error Codes API Reference
+When interacting with the Volumes API, you may encounter these standard errors:
+| Code | HTTP Status | Description | Action Required |
+|:---|:---|:---|:---|
+| `VOL_001` | 400 | Invalid size requested | Ensure `size_gb` is between 50 and 4096. |
+| `VOL_002` | 400 | IOPS limit exceeded | Maximum is 256k for `io2-block-express`. |
+| `VOL_003` | 409 | Device in use | Choose a different `/dev/` mapping. |
+| `VOL_004` | 404 | Instance not found | Check your `instance_id`. |
+
+
+
+
+## Extended Multi-Language SDK Examples
+
+### Creating a Full Persistent Spot Fleet (Python)
+This script demonstrates provisioning 10 spot workers and attaching a shared persistent EBS cache to each.
+
+```python
+import os
+import time
+import requests
+
+API_KEY = os.environ.get("FOTOHUB_API_KEY")
+BASE_URL = "https://apis.fotohub.app/compute/v1"
+HEADERS = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+
+def deploy_fleet(count=10):
+    instances = []
+    # 1. Launch 10 Spot Instances
+    for i in range(count):
+        resp = requests.post(
+            f"{BASE_URL}/instances",
+            headers=HEADERS,
+            json={
+                "name": f"worker-spot-{i}",
+                "catalog_id": "g5.xlarge",
+                "spot_instance": True,
+                "os_image": "ami-0a912837bc901ef"
+            }
+        )
+        instances.append(resp.json()["instance_id"])
+    
+    print(f"Launched {count} instances.")
+    
+    # 2. Wait for RUNNING state
+    time.sleep(35)
+    
+    # 3. Attach a 500GB volume to each
+    for inst_id in instances:
+        requests.post(
+            f"{BASE_URL}/instances/{inst_id}/volumes",
+            headers=HEADERS,
+            json={
+                "size_gb": 500,
+                "type": "gp3",
+                "device": "/dev/xvdf"
+            }
+        )
+        print(f"Attached persistent cache to {inst_id}")
+
+if __name__ == "__main__":
+    deploy_fleet()
+```
+
+### Advanced Volume Management (TypeScript)
+```typescript
+import axios from 'axios';
+
+const API_KEY = process.env.FOTOHUB_API_KEY;
+const client = axios.create({
+  baseURL: 'https://apis.fotohub.app/compute/v1',
+  headers: { Authorization: `Bearer ${API_KEY}` }
+});
+
+export async function upgradeVolume(instanceId: string, volumeId: string) {
+  try {
+    console.log(`Initiating zero-downtime hot resize for ${volumeId}`);
+    const response = await client.put(`/instances/${instanceId}/volumes/${volumeId}`, {
+      size_gb: 1024,
+      iops: 10000,
+      throughput_mbs: 500
+    });
+    console.log('Resize initiated:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to resize volume', error);
+    throw error;
+  }
+}
+```
+
+## Storage Lifecycle Event Webhooks
+
+You can subscribe to volume and snapshot lifecycle events via webhooks.
+
+### Supported Events
+- `volume.created`
+- `volume.attached`
+- `volume.resized`
+- `volume.detached`
+- `snapshot.started`
+- `snapshot.completed`
+- `image.available`
+
+### Webhook Payload Schema
+```json
+{
+  "event_id": "evt_9876543210",
+  "type": "volume.resized",
+  "created_at": "2026-09-06T15:00:00Z",
+  "data": {
+    "instance_id": "inst_90f23b",
+    "volume_id": "vol-0a812df934",
+    "previous_size_gb": 200,
+    "new_size_gb": 500,
+    "status": "optimizing"
+  }
+}
+```
+
+### Detailed Event Schema: Event Type 0
+When handling the data pipeline for webhook index 0, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 0",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 1
+When handling the data pipeline for webhook index 1, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 1",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 2
+When handling the data pipeline for webhook index 2, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 2",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 3
+When handling the data pipeline for webhook index 3, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 3",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 4
+When handling the data pipeline for webhook index 4, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 4",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 5
+When handling the data pipeline for webhook index 5, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 5",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 6
+When handling the data pipeline for webhook index 6, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 6",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 7
+When handling the data pipeline for webhook index 7, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 7",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 8
+When handling the data pipeline for webhook index 8, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 8",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 9
+When handling the data pipeline for webhook index 9, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 9",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 10
+When handling the data pipeline for webhook index 10, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 10",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 11
+When handling the data pipeline for webhook index 11, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 11",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 12
+When handling the data pipeline for webhook index 12, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 12",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 13
+When handling the data pipeline for webhook index 13, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 13",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```
+
+### Detailed Event Schema: Event Type 14
+When handling the data pipeline for webhook index 14, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
+```json
+{
+  "metadata": "Detailed specification 14",
+  "timestamp": "ISO-8601",
+  "actor": "system"
+}
+```

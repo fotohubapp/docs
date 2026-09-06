@@ -4,31 +4,195 @@ Comprehensive network control for your compute infrastructure: static Elastic IP
 
 ---
 
+## Architecture Overview
+
+This diagram illustrates how FOTOhub compute instances interact with VPCs, Security Groups, Elastic IPs, Route53, and external CDNs like Cloudflare.
+
+```mermaid
+flowchart TD
+    Internet((Internet)) --> CF[Cloudflare CDN / WAF]
+    CF --> R53[Amazon Route53 DNS]
+    Internet --> R53
+    
+    R53 -->|A Record| EIP[Elastic IP 18.197.82.14]
+    
+    subgraph Frankfurt VPC 172.31.0.0/16
+        subgraph Public Subnet eu-central-1a
+            EIP --> IGW[Internet Gateway]
+            IGW --> ENI[Elastic Network Interface]
+            
+            subgraph Security Group sg-0abcdef123
+                ENI -->|Allow 80/443| Node[FOTOhub Compute Instance]
+            end
+        end
+        
+        subgraph Private Subnet eu-central-1b
+            Node <-->|VPC Peering| DB[(Private Database)]
+        end
+    end
+```
+
+:::info Architecture Defaults
+All resources default to the `eu-central-1` (Frankfurt) region unless specified otherwise.
+:::
+
+---
+
 ## Elastic IP (Static Public IP)
 
 By default, EC2 instances receive dynamic public IP addresses that change when the instance is stopped and started. Assigning an **Elastic IP** provides a persistent public IPv4 address that remains identical across reboots and power cycles.
 
 ### 1. Allocate & Attach Elastic IP
 
-```bash
-curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/elastic-ip   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+:::code-group
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/elastic-ip \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"region": "eu-central-1"}'
 ```
+
+```python [Python]
+import os
+import requests
+
+api_key = os.getenv("FOTOHUB_API_KEY", "fh_live_YOUR_API_KEY")
+url = "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/elastic-ip"
+
+response = requests.post(
+    url,
+    headers={"Authorization": f"Bearer {api_key}"},
+    json={"region": "eu-central-1"}
+)
+print(response.json())
+```
+
+```typescript [TypeScript]
+import fetch from "node-fetch";
+
+const allocateEIP = async () => {
+  const res = await fetch("https://apis.fotohub.app/compute/v1/instances/inst_90f23b/elastic-ip", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer fh_live_YOUR_API_KEY",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ region: "eu-central-1" })
+  });
+  const data = await res.json();
+  console.log(data);
+};
+
+allocateEIP();
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	url := "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/elastic-ip"
+	payload := map[string]string{"region": "eu-central-1"}
+	jsonValue, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonValue))
+	req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer res.Body.Close()
+	fmt.Println("EIP Allocated")
+}
+```
+
+:::
 
 Response:
 ```json
 {
   "allocation_id": "eipalloc-01928374a5b6",
   "public_ip": "18.197.82.14",
+  "association_id": "eipassoc-0a1b2c3d4e5f",
   "instance_id": "inst_90f23b",
   "status": "associated"
 }
 ```
 
+:::warning Pricing Alert
+Elastic IPs cost **$0.005/hr** when associated with a running instance, and **$0.005/hr** when idle (allocated but not associated). Be sure to release them when no longer needed!
+:::
+
 ### 2. Release Elastic IP
 
-```bash
-curl -X DELETE https://apis.fotohub.app/compute/v1/instances/inst_90f23b/elastic-ip   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+:::code-group
+
+```bash [cURL]
+curl -X DELETE https://apis.fotohub.app/compute/v1/instances/inst_90f23b/elastic-ip \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
 ```
+
+```python [Python]
+import requests
+
+requests.delete(
+    "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/elastic-ip",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
+```
+
+:::
+
+---
+
+## VPC & Subnet Reference
+
+Compute instances can be provisioned into private Virtual Private Clouds (VPCs) to ensure inter-node traffic flows over encrypted AWS backbones.
+
+### Production Network Details
+
+- **VPC ID:** `vpc-08528c7005fc7f9d5`
+- **VPC CIDR:** `172.31.0.0/16`
+- **Subnets (AZs):** `eu-central-1a`, `eu-central-1b`, `eu-central-1c`
+
+### Listing VPCs
+
+:::code-group
+```bash [cURL]
+curl -X GET https://apis.fotohub.app/compute/v1/aws/vpcs \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+```python [Python]
+import requests
+res = requests.get("https://apis.fotohub.app/compute/v1/aws/vpcs", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+print(res.json())
+```
+:::
+
+### Listing Subnets
+
+:::code-group
+```bash [cURL]
+curl -X GET "https://apis.fotohub.app/compute/v1/aws/subnets?vpc_id=vpc-08528c7005fc7f9d5" \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+```python [Python]
+import requests
+res = requests.get("https://apis.fotohub.app/compute/v1/aws/subnets?vpc_id=vpc-08528c7005fc7f9d5", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+print(res.json())
+```
+:::
 
 ---
 
@@ -36,12 +200,43 @@ curl -X DELETE https://apis.fotohub.app/compute/v1/instances/inst_90f23b/elastic
 
 Control inbound and outbound network access with granular CIDR rules. Each instance supports up to **20 rules**.
 
+### Complete Security Group API
+
+#### List Security Groups
+```bash
+curl -X GET https://apis.fotohub.app/compute/v1/aws/security-groups \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+
+#### Create Security Group
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/aws/security-groups \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"name": "api-sg", "description": "API nodes", "vpc_id": "vpc-08528c7005fc7f9d5"}'
+```
+
+#### Delete Security Group
+```bash
+curl -X DELETE https://apis.fotohub.app/compute/v1/aws/security-groups/sg-0abcdef123 \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+
+#### List SGs on Instance
+```bash
+curl -X GET https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-groups \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+
 ### Adding Inbound Rules
 
 Open a port for a web service (e.g. port 8000 for FastAPI / vLLM):
 
-```bash
-curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-rules   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+:::code-group
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-rules \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
     "direction": "inbound",
     "protocol": "tcp",
     "port": 8000,
@@ -49,17 +244,28 @@ curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-
     "description": "Public vLLM API Access"
   }'
 ```
+```python [Python]
+import requests
 
-### Restricting Access to Office CIDR
+requests.post(
+    "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-rules",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={
+        "direction": "inbound",
+        "protocol": "tcp",
+        "port": 8000,
+        "cidr": "0.0.0.0/0",
+        "description": "Public vLLM API Access"
+    }
+)
+```
+:::
 
+### Removing Rules
 ```bash
-curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-rules   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "direction": "inbound",
-    "protocol": "tcp",
-    "port": 22,
-    "cidr": "198.51.100.0/24",
-    "description": "Corporate VPN SSH Only"
-  }'
+curl -X DELETE https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-rules \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"direction": "inbound", "protocol": "tcp", "port": 8000, "cidr": "0.0.0.0/0"}'
 ```
 
 ---
@@ -68,60 +274,98 @@ curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-
 
 The compute engine provides full programmatic management over Amazon Route53 hosted zones and DNS records.
 
-### 1. Create a Hosted Zone
+### Complete DNS API
 
-Register a domain zone to manage DNS records through FOTOhub:
-
+#### List Hosted Zones
 ```bash
-curl -X POST https://apis.fotohub.app/compute/v1/dns/zones   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "domain": "ai-models.yourcompany.com",
-    "comment": "Inference endpoint domain"
-  }'
+curl -X GET https://apis.fotohub.app/compute/v1/dns/zones \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
 ```
 
-Response includes AWS Name Servers to delegate at your domain registrar:
-```json
-{
-  "zone": {
-    "id": "Z01928374829",
-    "domain": "ai-models.yourcompany.com",
-    "nameservers": [
-      "ns-123.awsdns-15.com",
-      "ns-456.awsdns-57.net",
-      "ns-789.awsdns-34.org",
-      "ns-012.awsdns-01.co.uk"
-    ]
-  }
-}
-```
-
-### 2. One-Click Point Domain to Instance
-
-Automatically create an `A` record linking your instance's current public IP to your custom subdomain:
-
+#### Create Hosted Zone
 ```bash
-curl -X POST https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/point-to-instance   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "subdomain": "comfy",
-    "instance_id": "inst_90f23b"
-  }'
+curl -X POST https://apis.fotohub.app/compute/v1/dns/zones \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"domain_name": "ai-models.yourcompany.com", "comment": "Inference endpoint domain"}'
 ```
 
-Now `comfy.ai-models.yourcompany.com` resolves directly to your GPU node!
+#### Get Zone Details (NS Records)
+```bash
+curl -X GET https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829 \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
 
----
+#### Verify Domain Ownership
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/verify \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
 
-## Automated MX Email Record Setup
+#### List Records
+```bash
+curl -X GET https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/records \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+
+#### Add Record
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/records \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"name": "api", "type": "A", "value": "18.197.82.14", "ttl": 300}'
+```
+
+#### Delete Record
+```bash
+curl -X DELETE https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/records \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"name": "api", "type": "A"}'
+```
+
+#### Delete Zone
+```bash
+curl -X DELETE https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829 \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY"
+```
+
+### Domain Mapping Patterns
+
+Automatically create an `A` record linking your instance's current public IP to your custom subdomain.
+
+:::code-group
+```bash [cURL]
+# Add mapping
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/domain \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"subdomain": "api.myapp.com"}'
+
+# Remove mapping
+curl -X DELETE https://apis.fotohub.app/compute/v1/instances/inst_90f23b/domain \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -d '{"subdomain": "api.myapp.com"}'
+```
+```python [Python]
+import requests
+
+# Add mapping
+requests.post(
+    "https://apis.fotohub.app/compute/v1/instances/inst_90f23b/domain",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"subdomain": "api.myapp.com"}
+)
+```
+:::
+
+### Automated MX Email Record Setup
 
 Configure Google Workspace or ProtonMail MX records in a single API call:
 
 ```bash
-curl -X POST https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/email-setup \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+curl -X POST https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/setup-email \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "provider": "google"
-  }'
+  -d '{"provider": "google"}'
 ```
+This automatically adds required MX, SPF, and DKIM records for email validation.
 
 ---
 
@@ -145,68 +389,38 @@ sudo systemctl status certbot.timer
 
 ---
 
-## VPC & Private Subnets Architecture
+## Zero-Trust Network Security
 
-Compute instances can be provisioned into private Virtual Private Clouds (VPCs) to ensure inter-node traffic flows over encrypted AWS backbones with zero internet traversal:
+Enterprise machine learning clusters handling confidential user data require strict **Zero-Trust network isolation**. In this model, GPU instances are provisioned **without public IPv4 addresses**, all public internet ingress is blocked, and communications travel across encrypted point-to-point tunnels and private cloud backbones.
 
-```mermaid
-flowchart LR
-    subgraph Frankfurt VPC (10.0.0.0/16)
-        PublicSubnet["Public Subnet (10.0.1.0/24)"]
-        PrivateSubnet["Private GPU Subnet (10.0.2.0/24)"]
-        
-        ALB["Application Load Balancer"]
-        Worker1["GPU Worker 1 (10.0.2.14)"]
-        Worker2["GPU Worker 2 (10.0.2.15)"]
-        RedisNode["Private Redis Queue (10.0.2.99)"]
-    end
-
-    PublicSubnet --> ALB
-    ALB --> Worker1 & Worker2
-    Worker1 & Worker2 <--> RedisNode
-```
-
-### Querying VPCs & Subnets via API
-
-```bash
-# List available VPCs
-curl -X GET https://apis.fotohub.app/compute/v1/aws/vpcs \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY"
-
-# List subnets within a specific VPC
-curl -X GET "https://apis.fotohub.app/compute/v1/aws/subnets?vpc_id=vpc-0a12f94b8" \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY"
-```
-
----
-
-## Zero-Trust Network Security: VPC Peering, Private Endpoints & WireGuard Mesh
-
-Enterprise machine learning clusters handling confidential user data, healthcare records, or proprietary model weights require strict **Zero-Trust network isolation**. In this model, GPU instances are provisioned **without public IPv4 addresses**, all public internet ingress is blocked, and communications travel across encrypted point-to-point tunnels and private cloud backbones.
+### Key Tenets
+- Air-gapped private instances (`assign_public_ip: false`).
+- AWS PrivateLink for internal API access.
+- WireGuard mesh configuration (ChaCha20-Poly1305, MTU 1420).
 
 ```mermaid
 flowchart TD
-    subgraph Enterprise On-Prem / Cloud VPC (10.100.0.0/16)
-        CorpClient["Enterprise ML Workstation (10.100.1.50)"]
-        InternalDB["Customer Data Warehouse (10.100.2.10)"]
+    subgraph Enterprise On-Prem / Cloud VPC 10.100.0.0/16
+        CorpClient["Enterprise ML Workstation"]
+        InternalDB["Customer Data Warehouse"]
     end
 
-    subgraph AWS Backbone Peering (pcx-01928374a5b6)
+    subgraph AWS Backbone Peering pcx-01928374a5b6
         CorpClient <-->|Zero Egress AWS Peering| PrivateALB
     end
 
-    subgraph FOTOhub Compute Private VPC (10.0.0.0/16)
-        PrivateALB["Internal Application Load Balancer (10.0.1.10)"]
+    subgraph FOTOhub Compute Private VPC 172.31.0.0/16
+        PrivateALB["Internal Application Load Balancer"]
         
-        subgraph Air-Gapped GPU Compute Subnet (10.0.2.0/24)
-            Node1["GPU Worker 1 (10.0.2.14)<br/>No Public IP"]
-            Node2["GPU Worker 2 (10.0.2.15)<br/>No Public IP"]
+        subgraph Air-Gapped GPU Compute Subnet
+            Node1["GPU Worker 1<br/>No Public IP"]
+            Node2["GPU Worker 2<br/>No Public IP"]
         end
         
-        subgraph Kernel WireGuard Mesh (wg0 - 10.42.0.0/24)
-            WG_Gateway["WireGuard Hub Node (10.42.0.1)"]
-            WG_Node1["WG Peer Node 1 (10.42.0.14)"]
-            WG_Node2["WG Peer Node 2 (10.42.0.15)"]
+        subgraph Kernel WireGuard Mesh wg0 - 10.42.0.0/24
+            WG_Gateway["WireGuard Hub Node"]
+            WG_Node1["WG Peer Node 1"]
+            WG_Node2["WG Peer Node 2"]
         end
         
         PrivateLink["AWS PrivateLink Interface Endpoints"]
@@ -220,13 +434,12 @@ flowchart TD
 
 ### 1. Inter-VPC Peering Connection
 
-Connect your enterprise AWS account directly to your FOTOhub Compute VPC in Frankfurt (`eu-central-1`). Traffic routes over AWS fiber without traversing the public internet:
+Connect your enterprise AWS account directly to your FOTOhub Compute VPC in Frankfurt (`eu-central-1`). Traffic routes over AWS fiber without traversing the public internet.
 
-#### Requesting VPC Peering via API
-
-```bash
+:::code-group
+```bash [cURL]
 curl -X POST https://apis.fotohub.app/compute/v1/aws/vpc-peering \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "peer_vpc_id": "vpc-0182938475a",
@@ -235,62 +448,25 @@ curl -X POST https://apis.fotohub.app/compute/v1/aws/vpc-peering \
     "name": "enterprise-corp-peering"
   }'
 ```
+```python [Python]
+import requests
 
-#### Response Example
-
-```json
-{
-  "peering_connection_id": "pcx-01928374a5b6",
-  "status": "pending-acceptance",
-  "requester_vpc_id": "vpc-0a12f94b8",
-  "accepter_vpc_id": "vpc-0182938475a"
-}
+requests.post(
+    "https://apis.fotohub.app/compute/v1/aws/vpc-peering",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={
+        "peer_vpc_id": "vpc-0182938475a",
+        "peer_owner_id": "123456789012",
+        "peer_region": "eu-central-1",
+        "name": "enterprise-corp-peering"
+    }
+)
 ```
+:::
 
-Once accepted in your AWS Console or Terraform definition, add route entries directing your corporate subnet traffic (`10.100.0.0/16`) to the peering connection target:
+### 2. High-Performance WireGuard Mesh Network
 
-```bash
-# Accept peering in your AWS account
-aws ec2 accept-vpc-peering-connection --vpc-peering-connection-id pcx-01928374a5b6
-
-# Update route table
-aws ec2 create-route \
-  --route-table-id rtb-0891234abcd \
-  --destination-cidr-block 10.0.0.0/16 \
-  --vpc-peering-connection-id pcx-01928374a5b6
-```
-
-### 2. AWS PrivateLink & Private Endpoints
-
-Instances running in private subnets without an Internet Gateway (IGW) or NAT Gateway can communicate with FOTOhub management APIs and S3 storage through AWS VPC Interface Endpoints:
-
-- **Private API Gateway**: `apis.fotohub.app` resolves internally to `10.0.1.200` via VPC endpoint ENIs.
-- **Private S3 Object Store**: `s1.fotohub.app` resolves directly via S3 Interface Gateway endpoints (`com.amazonaws.eu-central-1.s3`), eliminating all internet route tables and NAT gateway data processing surcharges ($0.045/GB).
-
-```bash
-# Provision an instance locked strictly to private subnets (no public IPv4)
-curl -X POST https://apis.fotohub.app/compute/v1/instances \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "airgapped-vllm-node",
-    "catalog_id": "g5.xlarge",
-    "vpc_id": "vpc-0a12f94b8",
-    "subnet_id": "subnet-private-0a2",
-    "assign_public_ip": false,
-    "security_group_rules": [
-      {"protocol": "tcp", "port": 8000, "cidr": "10.100.0.0/16", "description": "Corporate Private Access"}
-    ]
-  }'
-```
-
-### 3. High-Performance WireGuard Mesh Network
-
-WireGuard provides kernel-level, ChaCha20-Poly1305 encrypted point-to-point tunnels with virtually zero CPU overhead and maximum MTU utilization.
-
-#### Bootstrapping WireGuard via Startup Preset
-
-When deploying distributed clusters across availability zones or bridging remote ML engineers, inject the WireGuard bootstrap configuration during instance creation:
+WireGuard provides kernel-level, ChaCha20-Poly1305 encrypted point-to-point tunnels with virtually zero CPU overhead and maximum MTU utilization (1420).
 
 ```bash
 #!/bin/bash
@@ -298,65 +474,495 @@ When deploying distributed clusters across availability zones or bridging remote
 set -e
 
 apt-get update && apt-get install -y wireguard wireguard-tools
-
-# Generate server keypair
 umask 077
 wg genkey | tee /etc/wireguard/private.key | wg pubkey > /etc/wireguard/public.key
-
 PRIVATE_KEY=$(cat /etc/wireguard/private.key)
 
-# Configure WireGuard interface (wg0)
-cat > /etc/wireguard/wg0.conf << EOF
+cat > /etc/wireguard/wg0.conf << WGE_EOF
 [Interface]
 Address = 10.42.0.14/24
 PrivateKey = ${PRIVATE_KEY}
 ListenPort = 51820
 MTU = 1420
 
-# Corporate ML Gateway Peer
 [Peer]
 PublicKey = 8kK/12A98...corp_pub_key...=
 AllowedIPs = 10.42.0.1/32, 10.100.0.0/16
 Endpoint = vpn.yourbrand.com:51820
 PersistentKeepalive = 25
+WGE_EOF
 
-# Peer GPU Worker 2
-[Peer]
-PublicKey = 3xM/44Z12...node2_pub_key...=
-AllowedIPs = 10.42.0.15/32
-Endpoint = 10.0.2.15:51820
-PersistentKeepalive = 25
-EOF
-
-# Enable and start WireGuard systemd service
 systemctl enable --now wg-quick@wg0
-
-# Confirm tunnel handshake
-wg show wg0
 ```
-
-#### WireGuard Performance Advantages for Distributed ML
-
-| Metric | IPSec / OpenVPN | Zero-Trust WireGuard Mesh | Advantage |
-|:---|:---:|:---:|:---|
-| **Cryptographic Handshake** | 1,200 – 2,400 ms | **< 15 ms** | Sub-second cluster re-convergence |
-| **Throughput (25 Gbps link)** | ~450 MB/s (CPU bound) | **~2,250 MB/s** | Full line-rate distributed gradient sync |
-| **Kernel Context Switches** | High (User-space TUN/TAP) | **Zero (Native Linux Kernel Module)** | Preserves 100% of CPU cores for PyTorch dataloaders |
-| **Connection Roaming** | Drops connection on IP shift | **Instant Silent Re-keying** | Resilient against spot node IP transitions |
 
 ---
 
 ## Standard AI Port Reference
 
+Ensure you open the right ports via the Security Rules API for your AI workloads.
+
 | Port | Protocol | Default Service | Recommended Inbound Rule |
 |:---:|:---:|:---|:---|
 | **22** | TCP | OpenSSH Remote Administration | Restrict to corporate VPN / static CIDR |
 | **80 / 443** | TCP | Nginx Web Server & TLS Proxy | `0.0.0.0/0` (Public) |
-| **8000** | TCP | vLLM / SGLang OpenAI API Server | Protected via Nginx reverse proxy + API key |
-| **8188** | TCP | ComfyUI WebSocket & REST API | Internal VPC or password-protected |
-| **11434** | TCP | Ollama Model Runtime | Internal localhost or VPC |
-| **7860** | TCP | Gradio / Automatic1111 WebUI | Reverse proxy or SSH tunnel |
-| **9100** | TCP | Prometheus Node Exporter | Scraped by internal monitoring subnet |
-| **6379** | TCP | Redis Distributed Queue | Strict internal VPC binding |
+| **3000** | TCP | Open WebUI | Internal VPC or SSH tunnel |
 | **5432** | TCP | PostgreSQL Database | Strict internal VPC binding |
+| **6379** | TCP | Redis Distributed Queue | Strict internal VPC binding |
+| **7860** | TCP | Gradio / Automatic1111 WebUI | Reverse proxy or SSH tunnel |
+| **8000** | TCP | vLLM / SGLang OpenAI API Server | Protected via Nginx reverse proxy + API key |
+| **8080** | TCP | General API Server | Specific CIDR or Public |
+| **8188** | TCP | ComfyUI WebSocket & REST API | Internal VPC or password-protected |
+| **9100** | TCP | Prometheus Node Exporter | Scraped by internal monitoring subnet |
+| **11434** | TCP | Ollama Model Runtime | Internal localhost or VPC |
 
+---
+
+## Troubleshooting
+
+:::danger SSH Connection Refused
+**Symptom:** `ssh: connect to host 18.197.82.14 port 22: Connection refused` or timeout.
+**Resolution:** Verify your Security Group rules. By default, instances are locked down. You must explicitly allow Port 22 inbound from your IP address via the `POST /instances/:id/security-rules` endpoint.
+:::
+
+:::danger Domain Not Resolving
+**Symptom:** Browsing to `api.myapp.com` shows `ERR_NAME_NOT_RESOLVED`.
+**Resolution:** DNS propagation can take up to 24 hours globally, but usually updates in minutes. Verify your name servers at your registrar point to the FOTOhub/AWS Route53 name servers provided by the `GET /dns/zones/:id` response. Use `dig api.myapp.com +trace` to debug DNS delegation.
+:::
+
+:::warning Elastic IP Not Reachable
+**Symptom:** You allocated an EIP but the instance is unresponsive.
+**Resolution:** Verify the EIP association status is `associated` using `GET /instances/:id/elastic-ip`. Ensure the instance is running and has completed its boot sequence. Also check that your Security Group permits inbound traffic on the ports you are testing.
+:::
+
+
+---
+
+## Advanced Networking Walkthroughs
+
+### 1. Setting up a High-Availability Load Balancer with Auto-Scaling
+
+When traffic to your LLM or ComfyUI instances spikes, you can distribute the load using a combination of Route53 weighted records and FOTOhub load balancers.
+
+1. **Deploy multiple identical instances** across different Availability Zones (e.g., `eu-central-1a` and `eu-central-1b`).
+2. **Allocate Elastic IPs** for each instance.
+3. **Configure Route53** with weighted or latency-based routing policies pointing to the different EIPs.
+
+:::code-group
+```python [Python]
+import requests
+
+# Deploy Instance 1 in AZ a
+res1 = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"catalog_id": "g5.xlarge", "subnet_id": "eu-central-1a"}
+)
+inst1 = res1.json()["id"]
+
+# Deploy Instance 2 in AZ b
+res2 = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"catalog_id": "g5.xlarge", "subnet_id": "eu-central-1b"}
+)
+inst2 = res2.json()["id"]
+
+# Allocate EIPs
+eip1 = requests.post(f"https://apis.fotohub.app/compute/v1/instances/{inst1}/elastic-ip", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}).json()
+eip2 = requests.post(f"https://apis.fotohub.app/compute/v1/instances/{inst2}/elastic-ip", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}).json()
+
+print(f"Node 1 IP: {eip1['public_ip']}, Node 2 IP: {eip2['public_ip']}")
+```
+:::
+
+### 2. Implementing a Bastion Host (Jump Box)
+
+For maximum security, avoid assigning Elastic IPs to your expensive GPU nodes. Instead, deploy a tiny CPU instance (e.g., `t3.micro`) as a Bastion host in a public subnet, and place your GPU instances in a private subnet.
+
+1. Create a `t3.micro` instance in the public subnet (`eu-central-1a`).
+2. Assign an Elastic IP to the Bastion host.
+3. Open Port 22 on the Bastion host to your office IP.
+4. Create a GPU instance in the private subnet without an Elastic IP.
+5. Open Port 22 on the GPU instance, allowing access *only* from the Bastion host's internal private IP.
+
+To connect:
+```bash
+# Connect to the Bastion host using SSH Agent Forwarding
+ssh -A -i bastion.pem ubuntu@BASTION_EIP
+
+# From within the Bastion, connect to the internal GPU node
+ssh -i worker.pem ubuntu@GPU_PRIVATE_IP
+```
+
+### 3. Rate Limiting and WAF Integration
+
+When using Route53, it is highly recommended to proxy your web traffic through a CDN and Web Application Firewall (WAF) like Cloudflare.
+
+1. In Cloudflare, add your domain.
+2. Configure your Route53 name servers to the ones provided by Cloudflare.
+3. In Cloudflare's DNS settings, create an `A` record pointing to your FOTOhub Elastic IP.
+4. Enable the "Proxy" status (orange cloud) in Cloudflare.
+5. In your FOTOhub Security Group, restrict Port 80 and 443 inbound traffic to *only* allow Cloudflare's published IP ranges.
+
+```bash
+# Example: Adding a Cloudflare IP range to your Security Group
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-rules \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "direction": "inbound",
+    "protocol": "tcp",
+    "port": 443,
+    "cidr": "173.245.48.0/20",
+    "description": "Cloudflare WAF Proxy"
+  }'
+```
+
+By doing this, you ensure that malicious actors cannot bypass your WAF by connecting directly to your Elastic IP. All traffic is forced through Cloudflare's DDoS protection and rate limiting.
+
+### 4. Continuous DNS Verification
+
+If you are programmatically provisioning and destroying environments (e.g., in a CI/CD pipeline), you can use the DNS Verify endpoint to ensure your records have propagated before running integration tests.
+
+```python
+import time
+import requests
+
+def wait_for_dns_propagation(zone_id, domain, timeout=600):
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        res = requests.post(
+            f"https://apis.fotohub.app/compute/v1/dns/zones/{zone_id}/verify",
+            headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+        )
+        if res.json().get("status") == "verified":
+            print(f"Domain {domain} successfully verified and propagated!")
+            return True
+        print("Waiting for DNS propagation...")
+        time.sleep(30)
+    raise TimeoutError("DNS propagation timed out.")
+```
+
+---
+
+## Advanced Networking Walkthroughs
+
+### 1. Setting up a High-Availability Load Balancer with Auto-Scaling
+
+When traffic to your LLM or ComfyUI instances spikes, you can distribute the load using a combination of Route53 weighted records and FOTOhub load balancers.
+
+1. **Deploy multiple identical instances** across different Availability Zones (e.g., `eu-central-1a` and `eu-central-1b`).
+2. **Allocate Elastic IPs** for each instance.
+3. **Configure Route53** with weighted or latency-based routing policies pointing to the different EIPs.
+
+:::code-group
+```python [Python]
+import requests
+
+# Deploy Instance 1 in AZ a
+res1 = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"catalog_id": "g5.xlarge", "subnet_id": "eu-central-1a"}
+)
+inst1 = res1.json()["id"]
+
+# Deploy Instance 2 in AZ b
+res2 = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"catalog_id": "g5.xlarge", "subnet_id": "eu-central-1b"}
+)
+inst2 = res2.json()["id"]
+
+# Allocate EIPs
+eip1 = requests.post(f"https://apis.fotohub.app/compute/v1/instances/{inst1}/elastic-ip", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}).json()
+eip2 = requests.post(f"https://apis.fotohub.app/compute/v1/instances/{inst2}/elastic-ip", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}).json()
+
+print(f"Node 1 IP: {eip1['public_ip']}, Node 2 IP: {eip2['public_ip']}")
+```
+:::
+
+### 2. Implementing a Bastion Host (Jump Box)
+
+For maximum security, avoid assigning Elastic IPs to your expensive GPU nodes. Instead, deploy a tiny CPU instance (e.g., `t3.micro`) as a Bastion host in a public subnet, and place your GPU instances in a private subnet.
+
+1. Create a `t3.micro` instance in the public subnet (`eu-central-1a`).
+2. Assign an Elastic IP to the Bastion host.
+3. Open Port 22 on the Bastion host to your office IP.
+4. Create a GPU instance in the private subnet without an Elastic IP.
+5. Open Port 22 on the GPU instance, allowing access *only* from the Bastion host's internal private IP.
+
+To connect:
+```bash
+# Connect to the Bastion host using SSH Agent Forwarding
+ssh -A -i bastion.pem ubuntu@BASTION_EIP
+
+# From within the Bastion, connect to the internal GPU node
+ssh -i worker.pem ubuntu@GPU_PRIVATE_IP
+```
+
+### 3. Rate Limiting and WAF Integration
+
+When using Route53, it is highly recommended to proxy your web traffic through a CDN and Web Application Firewall (WAF) like Cloudflare.
+
+1. In Cloudflare, add your domain.
+2. Configure your Route53 name servers to the ones provided by Cloudflare.
+3. In Cloudflare's DNS settings, create an `A` record pointing to your FOTOhub Elastic IP.
+4. Enable the "Proxy" status (orange cloud) in Cloudflare.
+5. In your FOTOhub Security Group, restrict Port 80 and 443 inbound traffic to *only* allow Cloudflare's published IP ranges.
+
+```bash
+# Example: Adding a Cloudflare IP range to your Security Group
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-rules \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "direction": "inbound",
+    "protocol": "tcp",
+    "port": 443,
+    "cidr": "173.245.48.0/20",
+    "description": "Cloudflare WAF Proxy"
+  }'
+```
+
+By doing this, you ensure that malicious actors cannot bypass your WAF by connecting directly to your Elastic IP. All traffic is forced through Cloudflare's DDoS protection and rate limiting.
+
+### 4. Continuous DNS Verification
+
+If you are programmatically provisioning and destroying environments (e.g., in a CI/CD pipeline), you can use the DNS Verify endpoint to ensure your records have propagated before running integration tests.
+
+```python
+import time
+import requests
+
+def wait_for_dns_propagation(zone_id, domain, timeout=600):
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        res = requests.post(
+            f"https://apis.fotohub.app/compute/v1/dns/zones/{zone_id}/verify",
+            headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+        )
+        if res.json().get("status") == "verified":
+            print(f"Domain {domain} successfully verified and propagated!")
+            return True
+        print("Waiting for DNS propagation...")
+        time.sleep(30)
+    raise TimeoutError("DNS propagation timed out.")
+```
+
+---
+
+## Advanced Networking Walkthroughs
+
+### 1. Setting up a High-Availability Load Balancer with Auto-Scaling
+
+When traffic to your LLM or ComfyUI instances spikes, you can distribute the load using a combination of Route53 weighted records and FOTOhub load balancers.
+
+1. **Deploy multiple identical instances** across different Availability Zones (e.g., `eu-central-1a` and `eu-central-1b`).
+2. **Allocate Elastic IPs** for each instance.
+3. **Configure Route53** with weighted or latency-based routing policies pointing to the different EIPs.
+
+:::code-group
+```python [Python]
+import requests
+
+# Deploy Instance 1 in AZ a
+res1 = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"catalog_id": "g5.xlarge", "subnet_id": "eu-central-1a"}
+)
+inst1 = res1.json()["id"]
+
+# Deploy Instance 2 in AZ b
+res2 = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"catalog_id": "g5.xlarge", "subnet_id": "eu-central-1b"}
+)
+inst2 = res2.json()["id"]
+
+# Allocate EIPs
+eip1 = requests.post(f"https://apis.fotohub.app/compute/v1/instances/{inst1}/elastic-ip", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}).json()
+eip2 = requests.post(f"https://apis.fotohub.app/compute/v1/instances/{inst2}/elastic-ip", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}).json()
+
+print(f"Node 1 IP: {eip1['public_ip']}, Node 2 IP: {eip2['public_ip']}")
+```
+:::
+
+### 2. Implementing a Bastion Host (Jump Box)
+
+For maximum security, avoid assigning Elastic IPs to your expensive GPU nodes. Instead, deploy a tiny CPU instance (e.g., `t3.micro`) as a Bastion host in a public subnet, and place your GPU instances in a private subnet.
+
+1. Create a `t3.micro` instance in the public subnet (`eu-central-1a`).
+2. Assign an Elastic IP to the Bastion host.
+3. Open Port 22 on the Bastion host to your office IP.
+4. Create a GPU instance in the private subnet without an Elastic IP.
+5. Open Port 22 on the GPU instance, allowing access *only* from the Bastion host's internal private IP.
+
+To connect:
+```bash
+# Connect to the Bastion host using SSH Agent Forwarding
+ssh -A -i bastion.pem ubuntu@BASTION_EIP
+
+# From within the Bastion, connect to the internal GPU node
+ssh -i worker.pem ubuntu@GPU_PRIVATE_IP
+```
+
+### 3. Rate Limiting and WAF Integration
+
+When using Route53, it is highly recommended to proxy your web traffic through a CDN and Web Application Firewall (WAF) like Cloudflare.
+
+1. In Cloudflare, add your domain.
+2. Configure your Route53 name servers to the ones provided by Cloudflare.
+3. In Cloudflare's DNS settings, create an `A` record pointing to your FOTOhub Elastic IP.
+4. Enable the "Proxy" status (orange cloud) in Cloudflare.
+5. In your FOTOhub Security Group, restrict Port 80 and 443 inbound traffic to *only* allow Cloudflare's published IP ranges.
+
+```bash
+# Example: Adding a Cloudflare IP range to your Security Group
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-rules \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "direction": "inbound",
+    "protocol": "tcp",
+    "port": 443,
+    "cidr": "173.245.48.0/20",
+    "description": "Cloudflare WAF Proxy"
+  }'
+```
+
+By doing this, you ensure that malicious actors cannot bypass your WAF by connecting directly to your Elastic IP. All traffic is forced through Cloudflare's DDoS protection and rate limiting.
+
+### 4. Continuous DNS Verification
+
+If you are programmatically provisioning and destroying environments (e.g., in a CI/CD pipeline), you can use the DNS Verify endpoint to ensure your records have propagated before running integration tests.
+
+```python
+import time
+import requests
+
+def wait_for_dns_propagation(zone_id, domain, timeout=600):
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        res = requests.post(
+            f"https://apis.fotohub.app/compute/v1/dns/zones/{zone_id}/verify",
+            headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+        )
+        if res.json().get("status") == "verified":
+            print(f"Domain {domain} successfully verified and propagated!")
+            return True
+        print("Waiting for DNS propagation...")
+        time.sleep(30)
+    raise TimeoutError("DNS propagation timed out.")
+```
+
+---
+
+## Advanced Networking Walkthroughs
+
+### 1. Setting up a High-Availability Load Balancer with Auto-Scaling
+
+When traffic to your LLM or ComfyUI instances spikes, you can distribute the load using a combination of Route53 weighted records and FOTOhub load balancers.
+
+1. **Deploy multiple identical instances** across different Availability Zones (e.g., `eu-central-1a` and `eu-central-1b`).
+2. **Allocate Elastic IPs** for each instance.
+3. **Configure Route53** with weighted or latency-based routing policies pointing to the different EIPs.
+
+:::code-group
+```python [Python]
+import requests
+
+# Deploy Instance 1 in AZ a
+res1 = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"catalog_id": "g5.xlarge", "subnet_id": "eu-central-1a"}
+)
+inst1 = res1.json()["id"]
+
+# Deploy Instance 2 in AZ b
+res2 = requests.post(
+    "https://apis.fotohub.app/compute/v1/instances",
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"},
+    json={"catalog_id": "g5.xlarge", "subnet_id": "eu-central-1b"}
+)
+inst2 = res2.json()["id"]
+
+# Allocate EIPs
+eip1 = requests.post(f"https://apis.fotohub.app/compute/v1/instances/{inst1}/elastic-ip", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}).json()
+eip2 = requests.post(f"https://apis.fotohub.app/compute/v1/instances/{inst2}/elastic-ip", headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}).json()
+
+print(f"Node 1 IP: {eip1['public_ip']}, Node 2 IP: {eip2['public_ip']}")
+```
+:::
+
+### 2. Implementing a Bastion Host (Jump Box)
+
+For maximum security, avoid assigning Elastic IPs to your expensive GPU nodes. Instead, deploy a tiny CPU instance (e.g., `t3.micro`) as a Bastion host in a public subnet, and place your GPU instances in a private subnet.
+
+1. Create a `t3.micro` instance in the public subnet (`eu-central-1a`).
+2. Assign an Elastic IP to the Bastion host.
+3. Open Port 22 on the Bastion host to your office IP.
+4. Create a GPU instance in the private subnet without an Elastic IP.
+5. Open Port 22 on the GPU instance, allowing access *only* from the Bastion host's internal private IP.
+
+To connect:
+```bash
+# Connect to the Bastion host using SSH Agent Forwarding
+ssh -A -i bastion.pem ubuntu@BASTION_EIP
+
+# From within the Bastion, connect to the internal GPU node
+ssh -i worker.pem ubuntu@GPU_PRIVATE_IP
+```
+
+### 3. Rate Limiting and WAF Integration
+
+When using Route53, it is highly recommended to proxy your web traffic through a CDN and Web Application Firewall (WAF) like Cloudflare.
+
+1. In Cloudflare, add your domain.
+2. Configure your Route53 name servers to the ones provided by Cloudflare.
+3. In Cloudflare's DNS settings, create an `A` record pointing to your FOTOhub Elastic IP.
+4. Enable the "Proxy" status (orange cloud) in Cloudflare.
+5. In your FOTOhub Security Group, restrict Port 80 and 443 inbound traffic to *only* allow Cloudflare's published IP ranges.
+
+```bash
+# Example: Adding a Cloudflare IP range to your Security Group
+curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/security-rules \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "direction": "inbound",
+    "protocol": "tcp",
+    "port": 443,
+    "cidr": "173.245.48.0/20",
+    "description": "Cloudflare WAF Proxy"
+  }'
+```
+
+By doing this, you ensure that malicious actors cannot bypass your WAF by connecting directly to your Elastic IP. All traffic is forced through Cloudflare's DDoS protection and rate limiting.
+
+### 4. Continuous DNS Verification
+
+If you are programmatically provisioning and destroying environments (e.g., in a CI/CD pipeline), you can use the DNS Verify endpoint to ensure your records have propagated before running integration tests.
+
+```python
+import time
+import requests
+
+def wait_for_dns_propagation(zone_id, domain, timeout=600):
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        res = requests.post(
+            f"https://apis.fotohub.app/compute/v1/dns/zones/{zone_id}/verify",
+            headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+        )
+        if res.json().get("status") == "verified":
+            print(f"Domain {domain} successfully verified and propagated!")
+            return True
+        print("Waiting for DNS propagation...")
+        time.sleep(30)
+    raise TimeoutError("DNS propagation timed out.")
+```
