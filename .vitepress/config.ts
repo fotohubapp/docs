@@ -41,10 +41,10 @@ export default defineConfig({
       { text: 'Recipes', link: '/recipes/overview' },
       { text: 'Compute', link: '/compute/overview' },
       { text: 'Product', link: '/product/our-ai-models' },
-      { text: 'Status', link: 'https://status.fotohub.app' },
       {
         text: 'Resources',
         items: [
+          { text: 'System Status', link: 'https://status.fotohub.app' },
           { text: 'Changelog', link: '/changelog' },
           { text: 'Community', link: 'https://discord.gg/fotohub' },
         ],
@@ -165,13 +165,30 @@ export default defineConfig({
       ],
       '/recipes/': [
         {
-          text: 'Multimodal Recipes',
+          text: 'Media & Video Automation',
           items: [
-            { text: 'Overview & Blueprints', link: '/recipes/overview' },
+            { text: 'Overview & Recipe Catalog', link: '/recipes/overview' },
             { text: 'Video to Viral Shorts', link: '/recipes/video-to-shorts' },
-            { text: 'Lip-Sync Dubbing', link: '/recipes/lip-sync-dubbing' },
-            { text: '2D Photo to AR 3D', link: '/recipes/image-to-3d' },
+            { text: 'Automated UGC Video Ads', link: '/recipes/ugc-video-campaigns' },
+            { text: 'Podcast to Viral Clips', link: '/recipes/podcast-to-clips' },
+            { text: 'Multilingual Lip-Sync Dubbing', link: '/recipes/lip-sync-dubbing' },
+            { text: 'Video Sound Design & Foley', link: '/recipes/video-sound-design' },
+          ],
+        },
+        {
+          text: 'Brand & Social Studio',
+          items: [
+            { text: 'Virtual Try-On Fashion Studio', link: '/recipes/virtual-tryon-fashion' },
+            { text: 'Brand DNA & Virtual Influencers', link: '/recipes/brand-dna-virtual-influencers' },
+            { text: 'Automated Social Publisher', link: '/recipes/social-auto-publisher' },
+          ],
+        },
+        {
+          text: 'E-Commerce & Enterprise',
+          items: [
+            { text: '2D Photo to AR 3D Assets', link: '/recipes/image-to-3d' },
             { text: 'E-Commerce Catalog Automation', link: '/recipes/ecommerce-catalog-automation' },
+            { text: 'Document & Invoice Intelligence', link: '/recipes/document-intelligence-pipeline' },
           ],
         },
       ],
