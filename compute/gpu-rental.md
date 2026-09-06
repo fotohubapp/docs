@@ -274,5 +274,70 @@ curl -X GET "https://apis.fotohub.app/compute/v1/instances/inst_9a8b7c/metrics?p
 When debugging boot failures, kernel panics, or cloud-init startup scripts:
 
 ```bash
-curl -X GET "https://apis.fotohub.app/compute/v1/instances/inst_9a8b7c/logs?lines=50"   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+curl -X GET "https://apis.fotohub.app/compute/v1/instances/inst_9a8b7c/logs?lines=50" \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
+
+---
+
+## Dynamic Vertical Resizing (`POST /resize`)
+
+Upgrade or downgrade compute hardware without reconfiguring operating systems, reinstalling CUDA libraries, or re-downloading model weights.
+
+### Zero-Data-Loss Resizing Workflow
+
+1. Stop the instance:
+   ```bash
+   curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_9a8b7c/stop \
+     -H "Authorization: Bearer $FOTOHUB_API_KEY"
+   ```
+2. Resize to higher-spec catalog tier (e.g. upgrading to `g5.2xlarge` for 8 vCPUs and 32 GB RAM):
+   ```bash
+   curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_9a8b7c/resize \
+     -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"instance_type": "g5.2xlarge"}'
+   ```
+3. Restart instance:
+   ```bash
+   curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_9a8b7c/start \
+     -H "Authorization: Bearer $FOTOHUB_API_KEY"
+   ```
+
+All root disk files, conda environments, and attached EBS volumes are preserved identically.
+
+---
+
+## Pre-Launch Cost Estimator API
+
+Before provisioning instances, query exact financial projections based on disk allocations and spot selections:
+
+### Endpoint: `POST /compute/v1/instances/estimate-cost`
+
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/instances/estimate-cost \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "catalog_id": "g5.xlarge",
+    "spot_instance": true,
+    "root_volume_size_gb": 120,
+    "additional_volume_size_gb": 200,
+    "max_runtime_hours": 24
+  }'
+```
+
+#### Response Example
+
+```json
+{
+  "currency": "USD",
+  "instance_hourly_rate": 0.383,
+  "storage_hourly_rate": 0.035,
+  "total_hourly_rate": 0.418,
+  "max_cost_limit": 10.032,
+  "savings_percentage": 62.1,
+  "wallet_balance_sufficient": true
+}
+```
+

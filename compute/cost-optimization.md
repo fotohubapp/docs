@@ -91,3 +91,86 @@ Use the Firecracker sandbox API (`POST /sandbox/exec-python`):
 - **Startup:** Booted in under 200 milliseconds.
 - **Resource limit:** Up to 2,048 MB RAM and 60 seconds CPU timeout.
 - **Security:** Hardware KVM hypervisor isolation.
+
+---
+
+## 5. Automated Idle Auto-Shutdown Daemon
+
+To guarantee developers never incur idle charges, install this background daemon on your GPU instances. It tracks GPU load every 60 seconds and initiates a graceful instance shutdown if utilization stays below 5% for 15 consecutive minutes:
+
+```bash
+#!/bin/bash
+# /usr/local/bin/gpu-idle-guard.sh
+IDLE_MINUTES=15
+IDLE_THRESHOLD_PERCENT=5
+COUNTER=0
+
+while true; do
+  # Query GPU compute utilization
+  GPU_UTIL=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1)
+  
+  if [ "$GPU_UTIL" -lt "$IDLE_THRESHOLD_PERCENT" ]; then
+    COUNTER=$((COUNTER + 1))
+    echo "GPU idle ($GPU_UTIL%) for $COUNTER / $IDLE_MINUTES checks..."
+  else
+    COUNTER=0
+  fi
+  
+  if [ "$COUNTER" -ge "$IDLE_MINUTES" ]; then
+    echo "GPU idle for $IDLE_MINUTES consecutive minutes. Stopping instance via API..."
+    # Notify FOTOhub compute to gracefully stop instance
+    sudo poweroff
+    exit 0
+  fi
+  
+  sleep 60
+done
+```
+
+Install as a systemd service:
+```bash
+sudo cat > /etc/systemd/system/gpu-idle-guard.service << 'EOF'
+[Unit]
+Description=GPU Idle Guard Auto-Shutdown
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/gpu-idle-guard.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl enable --now gpu-idle-guard
+```
+
+---
+
+## 6. Multi-AZ Spot Capacity Diversification
+
+When requesting large spot fleets during high-demand European business hours, diversify requests across availability zones:
+
+```python
+from fotohub import FotoHub
+
+client = FotoHub(api_key="fh_live_...")
+
+def launch_resilient_spot_node(name: str):
+    zones = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
+    for az in zones:
+        try:
+            instance = client.post("/compute/v1/instances", {
+                "name": f"{name}-{az}",
+                "catalog_id": "g5.xlarge",
+                "spot_instance": True,
+                "availability_zone": az
+            })
+            print(f"Successfully claimed Spot capacity in {az}!")
+            return instance
+        except Exception as err:
+            print(f"AZ {az} spot pool congested, trying next zone...")
+            continue
+```
+

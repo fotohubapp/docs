@@ -115,7 +115,82 @@ Now `comfy.ai-models.yourcompany.com` resolves directly to your GPU node!
 Configure Google Workspace or ProtonMail MX records in a single API call:
 
 ```bash
-curl -X POST https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/email-setup   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+curl -X POST https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/email-setup \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
     "provider": "google"
   }'
 ```
+
+---
+
+## Automated SSL/TLS Certificates with Certbot
+
+Once your custom domain resolves to your instance's Elastic IP, secure it with free, auto-renewing TLS certificates from Let's Encrypt:
+
+```bash
+# SSH into your instance
+ssh -i worker.pem ubuntu@<ELASTIC_IP>
+
+# 1. Install Certbot and Nginx plugin (or use the nginx-certbot preset)
+sudo apt-get update && sudo apt-get install -y certbot python3-certbot-nginx
+
+# 2. Obtain and install certificate in one command
+sudo certbot --nginx -d comfy.ai-models.yourcompany.com --non-interactive --agree-tos -m admin@yourcompany.com
+
+# 3. Verify auto-renewal timer
+sudo systemctl status certbot.timer
+```
+
+---
+
+## VPC & Private Subnets Architecture
+
+Compute instances can be provisioned into private Virtual Private Clouds (VPCs) to ensure inter-node traffic flows over encrypted AWS backbones with zero internet traversal:
+
+```mermaid
+flowchart LR
+    subgraph Frankfurt VPC (10.0.0.0/16)
+        PublicSubnet["Public Subnet (10.0.1.0/24)"]
+        PrivateSubnet["Private GPU Subnet (10.0.2.0/24)"]
+        
+        ALB["Application Load Balancer"]
+        Worker1["GPU Worker 1 (10.0.2.14)"]
+        Worker2["GPU Worker 2 (10.0.2.15)"]
+        RedisNode["Private Redis Queue (10.0.2.99)"]
+    end
+
+    PublicSubnet --> ALB
+    ALB --> Worker1 & Worker2
+    Worker1 & Worker2 <--> RedisNode
+```
+
+### Querying VPCs & Subnets via API
+
+```bash
+# List available VPCs
+curl -X GET https://apis.fotohub.app/compute/v1/aws/vpcs \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY"
+
+# List subnets within a specific VPC
+curl -X GET "https://apis.fotohub.app/compute/v1/aws/subnets?vpc_id=vpc-0a12f94b8" \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY"
+```
+
+---
+
+## Standard AI Port Reference
+
+| Port | Protocol | Default Service | Recommended Inbound Rule |
+|:---:|:---:|:---|:---|
+| **22** | TCP | OpenSSH Remote Administration | Restrict to corporate VPN / static CIDR |
+| **80 / 443** | TCP | Nginx Web Server & TLS Proxy | `0.0.0.0/0` (Public) |
+| **8000** | TCP | vLLM / SGLang OpenAI API Server | Protected via Nginx reverse proxy + API key |
+| **8188** | TCP | ComfyUI WebSocket & REST API | Internal VPC or password-protected |
+| **11434** | TCP | Ollama Model Runtime | Internal localhost or VPC |
+| **7860** | TCP | Gradio / Automatic1111 WebUI | Reverse proxy or SSH tunnel |
+| **9100** | TCP | Prometheus Node Exporter | Scraped by internal monitoring subnet |
+| **6379** | TCP | Redis Distributed Queue | Strict internal VPC binding |
+| **5432** | TCP | PostgreSQL Database | Strict internal VPC binding |
+

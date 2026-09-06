@@ -198,6 +198,9 @@ export default defineConfig({
           items: [
             { text: 'Architecture & Catalog', link: '/compute/overview' },
             { text: 'GPU & CPU On-Demand Rental', link: '/compute/gpu-rental' },
+            { text: 'Load Balancers & Auto Scaling', link: '/compute/load-balancing-autoscaling' },
+            { text: 'Startup Scripts & Presets', link: '/compute/startup-scripts-presets' },
+            { text: 'CLI & Infrastructure as Code', link: '/compute/cli-iac' },
             { text: 'Networking, Elastic IP & Route53', link: '/compute/networking-dns' },
             { text: 'Cost Optimization & Spot', link: '/compute/cost-optimization' },
             { text: 'Benchmarks & Platform Comparison', link: '/compute/benchmarks-comparison' },
@@ -228,6 +231,8 @@ export default defineConfig({
             { text: 'Firecracker MicroVMs Architecture', link: '/compute/agent-sandboxes' },
             { text: 'Practical Sandbox Recipes', link: '/compute/sandbox-recipes' },
             { text: 'Autonomous Agent Orchestration', link: '/compute/autonomous-agents' },
+            { text: 'FH Claw: Persistent AI Assistants', link: '/compute/fh-claw-assistants' },
+            { text: 'Scheduled Tasks & Recurring Cron', link: '/compute/cron-schedules' },
           ],
         },
       ],
