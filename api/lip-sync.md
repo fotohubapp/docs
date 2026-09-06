@@ -3,7 +3,7 @@
 Generate perfectly synchronized lip-synced videos by combining face video footage with any audio track. FOTOhub's Lip-Sync API supports three distinct engines optimized for different quality and speed requirements — from real-time previews to ultra-high-fidelity 4K production output.
 
 ::: info Overview
-The Lip-Sync API is asynchronous — submit a job and receive a `job_id` for polling or webhook delivery. All engines accept standard video and audio formats, and output MP4 or WebM with configurable resolution. Requests are billed in USD from your prepaid wallet per job.
+The Lip-Sync API is asynchronous — submit a job and receive a `job_id` for polling or webhook delivery. All engines accept standard video and audio formats, and output MP4 or WebM with configurable resolution. Requests are billed in USD from your prepaid wallet per second of processed video.
 :::
 
 ---
@@ -12,9 +12,9 @@ The Lip-Sync API is asynchronous — submit a job and receive a `job_id` for pol
 
 | Engine | Architecture | Max Resolution | Max Duration | Speed | USD Price | Best For |
 |--------|-------------|---------------|--------------|-------|-----------|----------|
-| `musetalk` | Real-time feed-forward | 512x512 | 60s | ~3s/frame | $0.43 | Real-time previews, drafts, social media |
-| `latentsync` | Diffusion-based | 1024x1024 | 30s | ~8s/frame | $0.80 | HD content, YouTube, presentations |
-| `facefusion` | Multi-stage pipeline | 3840x2160 (4K) | 120s | ~15s/frame | $1.07 | Film production, commercials, broadcast |
+| `musetalk` | Real-time feed-forward | 512x512 | 60s | ~3s/frame | $0.0030 / s | Real-time previews, drafts, social media |
+| `latentsync` | Diffusion-based | 1024x1024 | 30s | ~8s/frame | $0.0060 / s | HD content, YouTube, presentations |
+| `facefusion` | Multi-stage pipeline | 3840x2160 (4K) | 120s | ~15s/frame | $0.0100 / s | Film production, commercials, broadcast |
 
 ### Engine Details
 
@@ -50,7 +50,7 @@ A production-grade multi-stage pipeline combining face detection, lip synchroniz
 - **4K upscale:** Built-in super-resolution for lower-res sources
 
 ::: tip Choosing an Engine
-Start with `musetalk` for quick iterations and preview. Once you are happy with the audio timing, switch to `latentsync` or `facefusion` for the final render. This workflow saves credits during the creative process.
+Start with `musetalk` for quick iterations and preview. Once you are happy with the audio timing, switch to `latentsync` or `facefusion` for the final render. This workflow saves costs during the creative process.
 :::
 
 ---
@@ -63,8 +63,8 @@ Start with `musetalk` for quick iterations and preview. Once you are happy with 
 POST /v1/video/lip-sync
 ```
 
-**Authentication:** Bearer token (API key)
-**Billing:** 8-20 credits per generation (varies by engine)
+**Authentication:** Bearer token (API key)  
+**Billing:** Billed per second of video ($0.0030 - $0.0100/s) from prepaid USD wallet  
 **Processing:** Asynchronous — returns a `job_id` for polling
 
 ### Request Parameters
@@ -73,7 +73,8 @@ POST /v1/video/lip-sync
 |-----------|------|----------|---------|-------------|
 | `video_url` | string | **Yes** | — | URL to the source face video. Supported formats: MP4, MOV, WebM. Must contain a clearly visible face. |
 | `audio_url` | string | **Yes** | — | URL to the audio track for lip-sync. Supported formats: MP3, WAV, M4A, OGG. Speech audio works best. |
-| `model` | string | No | `"musetalk"` | Engine identifier: `"musetalk"`, `"latentsync"`, or `"facefusion"`. |
+| `model` | string | No | `"musetalk"` | Engine identifier: `"musetalk"` ($0.0030/s), `"latentsync"` ($0.0060/s), or `"facefusion"` ($0.0100/s). |
+| `duration` | float | No | `5.0` | Duration in seconds of the video/audio to sync. Billed per second (min 1.0s, capped at model max: 60s for musetalk, 30s for latentsync, 120s for facefusion). |
 | `output_format` | string | No | `"mp4"` | Output video format: `"mp4"` or `"webm"`. |
 | `output_resolution` | string | No | `"auto"` | Output resolution: `"auto"` (match source), `"512"`, `"720"`, `"1080"`, `"4k"`. Higher resolutions require `facefusion` model. |
 | `face_detection_threshold` | float | No | `0.5` | Confidence threshold for face detection. Range: 0.1-0.9. Lower values detect more faces but may produce artifacts. |
@@ -91,6 +92,7 @@ POST /v1/video/lip-sync
   "video_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/presenter.mp4",
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/uploads/narration_en.mp3",
   "model": "latentsync",
+  "duration": 10.0,
   "output_format": "mp4",
   "enhance_face": true,
   "webhook_url": "https://your-app.com/webhooks/lip-sync"
@@ -104,8 +106,14 @@ POST /v1/video/lip-sync
   "job_id": "ls_7f3a9b2c4e1d",
   "status": "processing",
   "model": "latentsync",
+  "duration_billed_seconds": 10.0,
   "estimated_time_seconds": 45,
-  "credits_reserved": 15,
+  "billing": {
+    "method": "wallet",
+    "usd_charged": 0.060,
+    "balance_usd": 24.940,
+    "currency": "USD"
+  },
   "created_at": "2026-07-22T14:30:00Z"
 }
 ```
@@ -114,31 +122,32 @@ POST /v1/video/lip-sync
 
 ```json
 {
+  "operation": "lip-sync",
   "job_id": "ls_7f3a9b2c4e1d",
   "status": "completed",
   "model": "latentsync",
-  "credits_used": 15,
+  "duration_billed_seconds": 10.0,
   "billing": {
-    "method": "credits",
-    "credits_used": 15,
-    "usd_charged": 0,
-    "pln_charged": 0
+    "method": "wallet",
+    "usd_charged": 0.060,
+    "balance_usd": 24.940,
+    "currency": "USD"
   },
   "output": {
     "video_url": "https://s1.fotohub.app/storage/v1/object/public/generations/lipsync_7f3a9b2c4e1d.mp4",
-    "duration_seconds": 24.5,
+    "duration_seconds": 10.0,
     "resolution": "1024x1024",
-    "file_size_mb": 18.3
+    "file_size_mb": 8.3
   },
   "metadata": {
     "faces_detected": 1,
     "face_index_used": 0,
-    "processing_time_ms": 42300,
+    "processing_time_ms": 22300,
     "source_video_fps": 30,
     "output_fps": 30
   },
   "created_at": "2026-07-22T14:30:00Z",
-  "completed_at": "2026-07-22T14:30:42Z"
+  "completed_at": "2026-07-22T14:30:22Z"
 }
 ```
 
@@ -149,7 +158,7 @@ POST /v1/video/lip-sync
   "error": {
     "code": "no_face_detected",
     "message": "No face was detected in the source video. Ensure a clearly visible face is present in the first frame.",
-    "credits_refunded": 15
+    "usd_refunded": 0.060
   }
 }
 ```
@@ -158,12 +167,12 @@ Common error codes:
 
 | Code | Description |
 |------|-------------|
-| `no_face_detected` | No face found in source video |
+| `no_face_detected` | No face found in source video (wallet refunded) |
 | `audio_too_long` | Audio exceeds model max duration |
 | `video_too_short` | Video is under 1 second |
 | `invalid_format` | Unsupported video or audio format |
 | `resolution_exceeded` | Requested resolution exceeds model capability |
-| `processing_failed` | Internal rendering error (credits refunded) |
+| `processing_failed` | Internal rendering error (wallet refunded) |
 
 ---
 
@@ -175,8 +184,8 @@ Common error codes:
 GET /v1/video/lip-sync/models
 ```
 
-**Authentication:** Bearer token (API key)
-**Billing:** Free (no credits charged)
+**Authentication:** Bearer token (API key)  
+**Billing:** Free (information lookup)
 
 ### Response
 
@@ -185,44 +194,46 @@ GET /v1/video/lip-sync/models
   "models": [
     {
       "id": "musetalk",
-      "name": "MuseTalk 1.5",
-      "provider": "Tencent",
-      "description": "Fast real-time lip synchronization optimized for speed and low latency.",
-      "max_resolution": "512x512",
+      "name": "FOTOhub Sync Fast",
+      "provider": "FOTOhub",
+      "quality": "fast",
+      "description": "Fast real-time lip sync. Best for quick previews and social content.",
       "max_duration_seconds": 60,
-      "credits": 8,
-      "supports_enhance": true,
-      "supports_multi_face": false,
-      "output_formats": ["mp4", "webm"],
-      "status": "available"
+      "resolution": "512x512",
+      "price_usd_per_second": 0.003,
+      "price_usd": 0.003,
+      "currency": "USD",
+      "unit": "per second"
     },
     {
       "id": "latentsync",
-      "name": "LatentSync 1.6",
-      "provider": "ByteDance",
-      "description": "Diffusion-based lip sync with high accuracy and natural mouth movement.",
-      "max_resolution": "1024x1024",
+      "name": "FOTOhub Sync HD",
+      "provider": "FOTOhub",
+      "quality": "hd",
+      "description": "HD diffusion-based lip sync with high accuracy. Best for professional content.",
       "max_duration_seconds": 30,
-      "credits": 15,
-      "supports_enhance": true,
-      "supports_multi_face": true,
-      "output_formats": ["mp4", "webm"],
-      "status": "available"
+      "resolution": "1024x1024",
+      "price_usd_per_second": 0.006,
+      "price_usd": 0.006,
+      "currency": "USD",
+      "unit": "per second"
     },
     {
       "id": "facefusion",
-      "name": "FaceFusion 3.x",
-      "provider": "FaceFusion",
-      "description": "Ultra-quality multi-stage pipeline with expression restoration and 4K support.",
-      "max_resolution": "3840x2160",
+      "name": "FOTOhub Sync Ultra",
+      "provider": "FOTOhub",
+      "quality": "ultra",
+      "description": "Ultra multi-stage pipeline with expression restoration. Best for commercial/film.",
       "max_duration_seconds": 120,
-      "credits": 20,
-      "supports_enhance": true,
-      "supports_multi_face": true,
-      "output_formats": ["mp4", "webm"],
-      "status": "available"
+      "resolution": "up to 4K",
+      "price_usd_per_second": 0.010,
+      "price_usd": 0.010,
+      "currency": "USD",
+      "unit": "per second"
     }
-  ]
+  ],
+  "currency": "USD",
+  "billing": "prepaid_wallet_usd"
 }
 ```
 
@@ -236,8 +247,8 @@ GET /v1/video/lip-sync/models
 GET /v1/video/lip-sync/status/{job_id}
 ```
 
-**Authentication:** Bearer token (API key)
-**Billing:** Free (no credits charged)
+**Authentication:** Bearer token (API key)  
+**Billing:** Free (status check)
 
 ### Path Parameters
 
@@ -270,7 +281,7 @@ Returns the full completed job response as shown in the generation endpoint sect
   "error": {
     "code": "processing_failed",
     "message": "Face tracking lost at frame 342. Ensure the face remains visible throughout the video.",
-    "credits_refunded": 15
+    "usd_refunded": 0.060
   }
 }
 ```
@@ -282,7 +293,7 @@ Returns the full completed job response as shown in the generation endpoint sect
 | `queued` | Job is waiting in the processing queue |
 | `processing` | Actively generating the lip-synced video |
 | `completed` | Done — output URL available |
-| `failed` | Processing failed — credits refunded |
+| `failed` | Processing failed — wallet refunded |
 
 ---
 
@@ -312,7 +323,7 @@ print(f"Estimated time: {job.estimated_time_seconds}s")
 result = client.video.lip_sync_wait(job.job_id, poll_interval=3)
 
 print(f"Output: {result.output.video_url}")
-print(f"Credits used: {result.credits_used}")
+print(f"Charged USD: ${result.billing.usd_charged}")
 ```
 
 ```typescript [TypeScript]
@@ -334,7 +345,7 @@ console.log(`Estimated time: ${job.estimatedTimeSeconds}s`);
 const result = await client.video.lipSyncWait(job.jobId, { pollInterval: 3000 });
 
 console.log(`Output: ${result.output.videoUrl}`);
-console.log(`Credits used: ${result.creditsUsed}`);
+console.log(`Charged USD: $${result.billing.usdCharged}`);
 ```
 
 ```go [Go]
@@ -766,7 +777,6 @@ for lang, audio_url in languages.items():
     print(f"Submitted {lang}: {job.job_id}")
 
 print(f"\nTotal jobs: {len(jobs)}")
-print(f"Credits reserved: {len(jobs) * 15}")
 print("Results will be delivered via webhook.")
 ```
 
@@ -799,7 +809,7 @@ for (const [lang, audioUrl] of Object.entries(languages)) {
 }
 
 console.log(`\nTotal jobs: ${Object.keys(jobs).length}`);
-console.log(`Credits reserved: ${Object.keys(jobs).length * 15}`);
+console.log("Results will be delivered via webhook.");
 ```
 
 ```go [Go]
@@ -844,7 +854,7 @@ func main() {
 		json.Unmarshal(respBody, &job)
 		fmt.Printf("Submitted %s: %s\n", lang, job["job_id"])
 	}
-	fmt.Printf("\nTotal jobs: %d, Credits reserved: %d\n", len(languages), len(languages)*15)
+	fmt.Printf("\nTotal jobs: %d\n", len(languages))
 }
 ```
 
@@ -1121,11 +1131,9 @@ models = client.video.lip_sync_models()
 
 for model in models:
     print(f"{model.id}: {model.name}")
-    print(f"  Credits: {model.credits}")
-    print(f"  Max resolution: {model.max_resolution}")
+    print(f"  Price/sec: ${model.price_usd_per_second}")
+    print(f"  Max resolution: {model.resolution}")
     print(f"  Max duration: {model.max_duration_seconds}s")
-    print(f"  Multi-face: {model.supports_multi_face}")
-    print(f"  Status: {model.status}")
     print()
 ```
 
@@ -1138,11 +1146,9 @@ const { models } = await client.video.lipSyncModels();
 
 models.forEach(model => {
   console.log(`${model.id}: ${model.name}`);
-  console.log(`  Credits: ${model.credits}`);
-  console.log(`  Max resolution: ${model.maxResolution}`);
+  console.log(`  Price/sec: $${model.priceUsdPerSecond}`);
+  console.log(`  Max resolution: ${model.resolution}`);
   console.log(`  Max duration: ${model.maxDurationSeconds}s`);
-  console.log(`  Multi-face: ${model.supportsMultiFace}`);
-  console.log(`  Status: ${model.status}`);
   console.log();
 });
 ```
@@ -1171,15 +1177,15 @@ func main() {
 	models := result["models"].([]interface{})
 	for _, m := range models {
 		model := m.(map[string]interface{})
-		fmt.Printf("%s: %s — %v credits, max %vs\n",
-			model["id"], model["name"], model["credits"], model["max_duration_seconds"])
+		fmt.Printf("%s: %s — $%v/s, max %vs\n",
+			model["id"], model["name"], model["price_usd_per_second"], model["max_duration_seconds"])
 	}
 }
 ```
 
 ```bash [cURL]
 curl https://apis.fotohub.app/v1/video/lip-sync/models \
-  -H "Authorization: Bearer fh_live_your_api_key" | jq '.models[] | {id, name, credits, max_resolution, status}'
+  -H "Authorization: Bearer fh_live_your_api_key" | jq '.models[] | {id, name, price_usd_per_second, resolution}'
 ```
 :::
 
@@ -1241,8 +1247,9 @@ Use `facefusion` for production-grade output suitable for broadcast, advertising
 | **Audio Noise Tolerance** | Low | Moderate | High |
 | **4K Upscale** | No | No | Yes (built-in) |
 | **Output Formats** | MP4, WebM | MP4, WebM | MP4, WebM |
-| **Credits** | 8 | 15 | 20 |
-| **Approx. USD** | $0.4287 | $0.8039 | $1.07 |
+| **USD Price / Sec** | $0.0030 / s | $0.0060 / s | $0.0100 / s |
+| **Example 10s Clip** | $0.030 | $0.060 | $0.100 |
+| **Example 30s Clip** | $0.090 | $0.180 | $0.300 |
 
 ### Choosing by Use Case
 
@@ -1261,14 +1268,16 @@ Use `facefusion` for production-grade output suitable for broadcast, advertising
 
 ## Pricing
 
-| Engine | Credits | Approx. USD | Best For |
-|--------|---------|-------------|----------|
-| `musetalk` | 8 | $0.4287 | Quick previews, social media, drafts |
-| `latentsync` | 15 | $0.8039 | HD content, professional presentations |
-| `facefusion` | 20 | $1.07 | 4K production, broadcast, film |
+FOTOhub Lip-Sync operates on transparent, competitive market pricing billed **per second** of output video directly from your prepaid USD wallet. No flat fees or minimum duration penalties.
 
-::: info Credit Costs
-All lip-sync engines use flat credit pricing per job regardless of video duration (within model limits). A 5-second clip costs the same as a 60-second clip on `musetalk`. The USD column is what a job costs from your wallet once the included credits run out, at $0.0536 per credit.
+| Engine | Rate (USD / second) | Example (10s video) | Example (30s video) | Best For |
+|--------|---------------------|---------------------|---------------------|----------|
+| `musetalk` | **$0.0030 / s** | $0.030 | $0.090 | Quick previews, social media, drafts |
+| `latentsync` | **$0.0060 / s** | $0.060 | $0.180 | HD content, professional presentations |
+| `facefusion` | **$0.0100 / s** | $0.100 | $0.300 | 4K production, broadcast, film |
+
+::: info Per-Second Billing
+Lip-sync jobs are metered in exact seconds based on the video duration. Charges are deducted instantly from your prepaid USD wallet balance. If a job fails during processing, the entire charged amount is automatically refunded to your wallet.
 :::
 
 ---
@@ -1370,7 +1379,11 @@ X-FotoHub-Event: lip-sync.completed
     "resolution": "1024x1024",
     "file_size_mb": 18.3
   },
-  "credits_used": 15,
+  "billing": {
+    "method": "wallet",
+    "usd_charged": 0.060,
+    "currency": "USD"
+  },
   "created_at": "2026-07-22T14:30:00Z",
   "completed_at": "2026-07-22T14:30:42Z"
 }
@@ -1387,7 +1400,7 @@ X-FotoHub-Event: lip-sync.completed
     "code": "no_face_detected",
     "message": "No face was detected in the source video."
   },
-  "credits_refunded": 15,
+  "usd_refunded": 0.060,
   "created_at": "2026-07-22T14:30:00Z",
   "failed_at": "2026-07-22T14:30:05Z"
 }

@@ -914,13 +914,13 @@ Flat per-request charges on `/v1/ai/video/*`, independent of clip length.
 
 ## Lip-Sync & Face Animation
 
-Flat per-request charges.
+Billed per second of processed video from your prepaid USD wallet.
 
-| Model | Price (USD) | Speed | Quality | Description |
-|-------|------------:|-------|---------|-------------|
-| `musetalk` | 0.428725 | Fast | Good | Real-time lip-sync, MuseTalk 1.5 |
-| `latentsync` | 0.803859 | Medium | High | HD diffusion-based, LatentSync 1.6 |
-| `facefusion` | 1.071811 | Slow | Ultra | Multi-stage pipeline, FaceFusion 3.x |
+| Model | Price (USD / sec) | Unit | Speed | Quality | Description |
+|-------|------------------:|------|-------|---------|-------------|
+| `musetalk` | $0.0030 | per second | Fast | Real-time | FOTOhub Sync Fast (MuseTalk 1.5) |
+| `latentsync` | $0.0060 | per second | Medium | High (HD) | FOTOhub Sync HD (LatentSync 1.6) |
+| `facefusion` | $0.0100 | per second | Slow | Ultra (4K) | FOTOhub Sync Ultra (FaceFusion 3.x) |
 
 See [Lip-Sync](/api/lip-sync) for full API reference.
 
