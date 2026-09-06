@@ -130,8 +130,8 @@ curl -X POST https://apis.fotohub.app/compute/v1/dns/zones/Z01928374829/email-se
 Once your custom domain resolves to your instance's Elastic IP, secure it with free, auto-renewing TLS certificates from Let's Encrypt:
 
 ```bash
-# SSH into your instance
-ssh -i worker.pem ubuntu@<ELASTIC_IP>
+# SSH into your instance using allocated Elastic IP
+ssh -i worker.pem ubuntu@18.197.82.14
 
 # 1. Install Certbot and Nginx plugin (or use the nginx-certbot preset)
 sudo apt-get update && sudo apt-get install -y certbot python3-certbot-nginx
@@ -177,6 +177,172 @@ curl -X GET https://apis.fotohub.app/compute/v1/aws/vpcs \
 curl -X GET "https://apis.fotohub.app/compute/v1/aws/subnets?vpc_id=vpc-0a12f94b8" \
   -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
+
+---
+
+## Zero-Trust Network Security: VPC Peering, Private Endpoints & WireGuard Mesh
+
+Enterprise machine learning clusters handling confidential user data, healthcare records, or proprietary model weights require strict **Zero-Trust network isolation**. In this model, GPU instances are provisioned **without public IPv4 addresses**, all public internet ingress is blocked, and communications travel across encrypted point-to-point tunnels and private cloud backbones.
+
+```mermaid
+flowchart TD
+    subgraph Enterprise On-Prem / Cloud VPC (10.100.0.0/16)
+        CorpClient["Enterprise ML Workstation (10.100.1.50)"]
+        InternalDB["Customer Data Warehouse (10.100.2.10)"]
+    end
+
+    subgraph AWS Backbone Peering (pcx-01928374a5b6)
+        CorpClient <-->|Zero Egress AWS Peering| PrivateALB
+    end
+
+    subgraph FOTOhub Compute Private VPC (10.0.0.0/16)
+        PrivateALB["Internal Application Load Balancer (10.0.1.10)"]
+        
+        subgraph Air-Gapped GPU Compute Subnet (10.0.2.0/24)
+            Node1["GPU Worker 1 (10.0.2.14)<br/>No Public IP"]
+            Node2["GPU Worker 2 (10.0.2.15)<br/>No Public IP"]
+        end
+        
+        subgraph Kernel WireGuard Mesh (wg0 - 10.42.0.0/24)
+            WG_Gateway["WireGuard Hub Node (10.42.0.1)"]
+            WG_Node1["WG Peer Node 1 (10.42.0.14)"]
+            WG_Node2["WG Peer Node 2 (10.42.0.15)"]
+        end
+        
+        PrivateLink["AWS PrivateLink Interface Endpoints"]
+    end
+
+    PrivateALB --> Node1 & Node2
+    Node1 & Node2 <--> PrivateLink
+    PrivateLink <--> S3Service["FOTOhub S3 (s1.fotohub.app)"]
+    CorpClient <-.->|Encrypted ChaCha20-Poly1305 Tunnel| WG_Gateway
+```
+
+### 1. Inter-VPC Peering Connection
+
+Connect your enterprise AWS account directly to your FOTOhub Compute VPC in Frankfurt (`eu-central-1`). Traffic routes over AWS fiber without traversing the public internet:
+
+#### Requesting VPC Peering via API
+
+```bash
+curl -X POST https://apis.fotohub.app/compute/v1/aws/vpc-peering \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "peer_vpc_id": "vpc-0182938475a",
+    "peer_owner_id": "123456789012",
+    "peer_region": "eu-central-1",
+    "name": "enterprise-corp-peering"
+  }'
+```
+
+#### Response Example
+
+```json
+{
+  "peering_connection_id": "pcx-01928374a5b6",
+  "status": "pending-acceptance",
+  "requester_vpc_id": "vpc-0a12f94b8",
+  "accepter_vpc_id": "vpc-0182938475a"
+}
+```
+
+Once accepted in your AWS Console or Terraform definition, add route entries directing your corporate subnet traffic (`10.100.0.0/16`) to the peering connection target:
+
+```bash
+# Accept peering in your AWS account
+aws ec2 accept-vpc-peering-connection --vpc-peering-connection-id pcx-01928374a5b6
+
+# Update route table
+aws ec2 create-route \
+  --route-table-id rtb-0891234abcd \
+  --destination-cidr-block 10.0.0.0/16 \
+  --vpc-peering-connection-id pcx-01928374a5b6
+```
+
+### 2. AWS PrivateLink & Private Endpoints
+
+Instances running in private subnets without an Internet Gateway (IGW) or NAT Gateway can communicate with FOTOhub management APIs and S3 storage through AWS VPC Interface Endpoints:
+
+- **Private API Gateway**: `apis.fotohub.app` resolves internally to `10.0.1.200` via VPC endpoint ENIs.
+- **Private S3 Object Store**: `s1.fotohub.app` resolves directly via S3 Interface Gateway endpoints (`com.amazonaws.eu-central-1.s3`), eliminating all internet route tables and NAT gateway data processing surcharges ($0.045/GB).
+
+```bash
+# Provision an instance locked strictly to private subnets (no public IPv4)
+curl -X POST https://apis.fotohub.app/compute/v1/instances \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "airgapped-vllm-node",
+    "catalog_id": "g5.xlarge",
+    "vpc_id": "vpc-0a12f94b8",
+    "subnet_id": "subnet-private-0a2",
+    "assign_public_ip": false,
+    "security_group_rules": [
+      {"protocol": "tcp", "port": 8000, "cidr": "10.100.0.0/16", "description": "Corporate Private Access"}
+    ]
+  }'
+```
+
+### 3. High-Performance WireGuard Mesh Network
+
+WireGuard provides kernel-level, ChaCha20-Poly1305 encrypted point-to-point tunnels with virtually zero CPU overhead and maximum MTU utilization.
+
+#### Bootstrapping WireGuard via Startup Preset
+
+When deploying distributed clusters across availability zones or bridging remote ML engineers, inject the WireGuard bootstrap configuration during instance creation:
+
+```bash
+#!/bin/bash
+# /etc/wireguard/setup-mesh.sh
+set -e
+
+apt-get update && apt-get install -y wireguard wireguard-tools
+
+# Generate server keypair
+umask 077
+wg genkey | tee /etc/wireguard/private.key | wg pubkey > /etc/wireguard/public.key
+
+PRIVATE_KEY=$(cat /etc/wireguard/private.key)
+
+# Configure WireGuard interface (wg0)
+cat > /etc/wireguard/wg0.conf << EOF
+[Interface]
+Address = 10.42.0.14/24
+PrivateKey = ${PRIVATE_KEY}
+ListenPort = 51820
+MTU = 1420
+
+# Corporate ML Gateway Peer
+[Peer]
+PublicKey = 8kK/12A98...corp_pub_key...=
+AllowedIPs = 10.42.0.1/32, 10.100.0.0/16
+Endpoint = vpn.yourbrand.com:51820
+PersistentKeepalive = 25
+
+# Peer GPU Worker 2
+[Peer]
+PublicKey = 3xM/44Z12...node2_pub_key...=
+AllowedIPs = 10.42.0.15/32
+Endpoint = 10.0.2.15:51820
+PersistentKeepalive = 25
+EOF
+
+# Enable and start WireGuard systemd service
+systemctl enable --now wg-quick@wg0
+
+# Confirm tunnel handshake
+wg show wg0
+```
+
+#### WireGuard Performance Advantages for Distributed ML
+
+| Metric | IPSec / OpenVPN | Zero-Trust WireGuard Mesh | Advantage |
+|:---|:---:|:---:|:---|
+| **Cryptographic Handshake** | 1,200 – 2,400 ms | **< 15 ms** | Sub-second cluster re-convergence |
+| **Throughput (25 Gbps link)** | ~450 MB/s (CPU bound) | **~2,250 MB/s** | Full line-rate distributed gradient sync |
+| **Kernel Context Switches** | High (User-space TUN/TAP) | **Zero (Native Linux Kernel Module)** | Preserves 100% of CPU cores for PyTorch dataloaders |
+| **Connection Roaming** | Drops connection on IP shift | **Instant Silent Re-keying** | Resilient against spot node IP transitions |
 
 ---
 

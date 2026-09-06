@@ -16,7 +16,7 @@ Operational diagnostics for debugging GPU out-of-memory errors, spot interruptio
 | **Sandbox Execution Timeout** | Code exceeded `timeout_s` wall clock limit | Inspect `error` in response JSON | Increase `timeout_s` (max 120s) or vectorize Python loop |
 | **Vsock Connection Refused (9999)** | MicroVM guest execution daemon failed to boot | Inspect host kernel logs | Check dmesg for KVM virtualization errors; daemon auto-restarts |
 | **NVIDIA Driver Not Found** | Linux kernel updated without dkms driver rebuild | Run `nvidia-smi` | Run `sudo apt-get install --reinstall nvidia-dkms-550` |
-| **SSH Host Key Verification Failed** | Replaced instance reused the same Elastic IP | Inspect `~/.ssh/known_hosts` | Run `ssh-keygen -R <INSTANCE_IP>` |
+| **SSH Host Key Verification Failed** | Replaced instance reused the same Elastic IP | Inspect `~/.ssh/known_hosts` | Run `ssh-keygen -R 18.197.82.14` |
 | **EBS Volume Stuck in `attaching`** | NVMe device naming collision or AWS controller lock | Inspect AWS volume state | Detach volume via API, wait 10s, and re-attach |
 
 ---
@@ -76,9 +76,8 @@ chmod 400 worker_key.pem
 ```
 
 ### 2. Verify Username
-Always connect using the `ubuntu` default user:
-```bash
-ssh -i worker_key.pem ubuntu@<INSTANCE_PUBLIC_IP>
+# Connect to public IP (e.g. 18.197.82.14)
+ssh -i worker_key.pem ubuntu@18.197.82.14
 ```
 
 ### 3. Inspect Cloud-Init Boot Logs

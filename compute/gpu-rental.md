@@ -41,7 +41,13 @@ import os, time
 
 client = FotoHub(api_key=os.environ["FOTOHUB_API_KEY"])
 
-# 1. Preflight cost check
+# 1. Preflight wallet balance & eligibility check (minimum $0.50 USD balance)
+eligibility = client.get("/compute/v1/instances/eligibility")
+print(f"Eligibility: {eligibility['allowed']} | Wallet: ${eligibility.get('wallet_balance', 0):.2f} {eligibility.get('wallet_currency', 'USD')}")
+if not eligibility.get("allowed"):
+    raise RuntimeError(eligibility.get("message", "Insufficient USD balance"))
+
+# 2. Preflight cost check
 estimate = client.post("/compute/v1/instances/estimate", {
     "catalog_id": "g5.xlarge",
     "spot_instance": True,
@@ -51,7 +57,7 @@ estimate = client.post("/compute/v1/instances/estimate", {
 })
 print(f"Hourly rate: ${estimate['estimate']['hourly_rate_usd']:.3f}/hr (Total 8h: ${estimate['estimate']['total_estimated_cost_usd']:.2f})")
 
-# 2. Provision instance
+# 3. Provision instance
 instance_res = client.post("/compute/v1/instances", {
     "name": "comfyui-flux-worker",
     "catalog_id": "g5.xlarge",
@@ -79,7 +85,7 @@ instance_res = client.post("/compute/v1/instances", {
 instance_id = instance_res["instance"]["id"]
 print(f"Instance requested: {instance_id}")
 
-# 3. Download SSH Private Key
+# 4. Download SSH Private Key
 key_res = client.get(f"/compute/v1/instances/{instance_id}/ssh-key")
 key_path = "comfyui_worker.pem"
 with open(key_path, "w") as f:
@@ -87,7 +93,7 @@ with open(key_path, "w") as f:
 os.chmod(key_path, 0o400)
 print(f"Private key saved to {key_path}")
 
-# 4. Wait for Public IP assignment
+# 5. Wait for Public IP assignment
 while True:
     details = client.get(f"/compute/v1/instances/{instance_id}")["instance"]
     status = details["status"]
@@ -107,7 +113,14 @@ import * as fs from "fs";
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
 
 async function launchComfyUIWorker() {
-  // 1. Launch instance
+  // 1. Preflight wallet eligibility (requires pure USD wallet balance)
+  const elig = await client.get("/compute/v1/instances/eligibility");
+  console.log(`Eligible: ${elig.data.allowed} ($${elig.data.wallet_balance} USD available)`);
+  if (!elig.data.allowed) {
+    throw new Error(elig.data.message);
+  }
+
+  // 2. Launch instance
   const res = await client.post("/compute/v1/instances", {
     name: "ts-comfyui-node",
     catalog_id: "g5.xlarge",
@@ -130,7 +143,7 @@ async function launchComfyUIWorker() {
   const instanceId = res.data.instance.id;
   console.log("Instance provisioned:", instanceId);
 
-  // 2. Fetch SSH Key
+  // 3. Fetch SSH Key
   const keyRes = await client.get(`/compute/v1/instances/${instanceId}/ssh-key`);
   fs.writeFileSync("worker_key.pem", keyRes.data.private_key, { mode: 0o400 });
   console.log("Saved worker_key.pem");
@@ -234,9 +247,9 @@ Once running, query the instance directly using standard OpenAI client libraries
 ```python
 from openai import OpenAI
 
-# Connect directly to your GPU node IP
+# Connect directly to your GPU node IP (e.g. assigned Elastic IP)
 client = OpenAI(
-    base_url="http://<YOUR_INSTANCE_IP>:8000/v1",
+    base_url="http://18.197.82.14:8000/v1",
     api_key="none"
 )
 

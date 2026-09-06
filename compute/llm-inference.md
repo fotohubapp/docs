@@ -97,7 +97,8 @@ vLLM integrates Outlines regex and JSON schema finite state machines directly in
 from openai import OpenAI
 import json
 
-client = OpenAI(base_url="http://<INSTANCE_IP>:8000/v1", api_key="none")
+# Connect to instance Elastic IP (e.g. 18.197.82.14) or private VPC endpoint
+client = OpenAI(base_url="http://18.197.82.14:8000/v1", api_key="none")
 
 json_schema = {
     "type": "object",

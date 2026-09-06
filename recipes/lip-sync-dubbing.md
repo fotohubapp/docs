@@ -46,6 +46,28 @@ The engine provides three inference tiers configured via the `mode` parameter:
 
 ---
 
+## Production Economics & Pure USD Wallet Billing
+
+Lip-Sync and multilingual dubbing operations are metered strictly against your **prepaid USD wallet balance** (`wallet.available_usd`) at transparent 1:1 pass-through rates with zero synthetic credits:
+
+| Operation / Step | Endpoint | Engine / Underlying Model | Unit Price (USD) | Measured Billing Unit |
+|:---|:---|:---|:---:|:---|
+| **Audio Stem Separation** | `POST /v1/audio/separate` | Demucs v4 (Vocals + Accompaniment) | **$0.0200** | Flat per audio file |
+| **Speech Transcription & Translation** | `POST /v1/audio/transcribe` | Whisper Large-v3 | **$0.0150** | Per minute of source audio |
+| **Zero-Shot Voice Cloning** | `POST /v1/audio/voice-sonic/generate` | Voice Sonic Engine | **$0.0250** | Per minute of generated speech |
+| **Fast Lip-Sync (`mode: fast`)** | `POST /v1/video/lip-sync` | MuseTalk (720p) | **$0.0400** | Per minute of processed video |
+| **HD Diffusion Lip-Sync (`mode: hd`)** | `POST /v1/video/lip-sync` | LatentSync (1080p, CFG 2.0) | **$0.0800** | Per minute of processed video |
+| **Ultra Cinema Retargeting (`mode: ultra`)**| `POST /v1/video/lip-sync` | FaceFusion + GFPGAN 1.4 | **$0.1200** | Per minute of processed video |
+
+### Total Pipeline Unit Economics
+
+- **30-Second Commercial Ad Dubbing (HD Mode):**
+  $$\$0.0200 \text{ (Stems)} + \$0.0075 \text{ (Whisper)} + \$0.0125 \text{ (Voice Sonic)} + \$0.0400 \text{ (LatentSync HD)} = \mathbf{\$0.0800\text{ USD}}$$
+- **10-Minute Educational Webinar (Fast Mode):**
+  $$\$0.0200 + \$0.1500 + \$0.2500 + \$0.4000 = \mathbf{\$0.8200\text{ USD}}$$
+
+---
+
 ## Step-by-Step Implementation
 
 ### Complete Pipeline Call
@@ -108,6 +130,7 @@ def run_multilingual_dubbing(video_url: str, target_lang: str):
     })
 
     print(f"Lip-sync task dispatched: {lip_sync_job['job_id']}")
+    print(f"Billed: ${lip_sync_job.get('usd_charged', 0.04):.4f} USD | Remaining Balance: ${lip_sync_job.get('balance_usd', 18.50):.2f}")
     return lip_sync_job
 
 run_multilingual_dubbing(
@@ -135,7 +158,7 @@ async function executeLipSync() {
     output_quality: 95,
   });
 
-  console.log("Lip-Sync Job ID:", response.data.job_id);
+  console.log(`Lip-Sync Job ID: ${response.data.job_id} (USD Charged: $${response.data.usd_charged} USD)`);
 }
 
 executeLipSync();
@@ -162,6 +185,13 @@ type LipSyncRequest struct {
 	Seed            int     `json:"seed"`
 }
 
+type LipSyncResponse struct {
+	JobID      string  `json:"job_id"`
+	Status     string  `json:"status"`
+	USDCharged float64 `json:"usd_charged"`
+	BalanceUSD float64 `json:"balance_usd"`
+}
+
 func main() {
 	payload := LipSyncRequest{
 		VideoURL:       "https://storage.fotohub.app/raw/keynote.mp4",
@@ -183,8 +213,9 @@ func main() {
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
-	fmt.Println("Job Response:", string(respBody))
+	var result LipSyncResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+	fmt.Printf("[✓] Job %s queued! USD Charged: $%.4f (Wallet Balance: $%.2f USD)\n", result.JobID, result.USDCharged, result.BalanceUSD)
 }
 ```
 
@@ -200,6 +231,18 @@ curl -X POST https://apis.fotohub.app/v1/video/lip-sync \
     "inference_steps": 30,
     "seed": 1247
   }'
+```
+
+#### Response Example
+```json
+{
+  "job_id": "job_ls_890123ab",
+  "status": "queued",
+  "mode": "hd",
+  "usd_charged": 0.0400,
+  "balance_usd": 14.9600,
+  "currency": "USD"
+}
 ```
 
 :::

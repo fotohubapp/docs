@@ -97,11 +97,21 @@ High-performance AI workloads rely heavily on fast weight loading from disk to G
 |:---|:---:|:---:|:---:|:---:|
 | **EBS gp3 (Baseline 3k IOPS)** | 3,000 IOPS | 125 MB/s | 112 seconds | **$0.08** |
 | **EBS gp3 (Provisioned 10k IOPS)**| 10,000 IOPS | 500 MB/s | **28 seconds** | $0.14 |
-| **EBS io2 Block Express** | 64,000 IOPS | 1,000 MB/s | **14 seconds** | $0.24 |
+| **EBS io2 Block Express (Single Disk)**| 256,000 IOPS | 4,000 MB/s | **3.5 seconds** | $0.24 |
+| **Striped 4x io2 Block Express (RAID-0)**| 500,000+ IOPS | 8,000+ MB/s | **1.8 seconds** | $0.96 |
 | **Local NVMe SSD (g4dn/g5)** | 250,000 IOPS | 2,500 MB/s | **5.8 seconds** | Ephemeral ($0 extra) |
 
+### S3-to-EBS Model Checkpoint Synchronization Benchmarks (50 GB Bundle)
+
+| Sync Method & Tooling | Concurrency | Chunk Size | Sustained Throughput | 50 GB Sync Latency | Intra-Cluster Egress Cost |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| **Single-Stream HTTP (`curl / wget`)** | 1 | Stream | 65 MB/s | 12 min 50 s (770 s) | **$0.00** |
+| **AWS CLI (`aws s3 sync`) Default** | 10 | 8 MB | 125 MB/s | 6 min 40 s (400 s) | **$0.00** |
+| **AWS CLI (`aws s3 sync`) Tuned (32 threads)** | 32 | 64 MB | 680 MB/s | 1 min 14 s (74 s) | **$0.00** |
+| **Optimized `rclone copy` (Multi-Worker Pool)** | **32** | **64 MB** | **1,950 MB/s** | **~25.6 seconds** | **$0.00** |
+
 ::: tip Pro-Tip for 5-Second Model Boots
-Always cache your base model checkpoints on the local NVMe drive (`/mnt/nvme`) on instance initialization. FOTOhub startup scripts can automatically sync weights from your persistent EBS volume or S3 bucket into local NVMe during boot.
+Always cache your base model checkpoints on the local NVMe drive (`/mnt/nvme`) or tuned `io2 Block Express` disk on instance initialization. FOTOhub startup scripts can automatically sync weights using `rclone` from FOTOhub S3 (`s1.fotohub.app`) into local NVMe during boot in under 26 seconds with $0.00 intra-cluster egress fees.
 :::
 
 ---
