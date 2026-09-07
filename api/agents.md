@@ -63,7 +63,7 @@ Build complex AI pipelines that chain image generation, video creation, audio pr
 | `variables` | object | `{}` | Shared workflow-level variables |
 | `trigger` | TriggerSpec | required | How the workflow starts (`manual`\|`schedule`\|`webhook`\|`event`) |
 | `max_execution_time_s` | integer | `3600` | Maximum wall-clock time in seconds |
-| `max_credits` | integer \| null | `null` | Credit budget cap for entire run |
+| `usd_cap` | float \| null | `null` | USD spending cap for the entire run (e.g. `0.50` for 50 cents) |
 | `max_steps` | integer | `500` | Maximum total node executions |
 | `error_handler` | string | `"stop"` | `"stop"` \| `"continue"` \| `"retry"` |
 
@@ -101,7 +101,7 @@ Every node execution produces a `NodeOutput`:
 {
   "ok": true,
   "output": { "main": { "images": ["https://..."] } },
-  "credits_used": 2,
+  "usd_charged": 0.024,
   "error": null,
   "logs": [{ "level": "info", "message": "Generated 1 image", "ts": "2026-07-18T12:00:03Z" }],
   "duration_ms": 2840
@@ -118,26 +118,40 @@ Nodes reference upstream outputs using: `&#123;&#123;node_id.output.port.field&#
 
 ---
 
+::: tip PEŁNY KATALOG 198 WĘZŁÓW SILNIKA AGENTÓW
+FotoHub posiada **198 gotowych węzłów produkcyjnych** w 23 kategoriach (od zaawansowanych modeli generatywnych, przez integracje e-commerce Allegro/Shopify, po autonomiczny rój agentów i samonaprawę self-healing).
+
+👉 **[Przejdź do Pełnego Katalogu Węzłów Agenta (198 Nodes Reference)](/api/agent-nodes)** — kompletna specyfikacja parametrów, schematy wejść/wyjść, koszty operacji oraz receptury wdrożeniowe.
+:::
+
 ## Node Categories
 
-| Category | Description | Examples |
+Silnik klasyfikuje węzły w 23 głównych kategoriach wykonawczych:
+
+| Kategoria | Opis | Przykłady |
 |----------|-------------|----------|
-| `ai_agent` | Tool-using AI loop | LLM with tool calls, configurable models |
-| `core_io` | Input/Output | Workflow input/output definitions |
-| `core_logic` | Flow control | Conditionals, loops, switches |
-| `core_triggers` | Trigger definitions | Manual, schedule, webhook, event |
-| `fotohub_image` | Image generation | Generate and edit images |
-| `fotohub_image_ext` | Extended image ops | Advanced transformations |
-| `fotohub_video` | Video generation | Create videos from prompts/images |
-| `fotohub_video_ext` | Extended video ops | Advanced video processing |
-| `fotohub_audio` | Audio generation | Generate music and audio |
-| `fotohub_audio_ext` | Extended audio | Audio post-processing |
-| `fotohub_brand` | Brand assets | Brand-aware generation |
-| `fotohub_social` | Social media | Publish to social platforms |
-| `integrations` | External services | HTTP requests, email |
-| `knowledge_nodes` | RAG/Retrieval | Document search and retrieval |
-| `logic_ext` | Advanced logic | Complex routing and transforms |
-| `storage` | File operations | S3, file storage |
+| `agent` | Autonomiczni agenci i rój | Swarm fan-out, konsensus decyzyjny, critique loop, self-healing |
+| `control` | Sterowanie przepływem & routery | Traffic split (A/B), dynamic switch, fallback matrix, parallel gate |
+| `fotohub.shorts` | Wiralowe wideo & Shorts | AI Auto-Clipper, dynamiczne napisy karaoke, branding bumper |
+| `fotohub.ugc` | UGC Studio & Virtual Try-On | Renderowanie aktora UGC, generator skryptów, wirtualna przymierzalnia |
+| `fotohub.creative` | Studio produktowe 3D | E-Commerce Studio Mockup z dopasowaniem oświetlenia i cieni |
+| `fotohub.image` | Generowanie i edycja obrazu AI | Flux, Midjourney, upscale 8K, usuwanie tła, smart-crop, retusz |
+| `fotohub.video` | Wideo AI & postprodukcja | Generowanie wideo (Luma, Runway), stabilizacja, scalanie, oś czasu |
+| `fotohub.audio` | Dźwięk, mowa, muzyka & SFX | Synteza mowy (TTS), generowanie muzyki (Suno/Udio), mastering LUFS |
+| `voice` | Głos konwersacyjny w czasie rzeczywistym | Dwukierunkowe rozmowy głosowe real-time z detekcją ciszy VAD |
+| `fotohub.brand` | Nadzór i spójność marki | Ekstrakcja zasad z PDF, palety barw, bramki jakościowe księgi znaku |
+| `ai` | Modele LLM & analiza wizyjna | Promptowanie LLM, klasyfikacja, ekstrakcja schematów JSON, Vision QC |
+| `knowledge` | Baza wiedzy & pamięć wektorowa | Wyszukiwanie RAG, pamięć semantyczna agenta z czasem życia TTL |
+| `social` | Dystrybucja społecznościowa | Publikacja na Instagram, TikTok, YouTube Shorts, FB, LinkedIn |
+| `integration` | Konektory e-commerce & API | Allegro, Shopify, WooCommerce, eBay, Etsy, Stripe, Slack, Notion |
+| `storage` | Chmura i dostarczanie plików | Galeria FotoHub, pliki, AWS S3, Cloudflare R2, Dropbox, OneDrive |
+| `logic` | Logika deterministyczna | Warunki If/Switch, pętle while, agregacje (SUM/AVG), filtry JMESPath |
+| `trigger` | Wyzwalacze wykonania | Ręczny start, harmonogram CRON, webhook publiczny, bezpieczny HMAC |
+| `io` | Granice wejścia i wyjścia | Workflow input, zapis końcowy rezultatów wykonania |
+| `code` | Bezpieczna piaskownica kodu | Izolowane środowiska Python (Pillow/NumPy) oraz JavaScript |
+| `http` | Uniwersalne żądania HTTP REST | Klient REST API z obsługą nagłówków, autoryzacji i retry |
+| `system` | Bezpieczeństwo i migawki | Wersjonowanie snapshotów i automatyczny rollback po awarii |
+| `developer` | Narzędzia deweloperskie | Piaskownica testowa kodu i mocki środowiskowe |
 
 ### AI Agent Node Details
 
@@ -151,10 +165,25 @@ The `ai_agent` node runs a multi-turn tool-using loop powered by FOTOhub AI (pro
 | `tools` | string[] | `[]` | Tool IDs available to the agent |
 | `tool_strategy` | string | `"auto"` | `"auto"` (LLM decides) \| `"required"` (must use) \| `"none"` (disabled) |
 | `max_steps` | integer | `15` | Maximum LLM turns in the loop |
-| `max_credits` | integer \| null | `null` | Credit cap for this agent node |
+| `usd_cap` | float \| null | `null` | USD spending cap for this agent node |
 | `temperature` | number | `0.7` | Sampling temperature |
 
-The agent builds messages, calls the LLM, dispatches any `tool_use` blocks, appends results, and loops until the LLM produces a final response or limits are reached. Credits are calculated per-token based on model pricing.
+The agent builds messages, calls the LLM, dispatches any `tool_use` blocks, appends results, and loops until the LLM produces a final response or limits are reached. USD costs are calculated per-token based on model pricing (see [Models](/api/models#chat-models) for per-model rates).
+
+### Enterprise & Innovative Production Nodes
+
+| Node Type | Category | Key Properties | Description |
+|-----------|----------|----------------|-------------|
+| `agent.consensus_aggregate` | `swarm_consensus` | `aggregation_strategy` (`majority_vote`, `weighted_confidence`, `llm_jury_synthesis`, `unanimous_or_fallback`), `min_quorum`, `fallback_strategy` | Aggregates outputs from parallel agent workers into deterministic or synthesized verdicts with quorum validation. |
+| `agent.swarm_fanout` | `swarm_consensus` | `agent_tasks`, `max_concurrency`, `timeout_per_agent` | Dispatches tasks across an array of specialized agents in parallel. |
+| `memory.store` | `vector_rag` | `tenant_id`, `collection_name`, `namespace`, `ttl_seconds`, `metadata` | Ingests text or float embeddings into partitioned vector storage with automatic TTL expiry. |
+| `memory.query` | `vector_rag` | `query`, `top_k`, `min_score`, `filter_metadata` (`$eq`, `$in`, `$gte`, `$lte`) | Executes cosine similarity vector retrieval with metadata filtering. |
+| `flow.loop_while` | `flow_control` | `condition_expr`, `max_iterations` (1-1000), `accumulator_path`, `break_on_error` | Evaluates runtime conditions in a loop with infinite-loop prevention safeguards. |
+| `flow.batch_iterator` | `flow_control` | `items_expr`, `batch_size`, `max_concurrency`, `dlq_on_error` | Splits arrays into concurrent chunks with DLQ error routing. |
+| `traffic.canary_split` | `traffic_management` | `canary_percentage`, `sticky_session_key`, `fallback_version` | Directs user traffic between stable and canary workflow versions. |
+| `eval.auto_judge` | `quality_eval` | `criteria`, `min_score`, `evaluator_model` | Evaluates agent output quality and enforces automated pass/fail thresholds. |
+| `trigger.webhook_secure` | `core_triggers` | `hmac_secret_env`, `max_skew_seconds`, `ip_allowlist` | Cryptographically verifies incoming payloads with HMAC-SHA256 signatures. |
+| `tool.mcp_client` | `integrations` | `mcp_server_id`, `transport` (`sse`/`stdio`), `tool_name` | Connects workflows directly to external Model Context Protocol servers. |
 
 ---
 
@@ -206,7 +235,7 @@ POST /v1/workflows
     "edges": [{ "id": "e1", "source": "input", "target": "generate" }],
     "variables": {},
     "trigger": { "type": "manual", "config": {} },
-    "max_credits": 50,
+    "usd_cap": 0.600,
     "error_handler": "retry"
   },
   "tags": ["images", "batch"]
@@ -260,7 +289,7 @@ POST /v1/runs
   "workflow_id": "wf_abc123",
   "input": { "prompt": "A futuristic cityscape at night", "style": "cyberpunk" },
   "trigger_type": "manual",
-  "credits_max": 20,
+  "usd_cap": 0.240,
   "spec_override": null
 }
 ```
@@ -270,7 +299,7 @@ POST /v1/runs
 | `workflow_id` | string | yes | Workflow to execute |
 | `input` | object | yes | Input data for the workflow |
 | `trigger_type` | string | no | `"manual"` \| `"schedule"` \| `"webhook"` \| `"test"` |
-| `credits_max` | integer | no | Override per-run credit cap |
+| `usd_cap` | float | no | Override per-run USD spending cap |
 | `spec_override` | WorkflowSpec | no | Ad-hoc spec (run without saving changes) |
 
 **Response:**
@@ -307,13 +336,13 @@ GET /v1/runs/{run_id}
   "current_node": "generate",
   "nodes_completed": 1,
   "nodes_total": 3,
-  "credits_used": 4,
-  "credits_max": 20,
+  "usd_charged": 0.048,
+  "usd_cap": 0.240,
   "node_outputs": {
     "enhance": {
       "ok": true,
       "output": { "main": { "text": "A sprawling neon-lit metropolis..." } },
-      "credits_used": 2,
+      "usd_charged": 0.024,
       "duration_ms": 1800
     }
   }
@@ -335,6 +364,68 @@ POST /v1/runs/{run_id}/retry
 ```
 
 Creates a new run from a `failed`, `cancelled`, or `timed_out` run using the same spec and input. Returns a new `run_id`.
+
+### Resume from Checkpoint (Stateful Resumption)
+
+Unlike `/retry` which restarts the entire pipeline from scratch, `/resume` leverages **Stateful Checkpointing**:
+It queries `agent_run_nodes` for all nodes that already completed with `status = 'succeeded'`, preserves their outputs in memory, skips re-executing them, and seamlessly resumes DAG execution only from pending or failed nodes.
+
+```http
+POST /v1/runs/{run_id}/resume
+```
+
+**Response (200 OK):**
+```json
+{
+  "ok": true,
+  "run_id": "4739a55a-5663-43fb-80e8-f0dbce60d0f3",
+  "status": "resumed",
+  "skipped_nodes": ["node_1", "node_2"],
+  "total_skipped": 2
+}
+```
+
+### Autonomous Process Watchdog Guardian
+
+The Agent Engine includes an autonomous supervisor daemon running 24/7 in the background (`app/services/watchdog.py`). It monitors runs for dead heartbeats (>60s stall), network hiccups, or server restarts, diagnoses the failure cause, and automatically resumes execution from the exact checkpoint.
+
+#### Check Watchdog Status
+
+```http
+GET /v1/runs/watchdog/status
+```
+
+**Response (200 OK):**
+```json
+{
+  "active": true,
+  "total_scans": 42,
+  "total_recovered": 3,
+  "total_stalled_detected": 3,
+  "active_monitored_runs": 0,
+  "last_scan_at": "2026-09-07T08:50:34Z",
+  "started_at": "2026-09-07T08:49:39Z",
+  "recent_actions": [
+    { "action": "resumed_checkpoint", "run_id": "4739a55a-...", "timestamp": "2026-09-07T08:50:44Z" }
+  ]
+}
+```
+
+#### Scan & Auto-Heal Stalled Processes
+
+```http
+POST /v1/runs/watchdog/scan
+```
+
+Triggers an immediate scan for stalled runs across active workers. Stalled processes are diagnosed and automatically resumed without human intervention.
+
+#### Recover All User Interrupted Processes
+
+```http
+POST /v1/runs/watchdog/recover-all
+```
+
+Resumes all interrupted, timed-out, or failed runs belonging to the authenticated user from their checkpoints.
 
 ### Send Signal
 
@@ -367,9 +458,9 @@ Returns a Server-Sent Events stream. Use `since_seq` for reconnection (each even
 | Event | Fields | Description |
 |-------|--------|-------------|
 | `node_started` | `node_id`, `seq`, `timestamp` | Node begins execution |
-| `node_output` | `node_id`, `seq`, `output`, `credits_used` | Node produced output |
+| `node_output` | `node_id`, `seq`, `output`, `usd_charged` | Node produced output |
 | `node_completed` | `node_id`, `seq`, `duration_ms`, `ok` | Node finished |
-| `run_finished` | `seq`, `status`, `total_credits`, `duration_ms` | Run reached terminal state |
+| `run_finished` | `seq`, `status`, `total_usd_charged`, `duration_ms` | Run reached terminal state |
 
 **Example stream:**
 
@@ -378,7 +469,7 @@ event: node_started
 data: {"node_id": "enhance", "seq": 1, "timestamp": "2026-07-18T12:00:02Z"}
 
 event: node_output
-data: {"node_id": "enhance", "seq": 2, "output": {"main": {"text": "..."}}, "credits_used": 2}
+data: {"node_id": "enhance", "seq": 2, "output": {"main": {"text": "..."}}, "usd_charged": 0.024}
 
 event: node_completed
 data: {"node_id": "enhance", "seq": 3, "duration_ms": 1800, "ok": true}
@@ -396,7 +487,7 @@ event: node_completed
 data: {"node_id": "generate_square", "seq": 7, "duration_ms": 3400, "ok": true}
 
 event: run_finished
-data: {"seq": 8, "status": "completed", "total_credits": 8, "duration_ms": 5200}
+data: {"seq": 8, "status": "completed", "total_usd_charged": 8, "duration_ms": 5200}
 ```
 
 ::: tip
@@ -801,7 +892,7 @@ POST /v1/tests
   "assertions": [
     { "path": "generate.output.main.images", "operator": "length_gte", "value": 1 },
     { "path": "generate.ok", "operator": "eq", "value": true },
-    { "path": "generate.credits_used", "operator": "lte", "value": 5 }
+    { "path": "generate.usd_charged", "operator": "lte", "value": 5 }
   ]
 }
 ```
@@ -829,7 +920,7 @@ Creates a run with `trigger_type="test"` and evaluates assertions against output
   "result": "passed",
   "assertions": [
     { "path": "generate.output.main.images", "operator": "length_gte", "value": 1, "actual": 2, "passed": true },
-    { "path": "generate.credits_used", "operator": "lte", "value": 5, "actual": 3, "passed": true }
+    { "path": "generate.usd_charged", "operator": "lte", "value": 5, "actual": 3, "passed": true }
   ],
   "duration_ms": 4200
 }
@@ -896,7 +987,436 @@ PUT /v1/widget/{workflow_id}
 
 ---
 
+## Endpoints: Canary Deployments & Traffic Routing
+
+Canary deployments allow safe progressive rollouts of new workflow versions with sticky sessions, metric tracking, and automatic rollback on elevated error rates.
+
+### Get Canary Configuration & Metrics
+
+```http
+GET /v1/workflows/{workflow_id}/canary
+```
+
+**Response:**
+```json
+{
+  "workflow_id": "wf_12345",
+  "canary_config": {
+    "workflow_id": "wf_12345",
+    "canary_version": 2,
+    "stable_version": 1,
+    "canary_weight_pct": 20,
+    "auto_rollback_error_threshold_pct": 5.0,
+    "sticky_sessions": true,
+    "is_active": true
+  },
+  "metrics": {
+    "stable": { "total_runs": 1420, "error_runs": 12, "error_rate_pct": 0.85, "avg_duration_ms": 340.5 },
+    "canary": { "total_runs": 355, "error_runs": 4, "error_rate_pct": 1.12, "avg_duration_ms": 315.2 }
+  },
+  "rollback_triggered": false
+}
+```
+
+### Configure or Update Canary Rule
+
+```http
+POST /v1/workflows/{workflow_id}/canary
+```
+
+```json
+{
+  "canary_version": 2,
+  "stable_version": 1,
+  "canary_weight_pct": 25,
+  "auto_rollback_error_threshold_pct": 5.0,
+  "sticky_sessions": true,
+  "is_active": true
+}
+```
+
+### Delete / Reset Canary Rule
+
+```http
+DELETE /v1/workflows/{workflow_id}/canary
+```
+
+### Resolve Target Version for Incoming Request
+
+```http
+POST /v1/workflows/{workflow_id}/canary/resolve
+```
+
+```json
+{
+  "user_id": "usr_abc123"
+}
+```
+
+**Response:**
+```json
+{
+  "workflow_id": "wf_12345",
+  "selected_version": 2,
+  "is_canary": true,
+  "reason": "sticky_hash_match"
+}
+```
+
+---
+
+## Endpoints: Dead-Letter Queue (DLQ) & Incident Replay
+
+The Dead-Letter Queue intercepts failed executions and node exceptions, preserving full state payloads for replay, diagnostic diffing, and resolution workflows.
+
+### List Incidents
+
+```http
+GET /v1/incidents?workflow_id=wf_12345&status=unresolved&limit=50
+```
+
+### Replay Failed Incident
+
+```http
+POST /v1/incidents/{incident_id}/replay
+```
+
+```json
+{
+  "patch_incoming": { "product": "corrected payload" },
+  "override_config": { "timeout_s": 60 }
+}
+```
+
+**Response:**
+```json
+{
+  "replayed": true,
+  "incident_id": "inc_789",
+  "replayed_run_id": "run_replay_456",
+  "node_id": "api_call",
+  "status": "queued"
+}
+```
+
+### Update Incident Status
+
+```http
+PATCH /v1/incidents/{incident_id}/status
+```
+
+```json
+{
+  "status": "resolved",
+  "resolution_note": "API credential updated and replayed successfully"
+}
+```
+
+---
+
+## Endpoints: Audit Trail & Compliance (SOC2)
+
+Immutable enterprise audit logging for security compliance, version tracking, and administrative actions.
+
+### Get Workflow Audit Log
+
+```http
+GET /v1/audit/workflow/{workflow_id}?limit=50
+```
+
+### Get Recent System Audit Events
+
+```http
+GET /v1/audit/recent?limit=100
+```
+
+### Log Audit Entry
+
+```http
+POST /v1/audit
+```
+
+```json
+{
+  "workflow_id": "wf_12345",
+  "action": "workflow.published",
+  "summary": "Promoted workflow version 3 to production",
+  "actor_id": "usr_admin",
+  "actor_email": "admin@company.com",
+  "diff": { "canary_weight_pct": [10, 100] }
+}
+```
+
+---
+
+## Endpoints: Rate Limits & Concurrency Policies
+
+Per-workflow token bucket rate limiting and concurrency throttling.
+
+### Get Rate Limit Policy
+
+```http
+GET /v1/rate-limits/workflow/{workflow_id}
+```
+
+### Upsert Rate Limit Policy
+
+```http
+PUT /v1/rate-limits/workflow/{workflow_id}
+```
+
+```json
+{
+  "max_concurrent_runs": 15,
+  "requests_per_minute": 120,
+  "burst_allowance": 30
+}
+```
+
+---
+
+## Endpoints: Real-time Tracing & Span Telemetry
+
+OpenTelemetry-compatible distributed span waterfall for workflows and nodes.
+
+### Get Execution Trace Waterfall
+
+```http
+GET /v1/runs/{run_id}/telemetry
+```
+
+**Response:**
+```json
+{
+  "run_id": "run_abc123",
+  "workflow_id": "wf_prod",
+  "total_duration_ms": 1420.5,
+  "node_count": 5,
+  "spans": [
+    {
+      "node_id": "prompt_enrich",
+      "node_type": "ai_agent",
+      "started_at": 1725700000.1,
+      "finished_at": 1725700000.8,
+      "duration_ms": 700.0,
+      "status": "completed",
+      "tokens_consumed": 384,
+      "usd_cost": 0.0011
+    }
+  ]
+}
+```
+
+---
+
+## Endpoints: Workflow Simulator & Mocks
+
+Test and simulate entire DAG workflows with mocked API responses, synthetic latency, and assertional contracts without incurring LLM charges or calling external APIs.
+
+### Run Simulation
+
+```http
+POST /v1/workflows/simulate
+```
+
+```json
+{
+  "workflow_id": "wf_12345",
+  "initial_payload": { "order_id": "ord_999", "amount": 150 },
+  "mocks": {
+    "stripe_charge": { "output": { "main": { "charge_id": "ch_mock_1", "status": "succeeded" } }, "latency_ms": 80 }
+  },
+  "assertions": [
+    { "path": "stripe_charge.output.main.status", "operator": "eq", "expected": "succeeded" },
+    { "path": "summary_email.duration_ms", "operator": "lt", "expected": 1500 }
+  ]
+}
+```
+
+---
+
+## Endpoints: Vector Memory & Multi-Tenant RAG
+
+Persistent semantic vector storage and retrieval with cosine similarity, namespace isolation, TTL auto-pruning, and MongoDB-style metadata queries (`$eq`, `$in`, `$gte`, `$lte`).
+
+### Store Document or Embedding
+
+```http
+POST /v1/memory/store
+```
+
+```json
+{
+  "tenant_id": "org_enterprise_1",
+  "collection_name": "knowledge_base",
+  "namespace": "customer_support",
+  "content": "Refunds are processed within 3-5 business days back to the original payment method.",
+  "category": "policy",
+  "tags": ["refund", "billing", "faq"],
+  "metadata": { "region": "EU", "tier": "enterprise" },
+  "ttl_seconds": 2592000
+}
+```
+
+### Query Semantic Vectors
+
+```http
+POST /v1/memory/query
+```
+
+```json
+{
+  "tenant_id": "org_enterprise_1",
+  "collection_name": "knowledge_base",
+  "namespace": "customer_support",
+  "query": "How long does a refund take?",
+  "top_k": 3,
+  "min_similarity_threshold": 0.65,
+  "filter_metadata": { "region": { "$eq": "EU" } }
+}
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "id": "mem_1725700100_a1b2",
+      "similarity": 0.8924,
+      "content": "Refunds are processed within 3-5 business days back to the original payment method.",
+      "category": "policy",
+      "tags": ["refund", "billing", "faq"],
+      "metadata": { "region": "EU", "tier": "enterprise" },
+      "created_at": 1725700100.0,
+      "expires_at": 1728292100.0
+    }
+  ],
+  "count": 1,
+  "query": "How long does a refund take?",
+  "tenant_id": "org_enterprise_1",
+  "collection_name": "knowledge_base",
+  "namespace": "customer_support"
+}
+```
+
+### Memory Partition Statistics
+
+```http
+GET /v1/memory/stats?tenant_id=org_enterprise_1&collection_name=knowledge_base&namespace=customer_support
+```
+
+### Clear Memory Records
+
+```http
+DELETE /v1/memory/clear?tenant_id=org_enterprise_1&collection_name=knowledge_base&namespace=customer_support
+```
+
+---
+
+## Endpoints: Swarm Consensus & Jury API
+
+Calculate deterministic consensus, weighted confidence rankings, and LLM jury verdicts over candidate agent responses.
+
+### Calculate Swarm Consensus
+
+```http
+POST /v1/swarm/consensus
+```
+
+```json
+{
+  "votes": [
+    { "worker": "agent_audit", "decision": "FLAG_FRAUD", "confidence": 0.94 },
+    { "worker": "agent_compliance", "decision": "FLAG_FRAUD", "confidence": 0.88 },
+    { "worker": "agent_heuristic", "decision": "ALLOW", "confidence": 0.52 }
+  ],
+  "aggregation_strategy": "weighted_confidence",
+  "min_quorum": 2,
+  "fallback_strategy": "highest_confidence",
+  "confidence_field": "confidence"
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "winner": { "decision": "FLAG_FRAUD", "confidence": 0.94 },
+  "winning_value": "FLAG_FRAUD",
+  "consensus_score": 0.7778,
+  "agreed_count": 2,
+  "total_valid": 3,
+  "min_quorum": 2,
+  "quorum_reached": true,
+  "fallback_applied": false,
+  "strategy": "weighted_confidence",
+  "group_distribution": { "flag_fraud": 2, "allow": 1 }
+}
+```
+
+### Automated LLM Judge / Quality Gate
+
+```http
+POST /v1/swarm/evaluate
+```
+
+```json
+{
+  "content": "The generated marketing campaign adheres to brand guidelines, features high contrast visuals, and specifies a clear call to action.",
+  "criteria": ["accuracy", "brand_compliance", "clarity"],
+  "min_score": 0.80
+}
+```
+
+**Response:**
+```json
+{
+  "passed": true,
+  "overall_score": 0.877,
+  "min_score": 0.8,
+  "verdict": "PASSED: Quality score 0.877 meets threshold 0.8",
+  "criteria_scores": [
+    { "criterion": "accuracy", "score": 0.88, "reason": "Determined consistent and logically sound" },
+    { "criterion": "brand_compliance", "score": 0.85, "reason": "Meets standard benchmark for brand_compliance" },
+    { "criterion": "clarity", "score": 0.9, "reason": "Clear tone and well-formed structure" }
+  ],
+  "evaluator": "auto_judge_v1"
+}
+```
+
+---
+
+## Endpoints: OAuth2 Provider Integrations & Vault Security
+
+The agent engine natively integrates with 14 enterprise cloud providers with zero secret exposure.
+
+| Provider | Service Scope | Supported Grant Types |
+|----------|---------------|-----------------------|
+| Google Workspace | Drive, Gmail, Docs, Sheets | Authorization Code + PKCE, Refresh Token |
+| Slack | Channels, Chat, Webhooks | OAuth 2.0 Bot & User Token |
+| Discord | Webhooks, Bot Gateway | OAuth 2.0 Webhook integration |
+| Meta / Instagram | Media Publishing, Insights | OAuth 2.0 Long-Lived Access Token |
+| TikTok | Video Upload, Analytics | Content Posting API OAuth 2.0 |
+| LinkedIn | Social Sharing, Profile | OAuth 2.0 Community Management |
+| Twitter / X | Posts, Media Upload | OAuth 2.0 Bearer + User Context |
+| Notion | Database Read/Write, Pages | OAuth 2.0 Internal & Public Integration |
+| Airtable | Base Schema, Records | OAuth 2.0 with Granular Scopes |
+| Shopify | Store Products, Orders | OAuth 2.0 Merchant Token |
+| Microsoft 365 | Outlook, OneDrive, Teams | MS Graph OAuth 2.0 |
+| Dropbox | Asset Sync, Files | OAuth 2.0 Short-Lived + Refresh |
+| Stripe Connect | Payments, Invoicing, Customers | Restricted Keys & OAuth 2.0 Connect |
+| Custom HTTP | Any REST API endpoint | Bearer, Basic, Custom API Key |
+
+### Security Architecture
+
+- **Supabase Vault AES-256 GCM**: Tokens and client secrets are encrypted at rest using AES-256 GCM keys stored in hardware-isolated vaults.
+- **Preemptive Token Refresh Buffer**: Tokens expiring within 60 seconds are proactively refreshed before executing HTTP or tool nodes.
+- **SSRF Network Firewall**: Outgoing HTTP and OAuth requests enforce domain allowlisting, preventing local IP probing (RFC 1918) and cloud metadata exfiltration (`169.254.169.254`).
+
+---
+
 ## Code Examples
+
 
 ### Python: Create and Run a Workflow
 
@@ -933,7 +1453,7 @@ workflow = httpx.post(f"{BASE}/workflows", headers=HEADERS, json={
             {"id": "e2", "source": "enhance_prompt", "target": "generate"}
         ],
         "trigger": {"type": "manual", "config": {}},
-        "max_credits": 15
+        "usd_cap": 0.180
     }
 }).json()
 
@@ -950,7 +1470,7 @@ while True:
         break
     time.sleep(2)
 
-print(f"Status: {status['status']}, Credits: {status['credits_used']}")
+print(f"Status: {status['status']}, USD charged: ${status["usd_charged"]:.4f}")
 ```
 
 ### Python: Stream Events (SSE)
@@ -974,7 +1494,7 @@ with httpx.stream("GET", f"{BASE}/runs/run_xyz789/events", headers=HEADERS) as r
             elif event_type == "node_completed":
                 print(f"[DONE]  {data['node_id']} ({data['duration_ms']}ms)")
             elif event_type == "run_finished":
-                print(f"Run {data['status']} - Credits: {data['total_credits']}")
+                print(f"Run {data['status']} - USD charged: ${data["total_usd_charged"]:.4f}")
                 break
 ```
 
@@ -1035,8 +1555,8 @@ eventSource.addEventListener("node_completed", (e: MessageEvent) => {
 });
 
 eventSource.addEventListener("run_finished", (e: MessageEvent) => {
-  const { status, total_credits } = JSON.parse(e.data);
-  console.log(`Run ${status} - Credits: ${total_credits}`);
+  const { status, total_usd_charged } = JSON.parse(e.data);
+  console.log(`Run ${status} - USD charged: ${total_usd_charged}`);
   eventSource.close();
 });
 ```
@@ -1058,6 +1578,110 @@ async function approveStep(runId: string, approved: boolean, comment?: string) {
 
 // Usage: workflow pauses at a wait_signal node, your app detects it and presents to user
 await approveStep("run_xyz789", true, "Image quality approved, proceed to publish");
+```
+
+### Python: Vector Memory & Multi-Tenant RAG
+
+```python
+import httpx
+
+BASE = "https://apis.fotohub.app/engine/v1"
+HEADERS = {"Authorization": "Bearer YOUR_API_KEY"}
+
+# Store knowledge document in isolated tenant partition
+store_res = httpx.post(f"{BASE}/memory/store", headers=HEADERS, json={
+    "tenant_id": "tenant_enterprise_prod",
+    "collection_name": "product_specs",
+    "namespace": "cameras_2026",
+    "content": "Model Pro-X features a 48MP full-frame sensor with 8K 60fps raw recording.",
+    "category": "specifications",
+    "metadata": {"brand": "PhotoHub", "series": "Pro-X"},
+    "ttl_seconds": 604800,
+}).json()
+
+print(f"Stored record ID: {store_res['memory_id']} (dim: {store_res['embedding_dim']})")
+
+# Semantic retrieval with cosine similarity and metadata filter
+query_res = httpx.post(f"{BASE}/memory/query", headers=HEADERS, json={
+    "tenant_id": "tenant_enterprise_prod",
+    "collection_name": "product_specs",
+    "namespace": "cameras_2026",
+    "query": "What resolution does the Pro camera sensor have?",
+    "top_k": 3,
+    "min_similarity_threshold": 0.5,
+    "filter_metadata": {"brand": {"$eq": "PhotoHub"}},
+}).json()
+
+for hit in query_res["results"]:
+    print(f"Similarity: {hit['similarity']} | Content: {hit['content']}")
+```
+
+### Python: Swarm Consensus & Quality Gate
+
+```python
+import httpx
+
+BASE = "https://apis.fotohub.app/engine/v1"
+HEADERS = {"Authorization": "Bearer YOUR_API_KEY"}
+
+# Aggregate consensus across 3 diverse model opinions
+consensus_res = httpx.post(f"{BASE}/swarm/consensus", headers=HEADERS, json={
+    "votes": [
+        {"worker": "claude_sonnet", "decision": "APPROVE_TRANSACTION", "confidence": 0.95},
+        {"worker": "gpt_4o", "decision": "APPROVE_TRANSACTION", "confidence": 0.90},
+        {"worker": "gemini_pro", "decision": "FLAG_MANUAL_REVIEW", "confidence": 0.55},
+    ],
+    "aggregation_strategy": "weighted_confidence",
+    "min_quorum": 2,
+    "fallback_strategy": "highest_confidence",
+}).json()
+
+print(f"Winner: {consensus_res['winning_value']}, Score: {consensus_res['consensus_score']}")
+
+# Pass through automated evaluation gate
+eval_res = httpx.post(f"{BASE}/swarm/evaluate", headers=HEADERS, json={
+    "content": "High contrast studio lighting, 85mm f/1.4 lens, flawless color reproduction.",
+    "criteria": ["clarity", "accuracy", "detail"],
+    "min_score": 0.80,
+}).json()
+
+print(f"Quality Check: {eval_res['verdict']}")
+```
+
+### TypeScript: Dead-Letter Queue (DLQ) Incident Replay
+
+```typescript
+const BASE = "https://apis.fotohub.app/engine/v1";
+const API_KEY = "YOUR_API_KEY";
+
+// Fetch unhandled DLQ incidents
+const incidents = await fetch(`${BASE}/incidents?status=unresolved`, {
+  headers: { "Authorization": `Bearer ${API_KEY}` },
+}).then(r => r.json());
+
+if (incidents.length > 0) {
+  const targetIncident = incidents[0];
+  console.log(`Replaying incident ${targetIncident.id} on node ${targetIncident.node_id}`);
+
+  // Replay incident with patched payload and timeout
+  const replay = await fetch(`${BASE}/incidents/${targetIncident.id}/replay`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      patch_incoming: { retry_counter: 1 },
+      override_config: { timeout_s: 45 },
+    }),
+  }).then(r => r.json());
+
+  console.log(`Replay queued with run ID: ${replay.replayed_run_id}`);
+
+  // Fetch execution telemetry waterfall
+  const telemetry = await fetch(`${BASE}/runs/${replay.replayed_run_id}/telemetry`, {
+    headers: { "Authorization": `Bearer ${API_KEY}` },
+  }).then(r => r.json());
+
+  console.log(`Telemetry duration: ${telemetry.total_duration_ms}ms over ${telemetry.node_count} nodes`);
+}
 ```
 
 ---
@@ -1104,7 +1728,7 @@ All errors return: `{ "error": { "code": "...", "message": "...", "details": {} 
 
 ## Limits and Pricing
 
-| Tier | Workflows | Concurrent Runs | Max Credits/Run | Max Execution Time |
+| Tier | Workflows | Concurrent Runs | USD Cap / Run | Max Execution Time |
 |------|-----------|-----------------|-----------------|-------------------|
 | Free | 0 | 0 | - | - |
 | Starter | 0 | 0 | - | - |
@@ -1117,13 +1741,13 @@ All errors return: `{ "error": { "code": "...", "message": "...", "details": {} 
 Free and Starter plans do not have access to Agent Workflows. Upgrade to Medium or higher.
 :::
 
-### Credit Usage
+### USD Cost Tracking
 
 - **AI Agent nodes** — per-token pricing based on the selected model
-- **Image/Video/Audio generation** — same credits as equivalent direct API calls
-- **HTTP/Logic/Storage nodes** — zero credits (infrastructure nodes)
+- **Image/Video/Audio generation** — same USD cost as equivalent direct API calls (e.g. $0.045/image, $0.240/5s video)
+- **HTTP/Logic/Storage nodes** — zero cost (infrastructure nodes)
 
-The `credits_max` field acts as a budget cap. Runs fail with `CREDITS_EXHAUSTED` if the cap is reached.
+The `usd_cap` field acts as a budget cap. Runs fail with `BUDGET_EXCEEDED` if the cap is reached.
 
 ---
 
@@ -1131,7 +1755,7 @@ The `credits_max` field acts as a budget cap. Runs fail with `CREDITS_EXHAUSTED`
 
 ### Workflow Design
 
-- **Set credit caps.** Always configure `max_credits` to prevent runaway spending from retry loops or recursive agents.
+- **Set USD budget caps.** Always configure `usd_cap` to prevent runaway spending from retry loops or recursive agents.
 - **Use meaningful node IDs.** `enhance_prompt` is easier to debug in template expressions than `node_7`.
 - **Enable retries for external calls.** HTTP and generation nodes should use exponential backoff.
 - **Leverage parallel branches.** The DAG executor runs independent branches concurrently — structure your graph accordingly.

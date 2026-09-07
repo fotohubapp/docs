@@ -105,6 +105,7 @@ export default defineConfig({
           items: [
             { text: 'Gabriel AI', link: '/api/gabriel-ai' },
             { text: 'Agent Workflows', link: '/api/agents' },
+            { text: 'Agent Nodes Catalog (198 Nodes)', link: '/api/agent-nodes' },
             { text: 'Cloud Computing', link: '/api/cloud-computing' },
             { text: 'S3 Storage', link: '/api/storage' },
             { text: 'Usage & Analytics', link: '/api/usage-analytics' },
