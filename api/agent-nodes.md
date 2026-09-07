@@ -1,88 +1,88 @@
 ---
 title: Agent Nodes Catalog (198 Nodes)
-description: Kompletny katalog i dokumentacja referencyjna wszystkich 198 węzłów wykonawczych w 23 kategoriach silnika FotoHub Agent Engine.
+description: Exhaustive reference documentation for all 198 production agent nodes across 23 categories in the FotoHub Agent Engine.
 ---
 
-# Katalog Węzłów Agenta (198 Nodes Reference)
+# Agent Nodes Catalog (198 Nodes Reference)
 
-Kompletny przewodnik po **wszystkich 198 produkcyjnych węzłach (nodes)** dostępnych w FotoHub Agent Engine (`/dashboard/agents/*`). Każdy węzeł posiada zweryfikowany schemat wejść/wyjść, obsługę błędów, system fallbacku oraz pełną integrację z orkiestratorem DAG i systemem telemetrycznym.
+The complete reference guide to **all 198 production-ready nodes** available in the FotoHub Agent Engine (`/dashboard/agents/*`). Every node is rigorously typed, equipped with input/output validation, error resilience, fallback policies, and full telemetry tracing within the DAG orchestrator.
 
-::: tip ARCHITEKTURA WYKONAWCZA (EXECUTION ENGINES)
-Węzły w FotoHub wykonywane są przez 5 wyspecjalizowanych środowisk uruchomieniowych:
-- **Built-in Logic Engine** (`builtin`): Błyskawiczne operacje pamięciowe w Pythonie (warunki, filtry JMESPath, agregacje).
-- **Supabase Edge Functions** (`edge_fn`): Zdecentralizowane funkcje brzegowe do integracji OAuth, AI i API.
-- **Dedicated GPU Microservices** (`http`): Klastry renderujące `image-engine`, `video-engine`, `music-server`.
-- **Autonomous LLM Agents** (`llm_agent`): Samodzielne pętle decyzyjne z obsługą wywołań narzędzi (Tool Calling) i modeli Claude/GPT/Bedrock.
-- **Model Context Protocol** (`mcp`): Standard Anthropic MCP pozwalający na podłączanie zewnętrznych serwerów narzędziowych.
+::: tip EXECUTION RUNTIMES & ENGINES
+FotoHub executes workflow nodes across 5 specialized execution runtimes:
+- **Built-in Logic Engine** (`builtin`): Ultra-fast in-memory Python operations (conditions, JMESPath filters, aggregations).
+- **Supabase Edge Functions** (`edge_fn`): Low-latency edge workers handling OAuth, third-party APIs, and lightweight logic.
+- **Dedicated GPU Microservices** (`http`): High-throughput compute clusters powering `image-engine`, `video-engine`, and `music-server`.
+- **Autonomous LLM Agents** (`llm_agent`): Multi-turn reasoning loops with native tool calling across Claude, GPT-4o, and Bedrock.
+- **Model Context Protocol** (`mcp`): Standard Anthropic MCP client connecting external tool and resource servers directly into workflow graphs.
 :::
 
-## Przegląd Kategorii (23 Kategorie)
+## Category Overview (23 Categories)
 
-| Kategoria | Emoji | Liczba węzłów | Główny cel i zastosowanie |
+| Category | Icon | Nodes | Primary Role & Business Use Case |
 |---|:---:|:---:|---|
-| [Triggers (Wyzwalacze Przepływów)](#trigger) | ⚡ | **5** | Węzły startowe inicjujące wykonanie grafu workflow. Przepływ może być wyzwalany ręcznie, w... |
-| [Autonomous Agents & Swarm (Autonomiczni Agenci & Rój)](#agent) | 🤖 | **8** | Samodzielne węzły decyzyjne i orkiestracyjne zdolne do wieloturowego rozumowania, wywoływa... |
-| [Advanced Flow Control & Routers (Sterowanie & Routery)](#control) | 🧭 | **7** | Mechanizmy zarządzania ruchem i niezawodnością klasy Enterprise: testy A/B canary, kaskado... |
-| [FotoHub Shorts & Viral Reels (Rolki i Wirale)](#fotohub-shorts) | ✂️ | **3** | Zoptymalizowane pod algorytmy TikToka, Instagram Reels i YouTube Shorts narzędzia do autom... |
-| [FotoHub UGC Studio & Try-On (User Generated Content)](#fotohub-ugc) | 🎭 | **3** | Generowanie autentycznych wideo recenzji z fotorealistycznymi aktorami UGC, synchronizacją... |
-| [FotoHub Creative Studio (E-Commerce Studio)](#fotohub-creative) | ✨ | **1** | Usuwanie surowego tła z fotografii produktowych i generowanie fotorealistycznych scen rekl... |
-| [Creative Studio & Styling (Aranżacja Produktowa)](#creative) | 💡 | **1** | Zaawansowane generowanie aranżacji packshotowych i studyjnych dla branży fashion, kosmetyk... |
-| [FotoHub AI Image Processing (Grafika & Obraz)](#fotohub-image) | 🎨 | **19** | Kompletny zestaw 19 operacji na obrazie: generowanie w modelach SOTA (Flux, Midjourney v6,... |
-| [FotoHub AI Video Generation (Wideo & Animacja)](#fotohub-video) | 🎬 | **12** | Potężny silnik wideo: generowanie sekwencji wideo z tekstu i obrazów, stabilizacja żyrosko... |
-| [FotoHub Audio, Voice & Music (Dźwięk, Muzyka, SFX)](#fotohub-audio) | 🎵 | **14** | Synteza mowy w 100+ językach z naturalną ekspresją, generowanie pełnych utworów muzycznych... |
-| [Real-Time Voice & Streaming Audio (Głos w Czasie Rzeczywistym)](#voice) | 🎙️ | **3** | Dwukierunkowa, konwersacyjna komunikacja głosowa na żywo z ultraniskim opóźnieniem (<300ms... |
-| [FotoHub Brand Governance (Zarządzanie Marką)](#fotohub-brand) | 🏷️ | **6** | Nadzór nad spójnością marki: automatyczna ekstrakcja wytycznych z PDF, generowanie palet k... |
-| [AI Models, LLMs & Vision (Modele LLM & Analiza Wizualna)](#ai) | 🧠 | **6** | Zintegrowane modele językowe i multimodalne (Claude 3.5 Sonnet, GPT-4o, Gemini 1.5 Pro) do... |
-| [Knowledge Base & Vector Memory (Baza Wiedzy & Pamięć RAG)](#knowledge) | 📚 | **3** | Wyszukiwanie semantyczne (Retrieval-Augmented Generation), długoterminowa pamięć wektorowa... |
-| [Social Media Publishing & Scheduling (Publikacja Społecznościowa)](#social) | 📱 | **14** | Bezpośrednia publikacja i harmonogramowanie treści na Instagram (Post, Reel, Story), TikTo... |
-| [External Integrations & E-Commerce (Konektory Zewnętrzne)](#integration) | 🔌 | **61** | 61 konektorów do platform handlowych (Allegro, Shopify, WooCommerce, eBay, Etsy, PrestaSho... |
-| [Cloud Storage & File Delivery (Magazyn Danych & Chmura)](#storage) | ☁️ | **10** | Bezpieczny transfer i archiwizacja assetów: Galeria FotoHub, pliki projektowe, AWS S3, Clo... |
-| [Flow Logic & Data Transformation (Logika & Przekształcanie Danych)](#logic) | 🔀 | **15** | Deterministyczna logika przepływu: warunki If, Switch, opóźnienia, agregacje matematyczne ... |
-| [Workflow Input & Output (Granice Wejścia/Wyjścia)](#io) | 📥 | **2** | Definiowanie punktów wejściowych parametrów użytkownika oraz bezpieczny zapis i podsumowan... |
-| [Code Sandbox (Piaskownica Kodu Python / JS)](#code) | ⌨️ | **2** | Bezpieczne, izolowane wykonywanie skryptów Python (Pillow, Requests, NumPy) oraz JavaScrip... |
-| [HTTP & REST API Client (Klient HTTP)](#http) | 🌐 | **1** | Uniwersalny klient HTTP do łączenia z dowolnym zewnętrznym API REST/GraphQL z obsługą Bear... |
-| [System & Rollback Safeguards (Wersjonowanie Systemu)](#system) | 🛡️ | **1** | Tworzenie migawek (snapshotów) stanu konfiguracji agenta i całego ekosystemu z automatyczn... |
-| [Developer Inspection Tooling (Narzędzia Developerskie)](#developer) | 🛠️ | **1** | Narzędzia inspekcyjne, mocki środowiskowe i piaskownice do debugowania i testowania zachow... |
-| **SUMA** | 🚀 | **198** | **Pełna gama węzłów produkcyjnych** |
+| [Workflow Triggers](#trigger) | ⚡ | **5** | Starting nodes that initiate workflow execution based on user interactions, scheduled cron... |
+| [Autonomous Agents & Swarms](#agent) | 🤖 | **8** | Autonomous decision-making and orchestration nodes capable of multi-turn reasoning, tool c... |
+| [Advanced Flow Control & Routers](#control) | 🧭 | **7** | Enterprise-grade traffic management and fault tolerance: canary A/B split testing, multi-t... |
+| [FotoHub Shorts & Viral Reels](#fotohub-shorts) | ✂️ | **3** | Optimized for TikTok, Instagram Reels, and YouTube Shorts algorithms. Detects high-engagem... |
+| [FotoHub UGC Studio & Virtual Try-On](#fotohub-ugc) | 🎭 | **3** | Authentic user-generated content creation: persuasive UGC video scripts (Hook-Problem-CTA)... |
+| [FotoHub Creative Studio](#fotohub-creative) | ✨ | **1** | Commercial packshot automation: removes raw backgrounds and synthesizes photorealistic 3D ... |
+| [Creative Studio & Styling](#creative) | 💡 | **1** | Advanced packshot styling and commercial set generation for fashion, cosmetics, luxury goo... |
+| [FotoHub AI Image Processing](#fotohub-image) | 🎨 | **19** | Comprehensive 19-node image suite: state-of-the-art generation (Flux, Midjourney v6, SD3),... |
+| [FotoHub AI Video Generation](#fotohub-video) | 🎬 | **12** | High-performance video engine: text/image-to-video (Luma, Runway, Kling), clip extension, ... |
+| [FotoHub Audio, Voice & Music](#fotohub-audio) | 🎵 | **14** | Expressive text-to-speech in 100+ languages, generative music composition (Suno, Udio), ci... |
+| [Real-Time Voice & Streaming Audio](#voice) | 🎙️ | **3** | Full-duplex conversational voice with sub-300ms latency, automatic voice activity detectio... |
+| [FotoHub Brand Governance](#fotohub-brand) | 🏷️ | **6** | Automated brand compliance: PDF brand guideline extraction, color palette generation, inte... |
+| [AI Models, LLMs & Vision](#ai) | 🧠 | **6** | Direct integration with top-tier foundation models (Claude 3.5 Sonnet, GPT-4o, Gemini 1.5 ... |
+| [Knowledge Base & Vector Memory](#knowledge) | 📚 | **3** | Semantic document search (Retrieval-Augmented Generation), persistent agent vector memory,... |
+| [Social Media Publishing & Scheduling](#social) | 📱 | **14** | Direct API publishing and intelligent scheduling across Instagram (Posts, Reels, Stories),... |
+| [External Integrations & E-Commerce](#integration) | 🔌 | **61** | 61 production connectors for e-commerce platforms (Allegro, Shopify, WooCommerce, eBay, Et... |
+| [Cloud Storage & Asset Delivery](#storage) | ☁️ | **10** | Secure asset management and Bring-Your-Own-Bucket (BYOB) delivery: FotoHub Gallery, AWS S3... |
+| [Flow Logic & Data Transformation](#logic) | 🔀 | **15** | Deterministic execution control and data manipulation: If/Else conditional branching, mult... |
+| [Workflow Input & Output Boundaries](#io) | 📥 | **2** | Entry-point parameter parsing, schema validation, and standardized workflow completion sum... |
+| [Secure Code Sandboxes](#code) | ⌨️ | **2** | Isolated, resource-constrained execution sandboxes for Python (with NumPy, Pillow, Request... |
+| [HTTP & REST API Client](#http) | 🌐 | **1** | Universal REST client supporting GET, POST, PUT, DELETE, and PATCH with custom headers, Be... |
+| [System Safeguards & Rollback](#system) | 🛡️ | **1** | Workflow configuration snapshots and automated rollback safeguards that restore previous s... |
+| [Developer Inspection Tooling](#developer) | 🛠️ | **1** | Inspection utilities, execution mock environments, and interactive test harnesses for deve... |
+| **TOTAL** | 🚀 | **198** | **Full Production Node Catalog** |
 
 ---
 
-## ⚡ Triggers (Wyzwalacze Przepływów) <a id="trigger"></a>
+## ⚡ Workflow Triggers <a id="trigger"></a>
 
-> **Liczba węzłów:** 5 | **Identyfikator kategorii:** `trigger`
+> **Total Nodes:** 5 | **Category Identifier:** `trigger`
 
-Węzły startowe inicjujące wykonanie grafu workflow. Przepływ może być wyzwalany ręcznie, wg harmonogramu CRON, poprzez publiczny webhook HTTP, formularz wejściowy lub kryptograficznie zabezpieczony webhook HMAC-SHA256.
+Starting nodes that initiate workflow execution based on user interactions, scheduled cron timers, incoming HTTP webhooks, input forms, or cryptographically signed HMAC-SHA256 payloads.
 
-**Typowe zastosowanie produkcyjne:** Uruchamianie generowania treści e-commerce natychmiast po pojawieniu się nowego zamówienia w sklepie, cykliczne publikowanie o 9:00 rano lub odbiór płatności ze Stripe/PayPal.
+**Enterprise Use Case:** Triggering automated e-commerce asset generation on new store orders, scheduling daily 9:00 AM social media posts, or receiving secure payment webhooks from Stripe and PayPal.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `trigger.manual` | **Ręczny Start**<br>_Manual Trigger_ | In: `main`<br>Out: `main` | `trigger` | Free (0 cr) |
-| `trigger.schedule` | **Harmonogram (CRON)**<br>_Schedule Trigger_ | In: `main`<br>Out: `main` | `trigger` | Free (0 cr) |
-| `trigger.webhook` | **Wyzwalacz Webhook**<br>_Webhook Trigger_ | In: `main`<br>Out: `main` | `trigger` | Free (0 cr) |
-| `trigger.form` | **Formularz Wejściowy**<br>_Form Trigger_ | In: `main`<br>Out: `main` | `trigger` | Free (0 cr) |
-| `trigger.webhook_secure` | **Bezpieczny Webhook (HMAC-SHA256)**<br>_Secure Webhook Trigger_ | In: `none`<br>Out: `valid, invalid` | `builtin` | Free (0 cr) |
+| `trigger.manual` | **Manual Trigger** | In: `main`<br>Out: `main` | `trigger` | Free (0 credits) |
+| `trigger.schedule` | **Schedule Trigger** | In: `main`<br>Out: `main` | `trigger` | Free (0 credits) |
+| `trigger.webhook` | **Webhook Trigger** | In: `main`<br>Out: `main` | `trigger` | Free (0 credits) |
+| `trigger.form` | **Form Trigger** | In: `main`<br>Out: `main` | `trigger` | Free (0 credits) |
+| `trigger.webhook_secure` | **Secure Webhook Trigger** | In: `none`<br>Out: `valid, invalid` | `builtin` | Free (0 credits) |
 
-### Szczegółowa Specyfikacja Węzłów (Triggers (Wyzwalacze Przepływów))
+### Node Specifications (Workflow Triggers)
 
-#### `trigger.manual` — Ręczny Start (Manual Trigger)
+#### `trigger.manual` — Manual Trigger
 
-Uruchom ten workflow ręcznie z panelu lub przez API.
+Start this workflow manually from the dashboard or via API.
 
-- **Executor:** `trigger`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `trigger`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `label` | `string` | Nie | `Manual run` | Shown to the user when they trigger this workflow. |
+| `label` | `string` | No | `Manual run` | Shown to the user when they trigger this workflow. |
 
 ```json
 {
@@ -100,23 +100,23 @@ Uruchom ten workflow ręcznie z panelu lub przez API.
 
 ---
 
-#### `trigger.schedule` — Harmonogram (CRON) (Schedule Trigger)
+#### `trigger.schedule` — Schedule Trigger
 
-Uruchamiaj ten workflow cyklicznie wg zadanego harmonogramu lub interwału.
+Fire this workflow on a cron schedule.
 
-- **Executor:** `trigger`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `trigger`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `cron` | `string` | Tak | `0 9 * * *` | Standard 5-field cron. e.g. '0 9 * * MON-FRI'. |
-| `timezone` | `options` | Nie | `Europe/Warsaw` | <br>_Dostępne opcje:_ `Europe/Warsaw`, `Europe/London`, `UTC`, `America/New_York`, `America/Los_Angeles` (+1 innych) |
+| `cron` | `string` | Yes | `0 9 * * *` | Standard 5-field cron. e.g. '0 9 * * MON-FRI'. |
+| `timezone` | `options` | No | `Europe/Warsaw` | <br>_Options:_ `Europe/Warsaw`, `Europe/London`, `UTC`, `America/New_York`, `America/Los_Angeles` (+1 more) |
 
 ```json
 {
@@ -135,24 +135,24 @@ Uruchamiaj ten workflow cyklicznie wg zadanego harmonogramu lub interwału.
 
 ---
 
-#### `trigger.webhook` — Wyzwalacz Webhook (Webhook Trigger)
+#### `trigger.webhook` — Webhook Trigger
 
-Uruchamiaj workflow po odebraniu żądania HTTP POST na publiczny adres URL.
+Start this workflow on HTTP POST to a public URL.
 
-- **Executor:** `trigger`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `trigger`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `path_label` | `string` | Nie | _brak_ | Human-friendly suffix appended after the random slug. |
-| `method` | `options` | Nie | `POST` | <br>_Dostępne opcje:_ `POST`, `GET`, `PUT`, `DELETE` |
-| `require_hmac` | `boolean` | Nie | `False` | If on, generated secret must match x-fh-signature header. |
+| `path_label` | `string` | No | _none_ | Human-friendly suffix appended after the random slug. |
+| `method` | `options` | No | `POST` | <br>_Options:_ `POST`, `GET`, `PUT`, `DELETE` |
+| `require_hmac` | `boolean` | No | `False` | If on, generated secret must match x-fh-signature header. |
 
 ```json
 {
@@ -171,23 +171,23 @@ Uruchamiaj workflow po odebraniu żądania HTTP POST na publiczny adres URL.
 
 ---
 
-#### `trigger.form` — Formularz Wejściowy (Form Trigger)
+#### `trigger.form` — Form Trigger
 
-Generuje publiczny formularz; wysłanie danych uruchamia workflow.
+Renders a public web form; submissions start a run.
 
-- **Executor:** `trigger`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `trigger`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `title` | `string` | Tak | `Submit` |  |
-| `description_md` | `string` | Nie | _brak_ |  |
+| `title` | `string` | Yes | `Submit` |  |
+| `description_md` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -205,24 +205,24 @@ Generuje publiczny formularz; wysłanie danych uruchamia workflow.
 
 ---
 
-#### `trigger.webhook_secure` — Bezpieczny Webhook (HMAC-SHA256) (Secure Webhook Trigger)
+#### `trigger.webhook_secure` — Secure Webhook Trigger
 
-Wyzwalacz webhooków z kryptograficzną weryfikacją podpisu HMAC-SHA256 i filtrem adresów IP.
+Trigger workflow on HTTP POST verified with HMAC-SHA256 signature.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** Brak (Węzeł początkowy)
-- **Porty Wyjściowe:** `valid` (any), `invalid` (any)
+- **Input Ports:** None (Start Node)
+- **Output Ports:** `valid` (any), `invalid` (any)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `secret_key` | `string` | Nie | `whsec_live_demo12345` | Sekretny klucz używany do obliczenia HMAC. |
-| `signature_header` | `string` | Nie | `X-Hub-Signature-256` | Nagłówek podpisu |
-| `allowed_ips` | `string` | Nie | `*` | Lista oddzielona przecinkami lub '*' dla wszystkich. |
+| `secret_key` | `string` | No | `whsec_live_demo12345` | Sekretny klucz używany do obliczenia HMAC. |
+| `signature_header` | `string` | No | `X-Hub-Signature-256` | Nagłówek podpisu |
+| `allowed_ips` | `string` | No | `*` | Lista oddzielona przecinkami lub '*' dla wszystkich. |
 
 ```json
 {
@@ -242,48 +242,48 @@ Wyzwalacz webhooków z kryptograficzną weryfikacją podpisu HMAC-SHA256 i filtr
 
 ---
 
-## 🤖 Autonomous Agents & Swarm (Autonomiczni Agenci & Rój) <a id="agent"></a>
+## 🤖 Autonomous Agents & Swarms <a id="agent"></a>
 
-> **Liczba węzłów:** 8 | **Identyfikator kategorii:** `agent`
+> **Total Nodes:** 8 | **Category Identifier:** `agent`
 
-Samodzielne węzły decyzyjne i orkiestracyjne zdolne do wieloturowego rozumowania, wywoływania narzędzi zewnętrznych, autonomicznej samonaprawy (self-healing), dystrybucji zadań do roju wyspecjalizowanych subagentów oraz syntezy konsensusu.
+Autonomous decision-making and orchestration nodes capable of multi-turn reasoning, tool calling, real-time self-healing diagnostic recovery, multi-agent swarm fanout, and consensus jury aggregation.
 
-**Typowe zastosowanie produkcyjne:** Kreatywny dyrektor AI, który rozbija brief marketingowy na zadania graficzne, wideo i copywriterskie, a następnie weryfikuje ich jakość w pętli critique loop przed ostateczną akceptacją.
+**Enterprise Use Case:** An autonomous AI Creative Director that breaks a marketing brief into visual, video, and copy subtasks, reviews results via a critique loop, and automatically heals transient generation errors.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `agent.call_subagent` | **Wywołaj Pod-agenta**<br>_Call Subagent_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `agent.swarm_fanout` | **Rój Agentów (Swarm Fanout)**<br>_Agent Swarm Fan-Out_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `agent.critique_loop` | **Pętla Samoulepszania (Evaluator)**<br>_Critique & Refinement Loop_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `agent.mcp_call` | **Narzędzie MCP (Model Context Protocol)**<br>_Call MCP Tool_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `mcp.hub_call` | **Wywołanie Narzędzia MCP Hub**<br>_Wywołanie Narzędzia MCP Hub_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `agent.consensus_aggregate` | **Konsensus i Jury Agentów**<br>_Consensus Aggregate_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `agent.voice_dialogue` | **Agent Głosowy Live (Full-Duplex)**<br>_Real-Time Voice Agent_ | In: `in`<br>Out: `main, transcription` | `builtin` | Free (0 cr) |
-| `agent.self_healing` | **Autonomiczny Self-Healing & Auto-Repair**<br>_Autonomous Self-Healing_ | In: `in`<br>Out: `repaired, fallback, fatal` | `builtin` | Free (0 cr) |
+| `agent.call_subagent` | **Call Subagent** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `agent.swarm_fanout` | **Agent Swarm Fan-Out** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `agent.critique_loop` | **Critique & Refinement Loop** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `agent.mcp_call` | **Call MCP Tool** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `mcp.hub_call` | **Wywołanie Narzędzia MCP Hub** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `agent.consensus_aggregate` | **Consensus Aggregate** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `agent.voice_dialogue` | **Real-Time Voice Agent** | In: `in`<br>Out: `main, transcription` | `builtin` | Free (0 credits) |
+| `agent.self_healing` | **Autonomous Self-Healing** | In: `in`<br>Out: `repaired, fallback, fatal` | `builtin` | Free (0 credits) |
 
-### Szczegółowa Specyfikacja Węzłów (Autonomous Agents & Swarm (Autonomiczni Agenci & Rój))
+### Node Specifications (Autonomous Agents & Swarms)
 
-#### `agent.call_subagent` — Wywołaj Pod-agenta (Call Subagent)
+#### `agent.call_subagent` — Call Subagent
 
-Uruchamia dedykowanego pod-agenta lub zagnieżdżony workflow z mapowaniem parametrów.
+Invoke another subagent and wait for its completion.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `workflow_id` | `string` | Tak | _brak_ | ID workflow lub nazwa agenta do wywołania |
-| `input_data` | `json` | Nie | _brak_ | Obiekt wejściowy przekazywany do pod-agenta |
-| `wait_for_completion` | `boolean` | Nie | `True` |  |
-| `timeout_seconds` | `number` | Nie | `300` |  |
+| `workflow_id` | `string` | Yes | _none_ | ID workflow lub nazwa agenta do wywołania |
+| `input_data` | `json` | No | _none_ | Obiekt wejściowy przekazywany do pod-agenta |
+| `wait_for_completion` | `boolean` | No | `True` |  |
+| `timeout_seconds` | `number` | No | `300` |  |
 
 ```json
 {
@@ -294,7 +294,7 @@ Uruchamia dedykowanego pod-agenta lub zagnieżdżony workflow z mapowaniem param
     150
   ],
   "params": {
-    "workflow_id": "<warto\u015b\u0107>",
+    "workflow_id": "<value>",
     "wait_for_completion": true,
     "timeout_seconds": 300
   }
@@ -303,25 +303,25 @@ Uruchamia dedykowanego pod-agenta lub zagnieżdżony workflow z mapowaniem param
 
 ---
 
-#### `agent.swarm_fanout` — Rój Agentów (Swarm Fanout) (Agent Swarm Fan-Out)
+#### `agent.swarm_fanout` — Agent Swarm Fan-Out
 
-Rozsyła listę zadań do klastra równoległych agentów i agreguje wyniki.
+Distribute tasks across multiple specialized agents concurrently.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `tasks_path` | `string` | Nie | `$.items` | JSONPath wskazujący listę elementów do przetworzenia |
-| `subagent_workflow_id` | `string` | Tak | _brak_ |  |
-| `concurrency` | `number` | Nie | `5` |  |
-| `aggregation` | `options` | Nie | `array` | <br>_Dostępne opcje:_ `array`, `merge_dict`, `first_success` |
+| `tasks_path` | `string` | No | `$.items` | JSONPath wskazujący listę elementów do przetworzenia |
+| `subagent_workflow_id` | `string` | Yes | _none_ |  |
+| `concurrency` | `number` | No | `5` |  |
+| `aggregation` | `options` | No | `array` | <br>_Options:_ `array`, `merge_dict`, `first_success` |
 
 ```json
 {
@@ -333,7 +333,7 @@ Rozsyła listę zadań do klastra równoległych agentów i agreguje wyniki.
   ],
   "params": {
     "tasks_path": "$.items",
-    "subagent_workflow_id": "<warto\u015b\u0107>",
+    "subagent_workflow_id": "<value>",
     "concurrency": 5,
     "aggregation": "array"
   }
@@ -342,26 +342,26 @@ Rozsyła listę zadań do klastra równoległych agentów i agreguje wyniki.
 
 ---
 
-#### `agent.critique_loop` — Pętla Samoulepszania (Evaluator) (Critique & Refinement Loop)
+#### `agent.critique_loop` — Critique & Refinement Loop
 
-Generuje wynik, ocenia go wg zdefiniowanych kryteriów i automatycznie poprawia do osiągnięcia zadanego progu.
+Evaluate output quality against criteria and retry until passing.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `task_prompt` | `string` | Tak | _brak_ |  |
-| `evaluation_rubric` | `string` | Nie | `Zgodność z promptem, estetyka, styl, poprawność logiczna` |  |
-| `target_score` | `number` | Nie | `8` |  |
-| `max_refinement_steps` | `number` | Nie | `3` |  |
-| `evaluator_model` | `options` | Nie | `claude-3-7-sonnet` | <br>_Dostępne opcje:_ `claude-3-7-sonnet`, `gpt-5-turbo`, `gemini-2.5-pro`, `fast-evaluator` |
+| `task_prompt` | `string` | Yes | _none_ |  |
+| `evaluation_rubric` | `string` | No | `Zgodność z promptem, estetyka, styl, poprawność logiczna` |  |
+| `target_score` | `number` | No | `8` |  |
+| `max_refinement_steps` | `number` | No | `3` |  |
+| `evaluator_model` | `options` | No | `claude-3-7-sonnet` | <br>_Options:_ `claude-3-7-sonnet`, `gpt-5-turbo`, `gemini-2.5-pro`, `fast-evaluator` |
 
 ```json
 {
@@ -372,7 +372,7 @@ Generuje wynik, ocenia go wg zdefiniowanych kryteriów i automatycznie poprawia 
     150
   ],
   "params": {
-    "task_prompt": "<warto\u015b\u0107>",
+    "task_prompt": "<value>",
     "evaluation_rubric": "Zgodno\u015b\u0107 z promptem, estetyka, styl, poprawno\u015b\u0107 logiczna",
     "target_score": 8,
     "max_refinement_steps": 3
@@ -382,25 +382,25 @@ Generuje wynik, ocenia go wg zdefiniowanych kryteriów i automatycznie poprawia 
 
 ---
 
-#### `agent.mcp_call` — Narzędzie MCP (Model Context Protocol) (Call MCP Tool)
+#### `agent.mcp_call` — Call MCP Tool
 
-Wywołuje dowolne narzędzie ze wskazanego serwera protokołu MCP.
+Execute an external tool exposed via Model Context Protocol (MCP).
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `server_url` | `string` | Tak | _brak_ |  |
-| `tool_name` | `string` | Tak | _brak_ |  |
-| `arguments` | `json` | Nie | _brak_ |  |
-| `auth_token` | `string` | Nie | _brak_ |  |
+| `server_url` | `string` | Yes | _none_ |  |
+| `tool_name` | `string` | Yes | _none_ |  |
+| `arguments` | `json` | No | _none_ |  |
+| `auth_token` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -411,33 +411,33 @@ Wywołuje dowolne narzędzie ze wskazanego serwera protokołu MCP.
     150
   ],
   "params": {
-    "server_url": "<warto\u015b\u0107>",
-    "tool_name": "<warto\u015b\u0107>"
+    "server_url": "<value>",
+    "tool_name": "<value>"
   }
 }
 ```
 
 ---
 
-#### `mcp.hub_call` — Wywołanie Narzędzia MCP Hub (Wywołanie Narzędzia MCP Hub)
+#### `mcp.hub_call` — Wywołanie Narzędzia MCP Hub
 
 Dynamiczne wywołanie narzędzia z zarejestrowanego serwera MCP w wieloserwerowym hubie narzędzi.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `server_id` | `string` | Tak | _brak_ |  |
-| `tool_name` | `string` | Tak | _brak_ |  |
-| `arguments` | `json` | Nie | `{}` |  |
-| `fail_silently` | `boolean` | Nie | `False` |  |
+| `server_id` | `string` | Yes | _none_ |  |
+| `tool_name` | `string` | Yes | _none_ |  |
+| `arguments` | `json` | No | `{}` |  |
+| `fail_silently` | `boolean` | No | `False` |  |
 
 ```json
 {
@@ -448,8 +448,8 @@ Dynamiczne wywołanie narzędzia z zarejestrowanego serwera MCP w wieloserwerowy
     150
   ],
   "params": {
-    "server_id": "<warto\u015b\u0107>",
-    "tool_name": "<warto\u015b\u0107>",
+    "server_id": "<value>",
+    "tool_name": "<value>",
     "arguments": {},
     "fail_silently": false
   }
@@ -458,25 +458,25 @@ Dynamiczne wywołanie narzędzia z zarejestrowanego serwera MCP w wieloserwerowy
 
 ---
 
-#### `agent.consensus_aggregate` — Konsensus i Jury Agentów (Consensus Aggregate)
+#### `agent.consensus_aggregate` — Consensus Aggregate
 
-Agreguje odpowiedzi roju agentów, weryfikuje quorum i wyłania zwycięski wariant na podstawie głosowania lub wag ufności.
+Aggregate decisions from multiple agents with weighted voting.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `aggregation_strategy` | `options` | Nie | `majority_vote` | Algorytm wyłaniania konsensusu spośród odpowiedzi agentów roju<br>_Dostępne opcje:_ `majority_vote`, `weighted_confidence`, `llm_jury_synthesis`, `unanimous_or_fallback` |
-| `min_quorum` | `number` | Nie | `2` | Minimalna liczba agentów popierających wariant lub minimalna liczba głosów |
-| `fallback_strategy` | `options` | Nie | `highest_confidence` | Strategia postępowania w przypadku braku quorum lub remisu<br>_Dostępne opcje:_ `highest_confidence`, `first_valid`, `fail` |
-| `confidence_field` | `string` | Nie | `confidence` | Nazwa pola określająca pewność/wagę odpowiedzi agenta (0.0-1.0) |
+| `aggregation_strategy` | `options` | No | `majority_vote` | Algorytm wyłaniania konsensusu spośród odpowiedzi agentów roju<br>_Options:_ `majority_vote`, `weighted_confidence`, `llm_jury_synthesis`, `unanimous_or_fallback` |
+| `min_quorum` | `number` | No | `2` | Minimalna liczba agentów popierających wariant lub minimalna liczba głosów |
+| `fallback_strategy` | `options` | No | `highest_confidence` | Strategia postępowania w przypadku braku quorum lub remisu<br>_Options:_ `highest_confidence`, `first_valid`, `fail` |
+| `confidence_field` | `string` | No | `confidence` | Nazwa pola określająca pewność/wagę odpowiedzi agenta (0.0-1.0) |
 
 ```json
 {
@@ -497,24 +497,24 @@ Agreguje odpowiedzi roju agentów, weryfikuje quorum i wyłania zwycięski waria
 
 ---
 
-#### `agent.voice_dialogue` — Agent Głosowy Live (Full-Duplex) (Real-Time Voice Agent)
+#### `agent.voice_dialogue` — Real-Time Voice Agent
 
-Dwukierunkowy agent głosowy czasu rzeczywistego z detekcją ciszy VAD i naturalną syntezą mowy.
+Interactive real-time voice dialogue with VAD silence detection.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `in` (any)
-- **Porty Wyjściowe:** `main` (any), `transcription` (string)
+- **Input Ports:** `in` (any)
+- **Output Ports:** `main` (any), `transcription` (string)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `voice_engine` | `options` | Nie | `elevenlabs_conversational` | Silnik głosu<br>_Dostępne opcje:_ `elevenlabs_conversational`, `openai_realtime_audio`, `gemini_multimodal_live` |
-| `language` | `options` | Nie | `pl-PL` | Język dialogu<br>_Dostępne opcje:_ `pl-PL`, `en-US`, `de-DE` |
-| `vad_threshold` | `number` | Nie | `0.5` | Próg detekcji głosu i przerywania mowy (barge-in). |
+| `voice_engine` | `options` | No | `elevenlabs_conversational` | Silnik głosu<br>_Options:_ `elevenlabs_conversational`, `openai_realtime_audio`, `gemini_multimodal_live` |
+| `language` | `options` | No | `pl-PL` | Język dialogu<br>_Options:_ `pl-PL`, `en-US`, `de-DE` |
+| `vad_threshold` | `number` | No | `0.5` | Próg detekcji głosu i przerywania mowy (barge-in). |
 
 ```json
 {
@@ -534,24 +534,24 @@ Dwukierunkowy agent głosowy czasu rzeczywistego z detekcją ciszy VAD i natural
 
 ---
 
-#### `agent.self_healing` — Autonomiczny Self-Healing & Auto-Repair (Autonomous Self-Healing)
+#### `agent.self_healing` — Autonomous Self-Healing
 
-Przechwytuje błędy i wyjątki wykonania, analizuje traceback i dynamicznie koryguje parametry/payload.
+Catch runtime errors, inspect stack traces, and adapt execution.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `in` (any)
-- **Porty Wyjściowe:** `repaired` (any), `fallback` (any), `fatal` (any)
+- **Input Ports:** `in` (any)
+- **Output Ports:** `repaired` (any), `fallback` (any), `fatal` (any)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `strategy` | `options` | Nie | `schema_and_params` | Strategia naprawy<br>_Dostępne opcje:_ `schema_and_params`, `model_fallback`, `prompt_compression` |
-| `max_repair_attempts` | `number` | Nie | `3` | Maks. liczba prób naprawy |
-| `auto_commit_patch` | `boolean` | Nie | `True` | Automatycznie zatwierdź poprawkę |
+| `strategy` | `options` | No | `schema_and_params` | Strategia naprawy<br>_Options:_ `schema_and_params`, `model_fallback`, `prompt_compression` |
+| `max_repair_attempts` | `number` | No | `3` | Maks. liczba prób naprawy |
+| `auto_commit_patch` | `boolean` | No | `True` | Automatycznie zatwierdź poprawkę |
 
 ```json
 {
@@ -571,51 +571,51 @@ Przechwytuje błędy i wyjątki wykonania, analizuje traceback i dynamicznie kor
 
 ---
 
-## 🧭 Advanced Flow Control & Routers (Sterowanie & Routery) <a id="control"></a>
+## 🧭 Advanced Flow Control & Routers <a id="control"></a>
 
-> **Liczba węzłów:** 7 | **Identyfikator kategorii:** `control`
+> **Total Nodes:** 7 | **Category Identifier:** `control`
 
-Mechanizmy zarządzania ruchem i niezawodnością klasy Enterprise: testy A/B canary, kaskadowe macierze fallbacku (fallback matrix), bezpieczne pętle warunkowe z ochroną przed deadlockami oraz bramki równoległe (parallel gates).
+Enterprise-grade traffic management and fault tolerance: canary A/B split testing, multi-tier fallback service matrices, guarded loops preventing infinite execution, dynamic routers, and parallel join gates.
 
-**Typowe zastosowanie produkcyjne:** Przekierowywanie 10% ruchu do eksperymentalnego modelu wideo, a w przypadku błędu GPU automatyczne kaskadowe przełączenie na model alternatywny bez przerywania sesji klienta.
+**Enterprise Use Case:** Directing 10% of traffic to experimental video models with automatic failover to stable backup models if GPU latency exceeds thresholds, without interrupting client sessions.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `control.human_approval` | **Zatwierdzenie Człowieka (Human Gate)**<br>_Zatwierdzenie Człowieka (Human Gate)_ | In: `main`<br>Out: `approved, rejected` | `builtin` | Free (0 cr) |
-| `control.fallback_matrix` | **Auto-Healing & Awaryjny Provider**<br>_Fallback Matrix_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `control.dynamic_switch` | **Dynamiczny Switch Router**<br>_Dynamic Switch_ | In: `main`<br>Out: `case_1, case_2, case_3, default` | `builtin` | Free (0 cr) |
-| `control.parallel_gate` | **Bramka Zbieżności Równoległej**<br>_Parallel Gate_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `control.loop_while` | **Pętla Iteracyjna While**<br>_Loop While_ | In: `main`<br>Out: `loop, done` | `builtin` | Free (0 cr) |
-| `control.smart_router` | **Semantyczny Smart Router**<br>_Smart AI Router_ | In: `main`<br>Out: `photo_generation, photo_editing, text_and_copy, data_analysis, fallback` | `builtin` | Free (0 cr) |
-| `control.traffic_split` | **A/B Traffic Splitter**<br>_Traffic Splitter (A/B)_ | In: `main`<br>Out: `variant_a, variant_b, variant_c` | `builtin` | Free (0 cr) |
+| `control.human_approval` | **Zatwierdzenie Człowieka (Human Gate)** | In: `main`<br>Out: `approved, rejected` | `builtin` | Free (0 credits) |
+| `control.fallback_matrix` | **Fallback Matrix** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `control.dynamic_switch` | **Dynamic Switch** | In: `main`<br>Out: `case_1, case_2, case_3, default` | `builtin` | Free (0 credits) |
+| `control.parallel_gate` | **Parallel Gate** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `control.loop_while` | **Loop While** | In: `main`<br>Out: `loop, done` | `builtin` | Free (0 credits) |
+| `control.smart_router` | **Smart AI Router** | In: `main`<br>Out: `photo_generation, photo_editing, text_and_copy, data_analysis, fallback` | `builtin` | Free (0 credits) |
+| `control.traffic_split` | **Traffic Splitter (A/B)** | In: `main`<br>Out: `variant_a, variant_b, variant_c` | `builtin` | Free (0 credits) |
 
-### Szczegółowa Specyfikacja Węzłów (Advanced Flow Control & Routers (Sterowanie & Routery))
+### Node Specifications (Advanced Flow Control & Routers)
 
-#### `control.human_approval` — Zatwierdzenie Człowieka (Human Gate) (Zatwierdzenie Człowieka (Human Gate))
+#### `control.human_approval` — Zatwierdzenie Człowieka (Human Gate)
 
 Wstrzymuje wykonanie workflow do momentu akceptacji lub odrzucenia przez użytkownika ze ścisłą polityką SLA i eskalacją.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `approved` (main), `rejected` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `approved` (main), `rejected` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `title` | `string` | Tak | _brak_ |  |
-| `message` | `string` | Nie | _brak_ |  |
-| `sla_minutes` | `number` | Nie | `60` |  |
-| `timeout_policy` | `options` | Nie | `auto_reject` | <br>_Dostępne opcje:_ `auto_approve`, `auto_reject`, `escalate_webhook` |
-| `escalation_webhook_url` | `string` | Nie | _brak_ |  |
-| `notification_channel` | `options` | Nie | `slack` | <br>_Dostępne opcje:_ `slack`, `discord`, `email`, `custom_webhook` |
-| `timeout_hours` | `number` | Nie | `24` |  |
-| `auto_approve_on_timeout` | `boolean` | Nie | `False` |  |
+| `title` | `string` | Yes | _none_ |  |
+| `message` | `string` | No | _none_ |  |
+| `sla_minutes` | `number` | No | `60` |  |
+| `timeout_policy` | `options` | No | `auto_reject` | <br>_Options:_ `auto_approve`, `auto_reject`, `escalate_webhook` |
+| `escalation_webhook_url` | `string` | No | _none_ |  |
+| `notification_channel` | `options` | No | `slack` | <br>_Options:_ `slack`, `discord`, `email`, `custom_webhook` |
+| `timeout_hours` | `number` | No | `24` |  |
+| `auto_approve_on_timeout` | `boolean` | No | `False` |  |
 
 ```json
 {
@@ -626,7 +626,7 @@ Wstrzymuje wykonanie workflow do momentu akceptacji lub odrzucenia przez użytko
     150
   ],
   "params": {
-    "title": "<warto\u015b\u0107>",
+    "title": "<value>",
     "sla_minutes": 60,
     "timeout_policy": "auto_reject"
   }
@@ -635,25 +635,25 @@ Wstrzymuje wykonanie workflow do momentu akceptacji lub odrzucenia przez użytko
 
 ---
 
-#### `control.fallback_matrix` — Auto-Healing & Awaryjny Provider (Fallback Matrix)
+#### `control.fallback_matrix` — Fallback Matrix
 
-Zapewnia odporność na awarie — automatycznie przełącza na zapasowy model w razie błędu lub limitu API.
+Cascade through fallback services if primary provider fails.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `primary_provider` | `string` | Tak | _brak_ |  |
-| `fallback_provider` | `string` | Tak | _brak_ |  |
-| `trigger_on` | `options` | Nie | `any_error` | <br>_Dostępne opcje:_ `any_error`, `rate_limit_only`, `timeout_only`, `server_error` |
-| `max_retries` | `number` | Nie | `2` |  |
+| `primary_provider` | `string` | Yes | _none_ |  |
+| `fallback_provider` | `string` | Yes | _none_ |  |
+| `trigger_on` | `options` | No | `any_error` | <br>_Options:_ `any_error`, `rate_limit_only`, `timeout_only`, `server_error` |
+| `max_retries` | `number` | No | `2` |  |
 
 ```json
 {
@@ -664,8 +664,8 @@ Zapewnia odporność na awarie — automatycznie przełącza na zapasowy model w
     150
   ],
   "params": {
-    "primary_provider": "<warto\u015b\u0107>",
-    "fallback_provider": "<warto\u015b\u0107>",
+    "primary_provider": "<value>",
+    "fallback_provider": "<value>",
     "trigger_on": "any_error",
     "max_retries": 2
   }
@@ -674,25 +674,25 @@ Zapewnia odporność na awarie — automatycznie przełącza na zapasowy model w
 
 ---
 
-#### `control.dynamic_switch` — Dynamiczny Switch Router (Dynamic Switch)
+#### `control.dynamic_switch` — Dynamic Switch
 
-Wielościeżkowy router ewaluujący warunki i kierujący przepływ do case_1, case_2, case_3 lub default.
+Dynamic multi-branch routing based on runtime conditions.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `case_1` (main), `case_2` (main), `case_3` (main), `default` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `case_1` (main), `case_2` (main), `case_3` (main), `default` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `variable_path` | `string` | Nie | `status` | Pole z danych wejściowych np. intent, type, status |
-| `case_1_value` | `string` | Nie | _brak_ |  |
-| `case_2_value` | `string` | Nie | _brak_ |  |
-| `case_3_value` | `string` | Nie | _brak_ |  |
+| `variable_path` | `string` | No | `status` | Pole z danych wejściowych np. intent, type, status |
+| `case_1_value` | `string` | No | _none_ |  |
+| `case_2_value` | `string` | No | _none_ |  |
+| `case_3_value` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -710,24 +710,24 @@ Wielościeżkowy router ewaluujący warunki i kierujący przepływ do case_1, ca
 
 ---
 
-#### `control.parallel_gate` — Bramka Zbieżności Równoległej (Parallel Gate)
+#### `control.parallel_gate` — Parallel Gate
 
-Synchronizuje równoległe gałęzie (wait_all, wait_first, quorum) i scala ich wyniki.
+Wait for multiple parallel branches to complete before continuing.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `sync_mode` | `options` | Nie | `wait_all` | <br>_Dostępne opcje:_ `wait_all`, `wait_first`, `quorum` |
-| `timeout_seconds` | `number` | Nie | `60` |  |
-| `allow_partial_failures` | `boolean` | Nie | `True` |  |
+| `sync_mode` | `options` | No | `wait_all` | <br>_Options:_ `wait_all`, `wait_first`, `quorum` |
+| `timeout_seconds` | `number` | No | `60` |  |
+| `allow_partial_failures` | `boolean` | No | `True` |  |
 
 ```json
 {
@@ -747,25 +747,25 @@ Synchronizuje równoległe gałęzie (wait_all, wait_first, quorum) i scala ich 
 
 ---
 
-#### `control.loop_while` — Pętla Iteracyjna While (Loop While)
+#### `control.loop_while` — Loop While
 
-Wykonuje cykliczne powtórzenia z licznikiem i buforem akumulacyjnym.
+Execute loop iterations until a condition evaluates to false.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `loop` (main), `done` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `loop` (main), `done` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `condition_expr` | `string` | Nie | _brak_ |  |
-| `max_iterations` | `number` | Nie | `50` |  |
-| `break_on_error` | `boolean` | Nie | `True` |  |
-| `accumulator_path` | `string` | Nie | `results` |  |
+| `condition_expr` | `string` | No | _none_ |  |
+| `max_iterations` | `number` | No | `50` |  |
+| `break_on_error` | `boolean` | No | `True` |  |
+| `accumulator_path` | `string` | No | `results` |  |
 
 ```json
 {
@@ -785,24 +785,24 @@ Wykonuje cykliczne powtórzenia z licznikiem i buforem akumulacyjnym.
 
 ---
 
-#### `control.smart_router` — Semantyczny Smart Router (Smart AI Router)
+#### `control.smart_router` — Smart AI Router
 
-Klasyfikuje intencję wejścia AI i kieruje do dedykowanych podprzepływów.
+Semantic intent routing to direct data to specialized handlers.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `photo_generation` (main), `photo_editing` (main), `text_and_copy` (main), `data_analysis` (main), `fallback` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `photo_generation` (main), `photo_editing` (main), `text_and_copy` (main), `data_analysis` (main), `fallback` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `user_input_path` | `string` | Nie | `prompt` |  |
-| `router_model` | `options` | Nie | `gemini-2.0-flash` | <br>_Dostępne opcje:_ `gpt-4o-mini`, `claude-3-5-haiku`, `gemini-2.0-flash` |
-| `custom_context` | `string` | Nie | _brak_ |  |
+| `user_input_path` | `string` | No | `prompt` |  |
+| `router_model` | `options` | No | `gemini-2.0-flash` | <br>_Options:_ `gpt-4o-mini`, `claude-3-5-haiku`, `gemini-2.0-flash` |
+| `custom_context` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -821,27 +821,27 @@ Klasyfikuje intencję wejścia AI i kieruje do dedykowanych podprzepływów.
 
 ---
 
-#### `control.traffic_split` — A/B Traffic Splitter (Traffic Splitter (A/B))
+#### `control.traffic_split` — Traffic Splitter (A/B)
 
-Rozdziela ruch przepływu pomiędzy warianty (A/B/n) probabilistycznie lub ze spójnym hashowaniem użytkownika.
+Split workflow traffic probabilistically between branches.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `variant_a` (main), `variant_b` (main), `variant_c` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `variant_a` (main), `variant_b` (main), `variant_c` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `experiment_name` | `string` | Nie | `exp_v1` | Identyfikator eksperymentu A/B |
-| `split_mode` | `options` | Nie | `sticky_hash` | Sticky hash gwarantuje, że ten sam użytkownik zawsze trafi do tego samego wariantu.<br>_Dostępne opcje:_ `sticky_hash`, `random` |
-| `weight_a` | `number` | Nie | `50` |  |
-| `weight_b` | `number` | Nie | `50` |  |
-| `enable_variant_c` | `boolean` | Nie | `False` |  |
-| `weight_c` | `number` | Nie | `0` |  |
+| `experiment_name` | `string` | No | `exp_v1` | Identyfikator eksperymentu A/B |
+| `split_mode` | `options` | No | `sticky_hash` | Sticky hash gwarantuje, że ten sam użytkownik zawsze trafi do tego samego wariantu.<br>_Options:_ `sticky_hash`, `random` |
+| `weight_a` | `number` | No | `50` |  |
+| `weight_b` | `number` | No | `50` |  |
+| `enable_variant_c` | `boolean` | No | `False` |  |
+| `weight_c` | `number` | No | `0` |  |
 
 ```json
 {
@@ -862,45 +862,45 @@ Rozdziela ruch przepływu pomiędzy warianty (A/B/n) probabilistycznie lub ze sp
 
 ---
 
-## ✂️ FotoHub Shorts & Viral Reels (Rolki i Wirale) <a id="fotohub-shorts"></a>
+## ✂️ FotoHub Shorts & Viral Reels <a id="fotohub-shorts"></a>
 
-> **Liczba węzłów:** 3 | **Identyfikator kategorii:** `fotohub.shorts`
+> **Total Nodes:** 3 | **Category Identifier:** `fotohub.shorts`
 
-Zoptymalizowane pod algorytmy TikToka, Instagram Reels i YouTube Shorts narzędzia do automatycznego wykrywania najciekawszych fragmentów długich nagrań, dodawania dynamicznych napisów karaoke oraz brandingu.
+Optimized for TikTok, Instagram Reels, and YouTube Shorts algorithms. Detects high-engagement segments from long-form video, applies animated karaoke subtitles (Hormozi / MrBeast style), and appends branded bumpers.
 
-**Typowe zastosowanie produkcyjne:** Automatyczna konwersja 60-minutowego podcastu lub wywiadu na 5 wiralowych pionowych rolek 9:16 z napisami word-by-word i animowanym logo sponsora w 90 sekund.
+**Enterprise Use Case:** Transforming a 60-minute podcast or webinar into 5 viral vertical 9:16 clips with animated word-by-word captions, sponsor bumpers, and aspect ratio adaptation in under 90 seconds.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `fotohub.shorts.clip_auto` | **AI Shorts Clipper & Virality**<br>_Shorts: AI Auto-Clipper_ | In: `main`<br>Out: `main, error` | `builtin` | 5 cr (~$0.0000) |
-| `fotohub.shorts.subtitles_karaoke` | **Animowane Napisy Karaoke**<br>_Shorts: Karaoke Subtitles_ | In: `main`<br>Out: `main, error` | `builtin` | 2 cr (~$0.0000) |
-| `fotohub.shorts.add_bumper` | **Brand Bumper & Canvas Fit**<br>_Shorts: Brand Bumper_ | In: `main`<br>Out: `main, error` | `builtin` | 1 cr (~$0.0000) |
+| `fotohub.shorts.clip_auto` | **Shorts: AI Auto-Clipper** | In: `main`<br>Out: `main, error` | `builtin` | 5 credits (~$0.0000) |
+| `fotohub.shorts.subtitles_karaoke` | **Shorts: Karaoke Subtitles** | In: `main`<br>Out: `main, error` | `builtin` | 2 credits (~$0.0000) |
+| `fotohub.shorts.add_bumper` | **Shorts: Brand Bumper** | In: `main`<br>Out: `main, error` | `builtin` | 1 credits (~$0.0000) |
 
-### Szczegółowa Specyfikacja Węzłów (FotoHub Shorts & Viral Reels (Rolki i Wirale))
+### Node Specifications (FotoHub Shorts & Viral Reels)
 
-#### `fotohub.shorts.clip_auto` — AI Shorts Clipper & Virality (Shorts: AI Auto-Clipper)
+#### `fotohub.shorts.clip_auto` — Shorts: AI Auto-Clipper
 
-Automatyczne cięcie długich nagrań na wiralowe Shorts/Reels z oceną retencji.
+Detect viral video segments and format for TikTok/Reels.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** 5 cr (~$0.0000)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** 5 credits (~$0.0000)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ | Link do pliku wideo lub nagrania źródłowego |
-| `max_clips` | `number` | Nie | `3` |  |
-| `aspect_ratio` | `options` | Nie | `9:16` | <br>_Dostępne opcje:_ `9:16`, `1:1`, `4:5`, `16:9` |
-| `caption_style` | `options` | Nie | `hormozi` | <br>_Dostępne opcje:_ `hormozi`, `beasty`, `karaoke`, `neon`, `clean` (+1 innych) |
-| `min_duration_s` | `number` | Nie | `15` |  |
-| `max_duration_s` | `number` | Nie | `60` |  |
+| `video_url` | `string` | Yes | _none_ | Link do pliku wideo lub nagrania źródłowego |
+| `max_clips` | `number` | No | `3` |  |
+| `aspect_ratio` | `options` | No | `9:16` | <br>_Options:_ `9:16`, `1:1`, `4:5`, `16:9` |
+| `caption_style` | `options` | No | `hormozi` | <br>_Options:_ `hormozi`, `beasty`, `karaoke`, `neon`, `clean` (+1 more) |
+| `min_duration_s` | `number` | No | `15` |  |
+| `max_duration_s` | `number` | No | `60` |  |
 
 ```json
 {
@@ -911,7 +911,7 @@ Automatyczne cięcie długich nagrań na wiralowe Shorts/Reels z oceną retencji
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "max_clips": 3,
     "aspect_ratio": "9:16",
     "caption_style": "hormozi"
@@ -921,26 +921,26 @@ Automatyczne cięcie długich nagrań na wiralowe Shorts/Reels z oceną retencji
 
 ---
 
-#### `fotohub.shorts.subtitles_karaoke` — Animowane Napisy Karaoke (Shorts: Karaoke Subtitles)
+#### `fotohub.shorts.subtitles_karaoke` — Shorts: Karaoke Subtitles
 
-Generowanie dynamicznych, animowanych napisów word-by-word z emotikonami.
+Render dynamic word-by-word highlighted captions.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** 2 cr (~$0.0000)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** 2 credits (~$0.0000)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `style` | `options` | Nie | `hormozi` | <br>_Dostępne opcje:_ `hormozi`, `beasty`, `karaoke`, `neon`, `clean` (+1 innych) |
-| `highlight_color` | `string` | Nie | `#facc15` |  |
-| `words_per_line` | `number` | Nie | `3` |  |
-| `add_emojis` | `boolean` | Nie | `True` |  |
+| `video_url` | `string` | Yes | _none_ |  |
+| `style` | `options` | No | `hormozi` | <br>_Options:_ `hormozi`, `beasty`, `karaoke`, `neon`, `clean` (+1 more) |
+| `highlight_color` | `string` | No | `#facc15` |  |
+| `words_per_line` | `number` | No | `3` |  |
+| `add_emojis` | `boolean` | No | `True` |  |
 
 ```json
 {
@@ -951,7 +951,7 @@ Generowanie dynamicznych, animowanych napisów word-by-word z emotikonami.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "style": "hormozi",
     "highlight_color": "#facc15",
     "words_per_line": 3
@@ -961,26 +961,26 @@ Generowanie dynamicznych, animowanych napisów word-by-word z emotikonami.
 
 ---
 
-#### `fotohub.shorts.add_bumper` — Brand Bumper & Canvas Fit (Shorts: Brand Bumper)
+#### `fotohub.shorts.add_bumper` — Shorts: Brand Bumper
 
-Wklejanie intra/outra marki, logo i dopasowanie formatu 9:16.
+Attach branded video intro, outro, or logo watermark.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** 1 cr (~$0.0000)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** 1 credits (~$0.0000)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `bumper_type` | `options` | Nie | `outro` | <br>_Dostępne opcje:_ `intro`, `outro`, `both` |
-| `brand_logo_url` | `string` | Nie | _brak_ | Opcjonalny plik PNG z przezroczystością |
-| `cta_text` | `string` | Nie | `Sprawdź link w bio!` |  |
-| `duration_s` | `number` | Nie | `3` |  |
+| `video_url` | `string` | Yes | _none_ |  |
+| `bumper_type` | `options` | No | `outro` | <br>_Options:_ `intro`, `outro`, `both` |
+| `brand_logo_url` | `string` | No | _none_ | Opcjonalny plik PNG z przezroczystością |
+| `cta_text` | `string` | No | `Sprawdź link w bio!` |  |
+| `duration_s` | `number` | No | `3` |  |
 
 ```json
 {
@@ -991,7 +991,7 @@ Wklejanie intra/outra marki, logo i dopasowanie formatu 9:16.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "bumper_type": "outro",
     "cta_text": "Sprawd\u017a link w bio!"
   }
@@ -1000,44 +1000,44 @@ Wklejanie intra/outra marki, logo i dopasowanie formatu 9:16.
 
 ---
 
-## 🎭 FotoHub UGC Studio & Try-On (User Generated Content) <a id="fotohub-ugc"></a>
+## 🎭 FotoHub UGC Studio & Virtual Try-On <a id="fotohub-ugc"></a>
 
-> **Liczba węzłów:** 3 | **Identyfikator kategorii:** `fotohub.ugc`
+> **Total Nodes:** 3 | **Category Identifier:** `fotohub.ugc`
 
-Generowanie autentycznych wideo recenzji z fotorealistycznymi aktorami UGC, synchronizacją ruchu warg (lip-sync), generatorami scenariuszy perswazyjnych oraz wirtualną przymierzalnią odzieży (VTO) na modelach ze zdjęć.
+Authentic user-generated content creation: persuasive UGC video scripts (Hook-Problem-CTA), photorealistic AI avatar rendering with synced lip movement, and AI virtual try-on (VTO) on model photos.
 
-**Typowe zastosowanie produkcyjne:** Produkcja 50 wariantów wideo z rekomendacjami kosmetyków przez wirtualnych influencerów na TikToka bez konieczności angażowania studia nagraniowego.
+**Enterprise Use Case:** Generating 50 localized video variations of customer product reviews featuring diverse avatars for TikTok ad campaigns without physical studio shoots.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `fotohub.ugc.script_generator` | **Generator Skryptu UGC**<br>_UGC: Script Generator_ | In: `main`<br>Out: `main, error` | `builtin` | 1 cr (~$0.0000) |
-| `fotohub.ugc.actor_render` | **Render Aktora UGC**<br>_UGC: Render Actor_ | In: `main`<br>Out: `main, error` | `builtin` | 10 cr (~$0.0000) |
-| `fotohub.ugc.product_tryon` | **Wirtualna Przymierzalnia (Try-On)**<br>_UGC: Virtual Try-On_ | In: `main`<br>Out: `main, error` | `builtin` | 4 cr (~$0.0000) |
+| `fotohub.ugc.script_generator` | **UGC: Script Generator** | In: `main`<br>Out: `main, error` | `builtin` | 1 credits (~$0.0000) |
+| `fotohub.ugc.actor_render` | **UGC: Render Actor** | In: `main`<br>Out: `main, error` | `builtin` | 10 credits (~$0.0000) |
+| `fotohub.ugc.product_tryon` | **UGC: Virtual Try-On** | In: `main`<br>Out: `main, error` | `builtin` | 4 credits (~$0.0000) |
 
-### Szczegółowa Specyfikacja Węzłów (FotoHub UGC Studio & Try-On (User Generated Content))
+### Node Specifications (FotoHub UGC Studio & Virtual Try-On)
 
-#### `fotohub.ugc.script_generator` — Generator Skryptu UGC (UGC: Script Generator)
+#### `fotohub.ugc.script_generator` — UGC: Script Generator
 
-Tworzy scenariusz Hook-Problem-Solution-CTA na podstawie produktu.
+Generate viral Hook-Agitate-Solution UGC video scripts.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** 1 cr (~$0.0000)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** 1 credits (~$0.0000)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `product_name` | `string` | Tak | _brak_ |  |
-| `product_url` | `string` | Nie | _brak_ |  |
-| `hook_style` | `options` | Nie | `curiosity` | <br>_Dostępne opcje:_ `curiosity`, `shock`, `question`, `before_after` |
-| `target_audience` | `string` | Nie | `Kobiety i mężczyźni 18-35 zainteresowani nowościami` |  |
-| `duration_target_s` | `number` | Nie | `30` |  |
+| `product_name` | `string` | Yes | _none_ |  |
+| `product_url` | `string` | No | _none_ |  |
+| `hook_style` | `options` | No | `curiosity` | <br>_Options:_ `curiosity`, `shock`, `question`, `before_after` |
+| `target_audience` | `string` | No | `Kobiety i mężczyźni 18-35 zainteresowani nowościami` |  |
+| `duration_target_s` | `number` | No | `30` |  |
 
 ```json
 {
@@ -1048,7 +1048,7 @@ Tworzy scenariusz Hook-Problem-Solution-CTA na podstawie produktu.
     150
   ],
   "params": {
-    "product_name": "<warto\u015b\u0107>",
+    "product_name": "<value>",
     "hook_style": "curiosity",
     "target_audience": "Kobiety i m\u0119\u017cczy\u017ani 18-35 zainteresowani nowo\u015bciami"
   }
@@ -1057,25 +1057,25 @@ Tworzy scenariusz Hook-Problem-Solution-CTA na podstawie produktu.
 
 ---
 
-#### `fotohub.ugc.actor_render` — Render Aktora UGC (UGC: Render Actor)
+#### `fotohub.ugc.actor_render` — UGC: Render Actor
 
-Fotorealistyczny influencer UGC z synchronizacją mimiki i ust.
+Generate AI video presenter speaking product review script.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** 10 cr (~$0.0000)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** 10 credits (~$0.0000)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `actor_id` | `options` | Nie | `emma` | <br>_Dostępne opcje:_ `emma`, `lucas`, `sophie`, `marcus`, `elena` |
-| `script_text` | `string` | Tak | _brak_ |  |
-| `product_image_url` | `string` | Nie | _brak_ |  |
-| `camera_angle` | `options` | Nie | `selfie` | <br>_Dostępne opcje:_ `selfie`, `close_up`, `medium` |
+| `actor_id` | `options` | No | `emma` | <br>_Options:_ `emma`, `lucas`, `sophie`, `marcus`, `elena` |
+| `script_text` | `string` | Yes | _none_ |  |
+| `product_image_url` | `string` | No | _none_ |  |
+| `camera_angle` | `options` | No | `selfie` | <br>_Options:_ `selfie`, `close_up`, `medium` |
 
 ```json
 {
@@ -1087,7 +1087,7 @@ Fotorealistyczny influencer UGC z synchronizacją mimiki i ust.
   ],
   "params": {
     "actor_id": "emma",
-    "script_text": "<warto\u015b\u0107>",
+    "script_text": "<value>",
     "camera_angle": "selfie"
   }
 }
@@ -1095,25 +1095,25 @@ Fotorealistyczny influencer UGC z synchronizacją mimiki i ust.
 
 ---
 
-#### `fotohub.ugc.product_tryon` — Wirtualna Przymierzalnia (Try-On) (UGC: Virtual Try-On)
+#### `fotohub.ugc.product_tryon` — UGC: Virtual Try-On
 
-Fotorealistyczne przeniesienie odzieży na postać / modela AI.
+Overlay apparel or garments onto photo models naturally.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** 4 cr (~$0.0000)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** 4 credits (~$0.0000)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `person_image_url` | `string` | Tak | _brak_ |  |
-| `clothing_image_url` | `string` | Tak | _brak_ |  |
-| `category` | `options` | Nie | `tops` | <br>_Dostępne opcje:_ `tops`, `bottoms`, `one_piece`, `accessories` |
-| `denoise_steps` | `number` | Nie | `30` |  |
+| `person_image_url` | `string` | Yes | _none_ |  |
+| `clothing_image_url` | `string` | Yes | _none_ |  |
+| `category` | `options` | No | `tops` | <br>_Options:_ `tops`, `bottoms`, `one_piece`, `accessories` |
+| `denoise_steps` | `number` | No | `30` |  |
 
 ```json
 {
@@ -1124,8 +1124,8 @@ Fotorealistyczne przeniesienie odzieży na postać / modela AI.
     150
   ],
   "params": {
-    "person_image_url": "<warto\u015b\u0107>",
-    "clothing_image_url": "<warto\u015b\u0107>",
+    "person_image_url": "<value>",
+    "clothing_image_url": "<value>",
     "category": "tops",
     "denoise_steps": 30
   }
@@ -1134,41 +1134,41 @@ Fotorealistyczne przeniesienie odzieży na postać / modela AI.
 
 ---
 
-## ✨ FotoHub Creative Studio (E-Commerce Studio) <a id="fotohub-creative"></a>
+## ✨ FotoHub Creative Studio <a id="fotohub-creative"></a>
 
-> **Liczba węzłów:** 1 | **Identyfikator kategorii:** `fotohub.creative`
+> **Total Nodes:** 1 | **Category Identifier:** `fotohub.creative`
 
-Usuwanie surowego tła z fotografii produktowych i generowanie fotorealistycznych scen reklamowych 3D z profesjonalnym, fizycznie poprawnym oświetleniem studyjnym i cieniami.
+Commercial packshot automation: removes raw backgrounds and synthesizes photorealistic 3D advertising mockups with physically accurate lighting, ambient reflections, and cast shadows.
 
-**Typowe zastosowanie produkcyjne:** Przekształcanie zdjęcia butelki perfum zrobionego telefonem w luksusowy billboard na marmurowym postumencie o wschodzie słońca.
+**Enterprise Use Case:** Turning a smartphone snapshot of a perfume bottle into an ultra-luxury marble pedestal advertisement bathed in sunrise lighting.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `fotohub.creative.product_mockup` | **E-Commerce Studio Mockup**<br>_Studio Product Mockup_ | In: `main`<br>Out: `main, error` | `builtin` | 3 cr (~$0.0000) |
+| `fotohub.creative.product_mockup` | **Studio Product Mockup** | In: `main`<br>Out: `main, error` | `builtin` | 3 credits (~$0.0000) |
 
-### Szczegółowa Specyfikacja Węzłów (FotoHub Creative Studio (E-Commerce Studio))
+### Node Specifications (FotoHub Creative Studio)
 
-#### `fotohub.creative.product_mockup` — E-Commerce Studio Mockup (Studio Product Mockup)
+#### `fotohub.creative.product_mockup` — Studio Product Mockup
 
-Generowanie sceny studyjnej produktu z fotorealistycznymi cieniami.
+Generate professional 3D studio lighting mockup for products.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** 3 cr (~$0.0000)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** 3 credits (~$0.0000)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `product_image_url` | `string` | Tak | _brak_ |  |
-| `scene_theme` | `options` | Nie | `minimalist_studio` | <br>_Dostępne opcje:_ `minimalist_studio`, `luxury_marble`, `outdoor_nature`, `cyber_neon`, `cozy_wood` |
-| `custom_prompt` | `string` | Nie | _brak_ |  |
-| `shadow_intensity` | `number` | Nie | `0.75` |  |
+| `product_image_url` | `string` | Yes | _none_ |  |
+| `scene_theme` | `options` | No | `minimalist_studio` | <br>_Options:_ `minimalist_studio`, `luxury_marble`, `outdoor_nature`, `cyber_neon`, `cozy_wood` |
+| `custom_prompt` | `string` | No | _none_ |  |
+| `shadow_intensity` | `number` | No | `0.75` |  |
 
 ```json
 {
@@ -1179,7 +1179,7 @@ Generowanie sceny studyjnej produktu z fotorealistycznymi cieniami.
     150
   ],
   "params": {
-    "product_image_url": "<warto\u015b\u0107>",
+    "product_image_url": "<value>",
     "scene_theme": "minimalist_studio",
     "shadow_intensity": 0.75
   }
@@ -1188,41 +1188,41 @@ Generowanie sceny studyjnej produktu z fotorealistycznymi cieniami.
 
 ---
 
-## 💡 Creative Studio & Styling (Aranżacja Produktowa) <a id="creative"></a>
+## 💡 Creative Studio & Styling <a id="creative"></a>
 
-> **Liczba węzłów:** 1 | **Identyfikator kategorii:** `creative`
+> **Total Nodes:** 1 | **Category Identifier:** `creative`
 
-Zaawansowane generowanie aranżacji packshotowych i studyjnych dla branży fashion, kosmetyków i elektroniki użytkowej.
+Advanced packshot styling and commercial set generation for fashion, cosmetics, luxury goods, and consumer electronics.
 
-**Typowe zastosowanie produkcyjne:** Automatyczne przygotowanie katalogu e-commerce z ujednoliconą scenerią i kątem padania cieni dla 500 produktów.
+**Enterprise Use Case:** Standardizing an entire 500-product e-commerce catalog with matching seasonal backgrounds, camera angles, and shadow depths.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `ai.vision_analyzer` | **Głęboki Analizator Wizyjny AI**<br>_AI Vision Analyzer_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
+| `ai.vision_analyzer` | **AI Vision Analyzer** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
 
-### Szczegółowa Specyfikacja Węzłów (Creative Studio & Styling (Aranżacja Produktowa))
+### Node Specifications (Creative Studio & Styling)
 
-#### `ai.vision_analyzer` — Głęboki Analizator Wizyjny AI (AI Vision Analyzer)
+#### `ai.vision_analyzer` — AI Vision Analyzer
 
-Analizuje estetykę, paletę barw, OCR i obiekty na obrazie.
+Analyze visual image content, detect objects, and evaluate quality.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `extract_color_palette` | `boolean` | Nie | `True` |  |
-| `score_aesthetic` | `boolean` | Nie | `True` |  |
-| `extract_ocr_text` | `boolean` | Nie | `True` |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `extract_color_palette` | `boolean` | No | `True` |  |
+| `score_aesthetic` | `boolean` | No | `True` |  |
+| `extract_ocr_text` | `boolean` | No | `True` |  |
 
 ```json
 {
@@ -1233,7 +1233,7 @@ Analizuje estetykę, paletę barw, OCR i obiekty na obrazie.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "extract_color_palette": true,
     "score_aesthetic": true,
     "extract_ocr_text": true
@@ -1243,58 +1243,58 @@ Analizuje estetykę, paletę barw, OCR i obiekty na obrazie.
 
 ---
 
-## 🎨 FotoHub AI Image Processing (Grafika & Obraz) <a id="fotohub-image"></a>
+## 🎨 FotoHub AI Image Processing <a id="fotohub-image"></a>
 
-> **Liczba węzłów:** 19 | **Identyfikator kategorii:** `fotohub.image`
+> **Total Nodes:** 19 | **Category Identifier:** `fotohub.image`
 
-Kompletny zestaw 19 operacji na obrazie: generowanie w modelach SOTA (Flux, Midjourney v6, SD3), inteligentny smart-crop z detekcją twarzy, usuwanie tła alpha-matting, skalowanie 8K, inpainting, face-swap i korekcja barwna.
+Comprehensive 19-node image suite: state-of-the-art generation (Flux, Midjourney v6, SD3), 8K super-resolution upscaling, alpha matting background removal, face-aware smart cropping, inpainting, outpainting, face swapping, and relighting.
 
-**Typowe zastosowanie produkcyjne:** Automatyczna taśma produkcyjna dla agencji foto: generowanie tła, dopasowanie oświetlenia, retusz skóry modela i eksport w rozdzielczości do druku wielkoformatowego.
+**Enterprise Use Case:** End-to-end photo production pipeline: generate themed background, match subject lighting, retouch skin tones, and export in print-ready 300 DPI resolution.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `fotohub.gallery.save` | **Dodaj do galerii FOTOhub**<br>_FotoHub Gallery: Save_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `fotohub.image.generate` | **Generuj Obraz AI**<br>_Generate Image_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.upscale` | **Powiększ Obraz (Upscale)**<br>_Upscale Image_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.remove_bg` | **Usuń Tło**<br>_Remove Background_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.face_swap` | **Zamiana Twarzy (Face Swap)**<br>_Face Swap_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_operation |
-| `fotohub.image.colorize` | **Koloryzacja (B&W)**<br>_Colorize (B&W)_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.style_transfer` | **Transfer Stylu**<br>_Style Transfer_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.inpaint` | **Wypełnij Maskę (Inpaint)**<br>_Inpaint_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.outpaint` | **Rozszerz Kadr (Outpaint)**<br>_Outpaint_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.face_restore` | **Naprawa Twarzy**<br>_Restore Face_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.denoise` | **Usuń Szum (Denoise)**<br>_Denoise_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.auto_enhance` | **Automatyczne Ulepszenie**<br>_Auto-Enhance_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.color_grade` | **Grading Kolorów**<br>_Color Grade_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.filter` | **Filter**<br>_Filter_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.image.resize` | **Resize**<br>_Resize_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.image.smart_crop` | **Smart Crop**<br>_Smart Crop_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.watermark` | **Watermark**<br>_Watermark_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.image.generate_bg` | **Generate Background**<br>_Generate Background_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.image.deepfake` | **Deepfake Video**<br>_Deepfake Video_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_operation |
+| `fotohub.gallery.save` | **FotoHub Gallery: Save** | In: `main`<br>Out: `main` | `builtin` | free |
+| `fotohub.image.generate` | **Generate Image** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.upscale` | **Upscale Image** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.remove_bg` | **Remove Background** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.face_swap` | **Face Swap** | In: `main`<br>Out: `main, error` | `edge_fn` | per_operation |
+| `fotohub.image.colorize` | **Colorize (B&W)** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.style_transfer` | **Style Transfer** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.inpaint` | **Inpaint** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.outpaint` | **Outpaint** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.face_restore` | **Restore Face** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.denoise` | **Denoise** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.auto_enhance` | **Auto-Enhance** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.color_grade` | **Color Grade** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.filter` | **Filter** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.image.resize` | **Resize** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.image.smart_crop` | **Smart Crop** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.watermark` | **Watermark** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.image.generate_bg` | **Generate Background** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.image.deepfake` | **Deepfake Video** | In: `main`<br>Out: `main, error` | `edge_fn` | per_operation |
 
-### Szczegółowa Specyfikacja Węzłów (FotoHub AI Image Processing (Grafika & Obraz))
+### Node Specifications (FotoHub AI Image Processing)
 
-#### `fotohub.gallery.save` — Dodaj do galerii FOTOhub (FotoHub Gallery: Save)
+#### `fotohub.gallery.save` — FotoHub Gallery: Save
 
-Zapisuje wygenerowany lub przekształcony obraz bezpośrednio do Twojej galerii zdjęć FOTOhub.
+Save generated images directly to user FotoHub gallery.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `title` | `string` | Nie | _brak_ |  |
-| `visibility` | `options` | Nie | `private` | <br>_Dostępne opcje:_ `private`, `public`, `unlisted` |
-| `image_url` | `string` | Nie | _brak_ |  |
+| `title` | `string` | No | _none_ |  |
+| `visibility` | `options` | No | `private` | <br>_Options:_ `private`, `public`, `unlisted` |
+| `image_url` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -1312,28 +1312,28 @@ Zapisuje wygenerowany lub przekształcony obraz bezpośrednio do Twojej galerii 
 
 ---
 
-#### `fotohub.image.generate` — Generuj Obraz AI (Generate Image)
+#### `fotohub.image.generate` — Generate Image
 
-Twórz nowe obrazy z tekstu lub zdjęcia referencyjnego przy użyciu dowolnego modelu FOTOhub (Seedream, GPT Image, FLUX, Nano Banana).
+Create a new image from a text prompt using any FOTOhub model.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/generate`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/generate`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Tak | `dola-seedream-5-0-pro-260628` | <br>_Dostępne opcje:_ `dola-seedream-5-0-pro-260628`, `seedream-5-0-260128`, `seedream-4-5-251128`, `seedream-4-0-250828`, `gpt-image-2` (+34 innych) |
-| `prompt` | `string` | Tak | _brak_ |  |
-| `reference_image_url` | `string` | Nie | _brak_ |  |
-| `aspect_ratio` | `options` | Nie | `1:1` | <br>_Dostępne opcje:_ `1:1`, `16:9`, `9:16`, `4:3`, `3:4` (+3 innych) |
-| `count` | `number` | Nie | `1` |  |
-| `` | `collapsible` | Nie | _brak_ | Advanced |
+| `model` | `options` | Yes | `dola-seedream-5-0-pro-260628` | <br>_Options:_ `dola-seedream-5-0-pro-260628`, `seedream-5-0-260128`, `seedream-4-5-251128`, `seedream-4-0-250828`, `gpt-image-2` (+34 more) |
+| `prompt` | `string` | Yes | _none_ |  |
+| `reference_image_url` | `string` | No | _none_ |  |
+| `aspect_ratio` | `options` | No | `1:1` | <br>_Options:_ `1:1`, `16:9`, `9:16`, `4:3`, `3:4` (+3 more) |
+| `count` | `number` | No | `1` |  |
+| `` | `collapsible` | No | _none_ | Advanced |
 
 ```json
 {
@@ -1345,7 +1345,7 @@ Twórz nowe obrazy z tekstu lub zdjęcia referencyjnego przy użyciu dowolnego m
   ],
   "params": {
     "model": "dola-seedream-5-0-pro-260628",
-    "prompt": "<warto\u015b\u0107>",
+    "prompt": "<value>",
     "aspect_ratio": "1:1"
   }
 }
@@ -1353,24 +1353,24 @@ Twórz nowe obrazy z tekstu lub zdjęcia referencyjnego przy użyciu dowolnego m
 
 ---
 
-#### `fotohub.image.upscale` — Powiększ Obraz (Upscale) (Upscale Image)
+#### `fotohub.image.upscale` — Upscale Image
 
-Zwiększ rozdzielczość 2× lub 4× z modelem Real-ESRGAN zachowując ostrość.
+Increase image resolution 2×/4× with Real-ESRGAN.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/upscale`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/upscale`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `scale` | `options` | Nie | `2` | <br>_Dostępne opcje:_ `2`, `4` |
+| `image_url` | `string` | Yes | _none_ |  |
+| `scale` | `options` | No | `2` | <br>_Options:_ `2`, `4` |
 
 ```json
 {
@@ -1381,7 +1381,7 @@ Zwiększ rozdzielczość 2× lub 4× z modelem Real-ESRGAN zachowując ostrość
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "scale": "2"
   }
 }
@@ -1389,24 +1389,24 @@ Zwiększ rozdzielczość 2× lub 4× z modelem Real-ESRGAN zachowując ostrość
 
 ---
 
-#### `fotohub.image.remove_bg` — Usuń Tło (Remove Background)
+#### `fotohub.image.remove_bg` — Remove Background
 
-Precyzyjnie wytnij obiekt ze zdjęcia usuwając tło (ISNet / rembg).
+Cut out the subject of an image (rembg / ISNet).
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/remove-bg`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/remove-bg`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `model` | `options` | Nie | `isnet-general-use` | <br>_Dostępne opcje:_ `isnet-general-use`, `u2net`, `silueta` |
+| `image_url` | `string` | Yes | _none_ |  |
+| `model` | `options` | No | `isnet-general-use` | <br>_Options:_ `isnet-general-use`, `u2net`, `silueta` |
 
 ```json
 {
@@ -1417,7 +1417,7 @@ Precyzyjnie wytnij obiekt ze zdjęcia usuwając tło (ISNet / rembg).
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "model": "isnet-general-use"
   }
 }
@@ -1425,23 +1425,23 @@ Precyzyjnie wytnij obiekt ze zdjęcia usuwając tło (ISNet / rembg).
 
 ---
 
-#### `fotohub.image.face_swap` — Zamiana Twarzy (Face Swap) (Face Swap)
+#### `fotohub.image.face_swap` — Face Swap
 
-Wstaw twarz ze zdjęcia źródłowego na zdjęcie docelowe.
+Swap a face from a source image onto a target.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `source_url` | `string` | Tak | _brak_ |  |
-| `target_url` | `string` | Tak | _brak_ |  |
+| `source_url` | `string` | Yes | _none_ |  |
+| `target_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -1452,31 +1452,31 @@ Wstaw twarz ze zdjęcia źródłowego na zdjęcie docelowe.
     150
   ],
   "params": {
-    "source_url": "<warto\u015b\u0107>",
-    "target_url": "<warto\u015b\u0107>"
+    "source_url": "<value>",
+    "target_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.image.colorize` — Koloryzacja (B&W) (Colorize (B&W))
+#### `fotohub.image.colorize` — Colorize (B&W)
 
-Dodaj realistyczne kolory do czarno-białych fotografii.
+Add color to a black & white photo.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/colorize`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/colorize`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
+| `image_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -1487,31 +1487,31 @@ Dodaj realistyczne kolory do czarno-białych fotografii.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>"
+    "image_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.image.style_transfer` — Transfer Stylu (Style Transfer)
+#### `fotohub.image.style_transfer` — Style Transfer
 
-Nadaj zdjęciu artystyczny styl innego obrazu.
+Apply an artistic style to a photo.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/generate`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/generate`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `style_prompt` | `string` | Tak | _brak_ |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `style_prompt` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -1522,33 +1522,33 @@ Nadaj zdjęciu artystyczny styl innego obrazu.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
-    "style_prompt": "<warto\u015b\u0107>"
+    "image_url": "<value>",
+    "style_prompt": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.image.inpaint` — Wypełnij Maskę (Inpaint) (Inpaint)
+#### `fotohub.image.inpaint` — Inpaint
 
-Zastąp zaznaczony maską fragment nową zawartością wygenerowaną przez AI.
+Fill a masked region with AI-generated content matching the surroundings.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/inpaint`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/inpaint`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `mask_url` | `string` | Tak | _brak_ |  |
-| `prompt` | `string` | Tak | _brak_ |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `mask_url` | `string` | Yes | _none_ |  |
+| `prompt` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -1559,34 +1559,34 @@ Zastąp zaznaczony maską fragment nową zawartością wygenerowaną przez AI.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
-    "mask_url": "<warto\u015b\u0107>",
-    "prompt": "<warto\u015b\u0107>"
+    "image_url": "<value>",
+    "mask_url": "<value>",
+    "prompt": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.image.outpaint` — Rozszerz Kadr (Outpaint) (Outpaint)
+#### `fotohub.image.outpaint` — Outpaint
 
-Rozszerz kadr obrazu poza jego pierwotne granice.
+Extend an image beyond its original borders.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/outpaint`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/outpaint`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `direction` | `options` | Nie | `all` | <br>_Dostępne opcje:_ `left`, `right`, `up`, `down`, `all` |
-| `pixels` | `number` | Nie | `256` |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `direction` | `options` | No | `all` | <br>_Options:_ `left`, `right`, `up`, `down`, `all` |
+| `pixels` | `number` | No | `256` |  |
 
 ```json
 {
@@ -1597,7 +1597,7 @@ Rozszerz kadr obrazu poza jego pierwotne granice.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "direction": "all",
     "pixels": 256
   }
@@ -1606,23 +1606,23 @@ Rozszerz kadr obrazu poza jego pierwotne granice.
 
 ---
 
-#### `fotohub.image.face_restore` — Naprawa Twarzy (Restore Face)
+#### `fotohub.image.face_restore` — Restore Face
 
-Zrekonstruuj detale i wyostrz twarze (GFPGAN) ze starych lub rozmytych zdjęć.
+Clean up faces (GFPGAN) — great for old/low-res photos.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/face-restore`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/face-restore`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
+| `image_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -1633,31 +1633,31 @@ Zrekonstruuj detale i wyostrz twarze (GFPGAN) ze starych lub rozmytych zdjęć.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>"
+    "image_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.image.denoise` — Usuń Szum (Denoise) (Denoise)
+#### `fotohub.image.denoise` — Denoise
 
-Usuń ziarno i szum matrycy zachowując kluczowe detale.
+Remove grain and noise while keeping detail.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/denoise`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/denoise`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `strength` | `number` | Nie | `50` |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `strength` | `number` | No | `50` |  |
 
 ```json
 {
@@ -1668,7 +1668,7 @@ Usuń ziarno i szum matrycy zachowując kluczowe detale.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "strength": 50
   }
 }
@@ -1676,23 +1676,23 @@ Usuń ziarno i szum matrycy zachowując kluczowe detale.
 
 ---
 
-#### `fotohub.image.auto_enhance` — Automatyczne Ulepszenie (Auto-Enhance)
+#### `fotohub.image.auto_enhance` — Auto-Enhance
 
-Jedno-klikowe ulepszenie ekspozycji, ostrości i dynamiki barw.
+One-click AI enhancement (exposure + sharpness + color).
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/auto-enhance`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/auto-enhance`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
+| `image_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -1703,32 +1703,32 @@ Jedno-klikowe ulepszenie ekspozycji, ostrości i dynamiki barw.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>"
+    "image_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.image.color_grade` — Grading Kolorów (Color Grade)
+#### `fotohub.image.color_grade` — Color Grade
 
-Zastosuj kinowy profil barwny lub tablicę LUT.
+Apply cinematic color LUT or custom grade.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/color-grade`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/color-grade`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `preset` | `options` | Nie | `cinematic` | <br>_Dostępne opcje:_ `natural`, `cinematic`, `warm`, `cool`, `vintage` (+4 innych) |
-| `intensity` | `number` | Nie | `60` |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `preset` | `options` | No | `cinematic` | <br>_Options:_ `natural`, `cinematic`, `warm`, `cool`, `vintage` (+4 more) |
+| `intensity` | `number` | No | `60` |  |
 
 ```json
 {
@@ -1739,7 +1739,7 @@ Zastosuj kinowy profil barwny lub tablicę LUT.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "preset": "cinematic",
     "intensity": 60
   }
@@ -1748,25 +1748,25 @@ Zastosuj kinowy profil barwny lub tablicę LUT.
 
 ---
 
-#### `fotohub.image.filter` — Filter (Filter)
+#### `fotohub.image.filter` — Filter
 
 Apply one of 9 classic filters.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/filter`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/filter`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `filter` | `options` | Nie | `sharpen` | <br>_Dostępne opcje:_ `grayscale`, `sepia`, `invert`, `blur`, `sharpen` (+4 innych) |
-| `strength` | `number` | Nie | `50` |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `filter` | `options` | No | `sharpen` | <br>_Options:_ `grayscale`, `sepia`, `invert`, `blur`, `sharpen` (+4 more) |
+| `strength` | `number` | No | `50` |  |
 
 ```json
 {
@@ -1777,7 +1777,7 @@ Apply one of 9 classic filters.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "filter": "sharpen",
     "strength": 50
   }
@@ -1786,26 +1786,26 @@ Apply one of 9 classic filters.
 
 ---
 
-#### `fotohub.image.resize` — Resize (Resize)
+#### `fotohub.image.resize` — Resize
 
 Change an image's dimensions (with optional aspect lock).
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/resize`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/resize`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `width` | `number` | Tak | _brak_ |  |
-| `height` | `number` | Nie | _brak_ |  |
-| `mode` | `options` | Nie | `fit` | <br>_Dostępne opcje:_ `fit`, `fill`, `stretch`, `crop` |
+| `image_url` | `string` | Yes | _none_ |  |
+| `width` | `number` | Yes | _none_ |  |
+| `height` | `number` | No | _none_ |  |
+| `mode` | `options` | No | `fit` | <br>_Options:_ `fit`, `fill`, `stretch`, `crop` |
 
 ```json
 {
@@ -1816,8 +1816,8 @@ Change an image's dimensions (with optional aspect lock).
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
-    "width": "<warto\u015b\u0107>",
+    "image_url": "<value>",
+    "width": "<value>",
     "mode": "fit"
   }
 }
@@ -1825,24 +1825,24 @@ Change an image's dimensions (with optional aspect lock).
 
 ---
 
-#### `fotohub.image.smart_crop` — Smart Crop (Smart Crop)
+#### `fotohub.image.smart_crop` — Smart Crop
 
 Crop to a target aspect keeping the most important content.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/smart-crop`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/smart-crop`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `aspect` | `options` | Nie | `1:1` | <br>_Dostępne opcje:_ `1:1`, `16:9`, `9:16`, `4:3`, `3:4` |
+| `image_url` | `string` | Yes | _none_ |  |
+| `aspect` | `options` | No | `1:1` | <br>_Options:_ `1:1`, `16:9`, `9:16`, `4:3`, `3:4` |
 
 ```json
 {
@@ -1853,7 +1853,7 @@ Crop to a target aspect keeping the most important content.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "aspect": "1:1"
   }
 }
@@ -1861,26 +1861,26 @@ Crop to a target aspect keeping the most important content.
 
 ---
 
-#### `fotohub.image.watermark` — Watermark (Watermark)
+#### `fotohub.image.watermark` — Watermark
 
 Add text or image watermark.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/watermark`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/watermark`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `text` | `string` | Nie | `© FOTOhub` |  |
-| `position` | `options` | Nie | `bottom-right` | <br>_Dostępne opcje:_ `top-left`, `top-right`, `bottom-left`, `bottom-right`, `center` |
-| `opacity` | `number` | Nie | `70` |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `text` | `string` | No | `© FOTOhub` |  |
+| `position` | `options` | No | `bottom-right` | <br>_Options:_ `top-left`, `top-right`, `bottom-left`, `bottom-right`, `center` |
+| `opacity` | `number` | No | `70` |  |
 
 ```json
 {
@@ -1891,7 +1891,7 @@ Add text or image watermark.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "text": "\u00a9 FOTOhub",
     "position": "bottom-right",
     "opacity": 70
@@ -1901,24 +1901,24 @@ Add text or image watermark.
 
 ---
 
-#### `fotohub.image.generate_bg` — Generate Background (Generate Background)
+#### `fotohub.image.generate_bg` — Generate Background
 
 Composite a subject onto a freshly generated AI background.
 
-- **Executor:** `http`
-- **Microservice:** `image-engine` (ścieżka: `/api/generate-bg`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `image-engine` (endpoint: `/api/generate-bg`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `bg_prompt` | `string` | Tak | _brak_ |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `bg_prompt` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -1929,31 +1929,31 @@ Composite a subject onto a freshly generated AI background.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
-    "bg_prompt": "<warto\u015b\u0107>"
+    "image_url": "<value>",
+    "bg_prompt": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.image.deepfake` — Deepfake Video (Deepfake Video)
+#### `fotohub.image.deepfake` — Deepfake Video
 
 Advanced multi-frame face swap for video (opt-in watermarking + audit log).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `STARTER`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `STARTER`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `source_face_url` | `string` | Tak | _brak_ |  |
-| `target_video_url` | `string` | Tak | _brak_ |  |
+| `source_face_url` | `string` | Yes | _none_ |  |
+| `target_video_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -1964,65 +1964,65 @@ Advanced multi-frame face swap for video (opt-in watermarking + audit log).
     150
   ],
   "params": {
-    "source_face_url": "<warto\u015b\u0107>",
-    "target_video_url": "<warto\u015b\u0107>"
+    "source_face_url": "<value>",
+    "target_video_url": "<value>"
   }
 }
 ```
 
 ---
 
-## 🎬 FotoHub AI Video Generation (Wideo & Animacja) <a id="fotohub-video"></a>
+## 🎬 FotoHub AI Video Generation <a id="fotohub-video"></a>
 
-> **Liczba węzłów:** 12 | **Identyfikator kategorii:** `fotohub.video`
+> **Total Nodes:** 12 | **Category Identifier:** `fotohub.video`
 
-Potężny silnik wideo: generowanie sekwencji wideo z tekstu i obrazów, stabilizacja żyroskopowa, łączenie klipów, wydłużanie czasu trwania, renderowanie osi czasu NLE i kompresja do formatów social media.
+High-performance video engine: text/image-to-video (Luma, Runway, Kling), clip extension, AI slow-motion frame interpolation, gyroscopic stabilization, NLE timeline rendering, and social format transcoding.
 
-**Typowe zastosowanie produkcyjne:** Automatyczne tworzenie dynamicznych teaserów wideo do kampanii reklamowych zsynchronizowanych z tempem muzyki.
+**Enterprise Use Case:** Creating dynamic 10-second social video teasers synced to musical beats, stabilized for handheld camera motion, and rendered in vertical MP4.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `fotohub.video.generate` | **Generuj Wideo AI**<br>_Generate Video_ | In: `main`<br>Out: `main, error` | `http` | per_second |
-| `fotohub.video.animate_image` | **Animuj Obraz**<br>_Animate Image_ | In: `main`<br>Out: `main, error` | `http` | per_second |
-| `fotohub.video.transcribe` | **Transkrypcja Wideo**<br>_Transcribe Video_ | In: `main`<br>Out: `main, error` | `http` | per_minute |
-| `fotohub.video.render_timeline` | **Renderuj Oś Czasu**<br>_Render Timeline_ | In: `main`<br>Out: `main, error` | `http` | per_second |
-| `fotohub.video.transcode` | **Transkodowanie**<br>_Transcode_ | In: `main`<br>Out: `main, error` | `http` | per_second |
-| `fotohub.video.trim` | **Przytnij Wideo**<br>_Trim_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.video.merge` | **Połącz Klipy Wideo**<br>_Merge Videos_ | In: `main`<br>Out: `main, error` | `http` | per_second |
-| `fotohub.video.extract_audio` | **Wyodrębnij Audio**<br>_Extract Audio_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.video.extract_frames` | **Wyciągnij Klatki**<br>_Extract Frames_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.video.stabilize` | **Stabilizacja Wideo**<br>_Stabilize_ | In: `main`<br>Out: `main, error` | `http` | per_second |
-| `fotohub.video.compress` | **Kompresja Wideo**<br>_Compress_ | In: `main`<br>Out: `main, error` | `http` | per_second |
-| `fotohub.video.summarize` | **Podsumuj Wideo**<br>_Summarize Video_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_minute |
+| `fotohub.video.generate` | **Generate Video** | In: `main`<br>Out: `main, error` | `http` | per_second |
+| `fotohub.video.animate_image` | **Animate Image** | In: `main`<br>Out: `main, error` | `http` | per_second |
+| `fotohub.video.transcribe` | **Transcribe Video** | In: `main`<br>Out: `main, error` | `http` | per_minute |
+| `fotohub.video.render_timeline` | **Render Timeline** | In: `main`<br>Out: `main, error` | `http` | per_second |
+| `fotohub.video.transcode` | **Transcode** | In: `main`<br>Out: `main, error` | `http` | per_second |
+| `fotohub.video.trim` | **Trim** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.video.merge` | **Merge Videos** | In: `main`<br>Out: `main, error` | `http` | per_second |
+| `fotohub.video.extract_audio` | **Extract Audio** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.video.extract_frames` | **Extract Frames** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.video.stabilize` | **Stabilize** | In: `main`<br>Out: `main, error` | `http` | per_second |
+| `fotohub.video.compress` | **Compress** | In: `main`<br>Out: `main, error` | `http` | per_second |
+| `fotohub.video.summarize` | **Summarize Video** | In: `main`<br>Out: `main, error` | `edge_fn` | per_minute |
 
-### Szczegółowa Specyfikacja Węzłów (FotoHub AI Video Generation (Wideo & Animacja))
+### Node Specifications (FotoHub AI Video Generation)
 
-#### `fotohub.video.generate` — Generuj Wideo AI (Generate Video)
+#### `fotohub.video.generate` — Generate Video
 
-Generuj wideo z tekstu lub klatki startowej (Sora, Veo, Kling, Seedance, Wan, Hailuo).
+Create a short video from a prompt or image using Veo, Sora, Hailuo, etc.
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/generate`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_second
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/generate`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_second
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Tak | `sora-2-azure` | <br>_Dostępne opcje:_ `sora-2-pro`, `sora-2-azure`, `veo-3.1-generate-001`, `veo-3.1-fast-generate-001`, `kling-v3` (+20 innych) |
-| `prompt` | `string` | Tak | _brak_ |  |
-| `first_frame_url` | `string` | Nie | _brak_ |  |
-| `last_frame_url` | `string` | Nie | _brak_ |  |
-| `duration_s` | `number` | Nie | `5` |  |
-| `aspect_ratio` | `options` | Nie | `16:9` | <br>_Dostępne opcje:_ `16:9`, `9:16`, `1:1` |
-| `resolution` | `options` | Nie | `720p` | <br>_Dostępne opcje:_ `720p`, `1080p`, `4k` |
-| `generate_audio` | `options` | Nie | `true` | <br>_Dostępne opcje:_ `true`, `false` |
+| `model` | `options` | Yes | `sora-2-azure` | <br>_Options:_ `sora-2-pro`, `sora-2-azure`, `veo-3.1-generate-001`, `veo-3.1-fast-generate-001`, `kling-v3` (+20 more) |
+| `prompt` | `string` | Yes | _none_ |  |
+| `first_frame_url` | `string` | No | _none_ |  |
+| `last_frame_url` | `string` | No | _none_ |  |
+| `duration_s` | `number` | No | `5` |  |
+| `aspect_ratio` | `options` | No | `16:9` | <br>_Options:_ `16:9`, `9:16`, `1:1` |
+| `resolution` | `options` | No | `720p` | <br>_Options:_ `720p`, `1080p`, `4k` |
+| `generate_audio` | `options` | No | `true` | <br>_Options:_ `true`, `false` |
 
 ```json
 {
@@ -2034,32 +2034,32 @@ Generuj wideo z tekstu lub klatki startowej (Sora, Veo, Kling, Seedance, Wan, Ha
   ],
   "params": {
     "model": "sora-2-azure",
-    "prompt": "<warto\u015b\u0107>"
+    "prompt": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.video.animate_image` — Animuj Obraz (Animate Image)
+#### `fotohub.video.animate_image` — Animate Image
 
-Przekształć statyczny obraz w dynamiczny klip wideo.
+Turn a still image into a short animated clip.
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/generate`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_second
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/generate`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_second
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `motion_prompt` | `string` | Nie | `subtle natural motion` |  |
-| `duration_s` | `number` | Nie | `4` |  |
+| `image_url` | `string` | Yes | _none_ |  |
+| `motion_prompt` | `string` | No | `subtle natural motion` |  |
+| `duration_s` | `number` | No | `4` |  |
 
 ```json
 {
@@ -2070,7 +2070,7 @@ Przekształć statyczny obraz w dynamiczny klip wideo.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
+    "image_url": "<value>",
     "motion_prompt": "subtle natural motion",
     "duration_s": 4
   }
@@ -2079,24 +2079,24 @@ Przekształć statyczny obraz w dynamiczny klip wideo.
 
 ---
 
-#### `fotohub.video.transcribe` — Transkrypcja Wideo (Transcribe Video)
+#### `fotohub.video.transcribe` — Transcribe Video
 
-Ekstrakcja napisów i tekstu z mowy (Whisper / chatterbox).
+Extract speech transcript (Whisper / chatterbox).
 
-- **Executor:** `http`
-- **Microservice:** `chatterbox` (ścieżka: `/transcribe`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_minute
+- **Executor Runtime:** `http`
+- **Microservice Service:** `chatterbox` (endpoint: `/transcribe`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_minute
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `language` | `options` | Nie | `auto` | <br>_Dostępne opcje:_ `auto`, `en`, `pl`, `de`, `es` (+3 innych) |
+| `video_url` | `string` | Yes | _none_ |  |
+| `language` | `options` | No | `auto` | <br>_Options:_ `auto`, `en`, `pl`, `de`, `es` (+3 more) |
 
 ```json
 {
@@ -2107,7 +2107,7 @@ Ekstrakcja napisów i tekstu z mowy (Whisper / chatterbox).
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "language": "auto"
   }
 }
@@ -2115,25 +2115,25 @@ Ekstrakcja napisów i tekstu z mowy (Whisper / chatterbox).
 
 ---
 
-#### `fotohub.video.render_timeline` — Renderuj Oś Czasu (Render Timeline)
+#### `fotohub.video.render_timeline` — Render Timeline
 
-Wyrenderuj pełny wielościeżkowy projekt wideo (klipy, dźwięk, napisy, efekty).
+Render a full multi-track video project (clips, audio, text, effects).
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/render`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_second
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/render`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_second
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `project_json` | `string` | Tak | _brak_ | Full video-engine timeline spec. |
-| `format` | `options` | Nie | `mp4` | <br>_Dostępne opcje:_ `mp4`, `webm`, `mov` |
-| `quality` | `options` | Nie | `1080p` | <br>_Dostępne opcje:_ `1080p`, `720p`, `480p`, `4k` |
+| `project_json` | `string` | Yes | _none_ | Full video-engine timeline spec. |
+| `format` | `options` | No | `mp4` | <br>_Options:_ `mp4`, `webm`, `mov` |
+| `quality` | `options` | No | `1080p` | <br>_Options:_ `1080p`, `720p`, `480p`, `4k` |
 
 ```json
 {
@@ -2144,7 +2144,7 @@ Wyrenderuj pełny wielościeżkowy projekt wideo (klipy, dźwięk, napisy, efekt
     150
   ],
   "params": {
-    "project_json": "<warto\u015b\u0107>",
+    "project_json": "<value>",
     "format": "mp4",
     "quality": "1080p"
   }
@@ -2153,25 +2153,25 @@ Wyrenderuj pełny wielościeżkowy projekt wideo (klipy, dźwięk, napisy, efekt
 
 ---
 
-#### `fotohub.video.transcode` — Transkodowanie (Transcode)
+#### `fotohub.video.transcode` — Transcode
 
-Konwertuj wideo na inny format, kodek lub rozdzielczość.
+Convert a video to another format/codec/resolution.
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/transcode`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_second
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/transcode`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_second
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `format` | `options` | Nie | `mp4` | <br>_Dostępne opcje:_ `mp4`, `webm`, `mov`, `gif` |
-| `quality` | `options` | Nie | `720p` | <br>_Dostępne opcje:_ `1080p`, `720p`, `480p` |
+| `video_url` | `string` | Yes | _none_ |  |
+| `format` | `options` | No | `mp4` | <br>_Options:_ `mp4`, `webm`, `mov`, `gif` |
+| `quality` | `options` | No | `720p` | <br>_Options:_ `1080p`, `720p`, `480p` |
 
 ```json
 {
@@ -2182,7 +2182,7 @@ Konwertuj wideo na inny format, kodek lub rozdzielczość.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "format": "mp4",
     "quality": "720p"
   }
@@ -2191,25 +2191,25 @@ Konwertuj wideo na inny format, kodek lub rozdzielczość.
 
 ---
 
-#### `fotohub.video.trim` — Przytnij Wideo (Trim)
+#### `fotohub.video.trim` — Trim
 
-Przytnij wideo do zadanego przedziału czasowego.
+Cut a video to [start, end] seconds.
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/trim`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/trim`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `start_s` | `number` | Nie | `0` |  |
-| `end_s` | `number` | Tak | _brak_ |  |
+| `video_url` | `string` | Yes | _none_ |  |
+| `start_s` | `number` | No | `0` |  |
+| `end_s` | `number` | Yes | _none_ |  |
 
 ```json
 {
@@ -2220,33 +2220,33 @@ Przytnij wideo do zadanego przedziału czasowego.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "start_s": 0,
-    "end_s": "<warto\u015b\u0107>"
+    "end_s": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.video.merge` — Połącz Klipy Wideo (Merge Videos)
+#### `fotohub.video.merge` — Merge Videos
 
-Połącz wiele klipów w jedno płynne wideo.
+Concatenate multiple clips into one.
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/merge`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_second
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/merge`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_second
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `urls_json` | `string` | Tak | _brak_ |  |
-| `transition` | `options` | Nie | `none` | <br>_Dostępne opcje:_ `none`, `fade`, `dissolve` |
+| `urls_json` | `string` | Yes | _none_ |  |
+| `transition` | `options` | No | `none` | <br>_Options:_ `none`, `fade`, `dissolve` |
 
 ```json
 {
@@ -2257,7 +2257,7 @@ Połącz wiele klipów w jedno płynne wideo.
     150
   ],
   "params": {
-    "urls_json": "<warto\u015b\u0107>",
+    "urls_json": "<value>",
     "transition": "none"
   }
 }
@@ -2265,23 +2265,23 @@ Połącz wiele klipów w jedno płynne wideo.
 
 ---
 
-#### `fotohub.video.extract_audio` — Wyodrębnij Audio (Extract Audio)
+#### `fotohub.video.extract_audio` — Extract Audio
 
-Zgraj ścieżkę dźwiękową z wideo jako plik MP3.
+Pull audio track out as MP3.
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/extract-audio`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/extract-audio`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
+| `video_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -2292,31 +2292,31 @@ Zgraj ścieżkę dźwiękową z wideo jako plik MP3.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>"
+    "video_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.video.extract_frames` — Wyciągnij Klatki (Extract Frames)
+#### `fotohub.video.extract_frames` — Extract Frames
 
-Pobierz klatki z wideo w równych odstępach czasowych.
+Grab N still frames from a video at even intervals.
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/extract-frames`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/extract-frames`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `count` | `number` | Nie | `10` |  |
+| `video_url` | `string` | Yes | _none_ |  |
+| `count` | `number` | No | `10` |  |
 
 ```json
 {
@@ -2327,7 +2327,7 @@ Pobierz klatki z wideo w równych odstępach czasowych.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "count": 10
   }
 }
@@ -2335,24 +2335,24 @@ Pobierz klatki z wideo w równych odstępach czasowych.
 
 ---
 
-#### `fotohub.video.stabilize` — Stabilizacja Wideo (Stabilize)
+#### `fotohub.video.stabilize` — Stabilize
 
-Zredukuje drgania kamery i ustabilizuje ruch.
+Remove camera shake.
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/stabilize`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_second
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/stabilize`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_second
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `strength` | `number` | Nie | `50` |  |
+| `video_url` | `string` | Yes | _none_ |  |
+| `strength` | `number` | No | `50` |  |
 
 ```json
 {
@@ -2363,7 +2363,7 @@ Zredukuje drgania kamery i ustabilizuje ruch.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "strength": 50
   }
 }
@@ -2371,24 +2371,24 @@ Zredukuje drgania kamery i ustabilizuje ruch.
 
 ---
 
-#### `fotohub.video.compress` — Kompresja Wideo (Compress)
+#### `fotohub.video.compress` — Compress
 
-Zmniejsz rozmiar pliku z zachowaniem optymalnej jakości.
+Reduce file size while preserving quality.
 
-- **Executor:** `http`
-- **Microservice:** `video-engine` (ścieżka: `/compress`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_second
+- **Executor Runtime:** `http`
+- **Microservice Service:** `video-engine` (endpoint: `/compress`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_second
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `target_size_mb` | `number` | Nie | `25` |  |
+| `video_url` | `string` | Yes | _none_ |  |
+| `target_size_mb` | `number` | No | `25` |  |
 
 ```json
 {
@@ -2399,7 +2399,7 @@ Zmniejsz rozmiar pliku z zachowaniem optymalnej jakości.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "target_size_mb": 25
   }
 }
@@ -2407,23 +2407,23 @@ Zmniejsz rozmiar pliku z zachowaniem optymalnej jakości.
 
 ---
 
-#### `fotohub.video.summarize` — Podsumuj Wideo (Summarize Video)
+#### `fotohub.video.summarize` — Summarize Video
 
-Wygeneruj tekstowe podsumowanie zawartości wideo.
+Generate a text summary of what's in a video.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_minute
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_minute
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `max_words` | `number` | Nie | `120` |  |
+| `video_url` | `string` | Yes | _none_ |  |
+| `max_words` | `number` | No | `120` |  |
 
 ```json
 {
@@ -2434,7 +2434,7 @@ Wygeneruj tekstowe podsumowanie zawartości wideo.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
+    "video_url": "<value>",
     "max_words": 120
   }
 }
@@ -2442,56 +2442,56 @@ Wygeneruj tekstowe podsumowanie zawartości wideo.
 
 ---
 
-## 🎵 FotoHub Audio, Voice & Music (Dźwięk, Muzyka, SFX) <a id="fotohub-audio"></a>
+## 🎵 FotoHub Audio, Voice & Music <a id="fotohub-audio"></a>
 
-> **Liczba węzłów:** 14 | **Identyfikator kategorii:** `fotohub.audio`
+> **Total Nodes:** 14 | **Category Identifier:** `fotohub.audio`
 
-Synteza mowy w 100+ językach z naturalną ekspresją, generowanie pełnych utworów muzycznych, efektów dźwiękowych SFX, profesjonalny mastering LUFS, separacja stemów i klonowanie barwy głosu.
+Expressive text-to-speech in 100+ languages, generative music composition (Suno, Udio), cinematic SFX, LUFS broadcast mastering, Whisper Large v3 speech-to-text, stem separation, and voice cloning.
 
-**Typowe zastosowanie produkcyjne:** Generowanie lektora w języku polskim, skomponowanie dedykowanego podkładu muzycznego w stylu lofi i zmasterowanie całości do standardów Spotify i YouTube.
+**Enterprise Use Case:** Generating multilingual voiceovers, composing custom royalty-free lofi background music, and mastering the combined audio to Spotify and YouTube standards.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `fotohub.audio.generate_voice` | **Generuj Głos (TTS)**<br>_Generate Voice_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_characters |
-| `fotohub.audio.generate_music` | **Generuj Muzykę AI**<br>_Generate Music_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.audio.generate_sfx` | **Generuj Efekty (SFX)**<br>_Generate Sound Effects (SFX)_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_operation |
-| `fotohub.audio.mastering` | **Mastering Audio**<br>_Audio Mastering_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.audio.dubbing` | **AI Dubbing**<br>_AI Dubbing_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_minute |
-| `fotohub.audio.transcribe` | **Transkrypcja Audio**<br>_Transcribe Audio_ | In: `main`<br>Out: `main, error` | `http` | per_minute |
-| `fotohub.audio.speech_to_speech` | **Speech to Speech AI**<br>_Audio: Speech-to-Speech_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_minute |
-| `fotohub.audio.voice_clone` | **Klonowanie Głosu**<br>_Voice Clone_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_characters |
-| `fotohub.audio.mix` | **Miksowanie Ścieżek**<br>_Mix Tracks_ | In: `main`<br>Out: `main, error` | `http` | per_minute |
-| `fotohub.audio.apply_effect` | **Zastosuj Efekt Audio**<br>_Apply Effect_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.audio.normalize` | **Normalizacja Głośności**<br>_Normalize Loudness_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.audio.separate_stems` | **Separacja Ścieżek (Stems)**<br>_Separate Stems_ | In: `main`<br>Out: `main, error` | `http` | per_minute |
-| `fotohub.audio.trim` | **Przytnij Audio**<br>_Trim Audio_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.audio.merge` | **Połącz Pliki Audio**<br>_Merge Audio_ | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.audio.generate_voice` | **Generate Voice** | In: `main`<br>Out: `main, error` | `edge_fn` | per_characters |
+| `fotohub.audio.generate_music` | **Generate Music** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.audio.generate_sfx` | **Generate Sound Effects (SFX)** | In: `main`<br>Out: `main, error` | `edge_fn` | per_operation |
+| `fotohub.audio.mastering` | **Audio Mastering** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.audio.dubbing` | **AI Dubbing** | In: `main`<br>Out: `main, error` | `edge_fn` | per_minute |
+| `fotohub.audio.transcribe` | **Transcribe Audio** | In: `main`<br>Out: `main, error` | `http` | per_minute |
+| `fotohub.audio.speech_to_speech` | **Audio: Speech-to-Speech** | In: `main`<br>Out: `main, error` | `edge_fn` | per_minute |
+| `fotohub.audio.voice_clone` | **Voice Clone** | In: `main`<br>Out: `main, error` | `edge_fn` | per_characters |
+| `fotohub.audio.mix` | **Mix Tracks** | In: `main`<br>Out: `main, error` | `http` | per_minute |
+| `fotohub.audio.apply_effect` | **Apply Effect** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.audio.normalize` | **Normalize Loudness** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.audio.separate_stems` | **Separate Stems** | In: `main`<br>Out: `main, error` | `http` | per_minute |
+| `fotohub.audio.trim` | **Trim Audio** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.audio.merge` | **Merge Audio** | In: `main`<br>Out: `main, error` | `http` | free |
 
-### Szczegółowa Specyfikacja Węzłów (FotoHub Audio, Voice & Music (Dźwięk, Muzyka, SFX))
+### Node Specifications (FotoHub Audio, Voice & Music)
 
-#### `fotohub.audio.generate_voice` — Generuj Głos (TTS) (Generate Voice)
+#### `fotohub.audio.generate_voice` — Generate Voice
 
-Synteza mowy lektora za pomocą ElevenLabs, Google TTS lub OpenAI TTS HD.
+Text-to-speech using ElevenLabs / chatterbox voices.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_characters
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_characters
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Tak | `elevenlabs` | <br>_Dostępne opcje:_ `elevenlabs`, `google-tts`, `openai-tts`, `bark` |
-| `text` | `string` | Tak | _brak_ |  |
-| `voice_id` | `options` | Nie | `ola-pl` | <br>_Dostępne opcje:_ `rachel`, `adam`, `ola-pl`, `jakub-pl`, `bella` (+4 innych) |
-| `language` | `options` | Nie | `pl` | <br>_Dostępne opcje:_ `pl`, `en`, `de`, `es`, `fr` (+1 innych) |
-| `speed` | `number` | Nie | `1.0` |  |
-| `stability` | `number` | Nie | `0.5` |  |
+| `model` | `options` | Yes | `elevenlabs` | <br>_Options:_ `elevenlabs`, `google-tts`, `openai-tts`, `bark` |
+| `text` | `string` | Yes | _none_ |  |
+| `voice_id` | `options` | No | `ola-pl` | <br>_Options:_ `rachel`, `adam`, `ola-pl`, `jakub-pl`, `bella` (+4 more) |
+| `language` | `options` | No | `pl` | <br>_Options:_ `pl`, `en`, `de`, `es`, `fr` (+1 more) |
+| `speed` | `number` | No | `1.0` |  |
+| `stability` | `number` | No | `0.5` |  |
 
 ```json
 {
@@ -2503,7 +2503,7 @@ Synteza mowy lektora za pomocą ElevenLabs, Google TTS lub OpenAI TTS HD.
   ],
   "params": {
     "model": "elevenlabs",
-    "text": "<warto\u015b\u0107>",
+    "text": "<value>",
     "voice_id": "ola-pl",
     "language": "pl"
   }
@@ -2512,28 +2512,28 @@ Synteza mowy lektora za pomocą ElevenLabs, Google TTS lub OpenAI TTS HD.
 
 ---
 
-#### `fotohub.audio.generate_music` — Generuj Muzykę AI (Generate Music)
+#### `fotohub.audio.generate_music` — Generate Music
 
-Twórz autorskie utwory muzyczne za pomocą Suno AI, Udio lub Stable Audio.
+Create original music from a prompt (Stable Audio / Udio).
 
-- **Executor:** `http`
-- **Microservice:** `music-server` (ścieżka: `/generate`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `music-server` (endpoint: `/generate`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Tak | `suno-ai` | <br>_Dostępne opcje:_ `suno-ai`, `udio`, `stable-audio-2`, `musicgen` |
-| `prompt` | `string` | Tak | _brak_ |  |
-| `genre` | `options` | Nie | `electronic` | <br>_Dostępne opcje:_ `electronic`, `hip-hop`, `pop`, `rock`, `classical` (+6 innych) |
-| `mood` | `options` | Nie | `energetic` | <br>_Dostępne opcje:_ `energetic`, `calm`, `epic`, `happy`, `dark` (+4 innych) |
-| `duration_s` | `number` | Nie | `30` |  |
-| `instrumental` | `options` | Nie | `true` | <br>_Dostępne opcje:_ `true`, `false` |
+| `model` | `options` | Yes | `suno-ai` | <br>_Options:_ `suno-ai`, `udio`, `stable-audio-2`, `musicgen` |
+| `prompt` | `string` | Yes | _none_ |  |
+| `genre` | `options` | No | `electronic` | <br>_Options:_ `electronic`, `hip-hop`, `pop`, `rock`, `classical` (+6 more) |
+| `mood` | `options` | No | `energetic` | <br>_Options:_ `energetic`, `calm`, `epic`, `happy`, `dark` (+4 more) |
+| `duration_s` | `number` | No | `30` |  |
+| `instrumental` | `options` | No | `true` | <br>_Options:_ `true`, `false` |
 
 ```json
 {
@@ -2545,7 +2545,7 @@ Twórz autorskie utwory muzyczne za pomocą Suno AI, Udio lub Stable Audio.
   ],
   "params": {
     "model": "suno-ai",
-    "prompt": "<warto\u015b\u0107>",
+    "prompt": "<value>",
     "genre": "electronic",
     "mood": "energetic"
   }
@@ -2554,24 +2554,24 @@ Twórz autorskie utwory muzyczne za pomocą Suno AI, Udio lub Stable Audio.
 
 ---
 
-#### `fotohub.audio.generate_sfx` — Generuj Efekty (SFX) (Generate Sound Effects (SFX))
+#### `fotohub.audio.generate_sfx` — Generate Sound Effects (SFX)
 
-Twórz niestandardowe efekty dźwiękowe z promptu tekstowego.
+Create custom sound effects from a descriptive prompt.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `prompt` | `string` | Tak | _brak_ |  |
-| `category` | `options` | Nie | `cinematic` | <br>_Dostępne opcje:_ `nature`, `urban`, `mechanical`, `digital`, `cinematic` (+1 innych) |
-| `duration_s` | `number` | Nie | `3` |  |
+| `prompt` | `string` | Yes | _none_ |  |
+| `category` | `options` | No | `cinematic` | <br>_Options:_ `nature`, `urban`, `mechanical`, `digital`, `cinematic` (+1 more) |
+| `duration_s` | `number` | No | `3` |  |
 
 ```json
 {
@@ -2582,7 +2582,7 @@ Twórz niestandardowe efekty dźwiękowe z promptu tekstowego.
     150
   ],
   "params": {
-    "prompt": "<warto\u015b\u0107>",
+    "prompt": "<value>",
     "category": "cinematic",
     "duration_s": 3
   }
@@ -2591,25 +2591,25 @@ Twórz niestandardowe efekty dźwiękowe z promptu tekstowego.
 
 ---
 
-#### `fotohub.audio.mastering` — Mastering Audio (Audio Mastering)
+#### `fotohub.audio.mastering` — Audio Mastering
 
-Profesjonalny mastering dźwięku AI z korekcją i limiterem.
+Professional AI audio mastering with EQ, compression and limiter presets.
 
-- **Executor:** `http`
-- **Microservice:** `music-server` (ścieżka: `/master`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `music-server` (endpoint: `/master`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `audio_url` | `string` | Tak | _brak_ |  |
-| `preset` | `options` | Nie | `punchy` | <br>_Dostępne opcje:_ `punchy`, `warm`, `club`, `podcast`, `cinematic` |
-| `target_lufs` | `number` | Nie | `-14` |  |
+| `audio_url` | `string` | Yes | _none_ |  |
+| `preset` | `options` | No | `punchy` | <br>_Options:_ `punchy`, `warm`, `club`, `podcast`, `cinematic` |
+| `target_lufs` | `number` | No | `-14` |  |
 
 ```json
 {
@@ -2620,7 +2620,7 @@ Profesjonalny mastering dźwięku AI z korekcją i limiterem.
     150
   ],
   "params": {
-    "audio_url": "<warto\u015b\u0107>",
+    "audio_url": "<value>",
     "preset": "punchy",
     "target_lufs": -14
   }
@@ -2629,24 +2629,24 @@ Profesjonalny mastering dźwięku AI z korekcją i limiterem.
 
 ---
 
-#### `fotohub.audio.dubbing` — AI Dubbing (AI Dubbing)
+#### `fotohub.audio.dubbing` — AI Dubbing
 
-Przetłumacz i zdubbinguj mowę na inny język z zachowaniem głosu.
+Translate and dub spoken audio into another language with matching voice timbre.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_minute
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_minute
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `audio_url` | `string` | Tak | _brak_ |  |
-| `target_language` | `options` | Nie | `en` | <br>_Dostępne opcje:_ `en`, `pl`, `de`, `es`, `fr` (+2 innych) |
-| `num_speakers` | `number` | Nie | `1` |  |
+| `audio_url` | `string` | Yes | _none_ |  |
+| `target_language` | `options` | No | `en` | <br>_Options:_ `en`, `pl`, `de`, `es`, `fr` (+2 more) |
+| `num_speakers` | `number` | No | `1` |  |
 
 ```json
 {
@@ -2657,7 +2657,7 @@ Przetłumacz i zdubbinguj mowę na inny język z zachowaniem głosu.
     150
   ],
   "params": {
-    "audio_url": "<warto\u015b\u0107>",
+    "audio_url": "<value>",
     "target_language": "en",
     "num_speakers": 1
   }
@@ -2666,24 +2666,24 @@ Przetłumacz i zdubbinguj mowę na inny język z zachowaniem głosu.
 
 ---
 
-#### `fotohub.audio.transcribe` — Transkrypcja Audio (Transcribe Audio)
+#### `fotohub.audio.transcribe` — Transcribe Audio
 
-Konwersja mowy na tekst z dokładnymi znacznikami czasu.
+Speech-to-text for an audio file.
 
-- **Executor:** `http`
-- **Microservice:** `chatterbox` (ścieżka: `/transcribe`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_minute
+- **Executor Runtime:** `http`
+- **Microservice Service:** `chatterbox` (endpoint: `/transcribe`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_minute
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `audio_url` | `string` | Tak | _brak_ |  |
-| `language` | `options` | Nie | `auto` | <br>_Dostępne opcje:_ `auto`, `en`, `pl`, `de`, `es` |
+| `audio_url` | `string` | Yes | _none_ |  |
+| `language` | `options` | No | `auto` | <br>_Options:_ `auto`, `en`, `pl`, `de`, `es` |
 
 ```json
 {
@@ -2694,7 +2694,7 @@ Konwersja mowy na tekst z dokładnymi znacznikami czasu.
     150
   ],
   "params": {
-    "audio_url": "<warto\u015b\u0107>",
+    "audio_url": "<value>",
     "language": "auto"
   }
 }
@@ -2702,25 +2702,25 @@ Konwersja mowy na tekst z dokładnymi znacznikami czasu.
 
 ---
 
-#### `fotohub.audio.speech_to_speech` — Speech to Speech AI (Audio: Speech-to-Speech)
+#### `fotohub.audio.speech_to_speech` — Audio: Speech-to-Speech
 
-Przekształć głos lektora w inny model głosu zachowując emocje i intonację.
+Convert spoken voice into a target character or tone.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_minute
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_minute
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `audio_url` | `string` | Tak | _brak_ |  |
-| `target_voice` | `options` | Nie | `ola-pl` | <br>_Dostępne opcje:_ `rachel`, `adam`, `ola-pl`, `jakub-pl`, `bella` (+4 innych) |
-| `preserve_emotion` | `options` | Nie | `true` | <br>_Dostępne opcje:_ `true`, `false` |
-| `remove_background` | `options` | Nie | `true` | <br>_Dostępne opcje:_ `true`, `false` |
+| `audio_url` | `string` | Yes | _none_ |  |
+| `target_voice` | `options` | No | `ola-pl` | <br>_Options:_ `rachel`, `adam`, `ola-pl`, `jakub-pl`, `bella` (+4 more) |
+| `preserve_emotion` | `options` | No | `true` | <br>_Options:_ `true`, `false` |
+| `remove_background` | `options` | No | `true` | <br>_Options:_ `true`, `false` |
 
 ```json
 {
@@ -2731,7 +2731,7 @@ Przekształć głos lektora w inny model głosu zachowując emocje i intonację.
     150
   ],
   "params": {
-    "audio_url": "<warto\u015b\u0107>",
+    "audio_url": "<value>",
     "target_voice": "ola-pl",
     "preserve_emotion": "true",
     "remove_background": "true"
@@ -2741,24 +2741,24 @@ Przekształć głos lektora w inny model głosu zachowując emocje i intonację.
 
 ---
 
-#### `fotohub.audio.voice_clone` — Klonowanie Głosu (Voice Clone)
+#### `fotohub.audio.voice_clone` — Voice Clone
 
-Sklonuj głos lektora z próbki referencyjnej i generuj nowe wypowiedzi.
+Clone a speaker's voice from a reference sample, then TTS with it.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `STARTER`
-- **Koszt operacji:** per_characters
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `STARTER`
+- **Execution Cost:** per_characters
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `reference_url` | `string` | Tak | _brak_ | 5-30s of clean speech. |
-| `text` | `string` | Tak | _brak_ |  |
-| `language` | `options` | Nie | `en` | <br>_Dostępne opcje:_ `en`, `pl`, `de`, `es`, `fr` |
+| `reference_url` | `string` | Yes | _none_ | 5-30s of clean speech. |
+| `text` | `string` | Yes | _none_ |  |
+| `language` | `options` | No | `en` | <br>_Options:_ `en`, `pl`, `de`, `es`, `fr` |
 
 ```json
 {
@@ -2769,8 +2769,8 @@ Sklonuj głos lektora z próbki referencyjnej i generuj nowe wypowiedzi.
     150
   ],
   "params": {
-    "reference_url": "<warto\u015b\u0107>",
-    "text": "<warto\u015b\u0107>",
+    "reference_url": "<value>",
+    "text": "<value>",
     "language": "en"
   }
 }
@@ -2778,23 +2778,23 @@ Sklonuj głos lektora z próbki referencyjnej i generuj nowe wypowiedzi.
 
 ---
 
-#### `fotohub.audio.mix` — Miksowanie Ścieżek (Mix Tracks)
+#### `fotohub.audio.mix` — Mix Tracks
 
-Połącz wiele ścieżek audio z niezależną głośnością i panoramą.
+Combine multiple audio tracks with per-track volume + pan.
 
-- **Executor:** `http`
-- **Microservice:** `music-server` (ścieżka: `/render`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_minute
+- **Executor Runtime:** `http`
+- **Microservice Service:** `music-server` (endpoint: `/render`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_minute
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `tracks_json` | `string` | Tak | _brak_ |  |
+| `tracks_json` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -2805,32 +2805,32 @@ Połącz wiele ścieżek audio z niezależną głośnością i panoramą.
     150
   ],
   "params": {
-    "tracks_json": "<warto\u015b\u0107>"
+    "tracks_json": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.audio.apply_effect` — Zastosuj Efekt Audio (Apply Effect)
+#### `fotohub.audio.apply_effect` — Apply Effect
 
-Nałóż pogłos, echo, korekcję EQ lub kompresję na dźwięk.
+Apply EQ / reverb / compression / echo to a track.
 
-- **Executor:** `http`
-- **Microservice:** `music-server` (ścieżka: `/effect`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `music-server` (endpoint: `/effect`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `audio_url` | `string` | Tak | _brak_ |  |
-| `effect` | `options` | Nie | `reverb` | <br>_Dostępne opcje:_ `reverb`, `echo`, `compression`, `eq_bright`, `eq_warm` (+3 innych) |
-| `intensity` | `number` | Nie | `50` |  |
+| `audio_url` | `string` | Yes | _none_ |  |
+| `effect` | `options` | No | `reverb` | <br>_Options:_ `reverb`, `echo`, `compression`, `eq_bright`, `eq_warm` (+3 more) |
+| `intensity` | `number` | No | `50` |  |
 
 ```json
 {
@@ -2841,7 +2841,7 @@ Nałóż pogłos, echo, korekcję EQ lub kompresję na dźwięk.
     150
   ],
   "params": {
-    "audio_url": "<warto\u015b\u0107>",
+    "audio_url": "<value>",
     "effect": "reverb",
     "intensity": 50
   }
@@ -2850,24 +2850,24 @@ Nałóż pogłos, echo, korekcję EQ lub kompresję na dźwięk.
 
 ---
 
-#### `fotohub.audio.normalize` — Normalizacja Głośności (Normalize Loudness)
+#### `fotohub.audio.normalize` — Normalize Loudness
 
-Normalizacja głośności wg standardu EBU R128.
+2-pass EBU R128 loudness normalization.
 
-- **Executor:** `http`
-- **Microservice:** `music-server` (ścieżka: `/normalize`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `music-server` (endpoint: `/normalize`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `audio_url` | `string` | Tak | _brak_ |  |
-| `target_lufs` | `number` | Nie | `-16` | −16 LUFS for podcasts, −14 for streaming |
+| `audio_url` | `string` | Yes | _none_ |  |
+| `target_lufs` | `number` | No | `-16` | −16 LUFS for podcasts, −14 for streaming |
 
 ```json
 {
@@ -2878,7 +2878,7 @@ Normalizacja głośności wg standardu EBU R128.
     150
   ],
   "params": {
-    "audio_url": "<warto\u015b\u0107>",
+    "audio_url": "<value>",
     "target_lufs": -16
   }
 }
@@ -2886,23 +2886,23 @@ Normalizacja głośności wg standardu EBU R128.
 
 ---
 
-#### `fotohub.audio.separate_stems` — Separacja Ścieżek (Stems) (Separate Stems)
+#### `fotohub.audio.separate_stems` — Separate Stems
 
-Rozdziel utwór na wokal, perkusję, bas i instrumenty.
+Split a mix into vocals, drums, bass, other (demucs).
 
-- **Executor:** `http`
-- **Microservice:** `music-server` (ścieżka: `/stems`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_minute
+- **Executor Runtime:** `http`
+- **Microservice Service:** `music-server` (endpoint: `/stems`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_minute
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `audio_url` | `string` | Tak | _brak_ |  |
+| `audio_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -2913,32 +2913,32 @@ Rozdziel utwór na wokal, perkusję, bas i instrumenty.
     150
   ],
   "params": {
-    "audio_url": "<warto\u015b\u0107>"
+    "audio_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.audio.trim` — Przytnij Audio (Trim Audio)
+#### `fotohub.audio.trim` — Trim Audio
 
-Wytnij fragment nagrania audio.
+Cut audio to [start, end] seconds.
 
-- **Executor:** `http`
-- **Microservice:** `music-server` (ścieżka: `/trim`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `music-server` (endpoint: `/trim`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `audio_url` | `string` | Tak | _brak_ |  |
-| `start_s` | `number` | Nie | `0` |  |
-| `end_s` | `number` | Tak | _brak_ |  |
+| `audio_url` | `string` | Yes | _none_ |  |
+| `start_s` | `number` | No | `0` |  |
+| `end_s` | `number` | Yes | _none_ |  |
 
 ```json
 {
@@ -2949,33 +2949,33 @@ Wytnij fragment nagrania audio.
     150
   ],
   "params": {
-    "audio_url": "<warto\u015b\u0107>",
+    "audio_url": "<value>",
     "start_s": 0,
-    "end_s": "<warto\u015b\u0107>"
+    "end_s": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.audio.merge` — Połącz Pliki Audio (Merge Audio)
+#### `fotohub.audio.merge` — Merge Audio
 
-Połącz wiele nagrań audio w jeden plik.
+Join multiple clips end-to-end.
 
-- **Executor:** `http`
-- **Microservice:** `music-server` (ścieżka: `/merge`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `music-server` (endpoint: `/merge`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `urls_json` | `string` | Tak | _brak_ |  |
-| `crossfade_ms` | `number` | Nie | `0` |  |
+| `urls_json` | `string` | Yes | _none_ |  |
+| `crossfade_ms` | `number` | No | `0` |  |
 
 ```json
 {
@@ -2986,7 +2986,7 @@ Połącz wiele nagrań audio w jeden plik.
     150
   ],
   "params": {
-    "urls_json": "<warto\u015b\u0107>",
+    "urls_json": "<value>",
     "crossfade_ms": 0
   }
 }
@@ -2994,42 +2994,42 @@ Połącz wiele nagrań audio w jeden plik.
 
 ---
 
-## 🎙️ Real-Time Voice & Streaming Audio (Głos w Czasie Rzeczywistym) <a id="voice"></a>
+## 🎙️ Real-Time Voice & Streaming Audio <a id="voice"></a>
 
-> **Liczba węzłów:** 3 | **Identyfikator kategorii:** `voice`
+> **Total Nodes:** 3 | **Category Identifier:** `voice`
 
-Dwukierunkowa, konwersacyjna komunikacja głosowa na żywo z ultraniskim opóźnieniem (<300ms), detekcją przerywania (VAD) i strumieniową syntezą WebSocket.
+Full-duplex conversational voice with sub-300ms latency, automatic voice activity detection (VAD), interruption handling, and streaming WebSocket transcription and synthesis.
 
-**Typowe zastosowanie produkcyjne:** Głosowy asystent infolinii fotograficznej przyjmujący zamówienia i doradzający w doborze sesji zdjęciowej przez telefon.
+**Enterprise Use Case:** An interactive phone/web voice assistant that conducts customer consultations, answers technical photography questions, and books appointments.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `voice.conversation` | **Rozmowa głosowa**<br>_Voice: Start Conversation_ | In: `main`<br>Out: `main, error` | `builtin` | per_minute |
-| `voice.end_call` | **Zakończ rozmowę**<br>_Zakończ rozmowę_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `voice.detect_language` | **Wykryj język**<br>_Wykryj język_ | In: `main`<br>Out: `main, error` | `builtin` | free |
+| `voice.conversation` | **Voice: Start Conversation** | In: `main`<br>Out: `main, error` | `builtin` | per_minute |
+| `voice.end_call` | **Zakończ rozmowę** | In: `main`<br>Out: `main` | `builtin` | free |
+| `voice.detect_language` | **Wykryj język** | In: `main`<br>Out: `main, error` | `builtin` | free |
 
-### Szczegółowa Specyfikacja Węzłów (Real-Time Voice & Streaming Audio (Głos w Czasie Rzeczywistym))
+### Node Specifications (Real-Time Voice & Streaming Audio)
 
-#### `voice.conversation` — Rozmowa głosowa (Voice: Start Conversation)
+#### `voice.conversation` — Voice: Start Conversation
 
-Start pętli rozmowy głosowej (IDA Voice/ElevenLabs).
+Initiate real-time full-duplex conversational audio session.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_minute
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_minute
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `first_message` | `string` | Nie | _brak_ |  |
-| `voice_id` | `string` | Nie | _brak_ |  |
-| `language` | `options` | Nie | `auto` | <br>_Dostępne opcje:_ `auto`, `pl`, `en`, `de`, `es` (+1 innych) |
+| `first_message` | `string` | No | _none_ |  |
+| `voice_id` | `string` | No | _none_ |  |
+| `language` | `options` | No | `auto` | <br>_Options:_ `auto`, `pl`, `en`, `de`, `es` (+1 more) |
 
 ```json
 {
@@ -3047,16 +3047,16 @@ Start pętli rozmowy głosowej (IDA Voice/ElevenLabs).
 
 ---
 
-#### `voice.end_call` — Zakończ rozmowę (Zakończ rozmowę)
+#### `voice.end_call` — Zakończ rozmowę
 
 Zamyka bieżącą rozmowę głosową.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
 ```json
 {
@@ -3072,16 +3072,16 @@ Zamyka bieżącą rozmowę głosową.
 
 ---
 
-#### `voice.detect_language` — Wykryj język (Wykryj język)
+#### `voice.detect_language` — Wykryj język
 
 Automatycznie wykrywa język mówcy w tle rozmowy.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
 ```json
 {
@@ -3097,44 +3097,44 @@ Automatycznie wykrywa język mówcy w tle rozmowy.
 
 ---
 
-## 🏷️ FotoHub Brand Governance (Zarządzanie Marką) <a id="fotohub-brand"></a>
+## 🏷️ FotoHub Brand Governance <a id="fotohub-brand"></a>
 
-> **Liczba węzłów:** 6 | **Identyfikator kategorii:** `fotohub.brand`
+> **Total Nodes:** 6 | **Category Identifier:** `fotohub.brand`
 
-Nadzór nad spójnością marki: automatyczna ekstrakcja wytycznych z PDF, generowanie palet kolorystycznych, znakowanie logo oraz bramki jakościowe weryfikujące zgodność z księgą znaku.
+Automated brand compliance: PDF brand guideline extraction, color palette generation, intelligent logo watermarking, and Delta-E visual compliance enforcement gates.
 
-**Typowe zastosowanie produkcyjne:** Blokowanie publikacji grafik, w których kolory akcentowe odbiegają o więcej niż DeltaE=2 od oficjalnej palety marki klienta.
+**Enterprise Use Case:** Automatically rejecting and re-generating marketing assets when accent colors deviate by more than DeltaE=2.0 from official corporate guidelines.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `fotohub.brand.get_face` | **Brand: Get Face**<br>_Brand: Get Face_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.brand.generate_face` | **Brand: Generate Face**<br>_Brand: Generate Face_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `fotohub.brand.get_logo` | **Brand: Get Logo**<br>_Brand: Get Logo_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.brand.get_product_shot` | **Brand: Get Product Shot**<br>_Brand: Get Product Shot_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.brand.extract_palette` | **Brand: Extract Palette**<br>_Brand: Extract Palette_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.brand.apply_to_image` | **Brand: Apply to Image**<br>_Brand: Apply to Image_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.brand.get_face` | **Brand: Get Face** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.brand.generate_face` | **Brand: Generate Face** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `fotohub.brand.get_logo` | **Brand: Get Logo** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.brand.get_product_shot` | **Brand: Get Product Shot** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.brand.extract_palette` | **Brand: Extract Palette** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.brand.apply_to_image` | **Brand: Apply to Image** | In: `main`<br>Out: `main, error` | `http` | per_operation |
 
-### Szczegółowa Specyfikacja Węzłów (FotoHub Brand Governance (Zarządzanie Marką))
+### Node Specifications (FotoHub Brand Governance)
 
-#### `fotohub.brand.get_face` — Brand: Get Face (Brand: Get Face)
+#### `fotohub.brand.get_face` — Brand: Get Face
 
 Fetch a brand face/character by ID.
 
-- **Executor:** `http`
-- **Microservice:** `brand-engine` (ścieżka: `/v1/faces/{face_id}`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `brand-engine` (endpoint: `/v1/faces/{face_id}`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `face_id` | `string` | Tak | _brak_ |  |
+| `face_id` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -3145,33 +3145,33 @@ Fetch a brand face/character by ID.
     150
   ],
   "params": {
-    "face_id": "<warto\u015b\u0107>"
+    "face_id": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.brand.generate_face` — Brand: Generate Face (Brand: Generate Face)
+#### `fotohub.brand.generate_face` — Brand: Generate Face
 
 Generate a new brand face using the image-engine.
 
-- **Executor:** `http`
-- **Microservice:** `brand-engine` (ścieżka: `/v1/faces/generate`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `brand-engine` (endpoint: `/v1/faces/generate`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `brand_id` | `string` | Tak | _brak_ |  |
-| `prompt` | `string` | Tak | _brak_ |  |
-| `model` | `options` | Nie | `nano-banana-pro` | <br>_Dostępne opcje:_ `nano-banana-pro`, `imagen-4-ultra`, `gpt-image-1.5`, `flux-1-pro` |
-| `perspective` | `options` | Nie | `front` | <br>_Dostępne opcje:_ `front`, `three-quarter-left`, `three-quarter-right`, `profile`, `back` |
+| `brand_id` | `string` | Yes | _none_ |  |
+| `prompt` | `string` | Yes | _none_ |  |
+| `model` | `options` | No | `nano-banana-pro` | <br>_Options:_ `nano-banana-pro`, `imagen-4-ultra`, `gpt-image-1.5`, `flux-1-pro` |
+| `perspective` | `options` | No | `front` | <br>_Options:_ `front`, `three-quarter-left`, `three-quarter-right`, `profile`, `back` |
 
 ```json
 {
@@ -3182,8 +3182,8 @@ Generate a new brand face using the image-engine.
     150
   ],
   "params": {
-    "brand_id": "<warto\u015b\u0107>",
-    "prompt": "<warto\u015b\u0107>",
+    "brand_id": "<value>",
+    "prompt": "<value>",
     "model": "nano-banana-pro",
     "perspective": "front"
   }
@@ -3192,23 +3192,23 @@ Generate a new brand face using the image-engine.
 
 ---
 
-#### `fotohub.brand.get_logo` — Brand: Get Logo (Brand: Get Logo)
+#### `fotohub.brand.get_logo` — Brand: Get Logo
 
 Fetch a logo asset URL.
 
-- **Executor:** `http`
-- **Microservice:** `brand-engine` (ścieżka: `/v1/logos/{logo_id}`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `brand-engine` (endpoint: `/v1/logos/{logo_id}`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `logo_id` | `string` | Tak | _brak_ |  |
+| `logo_id` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -3219,30 +3219,30 @@ Fetch a logo asset URL.
     150
   ],
   "params": {
-    "logo_id": "<warto\u015b\u0107>"
+    "logo_id": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.brand.get_product_shot` — Brand: Get Product Shot (Brand: Get Product Shot)
+#### `fotohub.brand.get_product_shot` — Brand: Get Product Shot
 
 Fetch a stored product photo.
 
-- **Executor:** `http`
-- **Microservice:** `brand-engine` (ścieżka: `/v1/products/{product_id}`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `brand-engine` (endpoint: `/v1/products/{product_id}`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `product_id` | `string` | Tak | _brak_ |  |
+| `product_id` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -3253,30 +3253,30 @@ Fetch a stored product photo.
     150
   ],
   "params": {
-    "product_id": "<warto\u015b\u0107>"
+    "product_id": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.brand.extract_palette` — Brand: Extract Palette (Brand: Extract Palette)
+#### `fotohub.brand.extract_palette` — Brand: Extract Palette
 
 Extract dominant + complementary colors from an image.
 
-- **Executor:** `http`
-- **Microservice:** `brand-engine` (ścieżka: `/v1/palette/extract`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `brand-engine` (endpoint: `/v1/palette/extract`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
+| `image_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -3287,32 +3287,32 @@ Extract dominant + complementary colors from an image.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>"
+    "image_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.brand.apply_to_image` — Brand: Apply to Image (Brand: Apply to Image)
+#### `fotohub.brand.apply_to_image` — Brand: Apply to Image
 
 Composite logo/watermark/colors onto an image.
 
-- **Executor:** `http`
-- **Microservice:** `brand-engine` (ścieżka: `/v1/brand/apply-to-image`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `brand-engine` (endpoint: `/v1/brand/apply-to-image`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `image_url` | `string` | Tak | _brak_ |  |
-| `brand_id` | `string` | Tak | _brak_ |  |
-| `apply` | `options` | Nie | `logo` | <br>_Dostępne opcje:_ `logo`, `watermark`, `both` |
+| `image_url` | `string` | Yes | _none_ |  |
+| `brand_id` | `string` | Yes | _none_ |  |
+| `apply` | `options` | No | `logo` | <br>_Options:_ `logo`, `watermark`, `both` |
 
 ```json
 {
@@ -3323,8 +3323,8 @@ Composite logo/watermark/colors onto an image.
     150
   ],
   "params": {
-    "image_url": "<warto\u015b\u0107>",
-    "brand_id": "<warto\u015b\u0107>",
+    "image_url": "<value>",
+    "brand_id": "<value>",
     "apply": "logo"
   }
 }
@@ -3332,46 +3332,46 @@ Composite logo/watermark/colors onto an image.
 
 ---
 
-## 🧠 AI Models, LLMs & Vision (Modele LLM & Analiza Wizualna) <a id="ai"></a>
+## 🧠 AI Models, LLMs & Vision <a id="ai"></a>
 
-> **Liczba węzłów:** 6 | **Identyfikator kategorii:** `ai`
+> **Total Nodes:** 6 | **Category Identifier:** `ai`
 
-Zintegrowane modele językowe i multimodalne (Claude 3.5 Sonnet, GPT-4o, Gemini 1.5 Pro) do promptowania, ekstrakcji ustrukturyzowanych schematów JSON, klasyfikacji i inspekcji wizualnej jakości.
+Direct integration with top-tier foundation models (Claude 3.5 Sonnet, GPT-4o, Gemini 1.5 Pro) for multimodal vision analysis, OCR inspection, text generation, sentiment classification, and embeddings.
 
-**Typowe zastosowanie produkcyjne:** Inspekcja jakości wygenerowanych grafik przez model wizyjny w celu odrzucenia artefaktów rąk czy zniekształconych napisów przed publikacją.
+**Enterprise Use Case:** Multimodal QA inspection checking generated imagery for distorted hands, unintended text artifacts, or anatomical defects prior to publishing.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `ai.chat` | **AI Chat**<br>_AI Chat_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
-| `ai.agent` | **AI Agent**<br>_AI Agent_ | In: `main, tools, memory`<br>Out: `main, error` | `llm_agent` | dynamic |
-| `ai.extract` | **Extract Structured Data**<br>_Extract Structured Data_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
-| `ai.classify` | **Classify**<br>_Classify_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
-| `analysis.evaluate` | **Analiza: oceń run**<br>_Analyze: Evaluate Run_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
-| `analysis.extract_data` | **Analiza: wydobądź dane**<br>_Analyze: Extract Data_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
+| `ai.chat` | **AI Chat** | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
+| `ai.agent` | **AI Agent** | In: `main, tools, memory`<br>Out: `main, error` | `llm_agent` | dynamic |
+| `ai.extract` | **Extract Structured Data** | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
+| `ai.classify` | **Classify** | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
+| `analysis.evaluate` | **Analyze: Evaluate Run** | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
+| `analysis.extract_data` | **Analyze: Extract Data** | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
 
-### Szczegółowa Specyfikacja Węzłów (AI Models, LLMs & Vision (Modele LLM & Analiza Wizualna))
+### Node Specifications (AI Models, LLMs & Vision)
 
-#### `ai.chat` — AI Chat (AI Chat)
+#### `ai.chat` — AI Chat
 
 Single LLM call with a prompt. Great for text generation, classification, rewrites.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_tokens
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_tokens
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Tak | `claude-sonnet-4-6` | <br>_Dostępne opcje:_ `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-5.1`, `gpt-5-mini` (+2 innych) |
-| `system_prompt` | `string` | Nie | _brak_ | Sets the model's role. |
-| `user_prompt` | `string` | Tak | _brak_ |  |
-| `` | `collapsible` | Nie | _brak_ | Advanced |
+| `model` | `options` | Yes | `claude-sonnet-4-6` | <br>_Options:_ `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-5.1`, `gpt-5-mini` (+2 more) |
+| `system_prompt` | `string` | No | _none_ | Sets the model's role. |
+| `user_prompt` | `string` | Yes | _none_ |  |
+| `` | `collapsible` | No | _none_ | Advanced |
 
 ```json
 {
@@ -3383,32 +3383,32 @@ Single LLM call with a prompt. Great for text generation, classification, rewrit
   ],
   "params": {
     "model": "claude-sonnet-4-6",
-    "user_prompt": "<warto\u015b\u0107>"
+    "user_prompt": "<value>"
   }
 }
 ```
 
 ---
 
-#### `ai.agent` — AI Agent (AI Agent)
+#### `ai.agent` — AI Agent
 
 An LLM agent that can call tools (child nodes) to accomplish a goal. Wire any FOTOhub action as a tool by connecting to the 'tools' input.
 
-- **Executor:** `llm_agent`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** dynamic
+- **Executor Runtime:** `llm_agent`
+- **Required Tier:** `FREE`
+- **Execution Cost:** dynamic
 
-- **Porty Wejściowe:** `main` (main), `tools` (ai_tool), `memory` (ai_memory)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main), `tools` (ai_tool), `memory` (ai_memory)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Tak | `claude-sonnet-4-6` | <br>_Dostępne opcje:_ `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-5.1`, `gpt-5-mini` (+2 innych) |
-| `instructions` | `string` | Tak | _brak_ | Appended to the system prompt. |
-| `user_goal` | `string` | Tak | _brak_ |  |
-| `` | `collapsible` | Nie | _brak_ | Advanced |
+| `model` | `options` | Yes | `claude-sonnet-4-6` | <br>_Options:_ `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-5.1`, `gpt-5-mini` (+2 more) |
+| `instructions` | `string` | Yes | _none_ | Appended to the system prompt. |
+| `user_goal` | `string` | Yes | _none_ |  |
+| `` | `collapsible` | No | _none_ | Advanced |
 
 ```json
 {
@@ -3420,32 +3420,32 @@ An LLM agent that can call tools (child nodes) to accomplish a goal. Wire any FO
   ],
   "params": {
     "model": "claude-sonnet-4-6",
-    "instructions": "<warto\u015b\u0107>",
-    "user_goal": "<warto\u015b\u0107>"
+    "instructions": "<value>",
+    "user_goal": "<value>"
   }
 }
 ```
 
 ---
 
-#### `ai.extract` — Extract Structured Data (Extract Structured Data)
+#### `ai.extract` — Extract Structured Data
 
 Use an LLM to extract structured JSON matching a schema from free text.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_tokens
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_tokens
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Nie | `claude-haiku-4-5` | <br>_Dostępne opcje:_ `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-5.1`, `gpt-5-mini` (+2 innych) |
-| `text` | `string` | Tak | _brak_ |  |
-| `schema` | `json` | Tak | `{'type': 'object', 'properties': {'name': {'type': 'string'}}, 'required': ['name']}` |  |
+| `model` | `options` | No | `claude-haiku-4-5` | <br>_Options:_ `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-5.1`, `gpt-5-mini` (+2 more) |
+| `text` | `string` | Yes | _none_ |  |
+| `schema` | `json` | Yes | `{'type': 'object', 'properties': {'name': {'type': 'string'}}, 'required': ['name']}` |  |
 
 ```json
 {
@@ -3457,7 +3457,7 @@ Use an LLM to extract structured JSON matching a schema from free text.
   ],
   "params": {
     "model": "claude-haiku-4-5",
-    "text": "<warto\u015b\u0107>",
+    "text": "<value>",
     "schema": {
       "type": "object",
       "properties": {
@@ -3475,24 +3475,24 @@ Use an LLM to extract structured JSON matching a schema from free text.
 
 ---
 
-#### `ai.classify` — Classify (Classify)
+#### `ai.classify` — Classify
 
 Classify input into one of N labels.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_tokens
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_tokens
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Nie | `claude-haiku-4-5` | <br>_Dostępne opcje:_ `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-5.1`, `gpt-5-mini` (+2 innych) |
-| `input` | `string` | Tak | _brak_ |  |
-| `labels` | `json` | Nie | `['positive', 'neutral', 'negative']` | Array of string labels. |
+| `model` | `options` | No | `claude-haiku-4-5` | <br>_Options:_ `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-5.1`, `gpt-5-mini` (+2 more) |
+| `input` | `string` | Yes | _none_ |  |
+| `labels` | `json` | No | `['positive', 'neutral', 'negative']` | Array of string labels. |
 
 ```json
 {
@@ -3504,7 +3504,7 @@ Classify input into one of N labels.
   ],
   "params": {
     "model": "claude-haiku-4-5",
-    "input": "<warto\u015b\u0107>",
+    "input": "<value>",
     "labels": [
       "positive",
       "neutral",
@@ -3516,23 +3516,23 @@ Classify input into one of N labels.
 
 ---
 
-#### `analysis.evaluate` — Analiza: oceń run (Analyze: Evaluate Run)
+#### `analysis.evaluate` — Analyze: Evaluate Run
 
-LLM ocenia przebieg runa względem skonfigurowanych kryteriów oceny.
+LLM evaluates workflow run quality against defined grading criteria.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_tokens
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_tokens
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Nie | `gemini-2.5-flash` | <br>_Dostępne opcje:_ `gemini-2.5-flash`, `claude-haiku-4-5`, `gpt-5-mini` |
-| `transcript_path` | `string` | Nie | `$.output` |  |
+| `model` | `options` | No | `gemini-2.5-flash` | <br>_Options:_ `gemini-2.5-flash`, `claude-haiku-4-5`, `gpt-5-mini` |
+| `transcript_path` | `string` | No | `$.output` |  |
 
 ```json
 {
@@ -3551,23 +3551,23 @@ LLM ocenia przebieg runa względem skonfigurowanych kryteriów oceny.
 
 ---
 
-#### `analysis.extract_data` — Analiza: wydobądź dane (Analyze: Extract Data)
+#### `analysis.extract_data` — Analyze: Extract Data
 
-Wydobywa ustrukturyzowane pola ze tekstu zgodnie z konfiguracją Analytics.
+Extract structured entities and fields from unstructured text.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_tokens
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_tokens
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `model` | `options` | Nie | `claude-haiku-4-5` | <br>_Dostępne opcje:_ `gemini-2.5-flash`, `claude-haiku-4-5` |
-| `text` | `string` | Tak | _brak_ |  |
+| `model` | `options` | No | `claude-haiku-4-5` | <br>_Options:_ `gemini-2.5-flash`, `claude-haiku-4-5` |
+| `text` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -3579,49 +3579,49 @@ Wydobywa ustrukturyzowane pola ze tekstu zgodnie z konfiguracją Analytics.
   ],
   "params": {
     "model": "claude-haiku-4-5",
-    "text": "<warto\u015b\u0107>"
+    "text": "<value>"
   }
 }
 ```
 
 ---
 
-## 📚 Knowledge Base & Vector Memory (Baza Wiedzy & Pamięć RAG) <a id="knowledge"></a>
+## 📚 Knowledge Base & Vector Memory <a id="knowledge"></a>
 
-> **Liczba węzłów:** 3 | **Identyfikator kategorii:** `knowledge`
+> **Total Nodes:** 3 | **Category Identifier:** `knowledge`
 
-Wyszukiwanie semantyczne (Retrieval-Augmented Generation), długoterminowa pamięć wektorowa agenta oraz zarządzanie partycjonowanymi kolekcjami wiedzy z automatycznym czasem życia TTL.
+Semantic document search (Retrieval-Augmented Generation), persistent agent vector memory, and partitioned tenant collections with automated TTL expiration.
 
-**Typowe zastosowanie produkcyjne:** Umożliwienie agentowi odpowiadania na pytania klientów na podstawie 500-stronicowej bazy wiedzy o sprzęcie fotograficznym i cennikach.
+**Enterprise Use Case:** Enabling customer service agents to answer inquiries using a 500-page enterprise knowledge base of camera gear, pricing tables, and studio policies.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `knowledge.retrieve` | **Knowledge Retrieve (RAG)**<br>_Knowledge Retrieve (RAG)_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_operation |
-| `memory.store` | **Zapamiętaj w Pamięci Agenta**<br>_Memory: Store Record_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `memory.query` | **Wyszukaj w Pamięci Agenta**<br>_Memory: Semantic Query_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
+| `knowledge.retrieve` | **Knowledge Retrieve (RAG)** | In: `main`<br>Out: `main, error` | `edge_fn` | per_operation |
+| `memory.store` | **Memory: Store Record** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `memory.query` | **Memory: Semantic Query** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
 
-### Szczegółowa Specyfikacja Węzłów (Knowledge Base & Vector Memory (Baza Wiedzy & Pamięć RAG))
+### Node Specifications (Knowledge Base & Vector Memory)
 
-#### `knowledge.retrieve` — Knowledge Retrieve (RAG) (Knowledge Retrieve (RAG))
+#### `knowledge.retrieve` — Knowledge Retrieve (RAG)
 
-Pobiera najbardziej podobne fragmenty z Bazy Wiedzy agenta dla podanego query.
+Retrieve relevant context passages from agent knowledge base.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `query` | `string` | Tak | _brak_ |  |
-| `k` | `number` | Nie | `5` |  |
-| `source` | `options` | Nie | `workflow` | Zakres wyszukiwania.<br>_Dostępne opcje:_ `all`, `workflow`, `global` |
+| `query` | `string` | Yes | _none_ |  |
+| `k` | `number` | No | `5` |  |
+| `source` | `options` | No | `workflow` | Zakres wyszukiwania.<br>_Options:_ `all`, `workflow`, `global` |
 
 ```json
 {
@@ -3632,7 +3632,7 @@ Pobiera najbardziej podobne fragmenty z Bazy Wiedzy agenta dla podanego query.
     150
   ],
   "params": {
-    "query": "<warto\u015b\u0107>",
+    "query": "<value>",
     "k": 5,
     "source": "workflow"
   }
@@ -3641,31 +3641,31 @@ Pobiera najbardziej podobne fragmenty z Bazy Wiedzy agenta dla podanego query.
 
 ---
 
-#### `memory.store` — Zapamiętaj w Pamięci Agenta (Memory: Store Record)
+#### `memory.store` — Memory: Store Record
 
-Zapisuje fakt, regułę lub preferencję stylu w długoterminowej pamięci wektorowej agenta.
+Store facts or context into agent long-term memory.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `content` | `string` | Tak | _brak_ |  |
-| `namespace` | `string` | Nie | `default` | Izolacja logiczna / przestrzeń nazw pamięci |
-| `collection_name` | `string` | Nie | `default` | Kolekcja wektorowa |
-| `tenant_id` | `string` | Nie | _brak_ | Identyfikator tenanta (domyślnie user_id) |
-| `category` | `options` | Nie | `brand_voice` | <br>_Dostępne opcje:_ `brand_voice`, `user_preference`, `project_rule`, `fact` |
-| `tags` | `string` | Nie | _brak_ |  |
-| `metadata` | `json` | Nie | _brak_ | Dowolne metadane powiązane z wpisem |
-| `ttl_seconds` | `number` | Nie | `0` |  |
-| `ttl_days` | `number` | Nie | `0` |  |
-| `embedding` | `json` | Nie | _brak_ |  |
+| `content` | `string` | Yes | _none_ |  |
+| `namespace` | `string` | No | `default` | Izolacja logiczna / przestrzeń nazw pamięci |
+| `collection_name` | `string` | No | `default` | Kolekcja wektorowa |
+| `tenant_id` | `string` | No | _none_ | Identyfikator tenanta (domyślnie user_id) |
+| `category` | `options` | No | `brand_voice` | <br>_Options:_ `brand_voice`, `user_preference`, `project_rule`, `fact` |
+| `tags` | `string` | No | _none_ |  |
+| `metadata` | `json` | No | _none_ | Dowolne metadane powiązane z wpisem |
+| `ttl_seconds` | `number` | No | `0` |  |
+| `ttl_days` | `number` | No | `0` |  |
+| `embedding` | `json` | No | _none_ |  |
 
 ```json
 {
@@ -3676,7 +3676,7 @@ Zapisuje fakt, regułę lub preferencję stylu w długoterminowej pamięci wekto
     150
   ],
   "params": {
-    "content": "<warto\u015b\u0107>",
+    "content": "<value>",
     "namespace": "default",
     "collection_name": "default"
   }
@@ -3685,30 +3685,30 @@ Zapisuje fakt, regułę lub preferencję stylu w długoterminowej pamięci wekto
 
 ---
 
-#### `memory.query` — Wyszukaj w Pamięci Agenta (Memory: Semantic Query)
+#### `memory.query` — Memory: Semantic Query
 
-Wyszukuje semantycznie powiązane wspomnienia, reguły i preferencje dla zadanego kontekstu.
+Query agent long-term vector memory for past interactions.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `query` | `string` | Tak | _brak_ |  |
-| `namespace` | `string` | Nie | `default` | Szukaj w zadanym namespace |
-| `collection_name` | `string` | Nie | `default` | Nazwa kolekcji |
-| `tenant_id` | `string` | Nie | _brak_ | Identyfikator tenanta (domyślnie user_id) |
-| `category_filter` | `options` | Nie | `all` | <br>_Dostępne opcje:_ `all`, `brand_voice`, `user_preference`, `project_rule`, `fact` |
-| `filter_metadata` | `json` | Nie | _brak_ | Zaawansowane filtry $eq, $in, $gte, $lte |
-| `min_score` | `number` | Nie | `0.7` |  |
-| `top_k` | `number` | Nie | `3` |  |
-| `query_vector` | `json` | Nie | _brak_ |  |
+| `query` | `string` | Yes | _none_ |  |
+| `namespace` | `string` | No | `default` | Szukaj w zadanym namespace |
+| `collection_name` | `string` | No | `default` | Nazwa kolekcji |
+| `tenant_id` | `string` | No | _none_ | Identyfikator tenanta (domyślnie user_id) |
+| `category_filter` | `options` | No | `all` | <br>_Options:_ `all`, `brand_voice`, `user_preference`, `project_rule`, `fact` |
+| `filter_metadata` | `json` | No | _none_ | Zaawansowane filtry $eq, $in, $gte, $lte |
+| `min_score` | `number` | No | `0.7` |  |
+| `top_k` | `number` | No | `3` |  |
+| `query_vector` | `json` | No | _none_ |  |
 
 ```json
 {
@@ -3719,7 +3719,7 @@ Wyszukuje semantycznie powiązane wspomnienia, reguły i preferencje dla zadaneg
     150
   ],
   "params": {
-    "query": "<warto\u015b\u0107>",
+    "query": "<value>",
     "namespace": "default",
     "collection_name": "default"
   }
@@ -3728,53 +3728,53 @@ Wyszukuje semantycznie powiązane wspomnienia, reguły i preferencje dla zadaneg
 
 ---
 
-## 📱 Social Media Publishing & Scheduling (Publikacja Społecznościowa) <a id="social"></a>
+## 📱 Social Media Publishing & Scheduling <a id="social"></a>
 
-> **Liczba węzłów:** 14 | **Identyfikator kategorii:** `social`
+> **Total Nodes:** 14 | **Category Identifier:** `social`
 
-Bezpośrednia publikacja i harmonogramowanie treści na Instagram (Post, Reel, Story), TikTok, YouTube Shorts, Facebook, LinkedIn, Twitter/X i Pinterest wraz z analityką wzmianek.
+Direct API publishing and intelligent scheduling across Instagram (Posts, Reels, Stories), TikTok, YouTube Shorts, Facebook, LinkedIn, Twitter/X, and Pinterest, complete with hashtag optimization.
 
-**Typowe zastosowanie produkcyjne:** Jednoczesna publikacja gotowej kampanii wideo na 6 platformach społecznościowych z dopasowanymi hashtagami i opisami pod każdą platformę.
+**Enterprise Use Case:** Simultaneously broadcasting a completed product video to 6 social networks with platform-tailored captions, optimal aspect ratios, and viral tags.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `social.publish_instagram_post` | **Instagram — Post**<br>_Instagram — Post_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `social.publish_instagram_reel` | **Instagram — Reel**<br>_Instagram — Reel_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `social.publish_instagram_story` | **Instagram — Story**<br>_Instagram — Story_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `social.publish_facebook_post` | **Facebook — Post**<br>_Facebook — Post_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `social.publish_tiktok_video` | **Tiktok — Video**<br>_Tiktok — Video_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `social.publish_youtube_short` | **Youtube — Short**<br>_Youtube — Short_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `social.publish_linkedin_post` | **Linkedin — Post**<br>_Linkedin — Post_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `social.publish_twitter_post` | **Twitter — Post**<br>_Twitter — Post_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `social.publish_pinterest_pin` | **Pinterest — Pin**<br>_Pinterest — Pin_ | In: `main`<br>Out: `main, error` | `http` | per_operation |
-| `social.schedule_post` | **Schedule Social Post**<br>_Schedule Social Post_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `social.generate_caption` | **Generate Caption**<br>_Generate Caption_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
-| `social.generate_hashtags` | **Generate Hashtags**<br>_Generate Hashtags_ | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
-| `social.listen_mentions` | **Listen: Mentions**<br>_Listen: Mentions_ | In: `main`<br>Out: `main, error` | `http` | free |
-| `fotohub.social.cross_publish` | **Publikacja Multi-Social**<br>_Multi-Social Publishing_ | In: `main`<br>Out: `main, error` | `builtin` | 1 cr (~$0.0000) |
+| `social.publish_instagram_post` | **Instagram — Post** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `social.publish_instagram_reel` | **Instagram — Reel** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `social.publish_instagram_story` | **Instagram — Story** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `social.publish_facebook_post` | **Facebook — Post** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `social.publish_tiktok_video` | **Tiktok — Video** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `social.publish_youtube_short` | **Youtube — Short** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `social.publish_linkedin_post` | **Linkedin — Post** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `social.publish_twitter_post` | **Twitter — Post** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `social.publish_pinterest_pin` | **Pinterest — Pin** | In: `main`<br>Out: `main, error` | `http` | per_operation |
+| `social.schedule_post` | **Schedule Social Post** | In: `main`<br>Out: `main, error` | `http` | free |
+| `social.generate_caption` | **Generate Caption** | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
+| `social.generate_hashtags` | **Generate Hashtags** | In: `main`<br>Out: `main, error` | `edge_fn` | per_tokens |
+| `social.listen_mentions` | **Listen: Mentions** | In: `main`<br>Out: `main, error` | `http` | free |
+| `fotohub.social.cross_publish` | **Multi-Social Publishing** | In: `main`<br>Out: `main, error` | `builtin` | 1 credits (~$0.0000) |
 
-### Szczegółowa Specyfikacja Węzłów (Social Media Publishing & Scheduling (Publikacja Społecznościowa))
+### Node Specifications (Social Media Publishing & Scheduling)
 
-#### `social.publish_instagram_post` — Instagram — Post (Instagram — Post)
+#### `social.publish_instagram_post` — Instagram — Post
 
 Publish a post to Instagram.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/instagram/publish/post`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/instagram/publish/post`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -3785,34 +3785,34 @@ Publish a post to Instagram.
     150
   ],
   "params": {
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>"
+    "caption": "<value>",
+    "media_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `social.publish_instagram_reel` — Instagram — Reel (Instagram — Reel)
+#### `social.publish_instagram_reel` — Instagram — Reel
 
 Publish a reel to Instagram.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/instagram/publish/reel`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/instagram/publish/reel`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
-| `thumbnail_url` | `string` | Nie | _brak_ |  |
-| `share_to_feed` | `boolean` | Nie | `True` |  |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
+| `thumbnail_url` | `string` | No | _none_ |  |
+| `share_to_feed` | `boolean` | No | `True` |  |
 
 ```json
 {
@@ -3823,8 +3823,8 @@ Publish a reel to Instagram.
     150
   ],
   "params": {
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>",
+    "caption": "<value>",
+    "media_url": "<value>",
     "share_to_feed": true
   }
 }
@@ -3832,24 +3832,24 @@ Publish a reel to Instagram.
 
 ---
 
-#### `social.publish_instagram_story` — Instagram — Story (Instagram — Story)
+#### `social.publish_instagram_story` — Instagram — Story
 
 Publish a story to Instagram.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/instagram/publish/story`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/instagram/publish/story`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -3860,33 +3860,33 @@ Publish a story to Instagram.
     150
   ],
   "params": {
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>"
+    "caption": "<value>",
+    "media_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `social.publish_facebook_post` — Facebook — Post (Facebook — Post)
+#### `social.publish_facebook_post` — Facebook — Post
 
 Publish a post to Facebook.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/facebook/publish/post`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/facebook/publish/post`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
-| `link_url` | `string` | Nie | _brak_ |  |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
+| `link_url` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -3897,33 +3897,33 @@ Publish a post to Facebook.
     150
   ],
   "params": {
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>"
+    "caption": "<value>",
+    "media_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `social.publish_tiktok_video` — Tiktok — Video (Tiktok — Video)
+#### `social.publish_tiktok_video` — Tiktok — Video
 
 Publish a video to Tiktok.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/tiktok/publish/video`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/tiktok/publish/video`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
-| `privacy` | `options` | Nie | `public` | <br>_Dostępne opcje:_ `public`, `friends`, `private` |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
+| `privacy` | `options` | No | `public` | <br>_Options:_ `public`, `friends`, `private` |
 
 ```json
 {
@@ -3934,8 +3934,8 @@ Publish a video to Tiktok.
     150
   ],
   "params": {
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>",
+    "caption": "<value>",
+    "media_url": "<value>",
     "privacy": "public"
   }
 }
@@ -3943,24 +3943,24 @@ Publish a video to Tiktok.
 
 ---
 
-#### `social.publish_youtube_short` — Youtube — Short (Youtube — Short)
+#### `social.publish_youtube_short` — Youtube — Short
 
 Publish a short to Youtube.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/youtube/publish/short`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/youtube/publish/short`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -3971,32 +3971,32 @@ Publish a short to Youtube.
     150
   ],
   "params": {
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>"
+    "caption": "<value>",
+    "media_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `social.publish_linkedin_post` — Linkedin — Post (Linkedin — Post)
+#### `social.publish_linkedin_post` — Linkedin — Post
 
 Publish a post to Linkedin.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/linkedin/publish/post`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/linkedin/publish/post`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -4007,33 +4007,33 @@ Publish a post to Linkedin.
     150
   ],
   "params": {
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>"
+    "caption": "<value>",
+    "media_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `social.publish_twitter_post` — Twitter — Post (Twitter — Post)
+#### `social.publish_twitter_post` — Twitter — Post
 
 Publish a post to Twitter.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/twitter/publish/post`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/twitter/publish/post`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
-| `reply_to_url` | `string` | Nie | _brak_ |  |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
+| `reply_to_url` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -4044,34 +4044,34 @@ Publish a post to Twitter.
     150
   ],
   "params": {
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>"
+    "caption": "<value>",
+    "media_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `social.publish_pinterest_pin` — Pinterest — Pin (Pinterest — Pin)
+#### `social.publish_pinterest_pin` — Pinterest — Pin
 
 Publish a pin to Pinterest.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/pinterest/publish/pin`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_operation
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/pinterest/publish/pin`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_operation
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
-| `board_id` | `string` | Tak | _brak_ |  |
-| `link_url` | `string` | Nie | _brak_ |  |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
+| `board_id` | `string` | Yes | _none_ |  |
+| `link_url` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -4082,35 +4082,35 @@ Publish a pin to Pinterest.
     150
   ],
   "params": {
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>",
-    "board_id": "<warto\u015b\u0107>"
+    "caption": "<value>",
+    "media_url": "<value>",
+    "board_id": "<value>"
   }
 }
 ```
 
 ---
 
-#### `social.schedule_post` — Schedule Social Post (Schedule Social Post)
+#### `social.schedule_post` — Schedule Social Post
 
 Queue a post for publication at a future time.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/schedule`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/schedule`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `platform` | `options` | Tak | _brak_ | <br>_Dostępne opcje:_ `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin` (+2 innych) |
-| `caption` | `string` | Tak | _brak_ |  |
-| `media_url` | `string` | Tak | _brak_ |  |
-| `publish_at` | `string` | Tak | _brak_ |  |
+| `platform` | `options` | Yes | _none_ | <br>_Options:_ `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin` (+2 more) |
+| `caption` | `string` | Yes | _none_ |  |
+| `media_url` | `string` | Yes | _none_ |  |
+| `publish_at` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -4121,35 +4121,35 @@ Queue a post for publication at a future time.
     150
   ],
   "params": {
-    "platform": "<warto\u015b\u0107>",
-    "caption": "<warto\u015b\u0107>",
-    "media_url": "<warto\u015b\u0107>",
-    "publish_at": "<warto\u015b\u0107>"
+    "platform": "<value>",
+    "caption": "<value>",
+    "media_url": "<value>",
+    "publish_at": "<value>"
   }
 }
 ```
 
 ---
 
-#### `social.generate_caption` — Generate Caption (Generate Caption)
+#### `social.generate_caption` — Generate Caption
 
 LLM-generated caption + hashtags tuned to a platform.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_tokens
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_tokens
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `topic` | `string` | Tak | _brak_ |  |
-| `platform` | `options` | Nie | `instagram` | <br>_Dostępne opcje:_ `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin` (+2 innych) |
-| `tone` | `options` | Nie | `casual` | <br>_Dostępne opcje:_ `casual`, `professional`, `funny`, `inspiring` |
-| `hashtag_count` | `number` | Nie | `10` |  |
+| `topic` | `string` | Yes | _none_ |  |
+| `platform` | `options` | No | `instagram` | <br>_Options:_ `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin` (+2 more) |
+| `tone` | `options` | No | `casual` | <br>_Options:_ `casual`, `professional`, `funny`, `inspiring` |
+| `hashtag_count` | `number` | No | `10` |  |
 
 ```json
 {
@@ -4160,7 +4160,7 @@ LLM-generated caption + hashtags tuned to a platform.
     150
   ],
   "params": {
-    "topic": "<warto\u015b\u0107>",
+    "topic": "<value>",
     "platform": "instagram",
     "tone": "casual",
     "hashtag_count": 10
@@ -4170,23 +4170,23 @@ LLM-generated caption + hashtags tuned to a platform.
 
 ---
 
-#### `social.generate_hashtags` — Generate Hashtags (Generate Hashtags)
+#### `social.generate_hashtags` — Generate Hashtags
 
 Produce N trending hashtags for a topic.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_tokens
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_tokens
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `topic` | `string` | Tak | _brak_ |  |
-| `count` | `number` | Nie | `10` |  |
+| `topic` | `string` | Yes | _none_ |  |
+| `count` | `number` | No | `10` |  |
 
 ```json
 {
@@ -4197,7 +4197,7 @@ Produce N trending hashtags for a topic.
     150
   ],
   "params": {
-    "topic": "<warto\u015b\u0107>",
+    "topic": "<value>",
     "count": 10
   }
 }
@@ -4205,25 +4205,25 @@ Produce N trending hashtags for a topic.
 
 ---
 
-#### `social.listen_mentions` — Listen: Mentions (Listen: Mentions)
+#### `social.listen_mentions` — Listen: Mentions
 
 Poll a platform for brand mentions since last run.
 
-- **Executor:** `http`
-- **Microservice:** `social-engine` (ścieżka: `/v1/listen/mentions`)
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `http`
+- **Microservice Service:** `social-engine` (endpoint: `/v1/listen/mentions`)
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `platform` | `options` | Tak | _brak_ | <br>_Dostępne opcje:_ `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin` (+2 innych) |
-| `keyword` | `string` | Tak | _brak_ |  |
-| `max_results` | `number` | Nie | `25` |  |
+| `platform` | `options` | Yes | _none_ | <br>_Options:_ `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin` (+2 more) |
+| `keyword` | `string` | Yes | _none_ |  |
+| `max_results` | `number` | No | `25` |  |
 
 ```json
 {
@@ -4234,8 +4234,8 @@ Poll a platform for brand mentions since last run.
     150
   ],
   "params": {
-    "platform": "<warto\u015b\u0107>",
-    "keyword": "<warto\u015b\u0107>",
+    "platform": "<value>",
+    "keyword": "<value>",
     "max_results": 25
   }
 }
@@ -4243,26 +4243,26 @@ Poll a platform for brand mentions since last run.
 
 ---
 
-#### `fotohub.social.cross_publish` — Publikacja Multi-Social (Multi-Social Publishing)
+#### `fotohub.social.cross_publish` — Multi-Social Publishing
 
-Jednoczesna publikacja materiałów na TikTok, Reels, YouTube Shorts i Facebook.
+Publish video or graphic simultaneously to TikTok, Reels, YouTube.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** 1 cr (~$0.0000)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** 1 credits (~$0.0000)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `video_url` | `string` | Tak | _brak_ |  |
-| `title` | `string` | Tak | _brak_ |  |
-| `description` | `string` | Nie | _brak_ |  |
-| `platforms` | `options` | Nie | `all` | <br>_Dostępne opcje:_ `all`, `tiktok_reels`, `youtube_shorts` |
-| `schedule_time` | `string` | Nie | _brak_ |  |
+| `video_url` | `string` | Yes | _none_ |  |
+| `title` | `string` | Yes | _none_ |  |
+| `description` | `string` | No | _none_ |  |
+| `platforms` | `options` | No | `all` | <br>_Options:_ `all`, `tiktok_reels`, `youtube_shorts` |
+| `schedule_time` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -4273,8 +4273,8 @@ Jednoczesna publikacja materiałów na TikTok, Reels, YouTube Shorts i Facebook.
     150
   ],
   "params": {
-    "video_url": "<warto\u015b\u0107>",
-    "title": "<warto\u015b\u0107>",
+    "video_url": "<value>",
+    "title": "<value>",
     "platforms": "all"
   }
 }
@@ -4282,100 +4282,100 @@ Jednoczesna publikacja materiałów na TikTok, Reels, YouTube Shorts i Facebook.
 
 ---
 
-## 🔌 External Integrations & E-Commerce (Konektory Zewnętrzne) <a id="integration"></a>
+## 🔌 External Integrations & E-Commerce <a id="integration"></a>
 
-> **Liczba węzłów:** 61 | **Identyfikator kategorii:** `integration`
+> **Total Nodes:** 61 | **Category Identifier:** `integration`
 
-61 konektorów do platform handlowych (Allegro, Shopify, WooCommerce, eBay, Etsy, PrestaShop), komunikatorów (Slack, Discord, Telegram), baz danych (Airtable, Notion, Google Sheets) i płatności (Stripe).
+61 production connectors for e-commerce platforms (Allegro, Shopify, WooCommerce, eBay, Etsy, PrestaShop, Shoper), payment processors (Stripe), CRMs (HubSpot, Salesforce), team messaging (Slack, Discord, Telegram, WhatsApp), and databases (Notion, Airtable, Google Sheets).
 
-**Typowe zastosowanie produkcyjne:** Automatyczne wystawianie aukcji na Allegro i eBay z wygenerowanymi zdjęciami produktowymi i zsynchronizowanym stanem magazynowym.
+**Enterprise Use Case:** Automatically generating product listings on Allegro, Shopify, and eBay complete with AI packshots, localized copy, and real-time inventory synchronization.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `mcp.call_tool` | **MCP Tool Call**<br>_MCP: Call Tool_ | In: `main`<br>Out: `main, error` | `mcp` | free |
-| `slack.send_message` | **Slack: Send Message**<br>_Slack: Send Message_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `slack.upload_file` | **Slack: Upload File**<br>_Slack: Upload File_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `gmail.send` | **Gmail: Send Email**<br>_Gmail: Send Email_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `gmail.list` | **Gmail: List Messages**<br>_Gmail: List Messages_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `calendar.create_event` | **Calendar: Create Event**<br>_Calendar: Create Event_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `drive.upload` | **Drive: Upload File**<br>_Drive: Upload File_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `sheets.append_row` | **Sheets: Append Row**<br>_Sheets: Append Row_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `sheets.read_range` | **Sheets: Read Range**<br>_Sheets: Read Range_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `notion.create_page` | **Notion: Create Page**<br>_Notion: Create Page_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `notion.query_db` | **Notion: Query Database**<br>_Notion: Query Database_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `airtable.create_record` | **Airtable: Create Record**<br>_Airtable: Create Record_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `airtable.list_records` | **Airtable: List Records**<br>_Airtable: List Records_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `discord.send_message` | **Discord: Send Message**<br>_Discord: Send Message_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `telegram.send_message` | **Telegram: Send Message**<br>_Telegram: Send Message_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `twilio.send_sms` | **Twilio: Send SMS**<br>_Twilio: Send SMS_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `shopify.create_product` | **Shopify: Create Product**<br>_Shopify: Create Product_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `shopify.update_product` | **Shopify: Update Product**<br>_Shopify: Update Product_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `shopify.list_products` | **Shopify: List Products**<br>_Shopify: List Products_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `shopify.update_inventory` | **Shopify: Update Inventory**<br>_Shopify: Update Inventory_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `shopify.list_orders` | **Shopify: List Orders**<br>_Shopify: List Orders_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `shopify.fulfill_order` | **Shopify: Fulfill Order**<br>_Shopify: Fulfill Order_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `woocommerce.create_product` | **WooCommerce: Create Product**<br>_WooCommerce: Create Product_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `woocommerce.update_product` | **WooCommerce: Update Product**<br>_WooCommerce: Update Product_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `woocommerce.list_orders` | **WooCommerce: List Orders**<br>_WooCommerce: List Orders_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `allegro.create_listing` | **Allegro: Wystaw ofertę**<br>_Allegro: Create Listing_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `allegro.update_listing` | **Allegro: Aktualizuj ofertę**<br>_Allegro: Aktualizuj ofertę_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `allegro.end_listing` | **Allegro: Zakończ ofertę**<br>_Allegro: End Listing_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `allegro.list_orders` | **Allegro: Pobierz zamówienia**<br>_Allegro: List Orders_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `amazon.create_listing` | **Amazon: Create Listing**<br>_Amazon: Create Listing_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `amazon.update_inventory` | **Amazon: Update Inventory**<br>_Amazon: Update Inventory_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `amazon.list_orders` | **Amazon: List Orders**<br>_Amazon: List Orders_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `etsy.create_listing` | **Etsy: Create Listing**<br>_Etsy: Create Listing_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `etsy.update_listing` | **Etsy: Update Listing**<br>_Etsy: Update Listing_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `etsy.list_orders` | **Etsy: Fetch Receipts**<br>_Etsy: Fetch Receipts_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `baselinker.add_product` | **BaseLinker: Dodaj produkt**<br>_BaseLinker: Dodaj produkt_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `baselinker.update_stock` | **BaseLinker: Aktualizuj stan**<br>_BaseLinker: Aktualizuj stan_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `baselinker.publish_to_marketplace` | **BaseLinker: Wystaw na marketplace**<br>_BaseLinker: Wystaw na marketplace_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `baselinker.list_orders` | **BaseLinker: Pobierz zamówienia**<br>_BaseLinker: Pobierz zamówienia_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `ceneo.upload_feed` | **Ceneo: Prześlij feed XML**<br>_Ceneo: Prześlij feed XML_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `ceneo.list_orders` | **Ceneo: Pobierz zamówienia (Kupuję)**<br>_Ceneo: Pobierz zamówienia (Kupuję)_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `ceneo.update_order_status` | **Ceneo: Aktualizuj status zamówienia**<br>_Ceneo: Aktualizuj status zamówienia_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `ceneo.price_compare` | **Ceneo: Porównaj cenę**<br>_Ceneo: Porównaj cenę_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `ebay.create_listing` | **eBay: Create Listing**<br>_eBay: Create Listing_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `ebay.update_listing` | **eBay: Update Listing**<br>_eBay: Update Listing_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `ebay.list_orders` | **eBay: List Orders**<br>_eBay: List Orders_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `ebay.ship_order` | **eBay: Mark Shipped**<br>_eBay: Mark Shipped_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `empik.create_offer` | **Empik: Wystaw ofertę**<br>_Empik: Wystaw ofertę_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `empik.list_orders` | **Empik: Pobierz zamówienia**<br>_Empik: Pobierz zamówienia_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `olx.create_ad` | **OLX: Wystaw ogłoszenie**<br>_OLX: Wystaw ogłoszenie_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `olx.list_messages` | **OLX: Pobierz wiadomości**<br>_OLX: Pobierz wiadomości_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `erli.create_listing` | **Erli: Wystaw ofertę**<br>_Erli: Wystaw ofertę_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `erli.list_orders` | **Erli: Pobierz zamówienia**<br>_Erli: Pobierz zamówienia_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `zalando.create_article` | **Zalando: Create Article**<br>_Zalando: Create Article_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `zalando.update_stock` | **Zalando: Update Stock**<br>_Zalando: Update Stock_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `zalando.list_orders` | **Zalando: List Orders**<br>_Zalando: List Orders_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `kaufland.create_offer` | **Kaufland: Create Offer**<br>_Kaufland: Create Offer_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `kaufland.list_orders` | **Kaufland: List Orders**<br>_Kaufland: List Orders_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `stripe.create_checkout` | **Stripe: Create Checkout**<br>_Stripe: Create Checkout_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `stripe.list_customers` | **Stripe: List Customers**<br>_Stripe: List Customers_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `mailchimp.add_subscriber` | **Mailchimp: Add Subscriber**<br>_Mailchimp: Add Subscriber_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `mcp.call_tool` | **MCP: Call Tool** | In: `main`<br>Out: `main, error` | `mcp` | free |
+| `slack.send_message` | **Slack: Send Message** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `slack.upload_file` | **Slack: Upload File** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `gmail.send` | **Gmail: Send Email** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `gmail.list` | **Gmail: List Messages** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `calendar.create_event` | **Calendar: Create Event** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `drive.upload` | **Drive: Upload File** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `sheets.append_row` | **Sheets: Append Row** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `sheets.read_range` | **Sheets: Read Range** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `notion.create_page` | **Notion: Create Page** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `notion.query_db` | **Notion: Query Database** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `airtable.create_record` | **Airtable: Create Record** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `airtable.list_records` | **Airtable: List Records** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `discord.send_message` | **Discord: Send Message** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `telegram.send_message` | **Telegram: Send Message** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `twilio.send_sms` | **Twilio: Send SMS** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `shopify.create_product` | **Shopify: Create Product** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `shopify.update_product` | **Shopify: Update Product** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `shopify.list_products` | **Shopify: List Products** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `shopify.update_inventory` | **Shopify: Update Inventory** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `shopify.list_orders` | **Shopify: List Orders** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `shopify.fulfill_order` | **Shopify: Fulfill Order** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `woocommerce.create_product` | **WooCommerce: Create Product** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `woocommerce.update_product` | **WooCommerce: Update Product** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `woocommerce.list_orders` | **WooCommerce: List Orders** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `allegro.create_listing` | **Allegro: Create Listing** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `allegro.update_listing` | **Allegro: Aktualizuj ofertę** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `allegro.end_listing` | **Allegro: End Listing** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `allegro.list_orders` | **Allegro: List Orders** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `amazon.create_listing` | **Amazon: Create Listing** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `amazon.update_inventory` | **Amazon: Update Inventory** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `amazon.list_orders` | **Amazon: List Orders** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `etsy.create_listing` | **Etsy: Create Listing** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `etsy.update_listing` | **Etsy: Update Listing** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `etsy.list_orders` | **Etsy: Fetch Receipts** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `baselinker.add_product` | **BaseLinker: Dodaj produkt** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `baselinker.update_stock` | **BaseLinker: Aktualizuj stan** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `baselinker.publish_to_marketplace` | **BaseLinker: Wystaw na marketplace** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `baselinker.list_orders` | **BaseLinker: Pobierz zamówienia** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `ceneo.upload_feed` | **Ceneo: Prześlij feed XML** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `ceneo.list_orders` | **Ceneo: Pobierz zamówienia (Kupuję)** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `ceneo.update_order_status` | **Ceneo: Aktualizuj status zamówienia** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `ceneo.price_compare` | **Ceneo: Porównaj cenę** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `ebay.create_listing` | **eBay: Create Listing** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `ebay.update_listing` | **eBay: Update Listing** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `ebay.list_orders` | **eBay: List Orders** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `ebay.ship_order` | **eBay: Mark Shipped** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `empik.create_offer` | **Empik: Wystaw ofertę** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `empik.list_orders` | **Empik: Pobierz zamówienia** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `olx.create_ad` | **OLX: Wystaw ogłoszenie** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `olx.list_messages` | **OLX: Pobierz wiadomości** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `erli.create_listing` | **Erli: Wystaw ofertę** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `erli.list_orders` | **Erli: Pobierz zamówienia** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `zalando.create_article` | **Zalando: Create Article** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `zalando.update_stock` | **Zalando: Update Stock** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `zalando.list_orders` | **Zalando: List Orders** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `kaufland.create_offer` | **Kaufland: Create Offer** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `kaufland.list_orders` | **Kaufland: List Orders** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `stripe.create_checkout` | **Stripe: Create Checkout** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `stripe.list_customers` | **Stripe: List Customers** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `mailchimp.add_subscriber` | **Mailchimp: Add Subscriber** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
 
-### Szczegółowa Specyfikacja Węzłów (External Integrations & E-Commerce (Konektory Zewnętrzne))
+### Node Specifications (External Integrations & E-Commerce)
 
-#### `mcp.call_tool` — MCP Tool Call (MCP: Call Tool)
+#### `mcp.call_tool` — MCP: Call Tool
 
-Wywołanie narzędzia z podłączonego serwera MCP.
+Invoke an external tool on a connected MCP server.
 
-- **Executor:** `mcp`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `mcp`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `server_name` | `string` | Tak | _brak_ |  |
-| `tool_name` | `string` | Tak | _brak_ |  |
-| `arguments` | `json` | Nie | `{}` |  |
+| `server_name` | `string` | Yes | _none_ |  |
+| `tool_name` | `string` | Yes | _none_ |  |
+| `arguments` | `json` | No | `{}` |  |
 
 ```json
 {
@@ -4386,8 +4386,8 @@ Wywołanie narzędzia z podłączonego serwera MCP.
     150
   ],
   "params": {
-    "server_name": "<warto\u015b\u0107>",
-    "tool_name": "<warto\u015b\u0107>",
+    "server_name": "<value>",
+    "tool_name": "<value>",
     "arguments": {}
   }
 }
@@ -4395,24 +4395,24 @@ Wywołanie narzędzia z podłączonego serwera MCP.
 
 ---
 
-#### `slack.send_message` — Slack: Send Message (Slack: Send Message)
+#### `slack.send_message` — Slack: Send Message
 
 Post a message to a channel or DM.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `channel` | `string` | Tak | _brak_ |  |
-| `text` | `string` | Tak | _brak_ |  |
-| `blocks` | `json` | Nie | _brak_ | Slack Block Kit JSON (optional) |
+| `channel` | `string` | Yes | _none_ |  |
+| `text` | `string` | Yes | _none_ |  |
+| `blocks` | `json` | No | _none_ | Slack Block Kit JSON (optional) |
 
 ```json
 {
@@ -4423,32 +4423,32 @@ Post a message to a channel or DM.
     150
   ],
   "params": {
-    "channel": "<warto\u015b\u0107>",
-    "text": "<warto\u015b\u0107>"
+    "channel": "<value>",
+    "text": "<value>"
   }
 }
 ```
 
 ---
 
-#### `slack.upload_file` — Slack: Upload File (Slack: Upload File)
+#### `slack.upload_file` — Slack: Upload File
 
 Share a file to a Slack channel.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `channel` | `string` | Tak | _brak_ |  |
-| `file_url` | `string` | Tak | _brak_ |  |
-| `title` | `string` | Nie | _brak_ |  |
+| `channel` | `string` | Yes | _none_ |  |
+| `file_url` | `string` | Yes | _none_ |  |
+| `title` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -4459,34 +4459,34 @@ Share a file to a Slack channel.
     150
   ],
   "params": {
-    "channel": "<warto\u015b\u0107>",
-    "file_url": "<warto\u015b\u0107>"
+    "channel": "<value>",
+    "file_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `gmail.send` — Gmail: Send Email (Gmail: Send Email)
+#### `gmail.send` — Gmail: Send Email
 
 Send an email via the connected Gmail account.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `to` | `string` | Tak | _brak_ |  |
-| `cc` | `string` | Nie | _brak_ |  |
-| `subject` | `string` | Tak | _brak_ |  |
-| `body` | `string` | Tak | _brak_ |  |
-| `body_type` | `options` | Nie | `text` | <br>_Dostępne opcje:_ `text`, `html` |
+| `to` | `string` | Yes | _none_ |  |
+| `cc` | `string` | No | _none_ |  |
+| `subject` | `string` | Yes | _none_ |  |
+| `body` | `string` | Yes | _none_ |  |
+| `body_type` | `options` | No | `text` | <br>_Options:_ `text`, `html` |
 
 ```json
 {
@@ -4497,32 +4497,32 @@ Send an email via the connected Gmail account.
     150
   ],
   "params": {
-    "to": "<warto\u015b\u0107>",
-    "subject": "<warto\u015b\u0107>",
-    "body": "<warto\u015b\u0107>"
+    "to": "<value>",
+    "subject": "<value>",
+    "body": "<value>"
   }
 }
 ```
 
 ---
 
-#### `gmail.list` — Gmail: List Messages (Gmail: List Messages)
+#### `gmail.list` — Gmail: List Messages
 
 Query messages using Gmail search syntax.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `query` | `string` | Nie | `is:unread` |  |
-| `max_results` | `number` | Nie | `20` |  |
+| `query` | `string` | No | `is:unread` |  |
+| `max_results` | `number` | No | `20` |  |
 
 ```json
 {
@@ -4541,27 +4541,27 @@ Query messages using Gmail search syntax.
 
 ---
 
-#### `calendar.create_event` — Calendar: Create Event (Calendar: Create Event)
+#### `calendar.create_event` — Calendar: Create Event
 
 Create a Google Calendar event.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `calendar_id` | `string` | Nie | `primary` |  |
-| `title` | `string` | Tak | _brak_ |  |
-| `description` | `string` | Nie | _brak_ |  |
-| `start` | `string` | Tak | _brak_ |  |
-| `end` | `string` | Tak | _brak_ |  |
-| `attendees` | `string` | Nie | _brak_ | Comma-separated emails |
+| `calendar_id` | `string` | No | `primary` |  |
+| `title` | `string` | Yes | _none_ |  |
+| `description` | `string` | No | _none_ |  |
+| `start` | `string` | Yes | _none_ |  |
+| `end` | `string` | Yes | _none_ |  |
+| `attendees` | `string` | No | _none_ | Comma-separated emails |
 
 ```json
 {
@@ -4573,32 +4573,32 @@ Create a Google Calendar event.
   ],
   "params": {
     "calendar_id": "primary",
-    "title": "<warto\u015b\u0107>",
-    "start": "<warto\u015b\u0107>"
+    "title": "<value>",
+    "start": "<value>"
   }
 }
 ```
 
 ---
 
-#### `drive.upload` — Drive: Upload File (Drive: Upload File)
+#### `drive.upload` — Drive: Upload File
 
 Upload a file to Google Drive.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `file_url` | `string` | Tak | _brak_ |  |
-| `folder_id` | `string` | Nie | _brak_ | Target folder ID (optional) |
-| `filename` | `string` | Nie | _brak_ |  |
+| `file_url` | `string` | Yes | _none_ |  |
+| `folder_id` | `string` | No | _none_ | Target folder ID (optional) |
+| `filename` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -4609,31 +4609,31 @@ Upload a file to Google Drive.
     150
   ],
   "params": {
-    "file_url": "<warto\u015b\u0107>"
+    "file_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `sheets.append_row` — Sheets: Append Row (Sheets: Append Row)
+#### `sheets.append_row` — Sheets: Append Row
 
 Append a row to a Google Sheet.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `spreadsheet_id` | `string` | Tak | _brak_ |  |
-| `sheet_name` | `string` | Nie | `Sheet1` |  |
-| `values` | `json` | Tak | _brak_ | Array of cell values, e.g. ["A", 123, true] |
+| `spreadsheet_id` | `string` | Yes | _none_ |  |
+| `sheet_name` | `string` | No | `Sheet1` |  |
+| `values` | `json` | Yes | _none_ | Array of cell values, e.g. ["A", 123, true] |
 
 ```json
 {
@@ -4644,32 +4644,32 @@ Append a row to a Google Sheet.
     150
   ],
   "params": {
-    "spreadsheet_id": "<warto\u015b\u0107>",
+    "spreadsheet_id": "<value>",
     "sheet_name": "Sheet1",
-    "values": "<warto\u015b\u0107>"
+    "values": "<value>"
   }
 }
 ```
 
 ---
 
-#### `sheets.read_range` — Sheets: Read Range (Sheets: Read Range)
+#### `sheets.read_range` — Sheets: Read Range
 
 Read a range of cells from a Google Sheet.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `spreadsheet_id` | `string` | Tak | _brak_ |  |
-| `range` | `string` | Tak | _brak_ |  |
+| `spreadsheet_id` | `string` | Yes | _none_ |  |
+| `range` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -4680,32 +4680,32 @@ Read a range of cells from a Google Sheet.
     150
   ],
   "params": {
-    "spreadsheet_id": "<warto\u015b\u0107>",
-    "range": "<warto\u015b\u0107>"
+    "spreadsheet_id": "<value>",
+    "range": "<value>"
   }
 }
 ```
 
 ---
 
-#### `notion.create_page` — Notion: Create Page (Notion: Create Page)
+#### `notion.create_page` — Notion: Create Page
 
 Create a page in a Notion database.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `database_id` | `string` | Tak | _brak_ |  |
-| `properties` | `json` | Tak | _brak_ |  |
-| `content_md` | `string` | Nie | _brak_ |  |
+| `database_id` | `string` | Yes | _none_ |  |
+| `properties` | `json` | Yes | _none_ |  |
+| `content_md` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -4716,32 +4716,32 @@ Create a page in a Notion database.
     150
   ],
   "params": {
-    "database_id": "<warto\u015b\u0107>",
-    "properties": "<warto\u015b\u0107>"
+    "database_id": "<value>",
+    "properties": "<value>"
   }
 }
 ```
 
 ---
 
-#### `notion.query_db` — Notion: Query Database (Notion: Query Database)
+#### `notion.query_db` — Notion: Query Database
 
 Fetch pages from a Notion database with filters.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `database_id` | `string` | Tak | _brak_ |  |
-| `filter` | `json` | Nie | _brak_ | Notion filter object |
-| `page_size` | `number` | Nie | `25` |  |
+| `database_id` | `string` | Yes | _none_ |  |
+| `filter` | `json` | No | _none_ | Notion filter object |
+| `page_size` | `number` | No | `25` |  |
 
 ```json
 {
@@ -4752,7 +4752,7 @@ Fetch pages from a Notion database with filters.
     150
   ],
   "params": {
-    "database_id": "<warto\u015b\u0107>",
+    "database_id": "<value>",
     "page_size": 25
   }
 }
@@ -4760,24 +4760,24 @@ Fetch pages from a Notion database with filters.
 
 ---
 
-#### `airtable.create_record` — Airtable: Create Record (Airtable: Create Record)
+#### `airtable.create_record` — Airtable: Create Record
 
 Create one record in an Airtable base/table.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `base_id` | `string` | Tak | _brak_ |  |
-| `table` | `string` | Tak | _brak_ |  |
-| `fields` | `json` | Tak | _brak_ |  |
+| `base_id` | `string` | Yes | _none_ |  |
+| `table` | `string` | Yes | _none_ |  |
+| `fields` | `json` | Yes | _none_ |  |
 
 ```json
 {
@@ -4788,34 +4788,34 @@ Create one record in an Airtable base/table.
     150
   ],
   "params": {
-    "base_id": "<warto\u015b\u0107>",
-    "table": "<warto\u015b\u0107>",
-    "fields": "<warto\u015b\u0107>"
+    "base_id": "<value>",
+    "table": "<value>",
+    "fields": "<value>"
   }
 }
 ```
 
 ---
 
-#### `airtable.list_records` — Airtable: List Records (Airtable: List Records)
+#### `airtable.list_records` — Airtable: List Records
 
 Fetch records from a table (with optional filterByFormula).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `base_id` | `string` | Tak | _brak_ |  |
-| `table` | `string` | Tak | _brak_ |  |
-| `filter_by_formula` | `string` | Nie | _brak_ | Airtable formula, e.g. {Status}='active' |
-| `max_records` | `number` | Nie | `50` |  |
+| `base_id` | `string` | Yes | _none_ |  |
+| `table` | `string` | Yes | _none_ |  |
+| `filter_by_formula` | `string` | No | _none_ | Airtable formula, e.g. {Status}='active' |
+| `max_records` | `number` | No | `50` |  |
 
 ```json
 {
@@ -4826,8 +4826,8 @@ Fetch records from a table (with optional filterByFormula).
     150
   ],
   "params": {
-    "base_id": "<warto\u015b\u0107>",
-    "table": "<warto\u015b\u0107>",
+    "base_id": "<value>",
+    "table": "<value>",
     "max_records": 50
   }
 }
@@ -4835,24 +4835,24 @@ Fetch records from a table (with optional filterByFormula).
 
 ---
 
-#### `discord.send_message` — Discord: Send Message (Discord: Send Message)
+#### `discord.send_message` — Discord: Send Message
 
 Post to a Discord channel via webhook or bot token.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `channel_id` | `string` | Tak | _brak_ |  |
-| `content` | `string` | Tak | _brak_ |  |
-| `embeds` | `json` | Nie | _brak_ |  |
+| `channel_id` | `string` | Yes | _none_ |  |
+| `content` | `string` | Yes | _none_ |  |
+| `embeds` | `json` | No | _none_ |  |
 
 ```json
 {
@@ -4863,32 +4863,32 @@ Post to a Discord channel via webhook or bot token.
     150
   ],
   "params": {
-    "channel_id": "<warto\u015b\u0107>",
-    "content": "<warto\u015b\u0107>"
+    "channel_id": "<value>",
+    "content": "<value>"
   }
 }
 ```
 
 ---
 
-#### `telegram.send_message` — Telegram: Send Message (Telegram: Send Message)
+#### `telegram.send_message` — Telegram: Send Message
 
 Send a message via Telegram Bot API.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `chat_id` | `string` | Tak | _brak_ |  |
-| `text` | `string` | Tak | _brak_ |  |
-| `parse_mode` | `options` | Nie | `none` | <br>_Dostępne opcje:_ `none`, `Markdown`, `HTML` |
+| `chat_id` | `string` | Yes | _none_ |  |
+| `text` | `string` | Yes | _none_ |  |
+| `parse_mode` | `options` | No | `none` | <br>_Options:_ `none`, `Markdown`, `HTML` |
 
 ```json
 {
@@ -4899,8 +4899,8 @@ Send a message via Telegram Bot API.
     150
   ],
   "params": {
-    "chat_id": "<warto\u015b\u0107>",
-    "text": "<warto\u015b\u0107>",
+    "chat_id": "<value>",
+    "text": "<value>",
     "parse_mode": "none"
   }
 }
@@ -4908,23 +4908,23 @@ Send a message via Telegram Bot API.
 
 ---
 
-#### `twilio.send_sms` — Twilio: Send SMS (Twilio: Send SMS)
+#### `twilio.send_sms` — Twilio: Send SMS
 
 Send an SMS via Twilio.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `to` | `string` | Tak | _brak_ |  |
-| `body` | `string` | Tak | _brak_ |  |
+| `to` | `string` | Yes | _none_ |  |
+| `body` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -4935,34 +4935,34 @@ Send an SMS via Twilio.
     150
   ],
   "params": {
-    "to": "<warto\u015b\u0107>",
-    "body": "<warto\u015b\u0107>"
+    "to": "<value>",
+    "body": "<value>"
   }
 }
 ```
 
 ---
 
-#### `shopify.create_product` — Shopify: Create Product (Shopify: Create Product)
+#### `shopify.create_product` — Shopify: Create Product
 
 Add a new product to the Shopify store.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `title` | `string` | Tak | _brak_ |  |
-| `description` | `string` | Nie | _brak_ |  |
-| `price` | `number` | Tak | _brak_ |  |
-| `images` | `json` | Nie | _brak_ | Array of image URLs |
-| `variants` | `json` | Nie | _brak_ |  |
+| `title` | `string` | Yes | _none_ |  |
+| `description` | `string` | No | _none_ |  |
+| `price` | `number` | Yes | _none_ |  |
+| `images` | `json` | No | _none_ | Array of image URLs |
+| `variants` | `json` | No | _none_ |  |
 
 ```json
 {
@@ -4973,31 +4973,31 @@ Add a new product to the Shopify store.
     150
   ],
   "params": {
-    "title": "<warto\u015b\u0107>",
-    "price": "<warto\u015b\u0107>"
+    "title": "<value>",
+    "price": "<value>"
   }
 }
 ```
 
 ---
 
-#### `shopify.update_product` — Shopify: Update Product (Shopify: Update Product)
+#### `shopify.update_product` — Shopify: Update Product
 
 Update product fields.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `product_id` | `string` | Tak | _brak_ |  |
-| `fields` | `json` | Tak | _brak_ |  |
+| `product_id` | `string` | Yes | _none_ |  |
+| `fields` | `json` | Yes | _none_ |  |
 
 ```json
 {
@@ -5008,31 +5008,31 @@ Update product fields.
     150
   ],
   "params": {
-    "product_id": "<warto\u015b\u0107>",
-    "fields": "<warto\u015b\u0107>"
+    "product_id": "<value>",
+    "fields": "<value>"
   }
 }
 ```
 
 ---
 
-#### `shopify.list_products` — Shopify: List Products (Shopify: List Products)
+#### `shopify.list_products` — Shopify: List Products
 
 Paginate products in the Shopify store.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `limit` | `number` | Nie | `50` |  |
-| `status` | `string` | Nie | _brak_ | active | draft | archived |
+| `limit` | `number` | No | `50` |  |
+| `status` | `string` | No | _none_ | active | draft | archived |
 
 ```json
 {
@@ -5050,24 +5050,24 @@ Paginate products in the Shopify store.
 
 ---
 
-#### `shopify.update_inventory` — Shopify: Update Inventory (Shopify: Update Inventory)
+#### `shopify.update_inventory` — Shopify: Update Inventory
 
 Adjust stock level for a variant.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `inventory_item_id` | `string` | Tak | _brak_ |  |
-| `location_id` | `string` | Tak | _brak_ |  |
-| `available` | `number` | Tak | _brak_ | Absolute available count (not delta). |
+| `inventory_item_id` | `string` | Yes | _none_ |  |
+| `location_id` | `string` | Yes | _none_ |  |
+| `available` | `number` | Yes | _none_ | Absolute available count (not delta). |
 
 ```json
 {
@@ -5078,34 +5078,34 @@ Adjust stock level for a variant.
     150
   ],
   "params": {
-    "inventory_item_id": "<warto\u015b\u0107>",
-    "location_id": "<warto\u015b\u0107>",
-    "available": "<warto\u015b\u0107>"
+    "inventory_item_id": "<value>",
+    "location_id": "<value>",
+    "available": "<value>"
   }
 }
 ```
 
 ---
 
-#### `shopify.list_orders` — Shopify: List Orders (Shopify: List Orders)
+#### `shopify.list_orders` — Shopify: List Orders
 
 Fetch recent orders, optionally filtered.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `status` | `options` | Nie | `any` | <br>_Dostępne opcje:_ `any`, `open`, `closed`, `cancelled` |
-| `financial_status` | `options` | Nie | `any` | <br>_Dostępne opcje:_ `any`, `paid`, `pending`, `refunded`, `partially_refunded` |
-| `limit` | `number` | Nie | `50` |  |
-| `since_id` | `string` | Nie | _brak_ | Only orders after this id |
+| `status` | `options` | No | `any` | <br>_Options:_ `any`, `open`, `closed`, `cancelled` |
+| `financial_status` | `options` | No | `any` | <br>_Options:_ `any`, `paid`, `pending`, `refunded`, `partially_refunded` |
+| `limit` | `number` | No | `50` |  |
+| `since_id` | `string` | No | _none_ | Only orders after this id |
 
 ```json
 {
@@ -5125,25 +5125,25 @@ Fetch recent orders, optionally filtered.
 
 ---
 
-#### `shopify.fulfill_order` — Shopify: Fulfill Order (Shopify: Fulfill Order)
+#### `shopify.fulfill_order` — Shopify: Fulfill Order
 
 Mark an order as fulfilled with tracking info.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `order_id` | `string` | Tak | _brak_ |  |
-| `tracking_number` | `string` | Nie | _brak_ |  |
-| `tracking_company` | `string` | Nie | _brak_ |  |
-| `notify_customer` | `boolean` | Nie | `True` |  |
+| `order_id` | `string` | Yes | _none_ |  |
+| `tracking_number` | `string` | No | _none_ |  |
+| `tracking_company` | `string` | No | _none_ |  |
+| `notify_customer` | `boolean` | No | `True` |  |
 
 ```json
 {
@@ -5154,7 +5154,7 @@ Mark an order as fulfilled with tracking info.
     150
   ],
   "params": {
-    "order_id": "<warto\u015b\u0107>",
+    "order_id": "<value>",
     "notify_customer": true
   }
 }
@@ -5162,28 +5162,28 @@ Mark an order as fulfilled with tracking info.
 
 ---
 
-#### `woocommerce.create_product` — WooCommerce: Create Product (WooCommerce: Create Product)
+#### `woocommerce.create_product` — WooCommerce: Create Product
 
 Create a product in WooCommerce via REST API.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `name` | `string` | Tak | _brak_ |  |
-| `sku` | `string` | Nie | _brak_ |  |
-| `regular_price` | `number` | Tak | _brak_ |  |
-| `description` | `string` | Nie | _brak_ |  |
-| `categories` | `json` | Nie | _brak_ | Array of category IDs |
-| `images` | `json` | Nie | _brak_ | Array of image URLs |
-| `status` | `options` | Nie | `publish` | <br>_Dostępne opcje:_ `publish`, `draft`, `private` |
+| `name` | `string` | Yes | _none_ |  |
+| `sku` | `string` | No | _none_ |  |
+| `regular_price` | `number` | Yes | _none_ |  |
+| `description` | `string` | No | _none_ |  |
+| `categories` | `json` | No | _none_ | Array of category IDs |
+| `images` | `json` | No | _none_ | Array of image URLs |
+| `status` | `options` | No | `publish` | <br>_Options:_ `publish`, `draft`, `private` |
 
 ```json
 {
@@ -5194,31 +5194,31 @@ Create a product in WooCommerce via REST API.
     150
   ],
   "params": {
-    "name": "<warto\u015b\u0107>",
-    "regular_price": "<warto\u015b\u0107>"
+    "name": "<value>",
+    "regular_price": "<value>"
   }
 }
 ```
 
 ---
 
-#### `woocommerce.update_product` — WooCommerce: Update Product (WooCommerce: Update Product)
+#### `woocommerce.update_product` — WooCommerce: Update Product
 
 Update WooCommerce product fields.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `product_id` | `string` | Tak | _brak_ |  |
-| `fields` | `json` | Tak | _brak_ |  |
+| `product_id` | `string` | Yes | _none_ |  |
+| `fields` | `json` | Yes | _none_ |  |
 
 ```json
 {
@@ -5229,31 +5229,31 @@ Update WooCommerce product fields.
     150
   ],
   "params": {
-    "product_id": "<warto\u015b\u0107>",
-    "fields": "<warto\u015b\u0107>"
+    "product_id": "<value>",
+    "fields": "<value>"
   }
 }
 ```
 
 ---
 
-#### `woocommerce.list_orders` — WooCommerce: List Orders (WooCommerce: List Orders)
+#### `woocommerce.list_orders` — WooCommerce: List Orders
 
 Paginate recent WooCommerce orders.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `status` | `options` | Nie | `any` | <br>_Dostępne opcje:_ `any`, `pending`, `processing`, `completed`, `refunded` |
-| `per_page` | `number` | Nie | `20` |  |
+| `status` | `options` | No | `any` | <br>_Options:_ `any`, `pending`, `processing`, `completed`, `refunded` |
+| `per_page` | `number` | No | `20` |  |
 
 ```json
 {
@@ -5272,31 +5272,31 @@ Paginate recent WooCommerce orders.
 
 ---
 
-#### `allegro.create_listing` — Allegro: Wystaw ofertę (Allegro: Create Listing)
+#### `allegro.create_listing` — Allegro: Create Listing
 
-Wystaw nową ofertę (produkt) na Allegro.
+Publish a new product auction or buy-now listing on Allegro.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `name` | `string` | Tak | _brak_ | Tytuł oferty (max 75 zn.) |
-| `category_id` | `string` | Tak | _brak_ | ID kategorii Allegro (np. 257936) |
-| `price` | `number` | Tak | _brak_ | Cena w PLN |
-| `quantity` | `number` | Tak | `1` |  |
-| `description_html` | `string` | Tak | _brak_ |  |
-| `images` | `json` | Nie | _brak_ | Do 16 URL-i zdjęć |
-| `parameters` | `json` | Nie | _brak_ | Parametry Allegro: [{id, values: [...]}, …] |
-| `condition` | `options` | Nie | `NEW` | <br>_Dostępne opcje:_ `NEW`, `USED`, `NEW_OTHER`, `REFURBISHED` |
-| `delivery_shipping_rates_id` | `string` | Nie | _brak_ | ID cennika dostaw |
-| `publication_status` | `options` | Nie | `ACTIVE` | <br>_Dostępne opcje:_ `ACTIVE`, `INACTIVE` |
+| `name` | `string` | Yes | _none_ | Tytuł oferty (max 75 zn.) |
+| `category_id` | `string` | Yes | _none_ | ID kategorii Allegro (np. 257936) |
+| `price` | `number` | Yes | _none_ | Cena w PLN |
+| `quantity` | `number` | Yes | `1` |  |
+| `description_html` | `string` | Yes | _none_ |  |
+| `images` | `json` | No | _none_ | Do 16 URL-i zdjęć |
+| `parameters` | `json` | No | _none_ | Parametry Allegro: [{id, values: [...]}, …] |
+| `condition` | `options` | No | `NEW` | <br>_Options:_ `NEW`, `USED`, `NEW_OTHER`, `REFURBISHED` |
+| `delivery_shipping_rates_id` | `string` | No | _none_ | ID cennika dostaw |
+| `publication_status` | `options` | No | `ACTIVE` | <br>_Options:_ `ACTIVE`, `INACTIVE` |
 
 ```json
 {
@@ -5307,9 +5307,9 @@ Wystaw nową ofertę (produkt) na Allegro.
     150
   ],
   "params": {
-    "name": "<warto\u015b\u0107>",
-    "category_id": "<warto\u015b\u0107>",
-    "price": "<warto\u015b\u0107>",
+    "name": "<value>",
+    "category_id": "<value>",
+    "price": "<value>",
     "quantity": 1
   }
 }
@@ -5317,23 +5317,23 @@ Wystaw nową ofertę (produkt) na Allegro.
 
 ---
 
-#### `allegro.update_listing` — Allegro: Aktualizuj ofertę (Allegro: Aktualizuj ofertę)
+#### `allegro.update_listing` — Allegro: Aktualizuj ofertę
 
 Zmień cenę, stan lub parametry oferty.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `offer_id` | `string` | Tak | _brak_ |  |
-| `fields` | `json` | Tak | _brak_ | Obiekt z polami do aktualizacji |
+| `offer_id` | `string` | Yes | _none_ |  |
+| `fields` | `json` | Yes | _none_ | Obiekt z polami do aktualizacji |
 
 ```json
 {
@@ -5344,30 +5344,30 @@ Zmień cenę, stan lub parametry oferty.
     150
   ],
   "params": {
-    "offer_id": "<warto\u015b\u0107>",
-    "fields": "<warto\u015b\u0107>"
+    "offer_id": "<value>",
+    "fields": "<value>"
   }
 }
 ```
 
 ---
 
-#### `allegro.end_listing` — Allegro: Zakończ ofertę (Allegro: End Listing)
+#### `allegro.end_listing` — Allegro: End Listing
 
-Zakończ aktywną ofertę Allegro.
+Terminate an active Allegro product listing or auction.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `offer_id` | `string` | Tak | _brak_ |  |
+| `offer_id` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -5378,30 +5378,30 @@ Zakończ aktywną ofertę Allegro.
     150
   ],
   "params": {
-    "offer_id": "<warto\u015b\u0107>"
+    "offer_id": "<value>"
   }
 }
 ```
 
 ---
 
-#### `allegro.list_orders` — Allegro: Pobierz zamówienia (Allegro: List Orders)
+#### `allegro.list_orders` — Allegro: List Orders
 
-Lista zamówień z ostatnich N dni.
+Fetch incoming buyer orders and fulfillment statuses from Allegro.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `days` | `number` | Nie | `7` | Zamówienia z ostatnich N dni |
-| `status` | `options` | Nie | `READY_FOR_PROCESSING` | <br>_Dostępne opcje:_ `BOUGHT`, `READY_FOR_PROCESSING`, `PROCESSING`, `READY_FOR_SHIPMENT`, `SENT` (+2 innych) |
+| `days` | `number` | No | `7` | Zamówienia z ostatnich N dni |
+| `status` | `options` | No | `READY_FOR_PROCESSING` | <br>_Options:_ `BOUGHT`, `READY_FOR_PROCESSING`, `PROCESSING`, `READY_FOR_SHIPMENT`, `SENT` (+2 more) |
 
 ```json
 {
@@ -5420,25 +5420,25 @@ Lista zamówień z ostatnich N dni.
 
 ---
 
-#### `amazon.create_listing` — Amazon: Create Listing (Amazon: Create Listing)
+#### `amazon.create_listing` — Amazon: Create Listing
 
 Submit a listing via Amazon SP-API.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `marketplace_id` | `string` | Tak | _brak_ | np. A1PA6795UKMFR9 (DE), APJ6JRA9NG5V4 (IT) |
-| `sku` | `string` | Tak | _brak_ |  |
-| `product_type` | `string` | Tak | _brak_ | Amazon product-type (np. SHOES, BOOK, TOY) |
-| `attributes` | `json` | Tak | _brak_ | Attribute dict per SP-API schema |
+| `marketplace_id` | `string` | Yes | _none_ | np. A1PA6795UKMFR9 (DE), APJ6JRA9NG5V4 (IT) |
+| `sku` | `string` | Yes | _none_ |  |
+| `product_type` | `string` | Yes | _none_ | Amazon product-type (np. SHOES, BOOK, TOY) |
+| `attributes` | `json` | Yes | _none_ | Attribute dict per SP-API schema |
 
 ```json
 {
@@ -5449,33 +5449,33 @@ Submit a listing via Amazon SP-API.
     150
   ],
   "params": {
-    "marketplace_id": "<warto\u015b\u0107>",
-    "sku": "<warto\u015b\u0107>",
-    "product_type": "<warto\u015b\u0107>",
-    "attributes": "<warto\u015b\u0107>"
+    "marketplace_id": "<value>",
+    "sku": "<value>",
+    "product_type": "<value>",
+    "attributes": "<value>"
   }
 }
 ```
 
 ---
 
-#### `amazon.update_inventory` — Amazon: Update Inventory (Amazon: Update Inventory)
+#### `amazon.update_inventory` — Amazon: Update Inventory
 
 Set SKU stock quantity in Amazon SP-API.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `sku` | `string` | Tak | _brak_ |  |
-| `quantity` | `number` | Tak | _brak_ |  |
+| `sku` | `string` | Yes | _none_ |  |
+| `quantity` | `number` | Yes | _none_ |  |
 
 ```json
 {
@@ -5486,31 +5486,31 @@ Set SKU stock quantity in Amazon SP-API.
     150
   ],
   "params": {
-    "sku": "<warto\u015b\u0107>",
-    "quantity": "<warto\u015b\u0107>"
+    "sku": "<value>",
+    "quantity": "<value>"
   }
 }
 ```
 
 ---
 
-#### `amazon.list_orders` — Amazon: List Orders (Amazon: List Orders)
+#### `amazon.list_orders` — Amazon: List Orders
 
 Fetch recent Amazon orders for given marketplaces.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `marketplace_ids` | `string` | Tak | _brak_ |  |
-| `days` | `number` | Nie | `7` |  |
+| `marketplace_ids` | `string` | Yes | _none_ |  |
+| `days` | `number` | No | `7` |  |
 
 ```json
 {
@@ -5521,7 +5521,7 @@ Fetch recent Amazon orders for given marketplaces.
     150
   ],
   "params": {
-    "marketplace_ids": "<warto\u015b\u0107>",
+    "marketplace_ids": "<value>",
     "days": 7
   }
 }
@@ -5529,30 +5529,30 @@ Fetch recent Amazon orders for given marketplaces.
 
 ---
 
-#### `etsy.create_listing` — Etsy: Create Listing (Etsy: Create Listing)
+#### `etsy.create_listing` — Etsy: Create Listing
 
 Draft a new listing in your Etsy shop.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `title` | `string` | Tak | _brak_ |  |
-| `description` | `string` | Tak | _brak_ |  |
-| `price` | `number` | Tak | _brak_ |  |
-| `quantity` | `number` | Tak | `1` |  |
-| `who_made` | `string` | Nie | `i_did` | i_did, collective, someone_else |
-| `when_made` | `string` | Nie | `made_to_order` | np. made_to_order, 2020_2024 |
-| `tags` | `json` | Nie | _brak_ | Do 13 tagów (tablica stringów) |
-| `materials` | `json` | Nie | _brak_ |  |
-| `image_ids` | `json` | Nie | _brak_ | Uploaded image ids |
+| `title` | `string` | Yes | _none_ |  |
+| `description` | `string` | Yes | _none_ |  |
+| `price` | `number` | Yes | _none_ |  |
+| `quantity` | `number` | Yes | `1` |  |
+| `who_made` | `string` | No | `i_did` | i_did, collective, someone_else |
+| `when_made` | `string` | No | `made_to_order` | np. made_to_order, 2020_2024 |
+| `tags` | `json` | No | _none_ | Do 13 tagów (tablica stringów) |
+| `materials` | `json` | No | _none_ |  |
+| `image_ids` | `json` | No | _none_ | Uploaded image ids |
 
 ```json
 {
@@ -5563,9 +5563,9 @@ Draft a new listing in your Etsy shop.
     150
   ],
   "params": {
-    "title": "<warto\u015b\u0107>",
-    "description": "<warto\u015b\u0107>",
-    "price": "<warto\u015b\u0107>",
+    "title": "<value>",
+    "description": "<value>",
+    "price": "<value>",
     "quantity": 1
   }
 }
@@ -5573,23 +5573,23 @@ Draft a new listing in your Etsy shop.
 
 ---
 
-#### `etsy.update_listing` — Etsy: Update Listing (Etsy: Update Listing)
+#### `etsy.update_listing` — Etsy: Update Listing
 
 Patch an existing Etsy listing.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `listing_id` | `string` | Tak | _brak_ |  |
-| `fields` | `json` | Tak | _brak_ |  |
+| `listing_id` | `string` | Yes | _none_ |  |
+| `fields` | `json` | Yes | _none_ |  |
 
 ```json
 {
@@ -5600,32 +5600,32 @@ Patch an existing Etsy listing.
     150
   ],
   "params": {
-    "listing_id": "<warto\u015b\u0107>",
-    "fields": "<warto\u015b\u0107>"
+    "listing_id": "<value>",
+    "fields": "<value>"
   }
 }
 ```
 
 ---
 
-#### `etsy.list_orders` — Etsy: Fetch Receipts (Etsy: Fetch Receipts)
+#### `etsy.list_orders` — Etsy: Fetch Receipts
 
 Pobierz zamówienia (receipts) z Etsy shopu.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `was_paid` | `options` | Nie | `true` | <br>_Dostępne opcje:_ `any`, `true`, `false` |
-| `was_shipped` | `options` | Nie | `false` | <br>_Dostępne opcje:_ `any`, `false` |
-| `limit` | `number` | Nie | `25` |  |
+| `was_paid` | `options` | No | `true` | <br>_Options:_ `any`, `true`, `false` |
+| `was_shipped` | `options` | No | `false` | <br>_Options:_ `any`, `false` |
+| `limit` | `number` | No | `25` |  |
 
 ```json
 {
@@ -5645,29 +5645,29 @@ Pobierz zamówienia (receipts) z Etsy shopu.
 
 ---
 
-#### `baselinker.add_product` — BaseLinker: Dodaj produkt (BaseLinker: Dodaj produkt)
+#### `baselinker.add_product` — BaseLinker: Dodaj produkt
 
 Dodaj produkt do katalogu BaseLinker (wieloplatformowy).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `inventory_id` | `string` | Tak | _brak_ | ID magazynu BaseLinker |
-| `sku` | `string` | Tak | _brak_ |  |
-| `name` | `string` | Tak | _brak_ |  |
-| `price_brutto` | `number` | Tak | _brak_ |  |
-| `quantity` | `number` | Tak | `0` |  |
-| `description_html` | `string` | Nie | _brak_ |  |
-| `images` | `json` | Nie | _brak_ |  |
-| `features` | `json` | Nie | _brak_ |  |
+| `inventory_id` | `string` | Yes | _none_ | ID magazynu BaseLinker |
+| `sku` | `string` | Yes | _none_ |  |
+| `name` | `string` | Yes | _none_ |  |
+| `price_brutto` | `number` | Yes | _none_ |  |
+| `quantity` | `number` | Yes | `0` |  |
+| `description_html` | `string` | No | _none_ |  |
+| `images` | `json` | No | _none_ |  |
+| `features` | `json` | No | _none_ |  |
 
 ```json
 {
@@ -5678,34 +5678,34 @@ Dodaj produkt do katalogu BaseLinker (wieloplatformowy).
     150
   ],
   "params": {
-    "inventory_id": "<warto\u015b\u0107>",
-    "sku": "<warto\u015b\u0107>",
-    "name": "<warto\u015b\u0107>",
-    "price_brutto": "<warto\u015b\u0107>"
+    "inventory_id": "<value>",
+    "sku": "<value>",
+    "name": "<value>",
+    "price_brutto": "<value>"
   }
 }
 ```
 
 ---
 
-#### `baselinker.update_stock` — BaseLinker: Aktualizuj stan (BaseLinker: Aktualizuj stan)
+#### `baselinker.update_stock` — BaseLinker: Aktualizuj stan
 
 Aktualizuj ilość sztuk SKU w magazynie BaseLinker.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `inventory_id` | `string` | Tak | _brak_ |  |
-| `sku` | `string` | Tak | _brak_ |  |
-| `quantity` | `number` | Tak | _brak_ |  |
+| `inventory_id` | `string` | Yes | _none_ |  |
+| `sku` | `string` | Yes | _none_ |  |
+| `quantity` | `number` | Yes | _none_ |  |
 
 ```json
 {
@@ -5716,34 +5716,34 @@ Aktualizuj ilość sztuk SKU w magazynie BaseLinker.
     150
   ],
   "params": {
-    "inventory_id": "<warto\u015b\u0107>",
-    "sku": "<warto\u015b\u0107>",
-    "quantity": "<warto\u015b\u0107>"
+    "inventory_id": "<value>",
+    "sku": "<value>",
+    "quantity": "<value>"
   }
 }
 ```
 
 ---
 
-#### `baselinker.publish_to_marketplace` — BaseLinker: Wystaw na marketplace (BaseLinker: Wystaw na marketplace)
+#### `baselinker.publish_to_marketplace` — BaseLinker: Wystaw na marketplace
 
 Jednym kliknięciem wystaw produkt na Allegro/Amazon/eBay przez BaseLinker.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `inventory_id` | `string` | Tak | _brak_ |  |
-| `sku` | `string` | Tak | _brak_ |  |
-| `marketplace` | `options` | Tak | _brak_ | <br>_Dostępne opcje:_ `allegro`, `amazon`, `ebay`, `empik`, `erli` (+1 innych) |
-| `marketplace_params` | `json` | Nie | _brak_ | Platform-specific override (category_id, shipping, …) |
+| `inventory_id` | `string` | Yes | _none_ |  |
+| `sku` | `string` | Yes | _none_ |  |
+| `marketplace` | `options` | Yes | _none_ | <br>_Options:_ `allegro`, `amazon`, `ebay`, `empik`, `erli` (+1 more) |
+| `marketplace_params` | `json` | No | _none_ | Platform-specific override (category_id, shipping, …) |
 
 ```json
 {
@@ -5754,32 +5754,32 @@ Jednym kliknięciem wystaw produkt na Allegro/Amazon/eBay przez BaseLinker.
     150
   ],
   "params": {
-    "inventory_id": "<warto\u015b\u0107>",
-    "sku": "<warto\u015b\u0107>",
-    "marketplace": "<warto\u015b\u0107>"
+    "inventory_id": "<value>",
+    "sku": "<value>",
+    "marketplace": "<value>"
   }
 }
 ```
 
 ---
 
-#### `baselinker.list_orders` — BaseLinker: Pobierz zamówienia (BaseLinker: Pobierz zamówienia)
+#### `baselinker.list_orders` — BaseLinker: Pobierz zamówienia
 
 Pobierz zamówienia z BaseLinker (wszystkie kanały).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `days` | `number` | Nie | `7` |  |
-| `status_id` | `string` | Nie | _brak_ | Opcjonalny filtr statusu |
+| `days` | `number` | No | `7` |  |
+| `status_id` | `string` | No | _none_ | Opcjonalny filtr statusu |
 
 ```json
 {
@@ -5797,23 +5797,23 @@ Pobierz zamówienia z BaseLinker (wszystkie kanały).
 
 ---
 
-#### `ceneo.upload_feed` — Ceneo: Prześlij feed XML (Ceneo: Prześlij feed XML)
+#### `ceneo.upload_feed` — Ceneo: Prześlij feed XML
 
 Wyślij plik XML z ofertami do Ceneo (price comparison).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `feed_url` | `string` | Tak | _brak_ | URL publicznego pliku XML (Ceneo pobiera cyklicznie) |
-| `format` | `options` | Nie | `ceneo` | <br>_Dostępne opcje:_ `ceneo`, `google_shopping`, `custom` |
+| `feed_url` | `string` | Yes | _none_ | URL publicznego pliku XML (Ceneo pobiera cyklicznie) |
+| `format` | `options` | No | `ceneo` | <br>_Options:_ `ceneo`, `google_shopping`, `custom` |
 
 ```json
 {
@@ -5824,7 +5824,7 @@ Wyślij plik XML z ofertami do Ceneo (price comparison).
     150
   ],
   "params": {
-    "feed_url": "<warto\u015b\u0107>",
+    "feed_url": "<value>",
     "format": "ceneo"
   }
 }
@@ -5832,23 +5832,23 @@ Wyślij plik XML z ofertami do Ceneo (price comparison).
 
 ---
 
-#### `ceneo.list_orders` — Ceneo: Pobierz zamówienia (Kupuję) (Ceneo: Pobierz zamówienia (Kupuję))
+#### `ceneo.list_orders` — Ceneo: Pobierz zamówienia (Kupuję)
 
 Pobierz zamówienia z Ceneo Kupuję (marketplace).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `days` | `number` | Nie | `7` |  |
-| `status` | `options` | Nie | `pending` | <br>_Dostępne opcje:_ `any`, `pending`, `confirmed`, `shipped`, `cancelled` |
+| `days` | `number` | No | `7` |  |
+| `status` | `options` | No | `pending` | <br>_Options:_ `any`, `pending`, `confirmed`, `shipped`, `cancelled` |
 
 ```json
 {
@@ -5867,25 +5867,25 @@ Pobierz zamówienia z Ceneo Kupuję (marketplace).
 
 ---
 
-#### `ceneo.update_order_status` — Ceneo: Aktualizuj status zamówienia (Ceneo: Aktualizuj status zamówienia)
+#### `ceneo.update_order_status` — Ceneo: Aktualizuj status zamówienia
 
 Zmień status (shipped/cancelled) w Ceneo Kupuję.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `order_id` | `string` | Tak | _brak_ |  |
-| `status` | `options` | Tak | _brak_ | <br>_Dostępne opcje:_ `confirmed`, `shipped`, `delivered`, `cancelled` |
-| `tracking_number` | `string` | Nie | _brak_ | Numer przewozowy (dla shipped) |
-| `courier` | `string` | Nie | _brak_ | Np. DPD, InPost, DHL, Poczta Polska |
+| `order_id` | `string` | Yes | _none_ |  |
+| `status` | `options` | Yes | _none_ | <br>_Options:_ `confirmed`, `shipped`, `delivered`, `cancelled` |
+| `tracking_number` | `string` | No | _none_ | Numer przewozowy (dla shipped) |
+| `courier` | `string` | No | _none_ | Np. DPD, InPost, DHL, Poczta Polska |
 
 ```json
 {
@@ -5896,32 +5896,32 @@ Zmień status (shipped/cancelled) w Ceneo Kupuję.
     150
   ],
   "params": {
-    "order_id": "<warto\u015b\u0107>",
-    "status": "<warto\u015b\u0107>"
+    "order_id": "<value>",
+    "status": "<value>"
   }
 }
 ```
 
 ---
 
-#### `ceneo.price_compare` — Ceneo: Porównaj cenę (Ceneo: Porównaj cenę)
+#### `ceneo.price_compare` — Ceneo: Porównaj cenę
 
 Pobierz ceny konkurencji dla danego EAN / nazwy produktu.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `ean` | `string` | Nie | _brak_ | Kod EAN/GTIN produktu |
-| `product_name` | `string` | Nie | _brak_ | Alternatywnie: nazwa |
-| `top_n` | `number` | Nie | `10` | Ile ofert zwrócić |
+| `ean` | `string` | No | _none_ | Kod EAN/GTIN produktu |
+| `product_name` | `string` | No | _none_ | Alternatywnie: nazwa |
+| `top_n` | `number` | No | `10` | Ile ofert zwrócić |
 
 ```json
 {
@@ -5939,34 +5939,34 @@ Pobierz ceny konkurencji dla danego EAN / nazwy produktu.
 
 ---
 
-#### `ebay.create_listing` — eBay: Create Listing (eBay: Create Listing)
+#### `ebay.create_listing` — eBay: Create Listing
 
-Create a fixed-price listing on eBay (Trading API).
+Create a new fixed-price or auction listing on eBay.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `marketplace_id` | `string` | Tak | _brak_ | np. EBAY_US, EBAY_DE, EBAY_PL |
-| `sku` | `string` | Tak | _brak_ |  |
-| `title` | `string` | Tak | _brak_ |  |
-| `description_html` | `string` | Tak | _brak_ |  |
-| `price` | `number` | Tak | _brak_ |  |
-| `currency` | `string` | Nie | `EUR` |  |
-| `quantity` | `number` | Tak | `1` |  |
-| `category_id` | `string` | Tak | _brak_ | eBay category ID (np. 9355) |
-| `condition` | `options` | Nie | `NEW` | <br>_Dostępne opcje:_ `NEW`, `NEW_OTHER`, `USED_EXCELLENT`, `USED_GOOD`, `USED_ACCEPTABLE` (+1 innych) |
-| `images` | `json` | Nie | _brak_ | Array of image URLs |
-| `fulfillment_policy_id` | `string` | Tak | _brak_ |  |
-| `payment_policy_id` | `string` | Tak | _brak_ |  |
-| `return_policy_id` | `string` | Tak | _brak_ |  |
+| `marketplace_id` | `string` | Yes | _none_ | np. EBAY_US, EBAY_DE, EBAY_PL |
+| `sku` | `string` | Yes | _none_ |  |
+| `title` | `string` | Yes | _none_ |  |
+| `description_html` | `string` | Yes | _none_ |  |
+| `price` | `number` | Yes | _none_ |  |
+| `currency` | `string` | No | `EUR` |  |
+| `quantity` | `number` | Yes | `1` |  |
+| `category_id` | `string` | Yes | _none_ | eBay category ID (np. 9355) |
+| `condition` | `options` | No | `NEW` | <br>_Options:_ `NEW`, `NEW_OTHER`, `USED_EXCELLENT`, `USED_GOOD`, `USED_ACCEPTABLE` (+1 more) |
+| `images` | `json` | No | _none_ | Array of image URLs |
+| `fulfillment_policy_id` | `string` | Yes | _none_ |  |
+| `payment_policy_id` | `string` | Yes | _none_ |  |
+| `return_policy_id` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -5977,33 +5977,33 @@ Create a fixed-price listing on eBay (Trading API).
     150
   ],
   "params": {
-    "marketplace_id": "<warto\u015b\u0107>",
-    "sku": "<warto\u015b\u0107>",
-    "title": "<warto\u015b\u0107>",
-    "description_html": "<warto\u015b\u0107>"
+    "marketplace_id": "<value>",
+    "sku": "<value>",
+    "title": "<value>",
+    "description_html": "<value>"
   }
 }
 ```
 
 ---
 
-#### `ebay.update_listing` — eBay: Update Listing (eBay: Update Listing)
+#### `ebay.update_listing` — eBay: Update Listing
 
 Update eBay listing price / quantity / fields.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `listing_id` | `string` | Tak | _brak_ |  |
-| `fields` | `json` | Tak | _brak_ |  |
+| `listing_id` | `string` | Yes | _none_ |  |
+| `fields` | `json` | Yes | _none_ |  |
 
 ```json
 {
@@ -6014,31 +6014,31 @@ Update eBay listing price / quantity / fields.
     150
   ],
   "params": {
-    "listing_id": "<warto\u015b\u0107>",
-    "fields": "<warto\u015b\u0107>"
+    "listing_id": "<value>",
+    "fields": "<value>"
   }
 }
 ```
 
 ---
 
-#### `ebay.list_orders` — eBay: List Orders (eBay: List Orders)
+#### `ebay.list_orders` — eBay: List Orders
 
 Fetch recent eBay orders (Fulfillment API).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `days` | `number` | Nie | `7` |  |
-| `order_status` | `options` | Nie | `ACTIVE` | <br>_Dostępne opcje:_ `ACTIVE`, `CANCELLED`, `COMPLETED`, `IN_PROGRESS` |
+| `days` | `number` | No | `7` |  |
+| `order_status` | `options` | No | `ACTIVE` | <br>_Options:_ `ACTIVE`, `CANCELLED`, `COMPLETED`, `IN_PROGRESS` |
 
 ```json
 {
@@ -6057,25 +6057,25 @@ Fetch recent eBay orders (Fulfillment API).
 
 ---
 
-#### `ebay.ship_order` — eBay: Mark Shipped (eBay: Mark Shipped)
+#### `ebay.ship_order` — eBay: Mark Shipped
 
 Create shipment fulfillment with tracking info.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `order_id` | `string` | Tak | _brak_ |  |
-| `tracking_number` | `string` | Tak | _brak_ |  |
-| `carrier` | `string` | Tak | _brak_ | np. DHL, FEDEX, UPS, USPS, DPD, GLS |
-| `line_items` | `json` | Nie | _brak_ | Items to fulfill: [{lineItemId, quantity}, …] |
+| `order_id` | `string` | Yes | _none_ |  |
+| `tracking_number` | `string` | Yes | _none_ |  |
+| `carrier` | `string` | Yes | _none_ | np. DHL, FEDEX, UPS, USPS, DPD, GLS |
+| `line_items` | `json` | No | _none_ | Items to fulfill: [{lineItemId, quantity}, …] |
 
 ```json
 {
@@ -6086,35 +6086,35 @@ Create shipment fulfillment with tracking info.
     150
   ],
   "params": {
-    "order_id": "<warto\u015b\u0107>",
-    "tracking_number": "<warto\u015b\u0107>",
-    "carrier": "<warto\u015b\u0107>"
+    "order_id": "<value>",
+    "tracking_number": "<value>",
+    "carrier": "<value>"
   }
 }
 ```
 
 ---
 
-#### `empik.create_offer` — Empik: Wystaw ofertę (Empik: Wystaw ofertę)
+#### `empik.create_offer` — Empik: Wystaw ofertę
 
 Utwórz nową ofertę w Empik Marketplace (wymaga BaseLinker/Mirakl).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `product_id` | `string` | Tak | _brak_ | Empik product ID (lub EAN) |
-| `price` | `number` | Tak | _brak_ |  |
-| `quantity` | `number` | Tak | `1` |  |
-| `condition` | `options` | Nie | `NEW` | <br>_Dostępne opcje:_ `NEW`, `USED_GOOD`, `USED_NEW` |
-| `shipping_type` | `string` | Nie | _brak_ | np. standard, express |
+| `product_id` | `string` | Yes | _none_ | Empik product ID (lub EAN) |
+| `price` | `number` | Yes | _none_ |  |
+| `quantity` | `number` | Yes | `1` |  |
+| `condition` | `options` | No | `NEW` | <br>_Options:_ `NEW`, `USED_GOOD`, `USED_NEW` |
+| `shipping_type` | `string` | No | _none_ | np. standard, express |
 
 ```json
 {
@@ -6125,8 +6125,8 @@ Utwórz nową ofertę w Empik Marketplace (wymaga BaseLinker/Mirakl).
     150
   ],
   "params": {
-    "product_id": "<warto\u015b\u0107>",
-    "price": "<warto\u015b\u0107>",
+    "product_id": "<value>",
+    "price": "<value>",
     "quantity": 1,
     "condition": "NEW"
   }
@@ -6135,23 +6135,23 @@ Utwórz nową ofertę w Empik Marketplace (wymaga BaseLinker/Mirakl).
 
 ---
 
-#### `empik.list_orders` — Empik: Pobierz zamówienia (Empik: Pobierz zamówienia)
+#### `empik.list_orders` — Empik: Pobierz zamówienia
 
 Pobierz zamówienia z Empik Marketplace.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `days` | `number` | Nie | `7` |  |
-| `status` | `options` | Nie | `WAITING_ACCEPTANCE` | <br>_Dostępne opcje:_ `PENDING`, `WAITING_ACCEPTANCE`, `SHIPPING`, `SHIPPED`, `RECEIVED` (+2 innych) |
+| `days` | `number` | No | `7` |  |
+| `status` | `options` | No | `WAITING_ACCEPTANCE` | <br>_Options:_ `PENDING`, `WAITING_ACCEPTANCE`, `SHIPPING`, `SHIPPED`, `RECEIVED` (+2 more) |
 
 ```json
 {
@@ -6170,28 +6170,28 @@ Pobierz zamówienia z Empik Marketplace.
 
 ---
 
-#### `olx.create_ad` — OLX: Wystaw ogłoszenie (OLX: Wystaw ogłoszenie)
+#### `olx.create_ad` — OLX: Wystaw ogłoszenie
 
 Utwórz ogłoszenie na OLX.pl.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `title` | `string` | Tak | _brak_ | Tytuł (max 70 zn.) |
-| `description` | `string` | Tak | _brak_ |  |
-| `price` | `number` | Tak | _brak_ |  |
-| `category_id` | `string` | Tak | _brak_ | ID kategorii OLX |
-| `city` | `string` | Tak | _brak_ |  |
-| `images` | `json` | Nie | _brak_ | Do 8 URL-i zdjęć |
-| `advertiser_type` | `options` | Nie | `business` | <br>_Dostępne opcje:_ `private`, `business` |
+| `title` | `string` | Yes | _none_ | Tytuł (max 70 zn.) |
+| `description` | `string` | Yes | _none_ |  |
+| `price` | `number` | Yes | _none_ |  |
+| `category_id` | `string` | Yes | _none_ | ID kategorii OLX |
+| `city` | `string` | Yes | _none_ |  |
+| `images` | `json` | No | _none_ | Do 8 URL-i zdjęć |
+| `advertiser_type` | `options` | No | `business` | <br>_Options:_ `private`, `business` |
 
 ```json
 {
@@ -6202,33 +6202,33 @@ Utwórz ogłoszenie na OLX.pl.
     150
   ],
   "params": {
-    "title": "<warto\u015b\u0107>",
-    "description": "<warto\u015b\u0107>",
-    "price": "<warto\u015b\u0107>",
-    "category_id": "<warto\u015b\u0107>"
+    "title": "<value>",
+    "description": "<value>",
+    "price": "<value>",
+    "category_id": "<value>"
   }
 }
 ```
 
 ---
 
-#### `olx.list_messages` — OLX: Pobierz wiadomości (OLX: Pobierz wiadomości)
+#### `olx.list_messages` — OLX: Pobierz wiadomości
 
 Pobierz wiadomości od kupujących (dla obsługi).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `unread_only` | `boolean` | Nie | `True` |  |
-| `limit` | `number` | Nie | `50` |  |
+| `unread_only` | `boolean` | No | `True` |  |
+| `limit` | `number` | No | `50` |  |
 
 ```json
 {
@@ -6247,28 +6247,28 @@ Pobierz wiadomości od kupujących (dla obsługi).
 
 ---
 
-#### `erli.create_listing` — Erli: Wystaw ofertę (Erli: Wystaw ofertę)
+#### `erli.create_listing` — Erli: Wystaw ofertę
 
 Wystaw ofertę w Erli (PL marketplace bez prowizji).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `title` | `string` | Tak | _brak_ |  |
-| `category_id` | `string` | Tak | _brak_ |  |
-| `price` | `number` | Tak | _brak_ |  |
-| `quantity` | `number` | Tak | `1` |  |
-| `description_html` | `string` | Tak | _brak_ |  |
-| `images` | `json` | Nie | _brak_ |  |
-| `ean` | `string` | Nie | _brak_ | Kod EAN (zalecane) |
+| `title` | `string` | Yes | _none_ |  |
+| `category_id` | `string` | Yes | _none_ |  |
+| `price` | `number` | Yes | _none_ |  |
+| `quantity` | `number` | Yes | `1` |  |
+| `description_html` | `string` | Yes | _none_ |  |
+| `images` | `json` | No | _none_ |  |
+| `ean` | `string` | No | _none_ | Kod EAN (zalecane) |
 
 ```json
 {
@@ -6279,9 +6279,9 @@ Wystaw ofertę w Erli (PL marketplace bez prowizji).
     150
   ],
   "params": {
-    "title": "<warto\u015b\u0107>",
-    "category_id": "<warto\u015b\u0107>",
-    "price": "<warto\u015b\u0107>",
+    "title": "<value>",
+    "category_id": "<value>",
+    "price": "<value>",
     "quantity": 1
   }
 }
@@ -6289,23 +6289,23 @@ Wystaw ofertę w Erli (PL marketplace bez prowizji).
 
 ---
 
-#### `erli.list_orders` — Erli: Pobierz zamówienia (Erli: Pobierz zamówienia)
+#### `erli.list_orders` — Erli: Pobierz zamówienia
 
 Pobierz zamówienia z Erli.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `days` | `number` | Nie | `7` |  |
-| `status` | `options` | Nie | `new` | <br>_Dostępne opcje:_ `new`, `processing`, `shipped`, `completed`, `cancelled` |
+| `days` | `number` | No | `7` |  |
+| `status` | `options` | No | `new` | <br>_Options:_ `new`, `processing`, `shipped`, `completed`, `cancelled` |
 
 ```json
 {
@@ -6324,28 +6324,28 @@ Pobierz zamówienia z Erli.
 
 ---
 
-#### `zalando.create_article` — Zalando: Create Article (Zalando: Create Article)
+#### `zalando.create_article` — Zalando: Create Article
 
 Submit a fashion article to Zalando Partner Connect (ZDT).
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `ean` | `string` | Tak | _brak_ | GTIN/EAN (required) |
-| `article_config_id` | `string` | Tak | _brak_ |  |
-| `name` | `string` | Tak | _brak_ |  |
-| `price` | `number` | Tak | _brak_ |  |
-| `currency` | `string` | Nie | `EUR` |  |
-| `images` | `json` | Nie | _brak_ | Min. 4 images, up to 8 |
-| `attributes` | `json` | Nie | _brak_ | Zalando attribute schema per category |
+| `ean` | `string` | Yes | _none_ | GTIN/EAN (required) |
+| `article_config_id` | `string` | Yes | _none_ |  |
+| `name` | `string` | Yes | _none_ |  |
+| `price` | `number` | Yes | _none_ |  |
+| `currency` | `string` | No | `EUR` |  |
+| `images` | `json` | No | _none_ | Min. 4 images, up to 8 |
+| `attributes` | `json` | No | _none_ | Zalando attribute schema per category |
 
 ```json
 {
@@ -6356,33 +6356,33 @@ Submit a fashion article to Zalando Partner Connect (ZDT).
     150
   ],
   "params": {
-    "ean": "<warto\u015b\u0107>",
-    "article_config_id": "<warto\u015b\u0107>",
-    "name": "<warto\u015b\u0107>",
-    "price": "<warto\u015b\u0107>"
+    "ean": "<value>",
+    "article_config_id": "<value>",
+    "name": "<value>",
+    "price": "<value>"
   }
 }
 ```
 
 ---
 
-#### `zalando.update_stock` — Zalando: Update Stock (Zalando: Update Stock)
+#### `zalando.update_stock` — Zalando: Update Stock
 
 Update stock level in Zalando Partner Connect.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `ean` | `string` | Tak | _brak_ |  |
-| `quantity` | `number` | Tak | _brak_ |  |
+| `ean` | `string` | Yes | _none_ |  |
+| `quantity` | `number` | Yes | _none_ |  |
 
 ```json
 {
@@ -6393,31 +6393,31 @@ Update stock level in Zalando Partner Connect.
     150
   ],
   "params": {
-    "ean": "<warto\u015b\u0107>",
-    "quantity": "<warto\u015b\u0107>"
+    "ean": "<value>",
+    "quantity": "<value>"
   }
 }
 ```
 
 ---
 
-#### `zalando.list_orders` — Zalando: List Orders (Zalando: List Orders)
+#### `zalando.list_orders` — Zalando: List Orders
 
 Fetch recent Zalando orders.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `days` | `number` | Nie | `7` |  |
-| `order_status` | `options` | Nie | `ACCEPTED` | <br>_Dostępne opcje:_ `CREATED`, `ACCEPTED`, `SHIPPED`, `DELIVERED`, `CANCELLED` |
+| `days` | `number` | No | `7` |  |
+| `order_status` | `options` | No | `ACCEPTED` | <br>_Options:_ `CREATED`, `ACCEPTED`, `SHIPPED`, `DELIVERED`, `CANCELLED` |
 
 ```json
 {
@@ -6436,27 +6436,27 @@ Fetch recent Zalando orders.
 
 ---
 
-#### `kaufland.create_offer` — Kaufland: Create Offer (Kaufland: Create Offer)
+#### `kaufland.create_offer` — Kaufland: Create Offer
 
 Create an offer in Kaufland Global Marketplace.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `ean` | `string` | Tak | _brak_ |  |
-| `price` | `number` | Tak | _brak_ |  |
-| `quantity` | `number` | Tak | `1` |  |
-| `delivery_time_min` | `string` | Nie | `1` |  |
-| `delivery_time_max` | `string` | Nie | `3` |  |
-| `condition` | `options` | Nie | `NEW` | <br>_Dostępne opcje:_ `NEW`, `USED_LIKE_NEW`, `USED_VERY_GOOD`, `USED_GOOD`, `USED_ACCEPTABLE` |
+| `ean` | `string` | Yes | _none_ |  |
+| `price` | `number` | Yes | _none_ |  |
+| `quantity` | `number` | Yes | `1` |  |
+| `delivery_time_min` | `string` | No | `1` |  |
+| `delivery_time_max` | `string` | No | `3` |  |
+| `condition` | `options` | No | `NEW` | <br>_Options:_ `NEW`, `USED_LIKE_NEW`, `USED_VERY_GOOD`, `USED_GOOD`, `USED_ACCEPTABLE` |
 
 ```json
 {
@@ -6467,8 +6467,8 @@ Create an offer in Kaufland Global Marketplace.
     150
   ],
   "params": {
-    "ean": "<warto\u015b\u0107>",
-    "price": "<warto\u015b\u0107>",
+    "ean": "<value>",
+    "price": "<value>",
     "quantity": 1,
     "delivery_time_min": "1"
   }
@@ -6477,23 +6477,23 @@ Create an offer in Kaufland Global Marketplace.
 
 ---
 
-#### `kaufland.list_orders` — Kaufland: List Orders (Kaufland: List Orders)
+#### `kaufland.list_orders` — Kaufland: List Orders
 
 Fetch recent Kaufland orders.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `days` | `number` | Nie | `7` |  |
-| `status` | `options` | Nie | `open` | <br>_Dostępne opcje:_ `open`, `shipped`, `delivered`, `canceled` |
+| `days` | `number` | No | `7` |  |
+| `status` | `options` | No | `open` | <br>_Options:_ `open`, `shipped`, `delivered`, `canceled` |
 
 ```json
 {
@@ -6512,25 +6512,25 @@ Fetch recent Kaufland orders.
 
 ---
 
-#### `stripe.create_checkout` — Stripe: Create Checkout (Stripe: Create Checkout)
+#### `stripe.create_checkout` — Stripe: Create Checkout
 
 Create a Checkout Session and return the URL.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `line_items` | `json` | Tak | _brak_ | Stripe line_items array |
-| `success_url` | `string` | Tak | _brak_ |  |
-| `cancel_url` | `string` | Tak | _brak_ |  |
-| `mode` | `options` | Nie | `payment` | <br>_Dostępne opcje:_ `payment`, `subscription` |
+| `line_items` | `json` | Yes | _none_ | Stripe line_items array |
+| `success_url` | `string` | Yes | _none_ |  |
+| `cancel_url` | `string` | Yes | _none_ |  |
+| `mode` | `options` | No | `payment` | <br>_Options:_ `payment`, `subscription` |
 
 ```json
 {
@@ -6541,9 +6541,9 @@ Create a Checkout Session and return the URL.
     150
   ],
   "params": {
-    "line_items": "<warto\u015b\u0107>",
-    "success_url": "<warto\u015b\u0107>",
-    "cancel_url": "<warto\u015b\u0107>",
+    "line_items": "<value>",
+    "success_url": "<value>",
+    "cancel_url": "<value>",
     "mode": "payment"
   }
 }
@@ -6551,23 +6551,23 @@ Create a Checkout Session and return the URL.
 
 ---
 
-#### `stripe.list_customers` — Stripe: List Customers (Stripe: List Customers)
+#### `stripe.list_customers` — Stripe: List Customers
 
 Paginate through Stripe customers.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `email` | `string` | Nie | _brak_ | Filter by email |
-| `limit` | `number` | Nie | `20` |  |
+| `email` | `string` | No | _none_ | Filter by email |
+| `limit` | `number` | No | `20` |  |
 
 ```json
 {
@@ -6585,25 +6585,25 @@ Paginate through Stripe customers.
 
 ---
 
-#### `mailchimp.add_subscriber` — Mailchimp: Add Subscriber (Mailchimp: Add Subscriber)
+#### `mailchimp.add_subscriber` — Mailchimp: Add Subscriber
 
 Add or update a subscriber in a list.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `list_id` | `string` | Tak | _brak_ |  |
-| `email` | `string` | Tak | _brak_ |  |
-| `merge_fields` | `json` | Nie | _brak_ |  |
-| `double_optin` | `boolean` | Nie | `True` |  |
+| `list_id` | `string` | Yes | _none_ |  |
+| `email` | `string` | Yes | _none_ |  |
+| `merge_fields` | `json` | No | _none_ |  |
+| `double_optin` | `boolean` | No | `True` |  |
 
 ```json
 {
@@ -6614,8 +6614,8 @@ Add or update a subscriber in a list.
     150
   ],
   "params": {
-    "list_id": "<warto\u015b\u0107>",
-    "email": "<warto\u015b\u0107>",
+    "list_id": "<value>",
+    "email": "<value>",
     "double_optin": true
   }
 }
@@ -6623,48 +6623,48 @@ Add or update a subscriber in a list.
 
 ---
 
-## ☁️ Cloud Storage & File Delivery (Magazyn Danych & Chmura) <a id="storage"></a>
+## ☁️ Cloud Storage & Asset Delivery <a id="storage"></a>
 
-> **Liczba węzłów:** 10 | **Identyfikator kategorii:** `storage`
+> **Total Nodes:** 10 | **Category Identifier:** `storage`
 
-Bezpieczny transfer i archiwizacja assetów: Galeria FotoHub, pliki projektowe, AWS S3, Cloudflare R2, Google Cloud Storage, Dropbox i Microsoft OneDrive.
+Secure asset management and Bring-Your-Own-Bucket (BYOB) delivery: FotoHub Gallery, AWS S3 (multipart upload and presigned URLs), Cloudflare R2 (zero egress fees), Google Cloud Storage, Dropbox, and Microsoft OneDrive.
 
-**Typowe zastosowanie produkcyjne:** Natychmiastowe kopiowanie zrenderowanych wideo w jakości bezstratnej do prywatnego bucketa S3 klienta i zapis miniatur w galerii FotoHub.
+**Enterprise Use Case:** Archiving high-resolution 4K master video files directly to an enterprise AWS S3 bucket while serving optimized WebP thumbnails from Cloudflare R2.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `storage.dropbox_upload` | **Dropbox: Upload**<br>_Dropbox: Upload_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `storage.dropbox_list` | **Dropbox: List Folder**<br>_Dropbox: List Folder_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `storage.onedrive_upload` | **OneDrive: Upload**<br>_OneDrive: Upload_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `storage.s3_put` | **AWS S3: Put Object**<br>_AWS S3: Put Object_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `storage.s3_get_url` | **AWS S3: Get Signed URL**<br>_AWS S3: Get Signed URL_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `storage.r2_put` | **Cloudflare R2: Put Object**<br>_Cloudflare R2: Put Object_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
-| `fotohub.files.save` | **FOTOhub: Zapisz do /fh/files**<br>_FotoHub Files: Save File_ | In: `main`<br>Out: `main, error` | `builtin` | free |
-| `fotohub.bucket.upload` | **FOTOhub: Zapisz do Bucket S3**<br>_FOTOhub: Zapisz do Bucket S3_ | In: `main`<br>Out: `main, error` | `builtin` | free |
-| `fotohub.files.get` | **FOTOhub: Pobierz plik z /fh/files**<br>_FotoHub Files: Get File_ | In: `main`<br>Out: `main, error` | `builtin` | free |
-| `fotohub.bucket.download` | **FOTOhub: Pobierz z Bucket S3**<br>_FOTOhub: Pobierz z Bucket S3_ | In: `main`<br>Out: `main, error` | `builtin` | free |
+| `storage.dropbox_upload` | **Dropbox: Upload** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `storage.dropbox_list` | **Dropbox: List Folder** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `storage.onedrive_upload` | **OneDrive: Upload** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `storage.s3_put` | **AWS S3: Put Object** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `storage.s3_get_url` | **AWS S3: Get Signed URL** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `storage.r2_put` | **Cloudflare R2: Put Object** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `fotohub.files.save` | **FotoHub Files: Save File** | In: `main`<br>Out: `main, error` | `builtin` | free |
+| `fotohub.bucket.upload` | **FOTOhub: Zapisz do Bucket S3** | In: `main`<br>Out: `main, error` | `builtin` | free |
+| `fotohub.files.get` | **FotoHub Files: Get File** | In: `main`<br>Out: `main, error` | `builtin` | free |
+| `fotohub.bucket.download` | **FOTOhub: Pobierz z Bucket S3** | In: `main`<br>Out: `main, error` | `builtin` | free |
 
-### Szczegółowa Specyfikacja Węzłów (Cloud Storage & File Delivery (Magazyn Danych & Chmura))
+### Node Specifications (Cloud Storage & Asset Delivery)
 
-#### `storage.dropbox_upload` — Dropbox: Upload (Dropbox: Upload)
+#### `storage.dropbox_upload` — Dropbox: Upload
 
 Upload a file URL to Dropbox.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `file_url` | `string` | Tak | _brak_ |  |
-| `target_path` | `string` | Tak | _brak_ |  |
+| `file_url` | `string` | Yes | _none_ |  |
+| `target_path` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -6675,30 +6675,30 @@ Upload a file URL to Dropbox.
     150
   ],
   "params": {
-    "file_url": "<warto\u015b\u0107>",
-    "target_path": "<warto\u015b\u0107>"
+    "file_url": "<value>",
+    "target_path": "<value>"
   }
 }
 ```
 
 ---
 
-#### `storage.dropbox_list` — Dropbox: List Folder (Dropbox: List Folder)
+#### `storage.dropbox_list` — Dropbox: List Folder
 
 List files in a Dropbox folder.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `folder_path` | `string` | Nie | `/` |  |
+| `folder_path` | `string` | No | `/` |  |
 
 ```json
 {
@@ -6716,23 +6716,23 @@ List files in a Dropbox folder.
 
 ---
 
-#### `storage.onedrive_upload` — OneDrive: Upload (OneDrive: Upload)
+#### `storage.onedrive_upload` — OneDrive: Upload
 
 Upload a file URL to OneDrive.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `file_url` | `string` | Tak | _brak_ |  |
-| `target_path` | `string` | Tak | _brak_ |  |
+| `file_url` | `string` | Yes | _none_ |  |
+| `target_path` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -6743,33 +6743,33 @@ Upload a file URL to OneDrive.
     150
   ],
   "params": {
-    "file_url": "<warto\u015b\u0107>",
-    "target_path": "<warto\u015b\u0107>"
+    "file_url": "<value>",
+    "target_path": "<value>"
   }
 }
 ```
 
 ---
 
-#### `storage.s3_put` — AWS S3: Put Object (AWS S3: Put Object)
+#### `storage.s3_put` — AWS S3: Put Object
 
 Upload a file URL to an S3 bucket.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `bucket` | `string` | Tak | _brak_ |  |
-| `key` | `string` | Tak | _brak_ |  |
-| `file_url` | `string` | Tak | _brak_ |  |
-| `content_type` | `string` | Nie | _brak_ |  |
+| `bucket` | `string` | Yes | _none_ |  |
+| `key` | `string` | Yes | _none_ |  |
+| `file_url` | `string` | Yes | _none_ |  |
+| `content_type` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -6780,32 +6780,32 @@ Upload a file URL to an S3 bucket.
     150
   ],
   "params": {
-    "bucket": "<warto\u015b\u0107>",
-    "key": "<warto\u015b\u0107>",
-    "file_url": "<warto\u015b\u0107>"
+    "bucket": "<value>",
+    "key": "<value>",
+    "file_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `storage.s3_get_url` — AWS S3: Get Signed URL (AWS S3: Get Signed URL)
+#### `storage.s3_get_url` — AWS S3: Get Signed URL
 
 Create a pre-signed GET URL for an S3 object.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `bucket` | `string` | Tak | _brak_ |  |
-| `key` | `string` | Tak | _brak_ |  |
+| `bucket` | `string` | Yes | _none_ |  |
+| `key` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -6816,32 +6816,32 @@ Create a pre-signed GET URL for an S3 object.
     150
   ],
   "params": {
-    "bucket": "<warto\u015b\u0107>",
-    "key": "<warto\u015b\u0107>"
+    "bucket": "<value>",
+    "key": "<value>"
   }
 }
 ```
 
 ---
 
-#### `storage.r2_put` — Cloudflare R2: Put Object (Cloudflare R2: Put Object)
+#### `storage.r2_put` — Cloudflare R2: Put Object
 
 Upload a file URL to R2.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `bucket` | `string` | Tak | _brak_ |  |
-| `key` | `string` | Tak | _brak_ |  |
-| `file_url` | `string` | Tak | _brak_ |  |
+| `bucket` | `string` | Yes | _none_ |  |
+| `key` | `string` | Yes | _none_ |  |
+| `file_url` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -6852,33 +6852,33 @@ Upload a file URL to R2.
     150
   ],
   "params": {
-    "bucket": "<warto\u015b\u0107>",
-    "key": "<warto\u015b\u0107>",
-    "file_url": "<warto\u015b\u0107>"
+    "bucket": "<value>",
+    "key": "<value>",
+    "file_url": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.files.save` — FOTOhub: Zapisz do /fh/files (FotoHub Files: Save File)
+#### `fotohub.files.save` — FotoHub Files: Save File
 
-Zapisz plik bezpośrednio do Twojego Menedżera Plików FOTOhub (/fh/files).
+Persist an asset into FotoHub secure project storage.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `file_url` | `string` | Nie | _brak_ |  |
-| `name` | `string` | Nie | `plik-agenta.png` |  |
-| `folder_id` | `string` | Nie | _brak_ |  |
+| `file_url` | `string` | No | _none_ |  |
+| `name` | `string` | No | `plik-agenta.png` |  |
+| `folder_id` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -6896,24 +6896,24 @@ Zapisz plik bezpośrednio do Twojego Menedżera Plików FOTOhub (/fh/files).
 
 ---
 
-#### `fotohub.bucket.upload` — FOTOhub: Zapisz do Bucket S3 (FOTOhub: Zapisz do Bucket S3)
+#### `fotohub.bucket.upload` — FOTOhub: Zapisz do Bucket S3
 
 Zapisz obiekt w Twoim prywatnym buckecie S3 w chmurze FOTOhub.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `bucket_name` | `string` | Tak | _brak_ |  |
-| `key` | `string` | Tak | _brak_ |  |
-| `file_url` | `string` | Nie | _brak_ |  |
+| `bucket_name` | `string` | Yes | _none_ |  |
+| `key` | `string` | Yes | _none_ |  |
+| `file_url` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -6924,31 +6924,31 @@ Zapisz obiekt w Twoim prywatnym buckecie S3 w chmurze FOTOhub.
     150
   ],
   "params": {
-    "bucket_name": "<warto\u015b\u0107>",
-    "key": "<warto\u015b\u0107>"
+    "bucket_name": "<value>",
+    "key": "<value>"
   }
 }
 ```
 
 ---
 
-#### `fotohub.files.get` — FOTOhub: Pobierz plik z /fh/files (FotoHub Files: Get File)
+#### `fotohub.files.get` — FotoHub Files: Get File
 
-Pobiera metadane i publiczny/podpisany URL pliku z Twojego Menedżera Plików FOTOhub.
+Download or reference an asset from FotoHub storage bucket.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `file_id` | `string` | Nie | _brak_ |  |
-| `file_path` | `string` | Nie | _brak_ |  |
+| `file_id` | `string` | No | _none_ |  |
+| `file_path` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -6964,23 +6964,23 @@ Pobiera metadane i publiczny/podpisany URL pliku z Twojego Menedżera Plików FO
 
 ---
 
-#### `fotohub.bucket.download` — FOTOhub: Pobierz z Bucket S3 (FOTOhub: Pobierz z Bucket S3)
+#### `fotohub.bucket.download` — FOTOhub: Pobierz z Bucket S3
 
 Generuje bezpieczny URL dostępowy do obiektu w Twoim prywatnym buckecie S3.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `bucket_name` | `string` | Tak | _brak_ |  |
-| `key` | `string` | Tak | _brak_ |  |
+| `bucket_name` | `string` | Yes | _none_ |  |
+| `key` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -6991,60 +6991,60 @@ Generuje bezpieczny URL dostępowy do obiektu w Twoim prywatnym buckecie S3.
     150
   ],
   "params": {
-    "bucket_name": "<warto\u015b\u0107>",
-    "key": "<warto\u015b\u0107>"
+    "bucket_name": "<value>",
+    "key": "<value>"
   }
 }
 ```
 
 ---
 
-## 🔀 Flow Logic & Data Transformation (Logika & Przekształcanie Danych) <a id="logic"></a>
+## 🔀 Flow Logic & Data Transformation <a id="logic"></a>
 
-> **Liczba węzłów:** 15 | **Identyfikator kategorii:** `logic`
+> **Total Nodes:** 15 | **Category Identifier:** `logic`
 
-Deterministyczna logika przepływu: warunki If, Switch, opóźnienia, agregacje matematyczne (SUM, AVG, MIN, MAX), sortowanie, deduplikacja oraz potężne transformacje schematów JMESPath.
+Deterministic execution control and data manipulation: If/Else conditional branching, multi-case Switch, While/ForEach loops, math aggregations (SUM, AVG, MIN, MAX, COUNT), array sorting, deduplication, and JMESPath JSON restructuring.
 
-**Typowe zastosowanie produkcyjne:** Filtrowanie listy 100 wygenerowanych zdjęć, wybór 5 o najwyższym wskaźniku estetyki i posortowanie ich malejąco przed zapisem.
+**Enterprise Use Case:** Filtering a batch of 100 generated images, retaining only the top 5 highest-rated candidates, and sorting them descending by aesthetic score.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `logic.if` | **If**<br>_If_ | In: `main`<br>Out: `true, false` | `builtin` | Free (0 cr) |
-| `logic.switch` | **Switch**<br>_Switch_ | In: `main`<br>Out: `default, case_1, case_2, case_3, case_4` | `builtin` | Free (0 cr) |
-| `logic.merge` | **Merge**<br>_Merge_ | In: `in_1, in_2, in_3`<br>Out: `main` | `builtin` | Free (0 cr) |
-| `logic.delay` | **Delay**<br>_Delay_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `data.set` | **Set Fields**<br>_Set Fields_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `data.filter` | **Filter**<br>_Filter_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `data.map` | **Map**<br>_Map_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `logic.approve` | **Approval Required**<br>_Approval Required_ | In: `main`<br>Out: `approved, rejected` | `builtin` | free |
-| `logic.loop` | **Loop over Items**<br>_Loop over Items_ | In: `main`<br>Out: `item, done` | `builtin` | free |
-| `logic.parallel` | **Parallel Branches**<br>_Parallel Branches_ | In: `main`<br>Out: `out_1, out_2, out_3, out_4` | `builtin` | free |
-| `data.aggregate` | **Aggregate**<br>_Aggregate_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `data.sort` | **Sort**<br>_Sort_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `data.unique` | **Unique**<br>_Unique_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `data.transform` | **JMESPath Transform**<br>_JMESPath Transform_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `logic.switch_expr` | **Switch (Expression)**<br>_Switch (Expression)_ | In: `main`<br>Out: `case_a, case_b, case_c, default` | `builtin` | free |
+| `logic.if` | **If** | In: `main`<br>Out: `true, false` | `builtin` | Free (0 credits) |
+| `logic.switch` | **Switch** | In: `main`<br>Out: `default, case_1, case_2, case_3, case_4` | `builtin` | Free (0 credits) |
+| `logic.merge` | **Merge** | In: `in_1, in_2, in_3`<br>Out: `main` | `builtin` | Free (0 credits) |
+| `logic.delay` | **Delay** | In: `main`<br>Out: `main` | `builtin` | free |
+| `data.set` | **Set Fields** | In: `main`<br>Out: `main` | `builtin` | free |
+| `data.filter` | **Filter** | In: `main`<br>Out: `main` | `builtin` | free |
+| `data.map` | **Map** | In: `main`<br>Out: `main` | `builtin` | free |
+| `logic.approve` | **Approval Required** | In: `main`<br>Out: `approved, rejected` | `builtin` | free |
+| `logic.loop` | **Loop over Items** | In: `main`<br>Out: `item, done` | `builtin` | free |
+| `logic.parallel` | **Parallel Branches** | In: `main`<br>Out: `out_1, out_2, out_3, out_4` | `builtin` | free |
+| `data.aggregate` | **Aggregate** | In: `main`<br>Out: `main` | `builtin` | free |
+| `data.sort` | **Sort** | In: `main`<br>Out: `main` | `builtin` | free |
+| `data.unique` | **Unique** | In: `main`<br>Out: `main` | `builtin` | free |
+| `data.transform` | **JMESPath Transform** | In: `main`<br>Out: `main` | `builtin` | free |
+| `logic.switch_expr` | **Switch (Expression)** | In: `main`<br>Out: `case_a, case_b, case_c, default` | `builtin` | free |
 
-### Szczegółowa Specyfikacja Węzłów (Flow Logic & Data Transformation (Logika & Przekształcanie Danych))
+### Node Specifications (Flow Logic & Data Transformation)
 
-#### `logic.if` — If (If)
+#### `logic.if` — If
 
 Branch the flow on a condition.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `true` (main), `false` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `true` (main), `false` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `condition` | `string` | Tak | _brak_ | Expression that must evaluate to truthy |
+| `condition` | `string` | Yes | _none_ | Expression that must evaluate to truthy |
 
 ```json
 {
@@ -7055,31 +7055,31 @@ Branch the flow on a condition.
     150
   ],
   "params": {
-    "condition": "<warto\u015b\u0107>"
+    "condition": "<value>"
   }
 }
 ```
 
 ---
 
-#### `logic.switch` — Switch (Switch)
+#### `logic.switch` — Switch
 
 Route to one of many branches by value.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `default` (main), `case_1` (main), `case_2` (main), `case_3` (main), `case_4` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `default` (main), `case_1` (main), `case_2` (main), `case_3` (main), `case_4` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `value` | `string` | Tak | _brak_ |  |
-| `cases` | `json` | Nie | `[{'match': 'active', 'port': 'case_1'}, {'match': 'pending', 'port': 'case_2'}]` | Array of {match, port}. |
-| `default_port` | `string` | Nie | `default` |  |
+| `value` | `string` | Yes | _none_ |  |
+| `cases` | `json` | No | `[{'match': 'active', 'port': 'case_1'}, {'match': 'pending', 'port': 'case_2'}]` | Array of {match, port}. |
+| `default_port` | `string` | No | `default` |  |
 
 ```json
 {
@@ -7090,7 +7090,7 @@ Route to one of many branches by value.
     150
   ],
   "params": {
-    "value": "<warto\u015b\u0107>",
+    "value": "<value>",
     "cases": [
       {
         "match": "active",
@@ -7108,22 +7108,22 @@ Route to one of many branches by value.
 
 ---
 
-#### `logic.merge` — Merge (Merge)
+#### `logic.merge` — Merge
 
 Combine multiple branches into one flow.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `in_1` (main), `in_2` (main), `in_3` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `in_1` (main), `in_2` (main), `in_3` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `strategy` | `options` | Nie | `merge_objects` | <br>_Dostępne opcje:_ `merge_objects`, `concat_arrays`, `wait_all` |
+| `strategy` | `options` | No | `merge_objects` | <br>_Options:_ `merge_objects`, `concat_arrays`, `wait_all` |
 
 ```json
 {
@@ -7141,22 +7141,22 @@ Combine multiple branches into one flow.
 
 ---
 
-#### `logic.delay` — Delay (Delay)
+#### `logic.delay` — Delay
 
 Pause the run for N seconds.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `seconds` | `number` | Nie | `5` |  |
+| `seconds` | `number` | No | `5` |  |
 
 ```json
 {
@@ -7174,23 +7174,23 @@ Pause the run for N seconds.
 
 ---
 
-#### `data.set` — Set Fields (Set Fields)
+#### `data.set` — Set Fields
 
 Add or override fields on the data flowing through.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `fields` | `json` | Nie | `{}` |  |
-| `keep_input` | `boolean` | Nie | `True` |  |
+| `fields` | `json` | No | `{}` |  |
+| `keep_input` | `boolean` | No | `True` |  |
 
 ```json
 {
@@ -7209,23 +7209,23 @@ Add or override fields on the data flowing through.
 
 ---
 
-#### `data.filter` — Filter (Filter)
+#### `data.filter` — Filter
 
 Keep only items matching a condition (JMESPath).
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `items_path` | `string` | Nie | `$.items` |  |
-| `predicate_path` | `string` | Nie | _brak_ |  |
+| `items_path` | `string` | No | `$.items` |  |
+| `predicate_path` | `string` | No | _none_ |  |
 
 ```json
 {
@@ -7243,23 +7243,23 @@ Keep only items matching a condition (JMESPath).
 
 ---
 
-#### `data.map` — Map (Map)
+#### `data.map` — Map
 
 Transform each item using a template.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `items_path` | `string` | Nie | `$.items` |  |
-| `template` | `json` | Nie | `{'id': '$.id', 'name': '$.name'}` |  |
+| `items_path` | `string` | No | `$.items` |  |
+| `template` | `json` | No | `{'id': '$.id', 'name': '$.name'}` |  |
 
 ```json
 {
@@ -7281,24 +7281,24 @@ Transform each item using a template.
 
 ---
 
-#### `logic.approve` — Approval Required (Approval Required)
+#### `logic.approve` — Approval Required
 
 Pause the run until a user explicitly approves or rejects.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `approved` (main), `rejected` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `approved` (main), `rejected` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `title` | `string` | Tak | `Please review` |  |
-| `message` | `string` | Nie | _brak_ |  |
-| `timeout_hours` | `number` | Nie | `24` |  |
+| `title` | `string` | Yes | `Please review` |  |
+| `message` | `string` | No | _none_ |  |
+| `timeout_hours` | `number` | No | `24` |  |
 
 ```json
 {
@@ -7317,24 +7317,24 @@ Pause the run until a user explicitly approves or rejects.
 
 ---
 
-#### `logic.loop` — Loop over Items (Loop over Items)
+#### `logic.loop` — Loop over Items
 
 Execute downstream nodes once per item.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `item` (main), `done` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `item` (main), `done` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `items_path` | `string` | Nie | `$.items` |  |
-| `max_iterations` | `number` | Nie | `1000` |  |
-| `mode` | `options` | Nie | `sequential` | <br>_Dostępne opcje:_ `sequential`, `parallel` |
+| `items_path` | `string` | No | `$.items` |  |
+| `max_iterations` | `number` | No | `1000` |  |
+| `mode` | `options` | No | `sequential` | <br>_Options:_ `sequential`, `parallel` |
 
 ```json
 {
@@ -7354,22 +7354,22 @@ Execute downstream nodes once per item.
 
 ---
 
-#### `logic.parallel` — Parallel Branches (Parallel Branches)
+#### `logic.parallel` — Parallel Branches
 
 Run multiple branches concurrently and wait for all.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `out_1` (main), `out_2` (main), `out_3` (main), `out_4` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `out_1` (main), `out_2` (main), `out_3` (main), `out_4` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `wait_for` | `number` | Nie | `0` | 0 = all |
+| `wait_for` | `number` | No | `0` | 0 = all |
 
 ```json
 {
@@ -7387,24 +7387,24 @@ Run multiple branches concurrently and wait for all.
 
 ---
 
-#### `data.aggregate` — Aggregate (Aggregate)
+#### `data.aggregate` — Aggregate
 
 Sum / avg / min / max / count over an array path.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `items_path` | `string` | Nie | `$.items` |  |
-| `field_path` | `string` | Nie | _brak_ |  |
-| `op` | `options` | Nie | `count` | <br>_Dostępne opcje:_ `sum`, `avg`, `min`, `max`, `count` |
+| `items_path` | `string` | No | `$.items` |  |
+| `field_path` | `string` | No | _none_ |  |
+| `op` | `options` | No | `count` | <br>_Options:_ `sum`, `avg`, `min`, `max`, `count` |
 
 ```json
 {
@@ -7423,24 +7423,24 @@ Sum / avg / min / max / count over an array path.
 
 ---
 
-#### `data.sort` — Sort (Sort)
+#### `data.sort` — Sort
 
 Sort items by a field.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `items_path` | `string` | Nie | `$.items` |  |
-| `field_path` | `string` | Tak | _brak_ |  |
-| `order` | `options` | Nie | `asc` | <br>_Dostępne opcje:_ `asc`, `desc` |
+| `items_path` | `string` | No | `$.items` |  |
+| `field_path` | `string` | Yes | _none_ |  |
+| `order` | `options` | No | `asc` | <br>_Options:_ `asc`, `desc` |
 
 ```json
 {
@@ -7452,7 +7452,7 @@ Sort items by a field.
   ],
   "params": {
     "items_path": "$.items",
-    "field_path": "<warto\u015b\u0107>",
+    "field_path": "<value>",
     "order": "asc"
   }
 }
@@ -7460,23 +7460,23 @@ Sort items by a field.
 
 ---
 
-#### `data.unique` — Unique (Unique)
+#### `data.unique` — Unique
 
 Deduplicate items by a field.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `items_path` | `string` | Nie | `$.items` |  |
-| `field_path` | `string` | Nie | _brak_ | If empty, full-item equality. |
+| `items_path` | `string` | No | `$.items` |  |
+| `field_path` | `string` | No | _none_ | If empty, full-item equality. |
 
 ```json
 {
@@ -7494,22 +7494,22 @@ Deduplicate items by a field.
 
 ---
 
-#### `data.transform` — JMESPath Transform (JMESPath Transform)
+#### `data.transform` — JMESPath Transform
 
 Apply any JMESPath expression to produce a new structure.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `expression` | `string` | Tak | _brak_ |  |
+| `expression` | `string` | Yes | _none_ |  |
 
 ```json
 {
@@ -7520,30 +7520,30 @@ Apply any JMESPath expression to produce a new structure.
     150
   ],
   "params": {
-    "expression": "<warto\u015b\u0107>"
+    "expression": "<value>"
   }
 }
 ```
 
 ---
 
-#### `logic.switch_expr` — Switch (Expression) (Switch (Expression))
+#### `logic.switch_expr` — Switch (Expression)
 
 Route by a free-form expression evaluated once.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `case_a` (main), `case_b` (main), `case_c` (main), `default` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `case_a` (main), `case_b` (main), `case_c` (main), `default` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `value` | `string` | Tak | _brak_ |  |
-| `map` | `json` | Nie | `{'active': 'case_a', 'pending': 'case_b', 'done': 'case_c'}` |  |
+| `value` | `string` | Yes | _none_ |  |
+| `map` | `json` | No | `{'active': 'case_a', 'pending': 'case_b', 'done': 'case_c'}` |  |
 
 ```json
 {
@@ -7554,7 +7554,7 @@ Route by a free-form expression evaluated once.
     150
   ],
   "params": {
-    "value": "<warto\u015b\u0107>",
+    "value": "<value>",
     "map": {
       "active": "case_a",
       "pending": "case_b",
@@ -7566,39 +7566,39 @@ Route by a free-form expression evaluated once.
 
 ---
 
-## 📥 Workflow Input & Output (Granice Wejścia/Wyjścia) <a id="io"></a>
+## 📥 Workflow Input & Output Boundaries <a id="io"></a>
 
-> **Liczba węzłów:** 2 | **Identyfikator kategorii:** `io`
+> **Total Nodes:** 2 | **Category Identifier:** `io`
 
-Definiowanie punktów wejściowych parametrów użytkownika oraz bezpieczny zapis i podsumowanie finalnych rezultatów wykonania workflow.
+Entry-point parameter parsing, schema validation, and standardized workflow completion summaries.
 
-**Typowe zastosowanie produkcyjne:** Przekazywanie parametrów z formularza na stronie do silnika i zwracanie klientowi gotowych linków CDN w odpowiedzi API.
+**Enterprise Use Case:** Accepting initial client request payloads from web forms and packaging output CDN URLs for synchronous API responses.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `io.input_json` | **JSON Input**<br>_JSON Input_ | In: `main`<br>Out: `main` | `builtin` | free |
-| `io.output_save` | **Save Output**<br>_Save Output_ | In: `main`<br>Out: `main` | `builtin` | free |
+| `io.input_json` | **JSON Input** | In: `main`<br>Out: `main` | `builtin` | free |
+| `io.output_save` | **Save Output** | In: `main`<br>Out: `main` | `builtin` | free |
 
-### Szczegółowa Specyfikacja Węzłów (Workflow Input & Output (Granice Wejścia/Wyjścia))
+### Node Specifications (Workflow Input & Output Boundaries)
 
-#### `io.input_json` — JSON Input (JSON Input)
+#### `io.input_json` — JSON Input
 
 Start the flow with a literal JSON object.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `data` | `json` | Nie | `{}` |  |
+| `data` | `json` | No | `{}` |  |
 
 ```json
 {
@@ -7616,24 +7616,24 @@ Start the flow with a literal JSON object.
 
 ---
 
-#### `io.output_save` — Save Output (Save Output)
+#### `io.output_save` — Save Output
 
 Store a JSON or binary result to Supabase Storage and record the URL.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `bucket` | `options` | Nie | `agent-outputs` | <br>_Dostępne opcje:_ `photos`, `videos`, `audio`, `documents`, `agent-outputs` |
-| `path` | `string` | Nie | _brak_ |  |
-| `public` | `boolean` | Nie | `False` |  |
+| `bucket` | `options` | No | `agent-outputs` | <br>_Options:_ `photos`, `videos`, `audio`, `documents`, `agent-outputs` |
+| `path` | `string` | No | _none_ |  |
+| `public` | `boolean` | No | `False` |  |
 
 ```json
 {
@@ -7652,40 +7652,40 @@ Store a JSON or binary result to Supabase Storage and record the URL.
 
 ---
 
-## ⌨️ Code Sandbox (Piaskownica Kodu Python / JS) <a id="code"></a>
+## ⌨️ Secure Code Sandboxes <a id="code"></a>
 
-> **Liczba węzłów:** 2 | **Identyfikator kategorii:** `code`
+> **Total Nodes:** 2 | **Category Identifier:** `code`
 
-Bezpieczne, izolowane wykonywanie skryptów Python (Pillow, Requests, NumPy) oraz JavaScript w piaskownicy ze ścisłymi limitami pamięci i czasu procesora.
+Isolated, resource-constrained execution sandboxes for Python (with NumPy, Pillow, Requests) and JavaScript (V8 engine) with strict CPU, memory, and timeout bounds.
 
-**Typowe zastosowanie produkcyjne:** Niestandardowe przeliczanie marży, parsowanie niestandardowych formatów CSV/XML lub generowanie wykresów z danych.
+**Enterprise Use Case:** Custom pricing calculations, parsing complex supplier XML/CSV feeds, or computing custom image aspect transformations.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `code.js` | **Code (JavaScript)**<br>_Code (JavaScript)_ | In: `main`<br>Out: `main, error` | `code_js` | free |
-| `code.python` | **Code (Python)**<br>_Code (Python)_ | In: `main`<br>Out: `main, error` | `code_python` | per_minute |
+| `code.js` | **Code (JavaScript)** | In: `main`<br>Out: `main, error` | `code_js` | free |
+| `code.python` | **Code (Python)** | In: `main`<br>Out: `main, error` | `code_python` | per_minute |
 
-### Szczegółowa Specyfikacja Węzłów (Code Sandbox (Piaskownica Kodu Python / JS))
+### Node Specifications (Secure Code Sandboxes)
 
-#### `code.js` — Code (JavaScript) (Code (JavaScript))
+#### `code.js` — Code (JavaScript)
 
 Run a JavaScript snippet in a Deno sandbox (no network/fs).
 
-- **Executor:** `code_js`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `code_js`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `code` | `string` | Tak | _brak_ |  |
-| `timeout_s` | `number` | Nie | `10` |  |
+| `code` | `string` | Yes | _none_ |  |
+| `timeout_s` | `number` | No | `10` |  |
 
 ```json
 {
@@ -7696,7 +7696,7 @@ Run a JavaScript snippet in a Deno sandbox (no network/fs).
     150
   ],
   "params": {
-    "code": "<warto\u015b\u0107>",
+    "code": "<value>",
     "timeout_s": 10
   }
 }
@@ -7704,24 +7704,24 @@ Run a JavaScript snippet in a Deno sandbox (no network/fs).
 
 ---
 
-#### `code.python` — Code (Python) (Code (Python))
+#### `code.python` — Code (Python)
 
 Run a Python snippet in a sandboxed microVM (NumPy / Pandas / Pillow available).
 
-- **Executor:** `code_python`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** per_minute
+- **Executor Runtime:** `code_python`
+- **Required Tier:** `FREE`
+- **Execution Cost:** per_minute
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `code` | `string` | Tak | _brak_ |  |
-| `timeout_s` | `number` | Nie | `30` |  |
-| `memory_mb` | `number` | Nie | `512` |  |
+| `code` | `string` | Yes | _none_ |  |
+| `timeout_s` | `number` | No | `30` |  |
+| `memory_mb` | `number` | No | `512` |  |
 
 ```json
 {
@@ -7732,7 +7732,7 @@ Run a Python snippet in a sandboxed microVM (NumPy / Pandas / Pillow available).
     150
   ],
   "params": {
-    "code": "<warto\u015b\u0107>",
+    "code": "<value>",
     "timeout_s": 30,
     "memory_mb": 512
   }
@@ -7741,44 +7741,44 @@ Run a Python snippet in a sandboxed microVM (NumPy / Pandas / Pillow available).
 
 ---
 
-## 🌐 HTTP & REST API Client (Klient HTTP) <a id="http"></a>
+## 🌐 HTTP & REST API Client <a id="http"></a>
 
-> **Liczba węzłów:** 1 | **Identyfikator kategorii:** `http`
+> **Total Nodes:** 1 | **Category Identifier:** `http`
 
-Uniwersalny klient HTTP do łączenia z dowolnym zewnętrznym API REST/GraphQL z obsługą Bearer Token, Basic Auth, kluczy API, nagłówków i automatycznych retry.
+Universal REST client supporting GET, POST, PUT, DELETE, and PATCH with custom headers, Bearer/Basic authentication, retry policies, and timeout guards.
 
-**Typowe zastosowanie produkcyjne:** Pobieranie aktualnych kursów walut z NBP lub wysyłanie webhooka do wewnętrznego systemu ERP przedsiębiorstwa.
+**Enterprise Use Case:** Fetching real-time exchange rates from external banking APIs or sending event webhooks to enterprise ERP systems.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `http.request` | **HTTP Request**<br>_HTTP Request_ | In: `main`<br>Out: `main, error` | `edge_fn` | free |
+| `http.request` | **HTTP Request** | In: `main`<br>Out: `main, error` | `edge_fn` | free |
 
-### Szczegółowa Specyfikacja Węzłów (HTTP & REST API Client (Klient HTTP))
+### Node Specifications (HTTP & REST API Client)
 
-#### `http.request` — HTTP Request (HTTP Request)
+#### `http.request` — HTTP Request
 
 Call any URL. Supports auth, pagination, retries. User-provided URLs go through an SSRF-safe egress.
 
-- **Executor:** `edge_fn`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** free
+- **Executor Runtime:** `edge_fn`
+- **Required Tier:** `FREE`
+- **Execution Cost:** free
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main), `error` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main), `error` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `method` | `options` | Nie | `GET` | <br>_Dostępne opcje:_ `GET`, `POST`, `PUT`, `PATCH`, `DELETE` |
-| `url` | `string` | Tak | _brak_ |  |
-| `headers` | `json` | Nie | `{}` |  |
-| `query` | `json` | Nie | `{}` |  |
-| `body` | `json` | Nie | `{}` |  |
-| `body_format` | `options` | Nie | `json` | <br>_Dostępne opcje:_ `json`, `form`, `text`, `none` |
-| `auth_type` | `options` | Nie | `none` | <br>_Dostępne opcje:_ `none`, `bearer`, `basic`, `api_key`, `oauth2` |
+| `method` | `options` | No | `GET` | <br>_Options:_ `GET`, `POST`, `PUT`, `PATCH`, `DELETE` |
+| `url` | `string` | Yes | _none_ |  |
+| `headers` | `json` | No | `{}` |  |
+| `query` | `json` | No | `{}` |  |
+| `body` | `json` | No | `{}` |  |
+| `body_format` | `options` | No | `json` | <br>_Options:_ `json`, `form`, `text`, `none` |
+| `auth_type` | `options` | No | `none` | <br>_Options:_ `none`, `bearer`, `basic`, `api_key`, `oauth2` |
 
 ```json
 {
@@ -7790,7 +7790,7 @@ Call any URL. Supports auth, pagination, retries. User-provided URLs go through 
   ],
   "params": {
     "method": "GET",
-    "url": "<warto\u015b\u0107>",
+    "url": "<value>",
     "headers": {},
     "query": {}
   }
@@ -7799,39 +7799,39 @@ Call any URL. Supports auth, pagination, retries. User-provided URLs go through 
 
 ---
 
-## 🛡️ System & Rollback Safeguards (Wersjonowanie Systemu) <a id="system"></a>
+## 🛡️ System Safeguards & Rollback <a id="system"></a>
 
-> **Liczba węzłów:** 1 | **Identyfikator kategorii:** `system`
+> **Total Nodes:** 1 | **Category Identifier:** `system`
 
-Tworzenie migawek (snapshotów) stanu konfiguracji agenta i całego ekosystemu z automatycznym przywracaniem (rollback) w razie wykrycia anomalii.
+Workflow configuration snapshots and automated rollback safeguards that restore previous stable states when runtime anomalies are detected.
 
-**Typowe zastosowanie produkcyjne:** Zabezpieczenie przed błędną konfiguracją produkcyjnego bota sprzedażowego przed wdrożeniem zmian przez zespół.
+**Enterprise Use Case:** Protecting production sales bots from configuration drift by rolling back automatically if error rates surge above 2%.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `system.version_snapshot` | **Punkt Kontrolny (Snapshot)**<br>_System: Version Snapshot_ | In: `in`<br>Out: `main, rollback` | `builtin` | Free (0 cr) |
+| `system.version_snapshot` | **System: Version Snapshot** | In: `in`<br>Out: `main, rollback` | `builtin` | Free (0 credits) |
 
-### Szczegółowa Specyfikacja Węzłów (System & Rollback Safeguards (Wersjonowanie Systemu))
+### Node Specifications (System Safeguards & Rollback)
 
-#### `system.version_snapshot` — Punkt Kontrolny (Snapshot) (System: Version Snapshot)
+#### `system.version_snapshot` — System: Version Snapshot
 
-Zapisuje migawkę stanu workflow z możliwością automatycznego rollbacku przy błędzie.
+Create a configuration snapshot for rollback safeguards.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `in` (any)
-- **Porty Wyjściowe:** `main` (any), `rollback` (any)
+- **Input Ports:** `in` (any)
+- **Output Ports:** `main` (any), `rollback` (any)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `snapshot_tag` | `string` | Nie | `v1.0-checkpoint` | Unikalna nazwa punktu kontrolnego. |
-| `auto_rollback_on_failure` | `boolean` | Nie | `True` | Czy automatycznie wycofać zmiany w przypadku awarii kolejnego węzła. |
+| `snapshot_tag` | `string` | No | `v1.0-checkpoint` | Unikalna nazwa punktu kontrolnego. |
+| `auto_rollback_on_failure` | `boolean` | No | `True` | Czy automatycznie wycofać zmiany w przypadku awarii kolejnego węzła. |
 
 ```json
 {
@@ -7850,42 +7850,42 @@ Zapisuje migawkę stanu workflow z możliwością automatycznego rollbacku przy 
 
 ---
 
-## 🛠️ Developer Inspection Tooling (Narzędzia Developerskie) <a id="developer"></a>
+## 🛠️ Developer Inspection Tooling <a id="developer"></a>
 
-> **Liczba węzłów:** 1 | **Identyfikator kategorii:** `developer`
+> **Total Nodes:** 1 | **Category Identifier:** `developer`
 
-Narzędzia inspekcyjne, mocki środowiskowe i piaskownice do debugowania i testowania zachowań agentów.
+Inspection utilities, execution mock environments, and interactive test harnesses for developing and debugging custom agent logic.
 
-**Typowe zastosowanie produkcyjne:** Testowanie integracji z zewnętrznymi API bez ponoszenia kosztów rzeczywistych wywołań produkcyjnych.
+**Enterprise Use Case:** Simulating external API responses and edge function executions during workflow prototyping without incurring third-party API costs.
 
-### Tabela Węzłów w Kategorii
+### Category Summary Table
 
-| Typ Węzła (`type`) | Nazwa (PL / EN) | Porty We / Wy | Silnik | Koszt |
+| Node Type (`type`) | Display Name | Ports (In / Out) | Runtime | Cost Model |
 |---|---|---|:---:|---|
-| `ai.code_sandbox_exec` | **Bezpieczny Sandbox Kodu**<br>_Piaskownica Kodu (Python / JS Sandbox)_ | In: `main`<br>Out: `main` | `builtin` | Free (0 cr) |
+| `ai.code_sandbox_exec` | **Piaskownica Kodu (Python / JS Sandbox)** | In: `main`<br>Out: `main` | `builtin` | Free (0 credits) |
 
-### Szczegółowa Specyfikacja Węzłów (Developer Inspection Tooling (Narzędzia Developerskie))
+### Node Specifications (Developer Inspection Tooling)
 
-#### `ai.code_sandbox_exec` — Bezpieczny Sandbox Kodu (Piaskownica Kodu (Python / JS Sandbox))
+#### `ai.code_sandbox_exec` — Piaskownica Kodu (Python / JS Sandbox)
 
-Izolowane środowisko wykonawcze Python/JS do zaawansowanych transformacji.
+Wykonuje bezpieczny skrypt transformacji danych, kalkulacji matematycznych i formatowania JSON w izolowanym środowisku.
 
-- **Executor:** `builtin`
-- **Wymagany Plan:** `FREE`
-- **Koszt operacji:** Free (0 cr)
+- **Executor Runtime:** `builtin`
+- **Required Tier:** `FREE`
+- **Execution Cost:** Free (0 credits)
 
-- **Porty Wejściowe:** `main` (main)
-- **Porty Wyjściowe:** `main` (main)
+- **Input Ports:** `main` (main)
+- **Output Ports:** `main` (main)
 
-**Parametry konfiguracyjne (`params`):**
+**Configuration Parameters (`params`):**
 
-| Parametr | Typ | Wymagany | Domyślnie | Opis / Opcje |
+| Parameter | Type | Required | Default | Description / Allowed Values |
 |---|:---:|:---:|:---:|---|
-| `language` | `options` | Nie | `python` | <br>_Dostępne opcje:_ `python`, `javascript` |
-| `code` | `string` | Nie | `# Wejście dostępne pod zmienną: input_data
+| `language` | `options` | No | `python` | <br>_Options:_ `python`, `javascript` |
+| `code` | `string` | No | `# Wejście dostępne pod zmienną: input_data
 # Wynik przypisz do: output_data
 output_data = {'status': 'processed', 'data': input_data}` |  |
-| `timeout_ms` | `number` | Nie | `3000` |  |
+| `timeout_ms` | `number` | No | `3000` |  |
 
 ```json
 {
@@ -7905,11 +7905,11 @@ output_data = {'status': 'processed', 'data': input_data}` |  |
 
 ---
 
-## Pełne Przykłady Produkcyjnych Pipeline'ów (Recipes)
+## Production Pipeline Recipes
 
-Poniższe przykłady przedstawiają kompletne schematy DAG łączące wyspecjalizowane węzły w autonomiczne, gotowe do wdrożenia procesy biznesowe.
+These battle-tested DAG orchestrations demonstrate how specialized nodes interconnect into autonomous business pipelines.
 
-### Receptura 1: Fabryka Treści E-Commerce (Packshot ➔ Studio Mockup ➔ Allegro & Instagram)
+### Recipe 1: E-Commerce Content Automation (Packshot ➔ 3D Studio Mockup ➔ Allegro & Instagram)
 
 ```
 ┌─────────────────┐     ┌───────────────────────┐     ┌────────────────────────┐
@@ -7923,9 +7923,9 @@ Poniższe przykłady przedstawiają kompletne schematy DAG łączące wyspecjali
              └───────────────────────┘                                  └───────────────────────────┘
 ```
 
-Scenariusz pobiera surowe zdjęcie produktu ze sklepu internetowego przez Webhook, usuwa tło przy pomocy algorytmu Alpha-Matting, umieszcza obiekt w trójwymiarowej scenerii z realistycznym oświetleniem studyjnym, a następnie równolegle tworzy aukcję na Allegro i publikuje rolkę promocyjną na profilu Instagram.
+This workflow receives raw product images via Webhook, eliminates background clutter using alpha matting, composes the product into a photorealistic 3D studio scene with physically accurate lighting, and concurrently publishes the commercial listing on Allegro and promotional Reel on Instagram.
 
-### Receptura 2: Wiralowy Silnik Shorts z Napisami Karaoke i Auto-Clipperem
+### Recipe 2: Viral Short-Form Video Engine with Auto-Clipper & Karaoke Captions
 
 ```
 ┌──────────────────┐     ┌────────────────────────┐     ┌──────────────────────────────┐
@@ -7939,9 +7939,9 @@ Scenariusz pobiera surowe zdjęcie produktu ze sklepu internetowego przez Webhoo
                       └────────────────────────────┘     └──────────────────────────────┘
 ```
 
-Cykliczny robot pobiera najnowszy webinar lub podcast, automatycznie wyszukuje najpopularniejsze momenty (AI Clipper), nanosi animowane napisy karaoke (styl Hormozi / MrBeast), dołącza animowane logo marki i symultanicznie publikuje klip na TikTok, YouTube Shorts i Instagram Reels.
+Runs on a daily schedule: fetches the latest webinar or podcast recording, pinpoints high-engagement segments using AI clipping, overlays dynamic karaoke subtitles (MrBeast / Hormozi style), attaches brand intro/outro bumpers, and broadcasts to TikTok, YouTube Shorts, and Instagram Reels simultaneously.
 
-### Receptura 3: Autonomiczny Rój Konsensusu z Samonaprawą (Swarm Fan-Out & Self-Healing)
+### Recipe 3: Multi-Agent Consensus Swarm with Self-Healing
 
 ```
 ┌──────────────────┐     ┌─────────────────────┐     ┌───────────────────────────────┐
@@ -7955,4 +7955,4 @@ Cykliczny robot pobiera najnowszy webinar lub podcast, automatycznie wyszukuje n
                          └───────────────────────┘     └───────────────────────────────┘
 ```
 
-Trzy niezależne instancje agentów generują propozycje strategii marketingowej. Węzeł `agent.consensus_aggregate` dokonuje syntezy ich ocen w oparciu o quorum, pętla `critique_loop` testuje zgodność z wytycznymi, a węzeł `self_healing` dynamicznie koryguje ewentualne błędy wykonawcze bez angażowania człowieka.
+Dispatches prompts to 3 distinct LLM personas in parallel. The consensus node evaluates answers based on confidence weighting and quorum rules, passes the winning strategy into a critique loop, and automatically heals execution anomalies before producing the final decision.

@@ -118,40 +118,41 @@ Nodes reference upstream outputs using: `&#123;&#123;node_id.output.port.field&#
 
 ---
 
-::: tip PEŁNY KATALOG 198 WĘZŁÓW SILNIKA AGENTÓW
-FotoHub posiada **198 gotowych węzłów produkcyjnych** w 23 kategoriach (od zaawansowanych modeli generatywnych, przez integracje e-commerce Allegro/Shopify, po autonomiczny rój agentów i samonaprawę self-healing).
+::: tip FULL CATALOG OF 198 AGENT NODES
+FotoHub features **198 production-ready agent nodes** across 23 categories (ranging from state-of-the-art generative video/image models and e-commerce connectors like Allegro/Shopify to autonomous multi-agent swarms and self-healing resilience).
 
-👉 **[Przejdź do Pełnego Katalogu Węzłów Agenta (198 Nodes Reference)](/api/agent-nodes)** — kompletna specyfikacja parametrów, schematy wejść/wyjść, koszty operacji oraz receptury wdrożeniowe.
+👉 **[Explore the Complete Agent Nodes Catalog (198 Nodes Reference)](/api/agent-nodes)** — exhaustive parameter schemas, I/O specifications, credit pricing, and battle-tested production recipes.
 :::
 
 ## Node Categories
 
-Silnik klasyfikuje węzły w 23 głównych kategoriach wykonawczych:
+The FotoHub Agent Engine organizes execution nodes across 23 core categories:
 
-| Kategoria | Opis | Przykłady |
+| Category | Description | Examples |
 |----------|-------------|----------|
-| `agent` | Autonomiczni agenci i rój | Swarm fan-out, konsensus decyzyjny, critique loop, self-healing |
-| `control` | Sterowanie przepływem & routery | Traffic split (A/B), dynamic switch, fallback matrix, parallel gate |
-| `fotohub.shorts` | Wiralowe wideo & Shorts | AI Auto-Clipper, dynamiczne napisy karaoke, branding bumper |
-| `fotohub.ugc` | UGC Studio & Virtual Try-On | Renderowanie aktora UGC, generator skryptów, wirtualna przymierzalnia |
-| `fotohub.creative` | Studio produktowe 3D | E-Commerce Studio Mockup z dopasowaniem oświetlenia i cieni |
-| `fotohub.image` | Generowanie i edycja obrazu AI | Flux, Midjourney, upscale 8K, usuwanie tła, smart-crop, retusz |
-| `fotohub.video` | Wideo AI & postprodukcja | Generowanie wideo (Luma, Runway), stabilizacja, scalanie, oś czasu |
-| `fotohub.audio` | Dźwięk, mowa, muzyka & SFX | Synteza mowy (TTS), generowanie muzyki (Suno/Udio), mastering LUFS |
-| `voice` | Głos konwersacyjny w czasie rzeczywistym | Dwukierunkowe rozmowy głosowe real-time z detekcją ciszy VAD |
-| `fotohub.brand` | Nadzór i spójność marki | Ekstrakcja zasad z PDF, palety barw, bramki jakościowe księgi znaku |
-| `ai` | Modele LLM & analiza wizyjna | Promptowanie LLM, klasyfikacja, ekstrakcja schematów JSON, Vision QC |
-| `knowledge` | Baza wiedzy & pamięć wektorowa | Wyszukiwanie RAG, pamięć semantyczna agenta z czasem życia TTL |
-| `social` | Dystrybucja społecznościowa | Publikacja na Instagram, TikTok, YouTube Shorts, FB, LinkedIn |
-| `integration` | Konektory e-commerce & API | Allegro, Shopify, WooCommerce, eBay, Etsy, Stripe, Slack, Notion |
-| `storage` | Chmura i dostarczanie plików | Galeria FotoHub, pliki, AWS S3, Cloudflare R2, Dropbox, OneDrive |
-| `logic` | Logika deterministyczna | Warunki If/Switch, pętle while, agregacje (SUM/AVG), filtry JMESPath |
-| `trigger` | Wyzwalacze wykonania | Ręczny start, harmonogram CRON, webhook publiczny, bezpieczny HMAC |
-| `io` | Granice wejścia i wyjścia | Workflow input, zapis końcowy rezultatów wykonania |
-| `code` | Bezpieczna piaskownica kodu | Izolowane środowiska Python (Pillow/NumPy) oraz JavaScript |
-| `http` | Uniwersalne żądania HTTP REST | Klient REST API z obsługą nagłówków, autoryzacji i retry |
-| `system` | Bezpieczeństwo i migawki | Wersjonowanie snapshotów i automatyczny rollback po awarii |
-| `developer` | Narzędzia deweloperskie | Piaskownica testowa kodu i mocki środowiskowe |
+| `agent` | Autonomous agents & swarms | Swarm fan-out, consensus aggregate, critique loop, self-healing |
+| `control` | Flow control & routing | Canary traffic split, dynamic switch, fallback matrix, parallel gate |
+| `fotohub.shorts` | Viral short-form video & reels | AI auto-clipper, karaoke subtitles, branded intro/outro bumpers |
+| `fotohub.ugc` | UGC Studio & Virtual Try-On | UGC actor renderer, script generator, virtual garment try-on |
+| `fotohub.creative` | 3D Product studio & mockups | E-commerce 3D studio mockups with physical lighting and cast shadows |
+| `creative` | Packshot styling & sets | Commercial set styling for fashion, cosmetics, and luxury goods |
+| `fotohub.image` | Generative image AI & editing | Flux, Midjourney, 8K upscaling, alpha matting, face swap, inpainting |
+| `fotohub.video` | Generative video & post-production | Video generation (Luma, Runway), stabilization, frame interpolation, NLE timeline |
+| `fotohub.audio` | Speech, music, SFX & mastering | Expressive TTS, Suno/Udio music, sound effects, LUFS mastering, stem separation |
+| `voice` | Real-time conversational audio | Full-duplex conversational voice with VAD (<300ms latency), WebSocket streaming |
+| `fotohub.brand` | Brand governance & compliance | Brand guideline extraction, color palettes, auto-watermark, Delta-E compliance |
+| `ai` | LLMs, Vision & Multimodal analysis | Multi-provider LLMs, OCR vision inspection, classification, JSON schema extraction |
+| `knowledge` | RAG & Vector memory | Semantic vector retrieval, long-term episodic memory, TTL-partitioned collections |
+| `social` | Multi-platform publishing | Simultaneous cross-posting to Instagram, TikTok, YouTube Shorts, FB, LinkedIn |
+| `integration` | E-Commerce & Third-party connectors | Allegro, Shopify, WooCommerce, eBay, Etsy, Stripe, Slack, Discord, Notion |
+| `storage` | Cloud storage & asset delivery | FotoHub Gallery, AWS S3, Cloudflare R2, Dropbox, Google Cloud, OneDrive |
+| `logic` | Deterministic flow logic | If/Else, Switch, While/ForEach loops, math aggregates (SUM/AVG), JMESPath transforms |
+| `trigger` | Workflow triggers | Manual execution, CRON schedules, public webhooks, HMAC-SHA256 secure webhooks |
+| `io` | Input & Output boundaries | Workflow input parameters, final run summaries |
+| `code` | Sandboxed script execution | Isolated Python (NumPy, Pillow, Requests) and JavaScript sandboxes |
+| `http` | Universal REST API client | HTTP client with headers, bearer tokens, API keys, and automatic retry backoff |
+| `system` | System state & rollback | Workflow configuration snapshots and automated rollbacks |
+| `developer` | Developer inspection tooling | Code execution sandboxes and mock testing harnesses |
 
 ### AI Agent Node Details
 
