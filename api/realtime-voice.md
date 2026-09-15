@@ -32,7 +32,7 @@ Your server holds the FOTOhub API key. The browser only ever holds a session sec
 │                      │                    │            │           │
 │   client_secret      │   2. 200 OK        │            ▼           │
 │   websocket_url     ◀┼────────────────────┤   ┌─────────────────┐  │
-│   subprotocols       │  (never the        │   │ 5 credits billed│  │
+│   subprotocols       │  (never the        │   │ $0.050 billed  │  │
 │   session            │   API key)         │   └─────────────────┘  │
 └──────────┬───────────┘                    └───────────┬────────────┘
            │                                            │
@@ -56,7 +56,7 @@ Your server holds the FOTOhub API key. The browser only ever holds a session sec
 ```
 
 ::: danger Never put an `fh_live_*` key in browser code
-Bundled, in a data attribute, fetched from a "private" config endpoint — it is all the same thing: a long-lived key that can spend your credits, readable by anyone who opens devtools. The session endpoint exists precisely so you never have to. Mint server-side, hand out the ten-minute secret.
+Bundled, in a data attribute, fetched from a "private" config endpoint — it is all the same thing: a long-lived key that can charge your USD wallet, readable by anyone who opens devtools. The session endpoint exists precisely so you never have to. Mint server-side, hand out the ten-minute secret.
 :::
 
 ---
@@ -75,7 +75,7 @@ const FOTOHUB_KEY = process.env.FOTOHUB_API_KEY;   // fh_live_...
 const AGENT_ID = process.env.FOTOHUB_VOICE_AGENT_ID;
 
 app.post("/api/voice/token", async (req, res) => {
-  // Your own auth first — this endpoint spends 5 credits per call.
+  // Your own auth first — this endpoint costs $0.050 per session start.
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const upstream = await fetch(
@@ -91,7 +91,7 @@ app.post("/api/voice/token", async (req, res) => {
 
   if (!upstream.ok) {
     const { detail } = await upstream.json().catch(() => ({}));
-    // 402 = out of credits, 403 = read-only key, 503 = engine unavailable.
+    // 402 = wallet empty (INSUFFICIENT_FUNDS), 403 = read-only key, 503 = engine unavailable.
     return res.status(upstream.status).json({ error: detail ?? "voice_unavailable" });
   }
 
@@ -122,13 +122,13 @@ HEADERS = {
 
 
 def mint_session(agent_id: str) -> dict:
-    """Mint a browser session for a stored agent. Costs 5 credits."""
+    """Mint a browser session for a stored agent. Costs $0.050 USD per session."""
     resp = requests.post(
         f"{BASE}/v1/voice/agents/{agent_id}/sessions",
         headers=HEADERS,
         timeout=20,
     )
-    resp.raise_for_status()          # 402 = no credits, 403 = read-only key
+    resp.raise_for_status()          # 402 = insufficient funds, 403 = read-only key
     data = resp.json()
     return {
         "client_secret": data["client_secret"],
@@ -174,7 +174,7 @@ if __name__ == "__main__":
 ```
 
 ```bash [cURL]
-# Mint a session for a stored agent (5 credits)
+# Mint a session for a stored agent ($0.050 USD)
 curl -X POST "https://apis.fotohub.app/v1/voice/agents/AGENT_ID/sessions" \
   -H "Authorization: Bearer fh_live_your_api_key"
 
@@ -616,7 +616,7 @@ For long-running tools, return a placeholder immediately (`{"status": "checking"
 
 Things that measurably help:
 
-- **Pre-mint on intent, not on page load.** Mint when the user reaches for the mic, so the socket is opening while permission is granted. Do not mint on render — that is 5 credits for a session nobody used.
+- **Pre-mint on intent, not on page load.** Mint when the user reaches for the mic, so the socket is opening while permission is granted. Do not mint on render — that charges $0.050 for a session nobody used.
 - **Keep `instructions` short and imperative.** "Keep replies under two sentences" measurably shortens time-to-first-word, because the model commits sooner.
 - **Enable `echoCancellation`.** Without it the assistant's own voice re-enters the mic and VAD interrupts the assistant mid-sentence, on repeat.
 - **Handle barge-in.** It is the difference between a demo and a product.
@@ -628,7 +628,7 @@ Things that measurably help:
 The client secret is valid for about **600 seconds** and cannot be renewed. Plan for the boundary rather than discovering it in production:
 
 - Track `expires_at` from the token response and refresh **before** it lapses, not after the socket dies.
-- Refreshing means minting a new session — another **5 credits**. Conversations longer than ten minutes cost 5 credits per session started.
+- Refreshing means minting a new session — another **$0.050**. Conversations longer than ten minutes cost $0.050 per session started.
 - The new session starts with no history. If continuity matters, keep the transcript client-side (from the transcript events) and replay a summary as the first `conversation.item.create` on the new socket.
 - If the socket closes unexpectedly, stop the mic and tear down the `AudioContext` before reconnecting. Reusing a half-closed graph produces silent capture that no amount of retrying fixes.
 
@@ -646,7 +646,7 @@ The client secret is valid for about **600 seconds** and cannot be renewed. Plan
 | Reply audio is chipmunked or slow | Sample-rate mismatch between capture, `createBuffer` and playback. All three must be 24 kHz |
 | Assistant interrupts itself constantly | Echo cancellation is off, so its own output re-triggers VAD |
 | Assistant goes silent after a tool call | `output` was not a JSON string, or `response.create` was not sent |
-| `402` when minting | Out of credits and the wallet or overage limit is exhausted. Nothing was charged |
+| `402` when minting | Wallet balance insufficient. Top up at [fotohub.app/console/billing](https://fotohub.app/console/billing). Nothing was charged. |
 | `403` when minting | The key is read-only. Sessions require a write or admin key |
 | `503` when minting | The realtime engine is unavailable server-side. Retry with backoff |
 

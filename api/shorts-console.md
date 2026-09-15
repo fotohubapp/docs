@@ -123,7 +123,7 @@ console.log(result.status); // "started"
 }
 ```
 
-**Credits used:** ~10-15 (ingest + transcribe + detect + clip + caption + render)
+**USD charged:** ~10-15 (ingest + transcribe + detect + clip + caption + render)
 
 ### Step 3: Get your clips
 
@@ -696,7 +696,7 @@ print(f"4. Published {result.queued} clips to TikTok")
 
 # 6. Check analytics
 dashboard = client.shorts.get_dashboard()
-print(f"5. Total credits used: {dashboard.total_credits_used}")
+print(f"5. Total USD charged: {dashboard.total_usd_spent}")
 ```
 
 ```typescript [TypeScript]

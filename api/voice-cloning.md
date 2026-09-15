@@ -80,7 +80,7 @@ POST /v1/ai/voice/clone
   "name": "Alex Narrator",
   "preview_url": "https://s1.fotohub.app/storage/v1/object/sign/audio/user123/voice-clones/vc_a1b2c3d4e5f6-sample.mp3?token=...",
   "generation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "credits_used": 2,
+  "usd_charged": 0.0900,
   "processing_time_ms": 4250,
   "sample_duration": 3.2,
   "provider": "ida-voice"
@@ -555,7 +555,7 @@ POST /v1/ai/voice/compare
   "confidence": "very_high",
   "threshold_used": 0.25,
   "processing_time_ms": 1450,
-  "credits_used": 1
+  "usd_charged": 0.0450
 }
 ```
 
@@ -633,7 +633,7 @@ POST /v1/ai/voice/deepfake-detect
   "confidence": "very_high",
   "model_used": "MelodyMachine/Deepfake-audio-detection-V2",
   "processing_time_ms": 2830,
-  "credits_used": 2
+  "usd_charged": 0.0900
 }
 ```
 
@@ -740,7 +740,7 @@ POST /v1/ai/voice/forensics
     "Audio appears authentic - no anomalies detected"
   ],
   "processing_time_ms": 5420,
-  "credits_used": 3
+  "usd_charged": 0.1350
 }
 ```
 

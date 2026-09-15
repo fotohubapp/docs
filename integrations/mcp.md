@@ -116,7 +116,7 @@ Get your API key at [fotohub.app/console](https://fotohub.app/console) → API K
 
 | Tool | Description |
 |------|-------------|
-| `check_balance` | Check your credit balance |
+| `check_balance` | Check your prepaid USD wallet balance |
 | `list_models` | List all available AI models with pricing |
 | `list_generations` | View generation history |
 | `search_photos` | Semantic photo search in your library |
@@ -148,7 +148,7 @@ The server also exposes MCP resources for browsing:
 | `fotohub://models/video` | Available video generation models |
 | `fotohub://models/audio` | Available audio/music models |
 | `fotohub://pricing` | Current pricing table |
-| `fotohub://balance` | Your credit balance |
+| `fotohub://balance` | Your prepaid USD wallet balance |
 
 ## Prompts
 
@@ -169,6 +169,6 @@ Pre-built prompt templates for common workflows:
 
 ## Billing
 
-Each tool call deducts credits from your account. Use `check_balance` to monitor usage. Pricing varies by model — use `list_models` to see current rates.
+Each generation tool call deducts pure USD from your prepaid wallet. Use `check_balance` to monitor usage. Pricing varies by model — use `list_models` to see current rates.
 
-If credits run out mid-request, you'll receive an error: `"Insufficient credits — top up at fotohub.app/console"`
+If wallet funds run out mid-request, you'll receive an error: `"insufficient_funds — top up at fotohub.app/console"`

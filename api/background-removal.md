@@ -53,11 +53,7 @@ Automatically detects and segments the main subject, removing the background and
 ```
 
 ::: info Reading the billing block
-`method` is `credits` while your plan's monthly allowance covers the request, and
-`usd_charged` is `0` because no money moved. Once the allowance is exhausted the
-same call returns `"method": "wallet"` with the USD amount in `usd_charged` (see
-[Pricing](#pricing)). `pln_charged` is a legacy mirror of the same charge -- read
-`usd_charged`.
+`usd_charged` is the exact USD amount debited from your prepaid wallet for this operation. The `billing.method` field reflects the backend routing (`"wallet"` for all API calls). See [Pricing](#pricing) for per-operation rates.
 :::
 
 ### Code Examples
@@ -74,7 +70,7 @@ result = client.images.remove_background(
 )
 
 print(f"Transparent image: {result.output_url}")
-print(f"Credits used: {result.credits_used}")
+print(f"USD charged: ${result.usd_charged:.4f}")
 ```
 
 ```typescript [TypeScript SDK]
@@ -87,7 +83,7 @@ const result = await client.images.removeBackground({
 });
 
 console.log(`Transparent image: ${result.outputUrl}`);
-console.log(`Credits used: ${result.creditsUsed}`);
+console.log(`USD charged: $${result.usdCharged}`);
 ```
 
 ```bash [cURL]

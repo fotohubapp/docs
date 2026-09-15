@@ -53,7 +53,6 @@ Convert a video to a different format, codec, resolution, or bitrate. Supports a
     "method": "wallet",
     "usd_charged": 1,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "duration_seconds": 42.5,
   "file_size_bytes": 15728640,
@@ -184,7 +183,6 @@ Merge multiple video clips into a single video. Clips are concatenated in the or
     "method": "wallet",
     "usd_charged": 2,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "duration_seconds": 128.4,
   "clips_merged": 4,
@@ -328,7 +326,6 @@ Change video playback speed or create slow-motion effects. Supports speed factor
     "method": "wallet",
     "usd_charged": 2,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "original_duration_seconds": 10.0,
   "output_duration_seconds": 40.0,
@@ -467,7 +464,6 @@ AI-powered video stabilization that removes camera shake and jitter. Uses deep l
     "method": "wallet",
     "usd_charged": 3,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "stability_score": {
     "before": 0.32,
@@ -605,7 +601,6 @@ Automatically transcribes speech in the video using AI speech recognition and em
     "method": "wallet",
     "usd_charged": 3,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "language_detected": "en",
   "segments": 47,
@@ -774,7 +769,6 @@ Each effect in the array is an object with `type` and effect-specific parameters
     "method": "wallet",
     "usd_charged": 2,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "effects_applied": ["color_grade", "vignette", "letterbox", "film_grain"],
   "duration_seconds": 60.0,
@@ -916,7 +910,6 @@ Add a text or image watermark to a video. Supports positioning, opacity, scaling
     "method": "wallet",
     "usd_charged": 2,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "watermark_type": "image",
   "position": "bottom_right",
@@ -1077,7 +1070,6 @@ AI-powered video upscaling using deep learning super-resolution. Increases resol
     "method": "wallet",
     "usd_charged": 4,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "input_resolution": "960x540",
   "output_resolution": "3840x2160",
@@ -1228,7 +1220,6 @@ AI analyzes your video content and automatically creates a polished edit. The AI
     "method": "wallet",
     "usd_charged": 5,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "edit_summary": "Created a 45-second cinematic edit from 3 clips. Applied teal-orange color grade, added crossfade transitions at beat drops, trimmed dead air segments.",
   "scenes_used": 8,
@@ -1389,7 +1380,7 @@ Rate limits depend on your subscription tier:
 
 ### Per-Tier Limits
 
-| Endpoint | Free | Creator (29 PLN/mo) | Pro (79 PLN/mo) | Business (199 PLN/mo) | Enterprise |
+| Endpoint | Free | Pay-as-you-go | Growth | Business | Enterprise |
 |----------|------|---------------------|-----------------|----------------------|------------|
 | `transcode` | 5/min | 15/min | 40/min | 120/min | Custom |
 | `merge` | 3/min | 10/min | 30/min | 100/min | Custom |
@@ -1784,7 +1775,7 @@ for platform in platforms:
     results.append({"name": platform["name"], "url": result.output_url, "size": result.file_size_bytes})
     print(f"{platform['name']}: {result.output_url} ({result.file_size_bytes / 1024 / 1024:.1f} MB)")
 
-print(f"\nTotal credits used: {len(platforms)} (1 per transcode)")
+print(f"\nTotal USD charged: {len(platforms)} (1 per transcode)")
 ```
 
 ```typescript [TypeScript]

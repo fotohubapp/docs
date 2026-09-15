@@ -416,7 +416,7 @@ is a `delivery` block, present only when routing resolved to a destination:
 {
   "model": "seedance-2-0-mini",
   "url": "https://s1.fotohub.app/storage/v1/object/sign/api-generations/...",
-  "credits_used": 84,
+  "usd_charged": 3.7800,
   "delivery": {
     "kind": "console_bucket",
     "routed_by": "rule",

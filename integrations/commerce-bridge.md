@@ -5,7 +5,7 @@ The Commerce Bridge orchestrates bulk catalog work for every FOTOhub e-commerce 
 ::: info What it handles for you
 - **Queue and fan-out** — one job covers up to 500 products, dispatched at a rate your store's API can absorb
 - **Per-item retries** — a rate-limited or failed product retries independently; one bad SKU never sinks the batch
-- **Cost preflight** — know the credit cost before a job starts, and get a `402` instead of a half-finished run
+- **Cost preflight** — know the USD cost before a job starts, and get a `402` instead of a half-finished run
 - **Preset library** — 63 server-side presets, updated without shipping a plugin release
 - **Signed callbacks** — HMAC-verified webhooks per item and per job
 :::
@@ -210,9 +210,9 @@ est = requests.post(f"{BASE}/estimate", headers=HEADERS, json={
 
 if not est["sufficient"]:
     raise SystemExit(
-        f"Need {est['total_credits']} credits, have {est['available_credits']}"
+        f"Need ${est['total_usd']} USD, have ${est['available_usd']} USD"
     )
-print(f"{est['total_credits']} credits for 120 products")
+print(f"${est['total_usd']} USD for 120 products")
 ```
 
 ```typescript [TypeScript]
@@ -229,7 +229,7 @@ const est = await fetch(`${BASE}/estimate`, {
 
 if (!est.sufficient) {
   throw new Error(
-    `Need ${est.total_credits} credits, have ${est.available_credits}`,
+    `Need $${est.total_usd} USD, have $${est.available_usd} USD`,
   );
 }
 ```
@@ -252,13 +252,13 @@ resp, _ := http.DefaultClient.Do(req)
 defer resp.Body.Close()
 
 var est struct {
-	TotalCredits     float64 `json:"total_credits"`
-	AvailableCredits float64 `json:"available_credits"`
+	TotalUSD         float64 `json:"total_usd"`
+	AvailableUSD     float64 `json:"available_usd"`
 	Sufficient       bool    `json:"sufficient"`
 }
 json.NewDecoder(resp.Body).Decode(&est)
 if !est.Sufficient {
-	fmt.Printf("need %.1f, have %.1f\n", est.TotalCredits, est.AvailableCredits)
+	fmt.Printf("need $%.4f, have $%.2f USD\n", est.TotalUSD, est.AvailableUSD)
 }
 ```
 
@@ -273,9 +273,9 @@ curl -X POST https://apis.fotohub.app/v1/commerce/estimate \
 
 ```json
 {
-  "credits_per_item": 4,
-  "total_credits": 480,
-  "available_credits": 3000,
+  "cost_per_item_usd": 0.1260,
+  "total_usd": 15.1200,
+  "available_usd": 75.0000,
   "sufficient": true
 }
 ```
@@ -339,7 +339,7 @@ job = requests.post(f"{BASE}/jobs", headers=HEADERS, json={
     "idempotency_key": "spring-refresh-2026-07-batch-1",
 }).json()
 
-print(job["job_id"], job["estimated_credits"])
+print(job["job_id"], job["estimated_usd"])
 ```
 
 ```typescript [TypeScript]
@@ -401,7 +401,7 @@ req.Header.Set("Content-Type", "application/json")
 resp, _ := http.DefaultClient.Do(req)
 defer resp.Body.Close()
 if resp.StatusCode == http.StatusPaymentRequired {
-	fmt.Println("not enough credits")
+	fmt.Println("insufficient wallet balance")
 	return
 }
 ```
@@ -427,7 +427,7 @@ curl -X POST https://apis.fotohub.app/v1/commerce/jobs \
   "job_id": "3d9a77e2-1c04-4f6b-9a58-7e1b2c4d8f90",
   "status": "queued",
   "total_items": 1,
-  "estimated_credits": 4
+  "estimated_usd": 0.1260
 }
 ```
 
@@ -435,15 +435,15 @@ If your balance is short, you get `402` **before** anything is charged:
 
 ```json
 {
-  "error": "insufficient_credits",
-  "required_credits": 480,
-  "available_credits": 120
+  "error": "insufficient_funds",
+  "required_usd": 15.12,
+  "available_usd": 3.50
 }
 ```
 
 ## Job kinds
 
-| Kind | What it does | Credits per item | Needs `source_image_url` |
+| Kind | What it does | Cost per item (USD) | Needs `source_image_url` |
 |------|--------------|------------------|--------------------------|
 | `image_generate` | New product photo from the preset and product context | model cost (2–5.3) | no |
 | `image_edit` | Edit an existing photo with a prompt | model cost | yes |
@@ -489,8 +489,8 @@ GET /v1/commerce/jobs
   "total_items": 120,
   "done_items": 47,
   "failed_items": 2,
-  "spent_credits": 188,
-  "estimated_credits": 480
+  "spent_usd": 5.9220,
+  "estimated_usd": 0.126080
 }
 ```
 
@@ -505,7 +505,7 @@ Item results carry everything you need to write back:
       "sku": "CRM-500-LAV",
       "status": "completed",
       "attempts": 1,
-      "credits_used": 4,
+      "usd_charged": 0.1260,
       "error_message": null,
       "result": {
         "image_urls": ["https://s1.fotohub.app/storage/v1/object/public/photos/..."],
@@ -532,7 +532,7 @@ while True:
 
     if job["status"] in ("completed", "completed_with_errors", "failed", "cancelled"):
         break
-    if job["status"] == "awaiting_credits":
+    if job["status"] == "awaiting_funds":
         print("job paused — top up, then call retry-failed")
         break
     time.sleep(5)
@@ -553,7 +553,7 @@ async function waitForJob(jobId: string) {
     onProgress(job.done_items, job.total_items, job.failed_items);
 
     if (terminal.includes(job.status)) return job;
-    if (job.status === "awaiting_credits") return job;
+    if (job.status === "awaiting_funds") return job;
     await new Promise((r) => setTimeout(r, 5000));
   }
 }
@@ -604,9 +604,9 @@ curl "https://apis.fotohub.app/v1/commerce/jobs/3d9a77e2/items?status=failed" \
                  │  queued  │
                  └────┬─────┘
                       ▼
-                ┌────────────┐        credits run out
+                ┌────────────┐        wallet funds run out
                 │ processing │──────────────────────────▶┌──────────────────┐
-                └─────┬──────┘                           │ awaiting_credits │
+                └─────┬──────┘                           │ awaiting_funds │
                       │                                  └────────┬─────────┘
    all items resolved │                                  top up,  │
                       ▼                                  then     │
@@ -616,11 +616,11 @@ completed  completed_with_errors   failed   cancelled ◀───────�
            (some items failed)   (all failed)
 ```
 
-`awaiting_credits` is deliberate: rather than charging item by item until the balance dies mid-catalog, the worker parks the batch and cancels the not-yet-started items. Top up, call `retry-failed`, and those items are revived along with the failed ones.
+`awaiting_funds` is deliberate: rather than charging item by item until the balance dies mid-catalog, the worker parks the batch and cancels the not-yet-started items. Top up, call `retry-failed`, and those items are revived along with the failed ones.
 
 | Operation | Endpoint | Notes |
 |-----------|----------|-------|
-| Retry failed only | `POST /v1/commerce/jobs/{id}/retry-failed` | Returns `{requeued}`. Also revives cancelled siblings of an `awaiting_credits` job. `attempts` is preserved for audit. |
+| Retry failed only | `POST /v1/commerce/jobs/{id}/retry-failed` | Returns `{requeued}`. Also revives cancelled siblings of an `awaiting_funds` job. `attempts` is preserved for audit. |
 | Cancel | `POST /v1/commerce/jobs/{id}/cancel` | Cancels the job and its pending items. Already-completed items keep their results. |
 
 ::: warning Retry failed, not everything
@@ -678,7 +678,7 @@ Set `callback_url` on the connection and the bridge posts events as work complet
 | `commerce.item.completed` | An item finished (may batch several items) |
 | `commerce.job.completed` | All items resolved |
 | `commerce.job.failed` | The job failed outright |
-| `commerce.job.awaiting_credits` | The batch was parked for lack of credits |
+| `commerce.job.awaiting_funds` | The batch was parked for lack of funds |
 
 Each request carries `X-FotoHub-Signature`: the HMAC-SHA256 of the **raw** request body, hex-encoded, keyed by your `callback_secret`. Compute it over the bytes you received, before any JSON parsing or re-serialisation.
 
@@ -795,7 +795,7 @@ Pass `idempotency_key` on submit. Replaying the same key for the same connection
 |--------|---------|-----------|
 | `400` | Malformed body or item count outside 1–500 | Fix the request |
 | `401` | Missing, invalid or revoked API key | Re-check the key in the console |
-| `402` | Not enough credits (`required_credits`, `available_credits` included) | Top up, then resubmit |
+| `402` | Insufficient wallet balance (`required_usd`, `available_usd` included) | Top up, then resubmit |
 | `404` | Job or connection not found, or not yours | Verify the ID belongs to this key |
 | `409` | Operation invalid for the current state, e.g. retrying a cancelled job | Create a new job |
 | `429` | Too many requests | Back off, honour `Retry-After` |
@@ -803,9 +803,9 @@ Pass `idempotency_key` on submit. Replaying the same key for the same connection
 
 ```json
 {
-  "error": "insufficient_credits",
-  "required_credits": 480,
-  "available_credits": 120
+  "error": "insufficient_funds",
+  "required_usd": 15.12,
+  "available_usd": 3.50
 }
 ```
 
@@ -827,7 +827,7 @@ def run_batch(connection_id, products, preset="fashion-studio"):
         "kind": "image_generate", "num_items": len(products),
     }).json()
     if not est["sufficient"]:
-        raise RuntimeError(f"need {est['total_credits']} credits")
+        raise RuntimeError(f"need ${est['total_usd']} USD")
 
     job = requests.post(f"{BASE}/jobs", headers=HEADERS, json={
         "connection_id": connection_id,
@@ -847,7 +847,7 @@ def run_batch(connection_id, products, preset="fashion-studio"):
 
     while True:
         state = requests.get(f"{BASE}/jobs/{job['job_id']}", headers=HEADERS).json()
-        if state["status"] in TERMINAL or state["status"] == "awaiting_credits":
+        if state["status"] in TERMINAL or state["status"] == "awaiting_funds":
             break
         time.sleep(5)
 
@@ -877,7 +877,7 @@ export async function runBatch(connectionId: string, products: Product[]) {
     kind: "image_generate",
     num_items: products.length,
   });
-  if (!est.sufficient) throw new Error(`need ${est.total_credits} credits`);
+  if (!est.sufficient) throw new Error(`need $${est.total_usd} USD`);
 
   const { job_id } = await post("/jobs", {
     connection_id: connectionId,
@@ -895,7 +895,7 @@ export async function runBatch(connectionId: string, products: Product[]) {
   do {
     await new Promise((r) => setTimeout(r, 5000));
     state = await get(`/jobs/${job_id}`);
-  } while (!TERMINAL.includes(state.status) && state.status !== "awaiting_credits");
+  } while (!TERMINAL.includes(state.status) && state.status !== "awaiting_funds");
 
   const { items } = await get(`/jobs/${job_id}/items?status=completed&limit=500`);
   for (const item of items) await saveDraft(item.external_id, item.result);

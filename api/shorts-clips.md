@@ -2257,7 +2257,7 @@ POST https://s1.fotohub.app/functions/v1/shorts-process
 
 ```json
 {
-  "total_credits_used": 245.50,
+  "total_usd_charged": 11.0475,
   "total_events": 87,
   "avg_processing_time_ms": 23400,
   "event_breakdown": {
@@ -2280,7 +2280,7 @@ POST https://s1.fotohub.app/functions/v1/shorts-process
   "recent_events": [
     {
       "event_type": "render",
-      "credits_used": 2.5,
+      "usd_charged": 0.1125,
       "processing_time_ms": 8500,
       "created_at": "2026-07-22T15:30:00Z"
     }
@@ -2291,7 +2291,7 @@ POST https://s1.fotohub.app/functions/v1/shorts-process
 ::: code-group
 ```python [Python]
 dashboard = client.shorts.get_dashboard()
-print(f"Credits used: {dashboard.total_credits_used}")
+print(f"Credits used: {dashboard.total_usd_charged}")
 print(f"Projects: {dashboard.projects.total}")
 ```
 
@@ -3021,7 +3021,7 @@ Every endpoint returns the same envelope: the operation name, credits charged, a
 ```json
 {
   "operation": "generate-clips",
-  "credits_used": 5,
+  "usd_charged": 0.2250,
   "billing": { "success": true, "remaining_credits": 995 },
   "...": "step-specific fields"
 }
@@ -3066,7 +3066,7 @@ resp = requests.post(
     json={"video_url": "https://youtube.com/watch?v=dQw4w9WgXcQ", "title": "Best Moments"},
 )
 data = resp.json()
-print(data["operation"], data["credits_used"])
+print(data["operation"], f"${data['usd_charged']:.4f}")
 ```
 
 ```typescript [TypeScript]
@@ -3082,7 +3082,7 @@ const resp = await fetch("https://apis.fotohub.app/v1/shorts/ingest", {
   }),
 });
 const data = await resp.json();
-console.log(data.operation, data.credits_used);
+console.log(data.operation, `$${data.usd_charged}`);
 ```
 :::
 
@@ -3348,7 +3348,7 @@ resp = requests.post(
     },
 )
 data = resp.json()
-print(f"{data['operation']} — {data['credits_used']} credits")
+print(f"{data['operation']} — ${data['usd_charged']:.4f}")
 ```
 
 ```typescript [TypeScript]
@@ -3369,7 +3369,7 @@ const resp = await fetch("https://apis.fotohub.app/v1/shorts/agent", {
   }),
 });
 const data = await resp.json();
-console.log(`${data.operation} — ${data.credits_used} credits`);
+console.log(`${data.operation} — $${data.usd_charged}`);
 ```
 :::
 

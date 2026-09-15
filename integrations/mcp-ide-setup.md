@@ -200,15 +200,15 @@ In Windsurf, open **Settings → Windsurf Settings → Cascade → MCP Servers**
 
 ## MCP Resources
 
-Read-only context URIs your assistant can inspect without consuming generation credits:
+Read-only context URIs your assistant can inspect without consuming generation balance:
 
 | Resource URI | Description |
 |:---|:---|
 | `fotohub://models/image` | Real-time image model catalog and features |
 | `fotohub://models/video` | Video generation models, durations, and resolution limits |
 | `fotohub://models/audio` | Music and TTS voices catalog |
-| `fotohub://pricing` | Full credit pricing table and USD exchange rates |
-| `fotohub://balance` | Current user credit balance and wallet status |
+| `fotohub://pricing` | Full model catalog and pure USD pass-through pricing table |
+| `fotohub://balance` | Current user prepaid USD wallet balance |
 
 ---
 

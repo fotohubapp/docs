@@ -8,8 +8,8 @@ API keys are the primary authentication mechanism. Each key is scoped to a speci
 
 | Environment | Prefix | Description |
 |-------------|--------|-------------|
-| **Production** | `fh_live_*` | Live keys access production resources. Generations consume real credits and wallet funds. Generated assets are stored permanently. |
-| **Sandbox** | `fh_test_*` | Sandbox keys return mock responses for development and testing. No credits are consumed. Assets are ephemeral and deleted after 24 hours. |
+| **Production** | `fh_live_*` | Live keys access production resources. Generations debit your **prepaid USD wallet** balance directly. Generated assets are stored permanently. |
+| **Sandbox** | `fh_test_*` | Sandbox keys return mock responses for development and testing. No USD is charged. Assets are ephemeral and deleted after 24 hours. |
 
 ::: info Key Format
 API keys are 48 characters long including the prefix. Example: `fh_live_sk2Kj8mN4pQ7rT1vX3yZ5bD9fH2gL6wA0cE4`. Keys are generated using cryptographically secure random bytes and are unique across the platform.

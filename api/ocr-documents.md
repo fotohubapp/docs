@@ -89,7 +89,7 @@ POST /v1/ai/document/ocr
   ],
   "detected_language": "en",
   "total_lines": 4,
-  "credits_used": 1
+  "usd_charged": 0.0450
 }
 ```
 
@@ -208,7 +208,7 @@ POST /v1/ai/document/redact
     { "type": "ADDRESS", "value": "ul. Marszalkowska 1, 00-001 Warszawa", "confidence": 96.8, "masked": true }
   ],
   "total_redactions": 4,
-  "credits_used": 2
+  "usd_charged": 0.0900
 }
 ```
 
@@ -315,7 +315,7 @@ POST /v1/ai/document/pdf-to-images
     }
   ],
   "total_pages": 2,
-  "credits_used": 2
+  "usd_charged": 0.0900
 }
 ```
 
@@ -425,7 +425,7 @@ POST /v1/ai/document/batch
   ],
   "total_processed": 2,
   "total_failed": 0,
-  "credits_used": 2
+  "usd_charged": 0.0900
 }
 ```
 
@@ -527,7 +527,7 @@ For `format: "json"`:
   "format": "json",
   "size_bytes": 4280,
   "expires_at": "2026-07-23T12:00:00Z",
-  "credits_used": 0
+  "usd_charged": 0.0000
 }
 ```
 
@@ -538,7 +538,7 @@ For `format: "csv"`:
   "format": "csv",
   "size_bytes": 2140,
   "expires_at": "2026-07-23T12:00:00Z",
-  "credits_used": 0
+  "usd_charged": 0.0000
 }
 ```
 
@@ -668,7 +668,7 @@ POST /v1/ai/document/invoice
   "document_type": "invoice",
   "detected_language": "pl",
   "overall_confidence": 97.6,
-  "credits_used": 3
+  "usd_charged": 0.1350
 }
 ```
 
@@ -800,7 +800,7 @@ POST /v1/ai/document/analyze
     }
   ],
   "total_blocks": 87,
-  "credits_used": 2
+  "usd_charged": 0.0900
 }
 ```
 
@@ -957,7 +957,7 @@ Extract key terms, signature blocks, dates, and party names from contracts. Use 
 | 400 | `batch_limit_exceeded` | Batch contains more than 100 images. Split into smaller batches. |
 | 400 | `invalid_job_id` | Export job ID not found or expired. Job results expire after 24 hours. |
 | 400 | `invalid_page_range` | PDF page range is invalid or exceeds document page count. |
-| 402 | `insufficient_credits` | Not enough credits for this operation. Top up at fotohub.app/billing. |
+| 402 | `INSUFFICIENT_FUNDS` | Wallet balance insufficient. Top up at [fotohub.app/console/billing](https://fotohub.app/console/billing). |
 | 413 | `payload_too_large` | Request body exceeds maximum size. Reduce image count or resolution. |
 | 429 | `rate_limited` | Too many requests. Default: 60 requests/minute. See [Rate Limits](/api/rate-limits). |
 | 500 | `ocr_failed` | Internal OCR engine error. Retry after a few seconds. |

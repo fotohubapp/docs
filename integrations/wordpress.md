@@ -24,7 +24,7 @@ Every hook, filter, AJAX action, REST route, option key, table name and menu slu
 1. Upload the `fotohub-ai` folder to `wp-content/plugins/`, or install the zip from **Plugins → Add New**.
 2. Activate the plugin.
 3. Go to **FOTOhub AI → Settings** and paste your API key.
-4. Click **Test Connection** — the plugin calls `GET /v1/billing/balance` and reports your credit balance.
+4. Click **Test Connection** — the plugin calls `GET /v1/billing/balance` and reports your available USD wallet balance.
 
 Activation (`FotohubAI::activate()`) seeds the default options and creates the three custom tables. It aborts with `wp_die()` on PHP older than 8.0.
 
@@ -62,7 +62,7 @@ The plugin also adds action links on the Plugins screen: **Settings** always, an
 | Field | Option key | Default | Notes |
 |-------|-----------|---------|-------|
 | API Key | `fotohub_ai_api_key` | `''` | Sanitized through `Fotohub_Admin::sanitize_api_key()`, stored encrypted. A masked value (`***abcd`) is a no-op. |
-| Default Model | `fotohub_ai_default_model` | `seedream-5-0-260128` | Dropdown built from `Fotohub_Bridge::get_image_models()`, showing credits per image. |
+| Default Model | `fotohub_ai_default_model` | `seedream-5-0-260128` | Dropdown built from `Fotohub_Bridge::get_image_models()`, showing USD price per image. |
 | Default Width | `fotohub_ai_default_width` | `1024` | 256–2048, step 64. |
 | Default Height | `fotohub_ai_default_height` | `1024` | 256–2048, step 64. |
 
@@ -70,18 +70,18 @@ The plugin also adds action links on the Plugins screen: **Settings** always, an
 
 `Fotohub_Bridge::get_image_models()` is the single catalog used by the settings dropdown, the wizard and the Gutenberg block.
 
-| Model ID | Label | Credits per image |
+| Model ID | Label | Cost per image (USD) |
 |----------|-------|-------------------|
-| `seedream-5-0-260128` | SeedDream 5.0 (recommended) | 2.0 |
-| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro | 3.0 |
-| `gpt-image-2` | GPT Image 2 | 2.0 |
-| `nano-banana-pro` | Nano Banana Pro | 5.3 |
-| `nano-banana-fast` | Nano Banana Fast | 2.0 |
+| `seedream-5-0-260128` | SeedDream 5.0 (recommended) | $0.0315 |
+| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro | $0.0480 |
+| `gpt-image-2` | GPT Image 2 | $0.0350 |
+| `nano-banana-pro` | Nano Banana Pro | $0.1340 |
+| `nano-banana-fast` | Nano Banana Fast | $0.0400 |
 | `imagen-4-standard` | Imagen 4 Standard | 3.0 |
 | `imagen-4-ultra` | Imagen 4 Ultra | 5.0 |
 | `imagen-4-fast` | Imagen 4 Fast | 2.0 |
 
-Credits are the platform's billing unit. When your plan credits run out, the same operation is charged to your USD wallet at $0.0536 per credit — see [Billing & Pricing](/api/billing).
+Billing is metered 100% in USD from your prepaid wallet balance (`wallet.available_usd`) at transparent pass-through provider rates — see [Billing & Pricing](/api/billing).
 
 ### Complete option key list
 
@@ -302,26 +302,26 @@ Attributes: `id` (defaults to `get_the_ID()`), `autoplay`, `loop`, `muted`, `con
 
 `Fotohub_Analytics::init()` listens on the `fotohub_api_request_completed` action, which `Fotohub_API::request()` and `Fotohub_Bridge::request()` fire after **every** API call. One row per call is written to `{$wpdb->prefix}fotohub_usage`.
 
-Recorded columns: `user_id`, `endpoint`, `category`, `model`, `credits_used`, `response_status`, `duration_ms`, `post_id`, `product_id`, `created_at`. Pure bookkeeping calls (`billing` category, successful, zero credits) are skipped so the log stays about actual work.
+Recorded columns: `user_id`, `endpoint`, `category`, `model`, `usd_charged`, `response_status`, `duration_ms`, `post_id`, `product_id`, `created_at`. Pure bookkeeping calls (`billing` category, successful, zero charge) are skipped so the log stays about actual work.
 
 Categories are derived from the endpoint path by `Fotohub_API::categorize_endpoint()`: `commerce`, `video`, `music`, `chat`, `billing`, `image`, `other`.
 
 **FOTOhub AI → Analytics** (`manage_options`) renders:
 
 - A period selector: 7, 30 or 90 days. The value drives the SQL date filter through `Fotohub_Analytics::normalize_period()` and `period_start()`.
-- Credits and generation counts per category and per model.
-- Top products by credit spend (`get_top_products()`).
+- USD spending and generation counts per category and per model.
+- Top products by USD spend (`get_top_products()`).
 - Recent rows (`get_recent_rows()`, newest first, up to 200).
 - Recent billing transactions from `GET /v1/billing/transactions`.
 - A Chart.js chart of usage by model. Chart.js 4.4.1 is loaded from jsDelivr; no copy is vendored in the plugin.
 
 ### CSV export
 
-The **Export CSV** button links to `admin.php?page=fotohub-ai-analytics&action=export_csv` with a `fotohub_export_csv` nonce. `Fotohub_Analytics::handle_csv_export()` checks `manage_options` and the nonce, then streams up to 10,000 rows with the columns: ID, User ID, Endpoint, Category, Model, Credits Used, Status, Duration (ms), Post ID, Product ID, Date. The same export is reachable over AJAX as `fotohub_export_csv`.
+The **Export CSV** button links to `admin.php?page=fotohub-ai-analytics&action=export_csv` with a `fotohub_export_csv` nonce. `Fotohub_Analytics::handle_csv_export()` checks `manage_options` and the nonce, then streams up to 10,000 rows with the columns: ID, User ID, Endpoint, Category, Model, USD Charged, Status, Duration (ms), Post ID, Product ID, Date. The same export is reachable over AJAX as `fotohub_export_csv`.
 
 ### Dashboard widget
 
-`wp_dashboard_setup` registers **FOTOhub AI Usage** (`manage_options` only). It shows the credit balance — flagged as low under 50 credits — plus 30-day counts and credits per category, and links to the full analytics page. On `index.php` the plugin enqueues only `admin/css/analytics.css` so the widget stays styled without loading the whole admin bundle.
+`wp_dashboard_setup` registers **FOTOhub AI Usage** (`manage_options` only). It shows the wallet balance — flagged as low under $5.00 USD — plus 30-day counts and USD spend per category, and links to the full analytics page. On `index.php` the plugin enqueues only `admin/css/analytics.css` so the widget stays styled without loading the whole admin bundle.
 
 ### Attaching context to a log row
 
@@ -423,7 +423,7 @@ Fired after every FOTOhub API call, by both the REST client and the bridge clien
 ```php
 add_action(
     'fotohub_api_request_completed',
-    function ( string $endpoint, string $category, string $model, float $credits, bool $success, int $duration_ms ) {
+    function ( string $endpoint, string $category, string $model, float $usd_charged, bool $success, int $duration_ms ) {
         if ( ! $success ) {
             error_log( "FOTOhub call failed: {$endpoint} ({$duration_ms}ms)" );
         }
@@ -501,7 +501,7 @@ Three tables are created on activation and dropped on uninstall.
 
 | Table | Created by | Purpose |
 |-------|-----------|---------|
-| `{prefix}fotohub_usage` | `Fotohub_Analytics::install_table()` | One row per API call: endpoint, category, model, credits, status, duration, post/product |
+| `{prefix}fotohub_usage` | `Fotohub_Analytics::install_table()` | One row per API call: endpoint, category, model, usd_charged, status, duration, post/product |
 | `{prefix}fotohub_jobs` | `Fotohub_Scheduler::install_table()` | Queue: `job_type`, `status`, `payload`, `result`, `attempts`, `max_attempts`, `scheduled_at`, timestamps |
 | `{prefix}fotohub_drafts` | `Fotohub_Drafts::install_table()` | Draft-first write-back store — see the [WooCommerce page](/integrations/woocommerce#drafts-table) |
 
@@ -563,7 +563,7 @@ Export anything you want to keep — the analytics CSV especially — before uni
 - cURL or `allow_url_fopen` for the WordPress HTTP API
 - `openssl` for encrypted key storage (the plugin degrades to plaintext storage without it)
 - WP-Cron running, or a real system cron hitting `wp-cron.php`, for the scheduler and video polling
-- A FOTOhub account with credits
+- A FOTOhub account with prepaid USD balance
 
 ## Troubleshooting
 

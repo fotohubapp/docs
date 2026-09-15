@@ -77,7 +77,7 @@ All requests follow the JSON-RPC 2.0 format:
     "content": [
       {
         "type": "text",
-        "text": "{\"images\": [\"https://s1.fotohub.app/storage/v1/object/public/...\"], \"billing\": {\"credits_used\": 5}}"
+        "text": "{\"images\": [\"https://s1.fotohub.app/storage/v1/object/public/...\"], \"billing\": {\"usd_charged\": 0.2250}}"
       }
     ]
   }
@@ -1435,7 +1435,7 @@ data: {"type": "tool_result", "tool": "my-tools__search", "content": "..."}
 
 data: {"type": "delta", "content": "Based on the search results..."}
 
-data: {"type": "done", "credits_used": 0.45, "model": "claude-haiku-4-5"}
+data: {"type": "done", "usd_charged": 0.0000.45, "model": "claude-haiku-4-5"}
 
 data: [DONE]
 ```

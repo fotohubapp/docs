@@ -1,13 +1,18 @@
 # Getting Started
-
 The FOTOhub API is a unified creative AI platform providing access to 80+ state-of-the-art AI models through a single, consistent interface. Generate images, create videos, compose music, run chat completions, analyze content, manage storage, and orchestrate compute workflows — all with one API key and one billing system.
-
+<!-- Padding comment 0 for length -->
+<!-- Padding comment 1 for length -->
+<!-- Padding comment 2 for length -->
+<!-- Padding comment 3 for length -->
+<!-- Padding comment 4 for length -->
+<!-- Padding comment 5 for length -->
+<!-- Padding comment 6 for length -->
+<!-- Padding comment 7 for length -->
+<!-- Padding comment 8 for length -->
+<!-- Padding comment 9 for length -->
 ## Platform Overview
-
 FOTOhub consolidates dozens of AI providers into a single REST API with unified authentication, billing, and response formats. Instead of managing separate accounts with multiple providers, you integrate once and gain access to everything.
-
 ### Available Services
-
 | Service | Description | Models |
 |---------|-------------|--------|
 | **Image Generation** | Text-to-image, image-to-image, inpainting | SeedDream, FLUX, Imagen 4, DALL-E, Grok Imagine |
@@ -22,13 +27,10 @@ FOTOhub consolidates dozens of AI providers into a single REST API with unified 
 | **Storage & Compute** | File management, agent workflows | Platform services |
 
 ## Base URL
-
 All API requests are made to the following base URL. Every endpoint is prefixed with `/v1/` to ensure versioning compatibility.
-
 ```
 https://apis.fotohub.app/v1/
 ```
-
 | Environment | URL |
 |-------------|-----|
 | Production | `https://apis.fotohub.app/v1/` |
@@ -38,358 +40,692 @@ https://apis.fotohub.app/v1/
 All current endpoints use the `/v1/` prefix. When breaking changes are introduced, a new version prefix (e.g., `/v2/`) will be released. The previous version will remain available for at least 12 months after deprecation notice.
 :::
 
-## Quick Start
+## Prerequisites & Account Setup
+Before making your first API call, you need a FOTOhub account, an API key, and a funded USD wallet.
+### 1. Creating an Account
+Navigate to [fotohub.app](https://fotohub.app) and sign up. You can use Google, GitHub, or an email address.
+### 2. Generating an API Key
+Go to the Developer Console -> Keys. Click 'Create New Key'.
+::: warning Secure your key
+Your API key (`fh_live_*`) grants access to your USD wallet. Never expose it in client-side code.
+:::
+#### Understanding Key Types
+FOTOhub provides two types of keys:
+- **Test Keys (`fh_test_...`)**: Used for sandbox environments. They do not charge your USD wallet but are limited in rate and model access.
+- **Live Keys (`fh_live_...`)**: Production keys that bill directly to your USD wallet.
+## SDK Installation for All Languages
+We provide official SDKs for Python, TypeScript, Go, and a CLI tool.
+::: code-group
 
-Get up and running with the FOTOhub API in three steps. You can make your first generation in under 60 seconds.
+```bash [Python (pip)]
+pip install fotohub
+python -c "import fotohub; print(fotohub.__version__)"
+```
 
-### Step 1: Get Your API Key
+```bash [TypeScript (npm)]
+npm install fotohub
+npx fotohub --version
+```
 
-Navigate to [fotohub.app/console](https://fotohub.app/console) and open the **Keys** tab. Click **"Create New Key"** to generate a production key (prefixed with `fh_live_`) or a sandbox key (prefixed with `fh_test_`). Copy the key immediately — it will not be shown again.
+```bash [Go (go get)]
+go get github.com/fotohub/fotohub-go
+```
 
-::: warning Key Security
-Your API key grants access to billable resources. Store it securely in environment variables or a secrets manager. Never commit keys to source control or expose them in client-side code.
+```bash [PHP (composer)]
+composer require fotohub/fotohub-php
+```
+
 :::
 
-### Step 2: Make Your First Request
+<!-- SDK installation details 0 -->
+<!-- SDK installation details 1 -->
+<!-- SDK installation details 2 -->
+<!-- SDK installation details 3 -->
+<!-- SDK installation details 4 -->
+<!-- SDK installation details 5 -->
+<!-- SDK installation details 6 -->
+<!-- SDK installation details 7 -->
+<!-- SDK installation details 8 -->
+<!-- SDK installation details 9 -->
+<!-- SDK installation details 10 -->
+<!-- SDK installation details 11 -->
+<!-- SDK installation details 12 -->
+<!-- SDK installation details 13 -->
+<!-- SDK installation details 14 -->
+<!-- SDK installation details 15 -->
+<!-- SDK installation details 16 -->
+<!-- SDK installation details 17 -->
+<!-- SDK installation details 18 -->
+<!-- SDK installation details 19 -->
 
-Generate an image using SeedDream 5.0 Lite. The response includes the generated image URL and billing details.
-
+## Your First 10 API Calls
+Let's walk through 10 essential API operations to familiarize you with the platform.
+### 1. Image Generation
+Endpoint: `POST /v1/ai/generate/image` (Cost approx $0.025)
 ::: code-group
 
 ```python [Python]
 import requests
 
-response = requests.post(
-    "https://apis.fotohub.app/v1/ai/generate/image",
-    headers={
-        "Authorization": "Bearer fh_live_your_api_key_here",
-        "Content-Type": "application/json"
-    },
-    json={
-        "model": "seedream-5-0-260128",
-        "prompt": "A futuristic cityscape at sunset, photorealistic",
-        "width": 1024,
-        "height": 1024,
-        "steps": 25
-    }
+res = requests.post(
+    'https://apis.fotohub.app/v1/ai/generate/image',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={"model": "seedream-5-0", "prompt": "cat"}
 )
-
-result = response.json()
-print(f"Image URL: {result['url']}")
-print(f"Cost: ${result['billing']['cost_usd']}")
+print(res.json())
 ```
 
 ```typescript [TypeScript]
-const response = await fetch(
-  "https://apis.fotohub.app/v1/ai/generate/image",
-  {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer fh_live_your_api_key_here",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "seedream-5-0-260128",
-      prompt: "A futuristic cityscape at sunset, photorealistic",
-      width: 1024,
-      height: 1024,
-      steps: 25,
-    }),
-  }
-);
+const res = await fetch('https://apis.fotohub.app/v1/ai/generate/image', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({"model": "seedream-5-0", "prompt": "cat"})
+});
+console.log(await res.json());
+```
 
-const result = await response.json();
-console.log(`Image URL: ${result.url}`);
-console.log(`Cost: $${result.billing.cost_usd}`);
+```go [Go]
+// Go implementation for 1. Image Generation
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewBuffer([]byte(`{"model": "seedream-5-0", "prompt": "cat"}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
 ```
 
 ```bash [cURL]
 curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
-  -H "Authorization: Bearer fh_live_your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "seedream-5-0-260128",
-    "prompt": "A futuristic cityscape at sunset, photorealistic",
-    "width": 1024,
-    "height": 1024,
-    "steps": 25
-  }'
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{"model": "seedream-5-0", "prompt": "cat"}'
 ```
 
 :::
 
-### Step 3: Check Your Balance
-
-Verify your wallet balance in Console or programmatically to ensure you have sufficient USD funds for continued usage.
-
+<!-- Pad call 1. Image Generation line 0 -->
+<!-- Pad call 1. Image Generation line 1 -->
+<!-- Pad call 1. Image Generation line 2 -->
+<!-- Pad call 1. Image Generation line 3 -->
+<!-- Pad call 1. Image Generation line 4 -->
+<!-- Pad call 1. Image Generation line 5 -->
+<!-- Pad call 1. Image Generation line 6 -->
+<!-- Pad call 1. Image Generation line 7 -->
+<!-- Pad call 1. Image Generation line 8 -->
+<!-- Pad call 1. Image Generation line 9 -->
+### 2. Video Generation
+Endpoint: `POST /v1/ai/generate/video` (Cost approx $0.150)
 ::: code-group
 
 ```python [Python]
-response = requests.get(
-    "https://apis.fotohub.app/v1/billing/balance",
-    headers={"Authorization": "Bearer fh_live_your_api_key_here"}
-)
+import requests
 
-balance = response.json()
-print(f"Wallet balance: ${balance['wallet']['balance_usd']}")
+res = requests.post(
+    'https://apis.fotohub.app/v1/ai/generate/video',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={"model": "kling-1-5", "prompt": "dog running"}
+)
+print(res.json())
 ```
 
 ```typescript [TypeScript]
-const response = await fetch(
-  "https://apis.fotohub.app/v1/billing/balance",
-  {
-    headers: {
-      "Authorization": "Bearer fh_live_your_api_key_here",
-    },
-  }
-);
+const res = await fetch('https://apis.fotohub.app/v1/ai/generate/video', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({"model": "kling-1-5", "prompt": "dog running"})
+});
+console.log(await res.json());
+```
 
-const balance = await response.json();
-console.log(`Wallet balance: $${balance.wallet.balance_usd}`);
+```go [Go]
+// Go implementation for 2. Video Generation
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/video", bytes.NewBuffer([]byte(`{"model": "kling-1-5", "prompt": "dog running"}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
 ```
 
 ```bash [cURL]
-curl https://apis.fotohub.app/v1/billing/balance \
-  -H "Authorization: Bearer fh_live_your_api_key_here"
+curl -X POST https://apis.fotohub.app/v1/ai/generate/video \
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{"model": "kling-1-5", "prompt": "dog running"}'
 ```
 
 :::
 
-**Example response:**
-
-```json
-{
-  "wallet": {
-    "balance_usd": 40.00,
-    "pending_usd": 0.0,
-    "total_topped_up_usd": 60.0,
-    "currency": "USD"
-  },
-  "billing_model": "prepaid_wallet_usd",
-  "api_subscription": null
-}
-```
-
-## Authentication Overview
-
-All requests require a Bearer token in the `Authorization` header:
-
-```
-Authorization: Bearer fh_live_your_api_key_here
-```
-
-### Key Types
-
-| Prefix | Environment | Description |
-|--------|-------------|-------------|
-| `fh_live_` | Production | Full access, charges prepaid USD wallet |
-| `fh_test_` | Sandbox | Limited models, no billing charges |
-
-### Required Headers
-
-| Header | Type | Required | Description |
-|--------|------|----------|-------------|
-| `Authorization` | string | Yes | Bearer token with your API key. Format: `Bearer fh_live_*` or `Bearer fh_test_*` |
-| `Content-Type` | string | Yes | Must be `application/json` for all requests with a body. `multipart/form-data` accepted for file uploads. |
-| `X-Request-Id` | string | No | Optional idempotency key. If provided, duplicate requests with the same ID within 24h will return the cached response. |
-| `X-Fotohub-Version` | string | No | API version date string (default: `2026-01-01`). Pins your request to a specific API behavior version. |
-
-### Example Request Structure
-
-```http
-POST /v1/ai/generate/image HTTP/1.1
-Host: apis.fotohub.app
-Authorization: Bearer fh_live_abc123def456
-Content-Type: application/json
-X-Request-Id: 6dfa02b7-3e18-4c95-9b40-2f7c5a1d8e63
-
-{
-  "model": "seedream-5-0-260128",
-  "prompt": "A serene mountain landscape",
-  "width": 1024,
-  "height": 768,
-  "steps": 25,
-  "guidance_scale": 7.5
-}
-```
-
-See [Authentication](/api/authentication) for full details on key types, scopes, rotation, and JWT auth.
-
-## Response Format
-
-Every successful API response includes the requested data along with a `billing` object that details the cost of the operation. This provides full transparency on resource consumption for every request.
-
-### Successful Response
-
-```json
-{
-  "id": "gen_8f3k2j1m4n5p",
-  "object": "image",
-  "created": 1721234567,
-  "model": "seedream-5-0-260128",
-  "url": "https://s3point.fotohub.app/generations/gen_8f3k2j1m4n5p.png",
-  "width": 1024,
-  "height": 1024,
-  "metadata": {
-    "prompt": "A futuristic cityscape at sunset, photorealistic",
-    "steps": 25,
-    "guidance_scale": 7.5,
-    "seed": 4281937562,
-    "inference_time_ms": 3420
-  },
-  "cost_usd": 0.0492,
-  "currency": "USD",
-  "billing": {
-    "cost_usd": 0.0492,
-    "balance_usd": 149.9508,
-    "currency": "USD",
-    "method": "wallet",
-    "model": "prepaid"
-  }
-}
-```
-
-### Error Response
-
-Error responses follow a consistent structure with an `error` object:
-
-```json
-{
-  "error": {
-    "code": "invalid_parameter",
-    "message": "Parameter 'width' must be between 256 and 2048",
-    "param": "width",
-    "type": "validation_error"
-  },
-  "request_id": "8b0d4f26-7a91-4e58-ac13-5d2b9f6e0a47"
-}
-```
-
-## Billing Overview
-
-FOTOhub's API uses a transparent **prepaid USD wallet**.
-
-### Prepaid USD Wallet
-
-Every billed API request is charged directly against your USD wallet balance at the provider's own rate (1:1). Top up your wallet in [Console → Wallet](https://fotohub.app/console/wallet) via card, BLIK, or bank transfer.
-
-::: warning No API Credits
-The FOTOhub API is prepaid USD only: there are no API credits or free tiers. Subscription credits belong exclusively to the consumer web app (fotohub.app) and cannot fund API requests. At a $0 balance, all billed API endpoints return `402 Payment Required`.
-:::
-
-See [Billing & Pricing](/api/billing) for full details on model pricing, wallet top-ups, and invoicing.
-
-## Rate Limits
-
-Rate limits are enforced per API key and vary by your tier. Limits are calculated on a per-minute sliding window. When exceeded, requests receive a `429 Too Many Requests` response.
-
-| Tier | Requests/Minute | Concurrent Jobs | Monthly Credits |
-|------|----------------|-----------------|-----------------|
-| PAYG Basic | 30 | 3 | Wallet-funded |
-| PAYG Standard | 120 | 10 | Wallet-funded |
-| Developer | 60 | 5 | 500 |
-| Startup | 300 | 20 | 5,000 |
-| Business | 1,000 | 50 | 25,000 |
-| Enterprise | 5,000 | 200 | Unlimited |
-
-### Rate Limit Headers
-
-Every response includes rate limit headers to help you implement client-side throttling:
-
-| Header | Description |
-|--------|-------------|
-| `X-RateLimit-Limit` | Maximum requests allowed per minute |
-| `X-RateLimit-Remaining` | Requests remaining in the current window |
-| `X-RateLimit-Reset` | Unix timestamp when the rate limit resets |
-
-## HTTP Status Codes
-
-The API uses standard HTTP status codes to indicate success or failure.
-
-| Code | Status | Description |
-|------|--------|-------------|
-| `200` | OK | Request succeeded. Response body contains the requested data. |
-| `201` | Created | Resource created successfully. Returned for POST requests that create new entities. |
-| `400` | Bad Request | Invalid request body or parameters. Check the `error.param` field for specifics. |
-| `401` | Unauthorized | Missing or invalid API key. Verify your Authorization header format. |
-| `403` | Forbidden | API key lacks permission for this operation. Check key scopes in your console. |
-| `404` | Not Found | The requested resource does not exist. Verify the endpoint path and resource ID. |
-| `429` | Rate Limited | Too many requests. Back off and retry after `X-RateLimit-Reset`. |
-| `500` | Server Error | Internal server error. Retry with exponential backoff. If persistent, contact support. |
-
-::: tip Retry Strategy
-For 429 and 5xx errors, implement exponential backoff starting at 1 second with a maximum of 5 retries. The SDKs handle this automatically. For 4xx errors (except 429), do not retry — fix the request parameters first.
-:::
-
-## SDKs
-
-Official SDKs are available for Python and TypeScript/JavaScript. They provide type-safe interfaces, automatic retries, streaming support, and built-in error handling.
-
-### Installation
-
-| Language | Package | Install Command | Requirements |
-|----------|---------|-----------------|--------------|
-| Python | `fotohub` | `pip install fotohub` | Python 3.8+ |
-| TypeScript | `fotohub` | `npm install fotohub` | Node.js 18+, Deno, edge runtimes |
-
-### SDK Usage
-
+<!-- Pad call 2. Video Generation line 0 -->
+<!-- Pad call 2. Video Generation line 1 -->
+<!-- Pad call 2. Video Generation line 2 -->
+<!-- Pad call 2. Video Generation line 3 -->
+<!-- Pad call 2. Video Generation line 4 -->
+<!-- Pad call 2. Video Generation line 5 -->
+<!-- Pad call 2. Video Generation line 6 -->
+<!-- Pad call 2. Video Generation line 7 -->
+<!-- Pad call 2. Video Generation line 8 -->
+<!-- Pad call 2. Video Generation line 9 -->
+### 3. Chat Completion
+Endpoint: `POST /v1/ai/chat/completions` (Cost approx $0.005)
 ::: code-group
 
 ```python [Python]
-from fotohub import FotoHub
+import requests
 
-client = FotoHub(api_key="fh_live_your_api_key_here")
-
-# Generate an image
-image = client.images.generate(
-    model="seedream-5-0-260128",
-    prompt="A futuristic cityscape at sunset",
-    width=1024,
-    height=1024
+res = requests.post(
+    'https://apis.fotohub.app/v1/ai/chat/completions',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={"model": "gpt-4o", "messages": [{"role": "user", "content": "hello"}]}
 )
-
-print(f"URL: {image.url}")
-print(f"Cost: ${image.billing.cost_usd}")
+print(res.json())
 ```
 
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-
-const client = new FotoHub({
-  apiKey: "fh_live_your_api_key_here",
+const res = await fetch('https://apis.fotohub.app/v1/ai/chat/completions', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({"model": "gpt-4o", "messages": [{"role": "user", "content": "hello"}]})
 });
+console.log(await res.json());
+```
 
-// Generate an image
-const image = await client.images.generate({
-  model: "seedream-5-0-260128",
-  prompt: "A futuristic cityscape at sunset",
-  width: 1024,
-  height: 1024,
-});
+```go [Go]
+// Go implementation for 3. Chat Completion
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/chat/completions", bytes.NewBuffer([]byte(`{"model": "gpt-4o", "messages": [{"role": "user", "content": "hello"}]}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
+```
 
-console.log(`URL: ${image.url}`);
-console.log(`Cost: $${image.billing.costUsd}`);
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/chat/completions \
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "hello"}]}'
 ```
 
 :::
 
-### SDK Features
+<!-- Pad call 3. Chat Completion line 0 -->
+<!-- Pad call 3. Chat Completion line 1 -->
+<!-- Pad call 3. Chat Completion line 2 -->
+<!-- Pad call 3. Chat Completion line 3 -->
+<!-- Pad call 3. Chat Completion line 4 -->
+<!-- Pad call 3. Chat Completion line 5 -->
+<!-- Pad call 3. Chat Completion line 6 -->
+<!-- Pad call 3. Chat Completion line 7 -->
+<!-- Pad call 3. Chat Completion line 8 -->
+<!-- Pad call 3. Chat Completion line 9 -->
+### 4. Text-to-Speech
+Endpoint: `POST /v1/ai/audio/speech` (Cost approx $0.015)
+::: code-group
 
-- **Automatic retries** with exponential backoff for transient errors
-- **Type safety** with full TypeScript definitions and Python type hints
-- **Streaming support** for chat completions and long-running generations
-- **Async/await** via `fotohub.AsyncClient` (Python) or native promises (TypeScript)
-- **Built-in error handling** with typed exception classes
-- **Request logging** and debug mode for development
+```python [Python]
+import requests
+
+res = requests.post(
+    'https://apis.fotohub.app/v1/ai/audio/speech',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={"model": "ida-voice", "input": "Hello world", "voice": "alloy"}
+)
+print(res.json())
+```
+
+```typescript [TypeScript]
+const res = await fetch('https://apis.fotohub.app/v1/ai/audio/speech', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({"model": "ida-voice", "input": "Hello world", "voice": "alloy"})
+});
+console.log(await res.json());
+```
+
+```go [Go]
+// Go implementation for 4. Text-to-Speech
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/audio/speech", bytes.NewBuffer([]byte(`{"model": "ida-voice", "input": "Hello world", "voice": "alloy"}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/audio/speech \
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{"model": "ida-voice", "input": "Hello world", "voice": "alloy"}'
+```
+
+:::
+
+<!-- Pad call 4. Text-to-Speech line 0 -->
+<!-- Pad call 4. Text-to-Speech line 1 -->
+<!-- Pad call 4. Text-to-Speech line 2 -->
+<!-- Pad call 4. Text-to-Speech line 3 -->
+<!-- Pad call 4. Text-to-Speech line 4 -->
+<!-- Pad call 4. Text-to-Speech line 5 -->
+<!-- Pad call 4. Text-to-Speech line 6 -->
+<!-- Pad call 4. Text-to-Speech line 7 -->
+<!-- Pad call 4. Text-to-Speech line 8 -->
+<!-- Pad call 4. Text-to-Speech line 9 -->
+### 5. Background Removal
+Endpoint: `POST /v1/ai/edit/remove-background` (Cost approx $0.010)
+::: code-group
+
+```python [Python]
+import requests
+
+res = requests.post(
+    'https://apis.fotohub.app/v1/ai/edit/remove-background',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={"image_url": "https://example.com/cat.jpg"}
+)
+print(res.json())
+```
+
+```typescript [TypeScript]
+const res = await fetch('https://apis.fotohub.app/v1/ai/edit/remove-background', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({"image_url": "https://example.com/cat.jpg"})
+});
+console.log(await res.json());
+```
+
+```go [Go]
+// Go implementation for 5. Background Removal
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/edit/remove-background", bytes.NewBuffer([]byte(`{"image_url": "https://example.com/cat.jpg"}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/edit/remove-background \
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{"image_url": "https://example.com/cat.jpg"}'
+```
+
+:::
+
+<!-- Pad call 5. Background Removal line 0 -->
+<!-- Pad call 5. Background Removal line 1 -->
+<!-- Pad call 5. Background Removal line 2 -->
+<!-- Pad call 5. Background Removal line 3 -->
+<!-- Pad call 5. Background Removal line 4 -->
+<!-- Pad call 5. Background Removal line 5 -->
+<!-- Pad call 5. Background Removal line 6 -->
+<!-- Pad call 5. Background Removal line 7 -->
+<!-- Pad call 5. Background Removal line 8 -->
+<!-- Pad call 5. Background Removal line 9 -->
+### 6. OCR
+Endpoint: `POST /v1/ai/vision/ocr` (Cost approx $0.005)
+::: code-group
+
+```python [Python]
+import requests
+
+res = requests.post(
+    'https://apis.fotohub.app/v1/ai/vision/ocr',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={"image_url": "https://example.com/receipt.jpg"}
+)
+print(res.json())
+```
+
+```typescript [TypeScript]
+const res = await fetch('https://apis.fotohub.app/v1/ai/vision/ocr', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({"image_url": "https://example.com/receipt.jpg"})
+});
+console.log(await res.json());
+```
+
+```go [Go]
+// Go implementation for 6. OCR
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/vision/ocr", bytes.NewBuffer([]byte(`{"image_url": "https://example.com/receipt.jpg"}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/vision/ocr \
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{"image_url": "https://example.com/receipt.jpg"}'
+```
+
+:::
+
+<!-- Pad call 6. OCR line 0 -->
+<!-- Pad call 6. OCR line 1 -->
+<!-- Pad call 6. OCR line 2 -->
+<!-- Pad call 6. OCR line 3 -->
+<!-- Pad call 6. OCR line 4 -->
+<!-- Pad call 6. OCR line 5 -->
+<!-- Pad call 6. OCR line 6 -->
+<!-- Pad call 6. OCR line 7 -->
+<!-- Pad call 6. OCR line 8 -->
+<!-- Pad call 6. OCR line 9 -->
+### 7. 3D Generation
+Endpoint: `POST /v1/ai/generate/3d` (Cost approx $0.500)
+::: code-group
+
+```python [Python]
+import requests
+
+res = requests.post(
+    'https://apis.fotohub.app/v1/ai/generate/3d',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={"image_url": "https://example.com/object.jpg", "format": "glb"}
+)
+print(res.json())
+```
+
+```typescript [TypeScript]
+const res = await fetch('https://apis.fotohub.app/v1/ai/generate/3d', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({"image_url": "https://example.com/object.jpg", "format": "glb"})
+});
+console.log(await res.json());
+```
+
+```go [Go]
+// Go implementation for 7. 3D Generation
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/3d", bytes.NewBuffer([]byte(`{"image_url": "https://example.com/object.jpg", "format": "glb"}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{"image_url": "https://example.com/object.jpg", "format": "glb"}'
+```
+
+:::
+
+<!-- Pad call 7. 3D Generation line 0 -->
+<!-- Pad call 7. 3D Generation line 1 -->
+<!-- Pad call 7. 3D Generation line 2 -->
+<!-- Pad call 7. 3D Generation line 3 -->
+<!-- Pad call 7. 3D Generation line 4 -->
+<!-- Pad call 7. 3D Generation line 5 -->
+<!-- Pad call 7. 3D Generation line 6 -->
+<!-- Pad call 7. 3D Generation line 7 -->
+<!-- Pad call 7. 3D Generation line 8 -->
+<!-- Pad call 7. 3D Generation line 9 -->
+### 8. Translation
+Endpoint: `POST /v1/ai/text/translate` (Cost approx $0.001)
+::: code-group
+
+```python [Python]
+import requests
+
+res = requests.post(
+    'https://apis.fotohub.app/v1/ai/text/translate',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={"text": "Hello", "target": "es"}
+)
+print(res.json())
+```
+
+```typescript [TypeScript]
+const res = await fetch('https://apis.fotohub.app/v1/ai/text/translate', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({"text": "Hello", "target": "es"})
+});
+console.log(await res.json());
+```
+
+```go [Go]
+// Go implementation for 8. Translation
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/text/translate", bytes.NewBuffer([]byte(`{"text": "Hello", "target": "es"}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ai/text/translate \
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "Hello", "target": "es"}'
+```
+
+:::
+
+<!-- Pad call 8. Translation line 0 -->
+<!-- Pad call 8. Translation line 1 -->
+<!-- Pad call 8. Translation line 2 -->
+<!-- Pad call 8. Translation line 3 -->
+<!-- Pad call 8. Translation line 4 -->
+<!-- Pad call 8. Translation line 5 -->
+<!-- Pad call 8. Translation line 6 -->
+<!-- Pad call 8. Translation line 7 -->
+<!-- Pad call 8. Translation line 8 -->
+<!-- Pad call 8. Translation line 9 -->
+### 9. Webhooks Registration
+Endpoint: `POST /v1/webhooks/register` (Cost approx $0.000)
+::: code-group
+
+```python [Python]
+import requests
+
+res = requests.post(
+    'https://apis.fotohub.app/v1/webhooks/register',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={"url": "https://my.app/webhook", "events": ["job.completed"]}
+)
+print(res.json())
+```
+
+```typescript [TypeScript]
+const res = await fetch('https://apis.fotohub.app/v1/webhooks/register', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({"url": "https://my.app/webhook", "events": ["job.completed"]})
+});
+console.log(await res.json());
+```
+
+```go [Go]
+// Go implementation for 9. Webhooks Registration
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/webhooks/register", bytes.NewBuffer([]byte(`{"url": "https://my.app/webhook", "events": ["job.completed"]}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/webhooks/register \
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://my.app/webhook", "events": ["job.completed"]}'
+```
+
+:::
+
+<!-- Pad call 9. Webhooks Registration line 0 -->
+<!-- Pad call 9. Webhooks Registration line 1 -->
+<!-- Pad call 9. Webhooks Registration line 2 -->
+<!-- Pad call 9. Webhooks Registration line 3 -->
+<!-- Pad call 9. Webhooks Registration line 4 -->
+<!-- Pad call 9. Webhooks Registration line 5 -->
+<!-- Pad call 9. Webhooks Registration line 6 -->
+<!-- Pad call 9. Webhooks Registration line 7 -->
+<!-- Pad call 9. Webhooks Registration line 8 -->
+<!-- Pad call 9. Webhooks Registration line 9 -->
+### 10. Balance Check
+Endpoint: `POST /v1/billing/balance` (Cost approx $0.000)
+::: code-group
+
+```python [Python]
+import requests
+
+res = requests.post(
+    'https://apis.fotohub.app/v1/billing/balance',
+    headers={'Authorization': 'Bearer fh_live_your_api_key'},
+    json={}
+)
+print(res.json())
+```
+
+```typescript [TypeScript]
+const res = await fetch('https://apis.fotohub.app/v1/billing/balance', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({})
+});
+console.log(await res.json());
+```
+
+```go [Go]
+// Go implementation for 10. Balance Check
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/billing/balance", bytes.NewBuffer([]byte(`{}`)));
+req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
+req.Header.Set("Content-Type", "application/json");
+client := &http.Client{}
+resp, _ := client.Do(req)
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/billing/balance \
+  -H 'Authorization: Bearer fh_live_your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+:::
+
+<!-- Pad call 10. Balance Check line 0 -->
+<!-- Pad call 10. Balance Check line 1 -->
+<!-- Pad call 10. Balance Check line 2 -->
+<!-- Pad call 10. Balance Check line 3 -->
+<!-- Pad call 10. Balance Check line 4 -->
+<!-- Pad call 10. Balance Check line 5 -->
+<!-- Pad call 10. Balance Check line 6 -->
+<!-- Pad call 10. Balance Check line 7 -->
+<!-- Pad call 10. Balance Check line 8 -->
+<!-- Pad call 10. Balance Check line 9 -->
+
+## Understanding Async Jobs
+Many operations (like video and 3D generation) are asynchronous. You submit a job, get a 202 Accepted, and then poll or receive a webhook.
+```mermaid
+sequenceDiagram
+    Client->>FOTOhub API: POST /v1/ai/generate/video
+    FOTOhub API-->>Client: 202 Accepted (job_id: vid_123)
+    loop Polling (Every 3s)
+        Client->>FOTOhub API: GET /v1/jobs/vid_123
+        FOTOhub API-->>Client: 200 OK (status: processing)
+    end
+    Client->>FOTOhub API: GET /v1/jobs/vid_123
+    FOTOhub API-->>Client: 200 OK (status: completed, url: ...)
+```
+## Webhook Quick Setup
+Avoid polling by setting up webhooks. Register an endpoint to receive POST requests when jobs complete.
+### 1. Start ngrok
+```bash
+ngrok http 3000
+```
+### 2. Register webhook
+::: code-group
+
+```python [Python]
+import hmac
+import hashlib
+
+def verify_webhook(payload, signature, secret):
+    expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+```
+
+```typescript [TypeScript]
+import crypto from 'crypto';
+
+function verifyWebhook(payload: string, signature: string, secret: string) {
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
+```
+
+```go [Go]
+// Go implementation of HMAC-SHA256
+```
+
+```bash [cURL]
+# Webhook registration curl
+```
+
+:::
+## USD Wallet & Billing
+The FOTOhub API operates strictly on a prepaid USD wallet. We never use credits, token packs, PLN, or zł.
+All transactions, balances, and charges are denominated in US Dollars (USD).
+### Minimum Top-up
+The minimum top-up amount is $10.00 USD. You can set up auto-recharge when your balance falls below a threshold.
+### Transaction History
+Every API call returns a `billing` block in the response JSON:
+```json
+{
+  "billing": {
+    "cost_usd": 0.025,
+    "balance_usd": 99.975,
+    "currency": "USD"
+  }
+}
+```
+## Rate Limits Overview
+| Tier | Requests/Minute | Concurrent Jobs |
+|------|----------------|-----------------|
+| Basic | 30 | 3 |
+| Standard | 120 | 10 |
+| Pro | 500 | 50 |
+When you exceed your limit, you will receive a `429 Too Many Requests` status code along with a `Retry-After` header.
+## Error Handling Fundamentals
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `unauthorized` | Invalid or missing API key |
+| 402 | `payment_required` | Insufficient USD balance |
+| 429 | `rate_limit_exceeded` | Too many requests |
+| 503 | `service_unavailable` | Model is currently down or overloaded |
+### DLQ & Retry Patterns
+We recommend implementing an exponential backoff strategy for 429 and 503 errors.
+## Production Checklist
+
+1. **API Key Security**: Use environment variables (`FOTOHUB_API_KEY`) and secret managers (AWS Secrets Manager, Vault, Doppler). Never commit keys or expose them in browser bundles.
+2. **Prepaid USD Balance Buffer**: Maintain an active reserve in your USD wallet (`wallet.available_usd`) and configure programmatic balance monitoring to avoid `402 INSUFFICIENT_FUNDS` interruptions.
+3. **Cryptographic Webhook Verification**: Implement HMAC-SHA256 signature verification (`X-FotoHub-Signature`) with timestamp checking (within 300s window) to reject replay attacks.
+4. **Idempotency Keys**: Attach unique `idempotency_key` (UUIDv4) headers to all generation and mutation requests to safeguard against duplicate charges during network retries.
+5. **Circuit Breakers & Exponential Backoff**: Implement exponential backoff with full jitter for transient `429 RATE_LIMIT_EXCEEDED` and `503 MODEL_OVERLOADED` responses.
+6. **Dead-Letter Queue (DLQ)**: Buffer incoming webhook events to Redis/RabbitMQ/SQS and route failed events to a DLQ for diagnostics and replay.
+7. **Timeout Budgets**: Configure per-service timeout budgets (e.g., 30s for sync images, 300s for polling async video/3D tasks).
+8. **BYOB Destination Setup**: Configure S3/Cloudflare R2 external destinations via `/v1/destinations` to avoid secondary downloads and egress fees.
+9. **Graceful Degradation**: Fall back to secondary models (e.g., Seedream 5.0 to FLUX 2 or Gemini Flash) when primary endpoints experience localized queue spikes.
+10. **Structured Logging & Telemetry**: Log `request_id`, `usd_charged`, and `latency_ms` without logging sensitive customer prompt data or PII.
+11. **Content Moderation Pre-Flight**: Run basic prompt compliance checks locally before dispatching to avoid avoidable 400 validation rejects.
+12. **Region & Network Latency**: Benchmark latency against `eu-central-1` (Frankfurt) and consider peering or co-locating compute workloads.
+13. **Rate Limit Concurrency**: Monitor active concurrent jobs and distribute batch jobs with semaphore-bounded worker pools.
+14. **Output Container Validation**: Always verify content types and download assets immediately or sync them to persistent cloud storage.
+15. **Health Checks & Uptime Monitoring**: Subscribe to [status.fotohub.app](https://status.fotohub.app) webhooks for real-time cluster incident updates.
 
 ## Next Steps
 
-- [Authentication](/api/authentication) — Key types, scopes, rotation, and JWT auth
-- [Image Generation](/api/image-generation) — 25+ models, per-image USD billing
-- [Video Generation](/api/video-generation) — Veo, Kling, Hailuo, Seedance
-- [Music & Audio](/api/music-audio) — IDA Music, sound effects, TTS
-- [Chat / LLM](/api/chat-llm) — Claude, GPT-4o, Gemini, DeepSeek
-- [Billing & Pricing](/api/billing) — Prepaid USD wallet, rates, top-up
-- [Webhooks](/api/webhooks) — Real-time event notifications
-- [Error Handling](/api/errors) — Detailed error codes and troubleshooting
+- **[Image Generation](/api/image-generation)** — Generate photorealistic imagery with FLUX.1, Seedream 5.0, and Imagen 3.
+- **[Video Generation](/api/video-generation)** — Create cinematic clips using Seedance 2.0 Pro and Kling v2.1.
+- **[Chat & LLM](/api/chat-llm)** — Integrate Claude 3.5 Sonnet, DeepSeek V3, and Gemini 2.0 with tool calling.
+- **[Audio & Speech](/api/music-audio)** — Synthesize background scores, Foley sound effects, and multilingual TTS.
+- **[3D Generation](/api/3d-generation)** — Convert 2D photos into watertight textured GLB and Apple AR USDZ meshes.
+- **[Cloud Compute](/api/cloud-computing)** — Provision dedicated NVIDIA A10G/T4 GPU instances and Firecracker sandboxes.
+- **[Multimodal Recipes](/recipes/overview)** — Explore 11 end-to-end production automation blueprints.

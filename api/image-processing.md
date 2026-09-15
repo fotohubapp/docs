@@ -68,7 +68,6 @@ Apply professional color grading to any image. Choose from cinematic presets use
     "method": "wallet",
     "usd_charged": 1,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "applied": {
     "preset": "cinematic",
@@ -82,7 +81,7 @@ Apply professional color grading to any image. Choose from cinematic presets use
 `method` is `credits` while your plan's monthly allowance covers the request, and
 `usd_charged` is `0` because no money moved. Once the allowance is exhausted the
 same call returns `"method": "wallet"` with the USD amount in `usd_charged` (see
-[Pricing](#pricing) for the per-operation figures). `pln_charged` is a legacy
+[Pricing](#pricing) for the per-operation figures). `usd_charged` is
 mirror of the same charge -- read `usd_charged`.
 :::
 
@@ -191,7 +190,6 @@ Automatic AI-powered enhancement that intelligently adjusts exposure, white bala
     "method": "wallet",
     "usd_charged": 1,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "adjustments_applied": {
     "exposure": 0.15,
@@ -278,7 +276,6 @@ Advanced AI noise reduction that removes grain, compression artifacts, and senso
     "method": "wallet",
     "usd_charged": 1,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "noise_level_detected": "high",
   "processing_time_ms": 1680
@@ -359,7 +356,6 @@ Automatically colorize black and white or grayscale images using deep learning. 
     "method": "wallet",
     "usd_charged": 2,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "processing_time_ms": 3450
 }
@@ -445,7 +441,6 @@ Restore degraded, blurry, or low-resolution faces using state-of-the-art face re
     "method": "wallet",
     "usd_charged": 2,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "faces_detected": 3,
   "faces_restored": 3,
@@ -544,7 +539,6 @@ Generate monocular depth maps from single images using state-of-the-art depth es
     "method": "wallet",
     "usd_charged": 2,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "model_used": "midas",
   "depth_range": {
@@ -647,7 +641,6 @@ Automatically tag images with descriptive labels using OpenAI's CLIP model. Retu
     "method": "wallet",
     "usd_charged": 1,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "processing_time_ms": 520
 }
@@ -743,7 +736,6 @@ Generate dense vector embeddings from images using CLIP. Returns a 512 or 768-di
     "method": "wallet",
     "usd_charged": 1,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "processing_time_ms": 380
 }
@@ -879,7 +871,6 @@ Available operation types: `color-grade`, `enhance`, `denoise`, `colorize`, `fac
     "method": "wallet",
     "usd_charged": 4,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "total_processing_time_ms": 4890
 }
@@ -945,7 +936,7 @@ result.results.forEach((item) => {
   }
 });
 
-console.log(`Total credits: ${result.creditsUsed}`);
+console.log(`Total credits: ${result.usdCharged}`);
 ```
 
 ```bash [cURL]

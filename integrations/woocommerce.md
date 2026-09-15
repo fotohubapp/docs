@@ -30,7 +30,7 @@ Connect from **WooCommerce → FOTOhub Bulk AI**:
 
 If the site is later moved or cloned to a different URL, `Fotohub_Bridge::get_connection_id()` notices the host mismatch and re-registers, so a staging copy does not receive production callbacks.
 
-**Check connection** on the dashboard runs `ajax_health`, which combines `GET /v1/commerce/health`, a balance call and the connection lookup, reporting `bridge_status`, `service`, `connection_id`, `credits`, `callback_url` and whether a callback secret is stored.
+**Check connection** on the dashboard runs `ajax_health`, which combines `GET /v1/commerce/health`, a balance call and the connection lookup, reporting `bridge_status`, `service`, `connection_id`, `wallet_balance_usd`, `callback_url` and whether a callback secret is stored.
 
 ## Admin menu
 
@@ -89,15 +89,15 @@ A checkbox on this step, **include variations**, is posted as `include_variation
 
 ### Step 3 — Model and style
 
-The image model dropdown is built from `Fotohub_Bridge::get_image_models()` with credits per image shown in each label. Default: `seedream-5-0-260128`.
+The image model dropdown is built from `Fotohub_Bridge::get_image_models()` with USD price per image shown in each label. Default: `seedream-5-0-260128`.
 
-| Model ID | Label | Credits per image |
+| Model ID | Label | Cost per image (USD) |
 |----------|-------|-------------------|
-| `seedream-5-0-260128` | SeedDream 5.0 (recommended) | 2.0 |
-| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro | 3.0 |
-| `gpt-image-2` | GPT Image 2 | 2.0 |
-| `nano-banana-pro` | Nano Banana Pro | 5.3 |
-| `nano-banana-fast` | Nano Banana Fast | 2.0 |
+| `seedream-5-0-260128` | SeedDream 5.0 (recommended) | $0.0315 |
+| `dola-seedream-5-0-pro-260628` | SeedDream 5.0 Pro | $0.0480 |
+| `gpt-image-2` | GPT Image 2 | $0.0350 |
+| `nano-banana-pro` | Nano Banana Pro | $0.1340 |
+| `nano-banana-fast` | Nano Banana Fast | $0.0400 |
 | `imagen-4-standard` | Imagen 4 Standard | 3.0 |
 | `imagen-4-ultra` | Imagen 4 Ultra | 5.0 |
 | `imagen-4-fast` | Imagen 4 Fast | 2.0 |
@@ -143,9 +143,9 @@ Selectable copy fields (`Fotohub_Commerce::get_text_fields()`): `title`, `short_
 
 ### Step 5 — Review and submit
 
-`ajax_estimate` calls `POST /v1/commerce/estimate` and returns the item count, product count, images per item, credits per item, total credits, available credits and a `sufficient` flag. The **Start batch** button stays disabled until the estimate says the balance covers the batch, and the shortfall message links straight to top-up.
+`ajax_estimate` calls `POST /v1/commerce/estimate` and returns the item count, product count, images per item, cost per item (USD), total USD cost, available wallet balance and a `sufficient` flag. The **Start batch** button stays disabled until the estimate says the balance covers the batch, and the shortfall message links straight to top-up.
 
-Submitting calls `ajax_submit`, which posts `POST /v1/commerce/jobs` and stores the returned job state locally. The response carries `job_id`, `status`, `total_items` and `estimated_credits`.
+Submitting calls `ajax_submit`, which posts `POST /v1/commerce/jobs` and stores the returned job state locally. The response carries `job_id`, `status`, `total_items` and `estimated_cost_usd`.
 
 ### Idempotency
 
@@ -206,11 +206,11 @@ Items whose kind needs a source image and that have none are skipped: `image_edi
 
 The progress view polls `ajax_job_status`, which fetches `GET /v1/commerce/jobs/{id}` plus a page of `GET /v1/commerce/jobs/{id}/items` and returns:
 
-- **Job**: `id`, `status`, `kind`, `total_items`, `done_items`, `failed_items`, `spent_credits`, `estimated_credits`.
-- **Items**: `id`, `external_id`, resolved `product_id` / `variation_id`, `product_title`, `sku`, `status`, `attempts`, `error_message`, `credits_used`.
+- **Job**: `id`, `status`, `kind`, `total_items`, `done_items`, `failed_items`, `spent_usd`, `estimated_usd`.
+- **Items**: `id`, `external_id`, resolved `product_id` / `variation_id`, `product_title`, `sku`, `status`, `attempts`, `error_message`, `usd_charged`.
 - **`drafted`**: how many completed items were harvested into drafts on this poll.
 
-Job statuses from the bridge: `queued`, `processing`, `completed`, `completed_with_errors`, `failed`, `cancelled`, `awaiting_credits`.
+Job statuses from the bridge: `queued`, `processing`, `completed`, `completed_with_errors`, `failed`, `cancelled`, `awaiting_funds`.
 
 Buttons on the panel:
 
@@ -221,13 +221,13 @@ Buttons on the panel:
 | Review drafts | — | Links to `admin.php?page=fotohub-drafts` |
 | Start another batch | — | Resets the wizard |
 
-Every poll calls `Fotohub_Drafts::remember_job_state()`, which keeps the last 25 job states in the `fotohub_bridge_jobs` option. That is what powers the **Recent batches** table — batch, operation, status, done/total, failed, credits and last update — and it is why the progress view survives a page reload. Clicking a row reopens that batch.
+Every poll calls `Fotohub_Drafts::remember_job_state()`, which keeps the last 25 job states in the `fotohub_bridge_jobs` option. That is what powers the **Recent batches** table — batch, operation, status, done/total, failed, USD spent and last update — and it is why the progress view survives a page reload. Clicking a row reopens that batch.
 
 `ajax_sync_job` is the belt-and-braces path: it pages through every `completed` item of a job (100 at a time, up to 2,000) and harvests them into drafts. Use it when callbacks never reached the site — a firewall, a staging URL, a plugin conflict during the run.
 
 ### Low balance warning
 
-`render_low_balance_notice()` prints a warning on any admin screen whose ID contains `fotohub` when the balance drops below `Fotohub_Commerce::LOW_BALANCE_THRESHOLD` (50 credits), with a top-up link. The same threshold is passed to the browser as `fotohubCommerce.lowBalance`.
+`render_low_balance_notice()` prints a warning on any admin screen whose ID contains `fotohub` when the balance drops below `Fotohub_Commerce::LOW_BALANCE_THRESHOLD` ($5.00 USD), with a top-up link. The same threshold is passed to the browser as `fotohubCommerce.lowBalance`.
 
 ## Drafts review
 
@@ -242,7 +242,7 @@ Nothing an AI produces is written to a product until you approve it. **WooCommer
 - `kind` — the operation that produced it.
 - `payload` — the normalized result: `image_urls[]` and a `text{}` map restricted to the eight allowed fields.
 - `before_snapshot` — the live values captured at record time: title, description, short description, featured image ID and URL, alt text, and the Yoast meta title/description. This is what the review UI diffs against.
-- `credits_used`, `created_at`, `resolved_at`, `error_message`.
+- `usd_charged`, `created_at`, `resolved_at`, `error_message`.
 
 Draft IDs are also linked onto the product as `_fotohub_draft` post meta, and unlinked when the draft is resolved — so the count on the dashboard is always live.
 
@@ -256,7 +256,7 @@ Status tabs (`pending`, `approved`, `rejected`, `failed`, `all`) with counts fro
 - Status badge, the `kind` as a code tag, and the timestamp.
 - For image drafts: the current product image beside up to four generated images, each opening full-size in a new tab.
 - For text drafts: a current-versus-proposed diff per field, both sides stripped of tags and trimmed to 90 words.
-- Credits spent on that item.
+- USD amount spent on that item.
 - **Approve and apply** / **Reject** per draft, plus bulk approve and bulk reject over the selected drafts.
 
 ### What approval writes
@@ -328,7 +328,7 @@ Events handled:
 | `commerce.item.completed` | Records the item as a pending draft |
 | `commerce.job.completed` | Marks the remembered job state `completed` |
 | `commerce.job.failed` | Marks it `failed` |
-| `commerce.job.awaiting_credits` | Marks it `awaiting_credits` |
+| `commerce.job.awaiting_funds` | Marks it `awaiting_funds` |
 
 Every verified callback, including unknown event names, fires:
 
@@ -340,8 +340,8 @@ Every verified callback, including unknown event names, fires:
  * @param array  $data  Event payload.
  */
 add_action( 'fotohub_commerce_callback', function ( string $event, array $data ) {
-    if ( 'commerce.job.awaiting_credits' === $event ) {
-        wp_mail( get_option( 'admin_email' ), 'FOTOhub batch paused', 'Top up credits to resume.' );
+    if ( 'commerce.job.awaiting_funds' === $event ) {
+        wp_mail( get_option( 'admin_email' ), 'FOTOhub batch paused', 'Top up wallet balance to resume.' );
     }
 }, 10, 2 );
 ```
@@ -401,7 +401,7 @@ Thirteen actions, all registered as `wp_ajax_fotohub_commerce_<name>` in `Fotohu
 
 The nonce action is `fotohub_commerce_nonce` (`Fotohub_Commerce::NONCE_ACTION`) — distinct from the `fotohub_ai_nonce` used by the WordPress-side handlers.
 
-A 402 from the bridge is surfaced as structured data, not a generic error: `error_payload()` turns `fotohub_insufficient_credits` into `{ insufficient: true, required_credits, available_credits }` so the UI can name the shortfall.
+A 402 from the bridge is surfaced as structured data, not a generic error: `error_payload()` turns `fotohub_insufficient_funds` into `{ insufficient: true, required_usd, available_usd }` so the UI can name the shortfall.
 
 ## Product editor
 
@@ -471,7 +471,7 @@ Shared options (`fotohub_ai_api_key`, `fotohub_ai_default_model`, …) are on th
 | `payload` | longtext | `{ image_urls[], text{} }` |
 | `before_snapshot` | longtext | Live values at record time |
 | `error_message` | text | |
-| `credits_used` | decimal(10,4) | |
+| `usd_charged` | decimal(10,6) | |
 | `created_at` / `resolved_at` | datetime | |
 
 Unique key `uniq_item (job_id, item_id)` is what makes callback and poll delivery idempotent. Further indexes on `status`, `product_id` and `job_id`.
@@ -513,7 +513,7 @@ You do not configure concurrency. The bridge spreads dispatch across at most hal
 - Publicly reachable image URLs — the bridge fetches `source_image_url` for edit, background, upscale, recolor and alt-text kinds. A password-protected staging site cannot serve source images.
 - A publicly reachable REST route for callbacks, or use **Sync results** to pull them instead
 - Action Scheduler (bundled with WooCommerce) for queued product bulk actions
-- A FOTOhub account with credits
+- A FOTOhub account with prepaid USD wallet balance
 
 ## Troubleshooting
 
@@ -521,7 +521,7 @@ You do not configure concurrency. The bridge spreads dispatch across at most hal
 |---------|---------------|
 | "WooCommerce is not active" on the wizard | `Fotohub_Products::is_available()` checks `wc_get_product()` and `WC_Product`. WooCommerce is inactive or failed to load. |
 | "None of the selected products can be processed" | The kind needs a source image and none of the selection has one. Generate images first, or pick `image_generate` / `description`. |
-| Estimate says insufficient credits | The batch cost exceeds the balance. Reduce the selection, drop `num_images`, pick a cheaper model, or top up. |
+| Estimate says insufficient funds | The batch cost exceeds the wallet balance. Reduce the selection, drop `num_images`, pick a cheaper model, or top up. |
 | Submitting again did not create a second job | Correct: the idempotency key matched, so the original job was replayed. Change the selection or the operation to start a new batch. |
 | Drafts never appear | Callbacks are not reaching the site. Open the batch and use **Sync results**, which pages every completed item into drafts over the REST client. |
 | Callback returns 401 | Signature mismatch. A proxy that rewrites or re-encodes the body invalidates the digest — the HMAC is over the raw bytes. |
@@ -529,7 +529,7 @@ You do not configure concurrency. The bridge spreads dispatch across at most hal
 | Approving a draft did not replace the main image | By design. A product that already has a featured image receives new images into the gallery. |
 | Approved meta title went nowhere visible | Neither Yoast nor Rank Math is active, so the copy is parked in `_fotohub_meta_title`. Activate an SEO plugin and re-approve, or read the meta in your theme. |
 | Variation images all landed on the parent | **Include variations** was not checked, so one item per product was submitted. Re-run with it enabled. |
-| Job sits in `awaiting_credits` | The batch paused mid-run when credits ran out. Top up; the bridge resumes. |
+| Job sits in `awaiting_funds` | The batch paused mid-run when wallet balance reached $0. Top up; the bridge resumes. |
 | Bulk action queued nothing | No API key stored, or neither Action Scheduler nor `Fotohub_Scheduler` is available. |
 
 ## Planned

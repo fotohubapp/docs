@@ -3529,3 +3529,1024 @@ Yes! The `client.document.parse_structured()` method accepts any arbitrary Pydan
 
 ### 7. Does the SDK support Python 3.12?
 Yes. The SDK is continuously tested against Python 3.8, 3.9, 3.10, 3.11, and 3.12 in CI pipelines.
+
+---
+
+## Brand Engine & Virtual Ambassador Pipeline (`client.brand`)
+
+The Brand Engine provides an enterprise-grade pipeline to create, manage, and animate photorealistic virtual ambassadors. You can ensure visual consistency across thousands of generated campaign assets using the `BrandProfile` abstraction. 
+
+::: tip Enterprise Feature
+Brand pipelines run exclusively on high-vRAM GPU clusters. Check `wallet.available_usd` before running large batch jobs.
+:::
+
+### 1. Creating a Brand Profile
+
+The `BrandProfile` binds specific stylistic constraints, negative prompts, and lighting preferences to a dedicated identifier. 
+
+::: code-group
+
+```python [Python]
+import asyncio
+from fotohub import AsyncFotoHub
+from fotohub.types.brand import BrandProfile, FaceExpression
+
+async def create_brand():
+    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
+        profile: BrandProfile = await client.brand.create_profile(
+            name="Lumiere_Cosmetics",
+            description="Luxury cosmetics virtual ambassador, cinematic lighting, 8k resolution.",
+            base_model="seedream-5-0-260128",
+            negative_prompt="low quality, distorted, cartoon, 3d render",
+            brand_guidelines={
+                "color_palette": ["#FFD700", "#000000", "#FFFFFF"],
+                "tone": "elegant"
+            }
+        )
+        print(f"Created brand: {profile.id} (Cost: ${profile.cost_usd:.3f})")
+        return profile
+```
+
+```typescript [TypeScript]
+import { FotoHub, BrandProfile } from 'fotohub';
+
+const client = new FotoHub({ apiKey: 'fh_live_your_api_key' });
+
+async function createBrand() {
+    const profile: BrandProfile = await client.brand.createProfile({
+        name: "Lumiere_Cosmetics",
+        description: "Luxury cosmetics virtual ambassador, cinematic lighting, 8k resolution.",
+        baseModel: "seedream-5-0-260128",
+        negativePrompt: "low quality, distorted, cartoon, 3d render",
+        brandGuidelines: {
+            colorPalette: ["#FFD700", "#000000", "#FFFFFF"],
+            tone: "elegant"
+        }
+    });
+    console.log(`Created brand: ${profile.id} (Cost: $${profile.costUsd})`);
+}
+```
+
+```go [Go]
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/fotohub/fotohub-go"
+	"github.com/fotohub/fotohub-go/types"
+)
+
+func main() {
+	client := fotohub.NewClient(fotohub.WithAPIKey("fh_live_your_api_key"))
+	
+	req := types.BrandProfileCreateRequest{
+		Name:           "Lumiere_Cosmetics",
+		Description:    "Luxury cosmetics virtual ambassador",
+		BaseModel:      "seedream-5-0-260128",
+		NegativePrompt: "low quality, distorted",
+	}
+	
+	profile, _ := client.Brand.CreateProfile(context.Background(), req)
+	fmt.Printf("Created brand: %s (Cost: $%.3f)\n", profile.ID, profile.CostUSD)
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/brand/profiles \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Lumiere_Cosmetics",
+    "description": "Luxury cosmetics virtual ambassador",
+    "base_model": "seedream-5-0-260128"
+  }'
+```
+
+:::
+
+### 2. Extracting DNA and Generating the Face
+
+Extract DNA from reference images and generate a highly consistent virtual face.
+
+```python
+async def setup_ambassador(profile_id: str):
+    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
+        # Extract facial DNA (Cost: $0.050)
+        dna = await client.brand.extract_dna(
+            reference_image_urls=[
+                "https://storage.fotohub.app/ref1.jpg",
+                "https://storage.fotohub.app/ref2.jpg"
+            ]
+        )
+        
+        # Lock in the face (Cost: $0.150)
+        face = await client.brand.generate_face(
+            profile_id=profile_id,
+            dna_id=dna.id,
+            ethnicity="east_asian",
+            age=25
+        )
+        
+        # Generate essential perspectives (Cost: $0.025 per perspective)
+        perspectives = await client.brand.get_perspectives(
+            face_id=face.id,
+            angles=["front", "profile_left", "profile_right", "high_angle"]
+        )
+        
+        # Get expressions
+        expressions = await client.brand.get_expressions(
+            face_id=face.id,
+            emotions=["smile", "surprise", "serious"]
+        )
+        
+        return face
+```
+
+### 3. Generating a Monthly Content Calendar (Async Batch)
+
+To generate hundreds of variations for a monthly calendar without blocking, utilize `asyncio.gather` combined with the SDK's built-in `httpx.AsyncClient` pooling.
+
+::: warning Rate Limits
+FOTOhub supports up to 100 concurrent requests on enterprise tiers. Ensure you implement an `asyncio.Semaphore` to throttle concurrency and avoid 429 errors.
+:::
+
+```python
+async def generate_monthly_calendar(face_id: str, profile_id: str):
+    prompts = [f"Ambassador holding product in {setting}" for setting in [
+        "a bright modern kitchen, morning light",
+        "a neon-lit city street at night",
+        "a tranquil zen garden",
+        "a bustling cafe in Paris"
+    ]] * 10  # 40 total assets
+
+    semaphore = asyncio.Semaphore(15) # Max 15 concurrent generations
+
+    async def _generate(prompt: str):
+        async with semaphore:
+            # Each generation costs $0.040 USD
+            asset = await client.brand.generate_asset(
+                face_id=face_id,
+                profile_id=profile_id,
+                prompt=prompt,
+                resolution="1024x1024"
+            )
+            
+            # Compliance Check (Cost: $0.005)
+            compliance = await client.brand.check_compliance(
+                image_url=asset.url,
+                strictness="high"
+            )
+            
+            return asset if compliance.passed else None
+
+    # Run batch
+    assets = await asyncio.gather(*[_generate(p) for p in prompts])
+    valid_assets = [a for a in assets if a is not None]
+    
+    print(f"Generated {len(valid_assets)} compliant assets for the calendar.")
+```
+
+### Multi-Brand Agency Management
+
+Manage multiple clients by storing their distinct `profile_id` instances.
+
+```python
+async def run_agency():
+    # 10 clients with different brand profiles
+    client_profiles = ["prof_1", "prof_2", "prof_3", "prof_4", "prof_5", "prof_6", "prof_7", "prof_8", "prof_9", "prof_10"]
+    # Run pipelines for each...
+```
+
+### Brand Engine Parameter Reference
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | `str` | Yes | - | The name of the brand profile. |
+| `description` | `str` | Yes | - | Core stylistic instructions applied globally. |
+| `base_model` | `str` | No | `"seedream-5-0-260128"` | Check model pricing tables. |
+| `negative_prompt` | `str` | No | `""` | Concepts to avoid in all outputs. |
+| `brand_guidelines` | `dict` | No | `{}` | Key-value pairs matching JSON guidelines schema. |
+| `strictness` | `str` | No | `"medium"` | `low`, `medium`, or `high` for compliance checks. |
+
+---
+
+## UGC Studio: Automated Ad Factory (`client.ugc`)
+
+The UGC (User Generated Content) Studio combines text-to-speech (TTS), LipSync/MuseTalk (on GPU3), and rendering nodes to mass-produce social media ads programmatically. 
+
+### End-to-End Pipeline
+
+1. **Brief** → Create the campaign brief.
+2. **Script** → LLM writes the script variants.
+3. **Audio** → TTS node synthesizes voices (Cost: $0.002 / sec).
+4. **Render** → LipSync model animates the avatar (Cost: $0.080 / sec).
+5. **Deliver** → S3 / CloudFront delivery.
+
+::: code-group
+
+```python [Python]
+async def ugc_pipeline():
+    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
+        # 1. Create Script (Cost: $0.010)
+        script = await client.ugc.generate_script(
+            product_url="https://example.com/shoe",
+            angles=["pain_point", "unboxing", "lifestyle"],
+            duration_target=15
+        )
+        
+        # 2. Estimate Cost
+        estimate = await client.ugc.estimate_cost(
+            script_id=script.id,
+            actor="ugc_actor_f_01"
+        )
+        print(f"Estimated Render Cost: ${estimate.total_usd:.3f}")
+        
+        # 3. Trigger Render Webhook-driven (Cost: ~ $1.200 per 15s)
+        job = await client.ugc.render(
+            script_id=script.id,
+            actor="ugc_actor_f_01",
+            voice="eleven_multilingual_v2",
+            webhook_url="https://api.yourdomain.com/webhooks/fotohub"
+        )
+        
+        print(f"Render Job {job.id} queued. Awaiting webhook.")
+```
+
+```typescript [TypeScript]
+import { FotoHub } from 'fotohub';
+
+async function ugcPipeline() {
+    const client = new FotoHub({ apiKey: 'fh_live_your_api_key' });
+    
+    const script = await client.ugc.generateScript({
+        productUrl: "https://example.com/shoe",
+        angles: ["pain_point", "unboxing", "lifestyle"],
+        durationTarget: 15
+    });
+    
+    const job = await client.ugc.render({
+        scriptId: script.id,
+        actor: "ugc_actor_f_01",
+        voice: "eleven_multilingual_v2",
+        webhookUrl: "https://api.yourdomain.com/webhooks/fotohub"
+    });
+    console.log(`Job ${job.id} queued.`);
+}
+```
+
+```go [Go]
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/fotohub/fotohub-go"
+	"github.com/fotohub/fotohub-go/types"
+)
+
+func main() {
+	client := fotohub.NewClient(fotohub.WithAPIKey("fh_live_your_api_key"))
+	
+	job, _ := client.UGC.Render(context.Background(), types.UGCRenderRequest{
+		ScriptID:   "scr_12345",
+		Actor:      "ugc_actor_f_01",
+		WebhookURL: "https://api.yourdomain.com/webhooks/fotohub",
+	})
+	fmt.Printf("Job queued: %s\n", job.ID)
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ugc/render \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "script_id": "scr_12345",
+    "actor": "ugc_actor_f_01",
+    "webhook_url": "https://api.yourdomain.com/webhooks/fotohub"
+  }'
+```
+
+:::
+
+### Verifying Webhooks (HMAC-SHA256)
+
+When the asynchronous UGC render completes, FOTOhub sends a POST request to your `webhook_url`. You **must** verify the signature to prevent spoofing.
+
+```python
+import hmac
+import hashlib
+
+def verify_fotohub_webhook(payload: bytes, signature_header: str, webhook_secret: str) -> bool:
+    """
+    Verify the FOTOhub webhook signature.
+    """
+    expected_mac = hmac.new(
+        webhook_secret.encode('utf-8'),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    
+    return hmac.compare_digest(expected_mac, signature_header)
+```
+
+### Auto-publish to TikTok on Webhook Receive
+```python
+async def on_webhook_received(payload: dict):
+    if payload.get("event") == "render_completed":
+        video_url = payload.get("video_url")
+        # Post to TikTok directly using Social Studio
+        # Cost: Free to publish
+        client.social.publish_now(
+            media_urls=[video_url],
+            caption="New UGC Ad #ad",
+            platforms=["tiktok"]
+        )
+```
+
+### Async Batch UGC (5 products * 3 angles * 2 actors = 30 variants)
+```python
+async def batch_ugc(products, angles, actors):
+    jobs = []
+    # Loop and gather 30 render jobs...
+    return jobs
+```
+
+### UGC Parameter Reference
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `script_id` | `str` | Yes | - | ID of the script generated via `generate_script`. |
+| `actor` | `str` | Yes | - | Standard library actor or custom brand face ID. |
+| `voice` | `str` | No | `"eleven_multilingual_v2"` | TTS Voice model. |
+| `webhook_url` | `str` | No | `None` | URL to receive the `render_completed` event. |
+| `duration_target`| `int` | No | `15` | Target duration in seconds. |
+
+---
+
+## Social Studio & Multi-Platform Publishing (`client.social`)
+
+FOTOhub can directly syndicate your generated media and AI-optimized captions to Instagram, TikTok, and X (Twitter) using native APIs. 
+
+### Immediate Publishing and Captioning
+
+Use the Social Studio to generate platform-specific captions with hashtags, and instantly publish or schedule.
+
+::: code-group
+
+```python [Python]
+async def schedule_social_campaign(image_url: str):
+    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
+        # Generate Caption (Cost: $0.005)
+        caption = await client.social.generate_caption(
+            image_url=image_url,
+            platform="instagram",
+            tone="witty",
+            include_hashtags=True
+        )
+        
+        # Schedule Post (Cost: $0.000, flat tier)
+        post = await client.social.schedule_post(
+            media_urls=[image_url],
+            caption=caption.text,
+            platforms=["instagram", "tiktok"],
+            scheduled_time="2026-10-31T14:00:00Z"
+        )
+        
+        # Publish now immediately
+        now_post = await client.social.publish_now(
+            media_urls=[image_url],
+            caption=caption.text,
+            platforms=["twitter"]
+        )
+        
+        print(f"Scheduled Post ID: {post.id} across {len(post.platforms)} platforms.")
+```
+
+```typescript [TypeScript]
+import { FotoHub } from 'fotohub';
+
+async function scheduleSocial() {
+    const client = new FotoHub({ apiKey: 'fh_live_your_api_key' });
+    
+    const caption = await client.social.generateCaption({
+        imageUrl: "https://storage.fotohub.app/img.jpg",
+        platform: "instagram",
+        tone: "witty"
+    });
+    
+    const post = await client.social.schedulePost({
+        mediaUrls: ["https://storage.fotohub.app/img.jpg"],
+        caption: caption.text,
+        platforms: ["instagram", "tiktok"],
+        scheduledTime: "2026-10-31T14:00:00Z"
+    });
+}
+```
+
+```go [Go]
+package main
+
+import (
+	"context"
+	"github.com/fotohub/fotohub-go"
+	"github.com/fotohub/fotohub-go/types"
+)
+
+func main() {
+	client := fotohub.NewClient(fotohub.WithAPIKey("fh_live_your_api_key"))
+	
+	client.Social.SchedulePost(context.Background(), types.SocialPostRequest{
+		MediaURLs:     []string{"https://storage.fotohub.app/img.jpg"},
+		Caption:       "Hello world! #AI",
+		Platforms:     []string{"instagram", "tiktok"},
+		ScheduledTime: "2026-10-31T14:00:00Z",
+	})
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/social/schedule \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "media_urls": ["https://storage.fotohub.app/img.jpg"],
+    "caption": "Hello world! #AI",
+    "platforms": ["instagram", "tiktok"],
+    "scheduled_time": "2026-10-31T14:00:00Z"
+  }'
+```
+:::
+
+### Content Calendar Automation (20 Posts)
+
+```python
+async def schedule_week(client, assets):
+    # Schedule 20 posts for the week
+    for i, asset in enumerate(assets[:20]):
+        time = f"2026-11-{10 + i // 3}T10:00:00Z"
+        await client.social.schedule_post(
+            media_urls=[asset.url],
+            caption="Daily Drop",
+            platforms=["instagram"],
+            scheduled_time=time
+        )
+```
+
+### Retrieving Analytics
+
+Wait 24 hours after a post goes live, then pull engagement metrics (Likes, Comments, Shares, Impressions).
+
+```python
+async def analyze_engagement(post_id: str):
+    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
+        analytics = await client.social.get_analytics(post_id=post_id)
+        print(f"Total Impressions: {analytics.total_impressions}")
+        print(f"Cost of analysis: ${analytics.cost_usd:.4f}")
+```
+
+### A/B Caption Testing
+Evaluate caption performance across multiple posts over time.
+
+### Social Studio Parameter Reference
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `media_urls` | `list[str]`| Yes | - | List of media URLs (images/video). |
+| `caption` | `str` | Yes | - | Post text. |
+| `platforms` | `list[str]`| Yes | - | `["instagram", "tiktok", "twitter", "linkedin"]` |
+| `scheduled_time`| `str` | No | `None` | ISO 8601 string. If None, uses `publish_now()`. |
+
+---
+
+## Document Intelligence & OCR (`client.documents`)
+
+The `client.documents` namespace provides highly robust document intelligence, extracting structured data, tables, and JSON from raw PDFs, receipts, and invoices. 
+
+### Invoice Automation Pipeline
+
+Automatically extract invoice data, redact Personally Identifiable Information (PII), and pipe to your ERP (like QuickBooks).
+
+::: tip Pydantic V2 Powered
+All responses in `client.documents` automatically parse into strict Pydantic V2 classes. The JSON structure is statically verified before it reaches your application code.
+:::
+
+::: code-group
+
+```python [Python]
+from fotohub import FotoHub
+from fotohub.types.documents import InvoiceData
+
+def process_expenses(pdf_url: str):
+    client = FotoHub(api_key="fh_live_your_api_key")
+    
+    # 1. Basic Fast OCR (Cost: $0.002)
+    text = client.documents.detect_text(url=pdf_url)
+    
+    # 2. Analyze Document Forms + Tables (Cost: $0.015 per page)
+    doc_analysis = client.documents.analyze_document(url=pdf_url)
+    
+    # 3. Analyze Expense/Invoice specifically (Cost: $0.020 per page)
+    invoice: InvoiceData = client.documents.analyze_expense(url=pdf_url)
+    
+    # 4. Redact PII for storage (Cost: $0.005 per page)
+    redacted_pdf_url = client.documents.redact_pii(
+        url=pdf_url,
+        entities=["SSN", "CREDIT_CARD", "HOME_ADDRESS"]
+    )
+    
+    print(f"Extracted Total: ${invoice.total_amount_usd}")
+    print(f"Vendor: {invoice.vendor_name}")
+    print(f"Redacted PDF saved to: {redacted_pdf_url}")
+    
+    # Push to QuickBooks JSON ...
+```
+
+```typescript [TypeScript]
+import { FotoHub } from 'fotohub';
+
+async function processExpenses() {
+    const client = new FotoHub({ apiKey: 'fh_live_your_api_key' });
+    
+    const invoice = await client.documents.analyzeExpense({ url: "https://storage/invoice.pdf" });
+    
+    const redactedPdf = await client.documents.redactPii({
+        url: "https://storage/invoice.pdf",
+        entities: ["SSN", "CREDIT_CARD", "HOME_ADDRESS"]
+    });
+    
+    console.log(`Extracted Total: $${invoice.totalAmountUsd}`);
+}
+```
+
+```go [Go]
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/fotohub/fotohub-go"
+	"github.com/fotohub/fotohub-go/types"
+)
+
+func main() {
+	client := fotohub.NewClient(fotohub.WithAPIKey("fh_live_your_api_key"))
+	
+	invoice, _ := client.Documents.AnalyzeExpense(context.Background(), types.DocumentAnalyzeRequest{
+		URL: "https://storage/invoice.pdf",
+	})
+	
+	fmt.Printf("Vendor: %s, Total: $%.2f\n", invoice.VendorName, invoice.TotalAmountUSD)
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/documents/analyze-expense \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://storage/invoice.pdf"
+  }'
+```
+:::
+
+### Batch Processing 100 Documents (Async)
+```python
+async def batch_process(urls: list[str]):
+    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
+        # process 100 documents ...
+        pass
+```
+
+### Document Intelligence Parameter Reference
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `url` | `str` | Yes | - | URL to the PDF or image file. |
+| `pages` | `str` | No | `"1-5"` | Page range to process. |
+| `extract_tables`| `bool` | No | `True` | Return parsed markdown tables. |
+| `entities` | `list[str]`| No | `[]` | Used for `redact_pii`. |
+
+---
+
+## Advanced Async Patterns & Concurrency
+
+When orchestrating FOTOhub at scale, standard blocking HTTP calls become a bottleneck. The Python SDK supports advanced `asyncio` patterns.
+
+### 1. Connection Pool Reuse
+
+By using `AsyncFotoHub` as an async context manager, the underlying `httpx.AsyncClient` HTTP/2 connection pool is reused. This prevents TLS handshake overhead on every request.
+
+```python
+import asyncio
+from fotohub import AsyncFotoHub
+
+async def main():
+    # Context manager ensures connection pooling and clean teardown
+    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
+        res1 = await client.images.generate(prompt="Cat")
+        res2 = await client.images.generate(prompt="Dog")
+```
+
+### 2. Structured Concurrency (TaskGroup)
+
+Python 3.11+ introduces `asyncio.TaskGroup`. If any sub-task fails (e.g. 402 Insufficient Funds), the group cancels the remaining tasks cleanly.
+
+```python
+import asyncio
+from fotohub import AsyncFotoHub
+
+async def generate_variants(prompts: list[str]):
+    results = []
+    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
+        async with asyncio.TaskGroup() as tg:
+            tasks = [
+                tg.create_task(client.images.generate(prompt=p)) 
+                for p in prompts
+            ]
+        # All tasks are complete here
+        results = [task.result() for task in tasks]
+    return results
+```
+
+### 3. Producer-Consumer Pipeline for Video Generation
+
+For long-running tasks like Video Generation (GPU2 - MMAudio), use `asyncio.Queue`.
+
+```python
+import asyncio
+from fotohub import AsyncFotoHub
+
+async def producer(queue: asyncio.Queue, prompts: list[str]):
+    for p in prompts:
+        await queue.put(p)
+    # Poison pill
+    for _ in range(5):
+        await queue.put(None)
+
+async def consumer(queue: asyncio.Queue, client: AsyncFotoHub, worker_id: int):
+    while True:
+        prompt = await queue.get()
+        if prompt is None:
+            break
+        print(f"Worker {worker_id} generating: {prompt}")
+        res = await client.video.generate(prompt=prompt, duration=5)
+        print(f"Cost: ${res.cost_usd:.3f}")
+        queue.task_done()
+
+async def run_pipeline():
+    prompts = ["A car driving", "A man walking", "A bird flying", "A ship sailing"] * 10
+    queue = asyncio.Queue()
+    
+    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
+        # Start 5 consumer workers
+        consumers = [asyncio.create_task(consumer(queue, client, i)) for i in range(5)]
+        # Start producer
+        prod = asyncio.create_task(producer(queue, prompts))
+        
+        await asyncio.gather(prod, *consumers)
+```
+
+### 4. Async File I/O with aiofiles
+
+```python
+import aiofiles
+import httpx
+
+async def save_asset(url: str, filepath: str):
+    async with httpx.AsyncClient() as http_client:
+        response = await http_client.get(url)
+        async with aiofiles.open(filepath, 'wb') as f:
+            await f.write(response.content)
+```
+
+---
+
+## Complete Pydantic V2 Type Reference
+
+FOTOhub heavily relies on Pydantic V2 for rigorous schema validation.
+
+### Request Validators
+
+When you send a request, the SDK validates fields before the HTTP request is even dispatched. For example, USD amounts must be >= 0.
+
+```python
+from pydantic import BaseModel, Field, field_validator
+
+class PaymentTopUpRequest(BaseModel):
+    amount_usd: float = Field(..., description="Amount to add in USD")
+    
+    @field_validator('amount_usd')
+    def amount_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("Top up amount must be > $0.00 USD")
+        return v
+```
+
+### Response Models and Computed Fields
+
+```python
+from pydantic import BaseModel, computed_field
+
+class GenerationResponse(BaseModel):
+    id: str
+    base_cost: float
+    tax: float
+    
+    @computed_field
+    def total_cost_usd(self) -> float:
+        return self.base_cost + self.tax
+```
+
+### Model Config & Dict Serialization
+
+Models implement `model_dump()` to serialize to dicts, useful for parsing webhook payloads.
+
+```python
+from fotohub.types.webhooks import WebhookPayload
+
+payload_dict = {
+    "event": "render_completed",
+    "cost_usd": 1.250,
+    "resource_id": "job_123"
+}
+
+# Parse from arbitrary dictionary
+webhook = WebhookPayload.model_validate(payload_dict)
+
+# Serialize back, respecting aliases
+json_str = webhook.model_dump_json(by_alias=True)
+```
+
+Model config for parsing:
+```python
+from pydantic import ConfigDict
+
+class WebhookPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, alias_generator=lambda x: x.upper())
+```
+
+---
+
+## pytest Test Suite for FotoHub Integrations
+
+We recommend using `pytest`, `respx`, and the SDK's built-in sandbox keys to write tests.
+
+::: info Sandbox API Keys
+Use `fh_test_...` prefixed keys. Sandbox requests bypass GPU provisioning, return mocked results immediately, and do **not** deduct USD from your wallet balance.
+:::
+
+### Mocking with RESPX
+
+Mock network calls tightly to test error states (e.g. 402 Insufficient Funds).
+
+```python
+import pytest
+import respx
+from httpx import Response
+from fotohub import FotoHub
+from fotohub.exceptions import InsufficientFundsError
+
+@pytest.fixture
+def client():
+    return FotoHub(api_key="fh_test_12345")
+
+@respx.mock
+def test_insufficient_funds(client):
+    # Mock the API returning 402
+    respx.post("https://apis.fotohub.app/v1/images/generate").mock(
+        return_value=Response(
+            402, 
+            json={"error": "Insufficient funds in prepaid USD wallet", "shortfall_usd": 5.0}
+        )
+    )
+    
+    with pytest.raises(InsufficientFundsError) as exc_info:
+        client.images.generate(prompt="Test")
+        
+    assert exc_info.value.shortfall_usd == 5.0
+```
+
+### Parametrized Tests across Models
+
+```python
+@pytest.mark.parametrize("model,expected_cost", [
+    ("seedream-5-0-260128", 0.040),
+    ("fotohub-turbo", 0.010),
+    ("fotohub-flux", 0.025)
+])
+def test_image_generation_pricing(client, model, expected_cost):
+    # If using fh_test_* keys, the API returns a simulated cost match
+    res = client.images.generate(prompt="A test image", model=model)
+    assert res.cost_usd == expected_cost
+```
+
+### Coverage for 429 and 503 Errors
+```python
+@respx.mock
+def test_rate_limit(client):
+    respx.post("https://apis.fotohub.app/v1/images/generate").mock(
+        return_value=Response(429, json={"error": "Rate limited"})
+    )
+    # Test retry logic or exception...
+```
+
+### Factory Functions for Test Data
+```python
+def make_mock_image_response(cost_usd=0.040):
+    return {"url": "https://example.com/img.jpg", "cost_usd": cost_usd}
+```
+
+---
+
+## AI Agent Orchestration with FOTOhub Tools
+
+FOTOhub functions can be natively registered as "tools" for LLMs like Claude or OpenAI, allowing autonomous agents to research, generate, and compare assets.
+
+### OpenAI Function Calling Wrapper
+
+```python
+fotohub_image_tool = {
+    "type": "function",
+    "function": {
+        "name": "generate_image",
+        "description": "Generates a photorealistic image using FOTOhub. Costs $0.040 USD per call.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string"},
+                "model": {"type": "string", "enum": ["seedream-5-0-260128", "fotohub-turbo"]}
+            },
+            "required": ["prompt"]
+        }
+    }
+}
+```
+
+### Claude Anthropic via `tool_use`
+```python
+anthropic_tool = {
+    "name": "fotohub_generate",
+    "description": "Generate an image via FOTOhub API. Cost: $0.040 USD.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "prompt": {"type": "string"}
+        },
+        "required": ["prompt"]
+    }
+}
+```
+
+### LangChain Integration
+
+```python
+from langchain.tools import BaseTool
+from fotohub import FotoHub
+
+class FotoHubImageTool(BaseTool):
+    name = "fotohub_image_generator"
+    description = "Use this tool to generate high quality images."
+    
+    def _run(self, prompt: str) -> str:
+        client = FotoHub(api_key="fh_live_your_api_key")
+        res = client.images.generate(prompt=prompt)
+        return f"Image generated at {res.url}. Cost: ${res.cost_usd:.3f}"
+
+# Pass to agent
+# agent = initialize_agent([FotoHubImageTool()], llm, agent="zero-shot-react-description")
+```
+
+### LlamaIndex Tool Integration
+```python
+from llama_index.core.tools import FunctionTool
+
+def generate_image_tool(prompt: str) -> str:
+    client = FotoHub(api_key="fh_live_your_api_key")
+    res = client.images.generate(prompt=prompt)
+    return res.url
+
+llama_tool = FunctionTool.from_defaults(fn=generate_image_tool)
+```
+
+### Autonomous Image Research Agent Pipeline
+- **Search**: `agent` decides what to generate
+- **Generate**: Calls FOTOhub tool
+- **Compare**: Runs OCR on image to verify text
+
+---
+
+## Production FastAPI + Celery + Redis Blueprint
+
+For large-scale applications, you should decouple API requests from generation tasks.
+
+### 1. Lifespan and Dependencies
+
+```python
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Depends
+from fotohub import AsyncFotoHub
+
+clients = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize connection pool on startup
+    clients["fotohub"] = AsyncFotoHub(api_key="fh_live_your_api_key")
+    yield
+    # Teardown
+    await clients["fotohub"].close()
+
+app = FastAPI(lifespan=lifespan)
+
+def get_fotohub() -> AsyncFotoHub:
+    return clients["fotohub"]
+```
+
+### 2. Celery Worker (Redis Broker)
+
+Store expensive generations in Redis, execute via Celery.
+
+```python
+from celery import Celery
+from fotohub import FotoHub
+
+celery_app = Celery('tasks', broker='redis://localhost:6379/0', backend='redis://localhost:6379/0')
+
+@celery_app.task(bind=True, max_retries=3)
+def background_generate(self, prompt: str):
+    client = FotoHub(api_key="fh_live_your_api_key")
+    try:
+        # Sync client used in Celery worker thread
+        res = client.images.generate(prompt=prompt)
+        return {"url": res.url, "cost_usd": res.cost_usd}
+    except Exception as e:
+        self.retry(exc=e, countdown=10)
+```
+
+### 3. API Endpoint Triggering Celery
+
+```python
+@app.post("/api/v1/generate")
+async def trigger_generation(prompt: str):
+    # Dispatch to background queue
+    task = background_generate.delay(prompt)
+    return {"task_id": task.id, "status": "processing"}
+```
+
+### Redis Result Caching for Expensive Generation Jobs
+```python
+import redis
+import hashlib
+
+r = redis.Redis(host='localhost', port=6379, db=1)
+
+def cached_generation(prompt: str):
+    prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()
+    cached = r.get(prompt_hash)
+    if cached:
+        return cached.decode('utf-8')
+    
+    # Not cached, run generation
+    client = FotoHub(api_key="fh_live_your_api_key")
+    res = client.images.generate(prompt=prompt)
+    
+    r.set(prompt_hash, res.url, ex=86400) # cache for 1 day
+    return res.url
+```
+
+### Celery Beat Schedule for Recurring Content Generation
+```python
+celery_app.conf.beat_schedule = {
+    'generate-daily-content': {
+        'task': 'tasks.background_generate',
+        'schedule': 86400.0,
+        'args': ('Daily inspirational quote background',)
+    },
+}
+```
+
+### Health Check Endpoint Validating API Connectivity
+```python
+@app.get("/health")
+async def health_check():
+    client = get_fotohub()
+    # Simple lightweight call to verify connectivity
+    try:
+        await client.billing.get_balance()
+        return {"status": "healthy"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
+```
+
+### Prometheus Metrics
+```python
+from prometheus_client import Counter, Histogram
+
+GEN_DURATION = Histogram('fotohub_gen_duration_seconds', 'Time spent generating')
+COST_USD = Counter('fotohub_cost_usd_total', 'Total USD spent')
+ERRORS = Counter('fotohub_errors_total', 'Total FOTOhub errors')
+```
+
+This ensures your API layer maintains sub-10ms response times while delegating heavy FOTOhub GPU workloads to background workers.

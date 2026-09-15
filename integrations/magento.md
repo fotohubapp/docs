@@ -105,7 +105,7 @@ Separating `generate` from `drafts` lets you have staff who can run jobs but not
 
 | Page | Path | Purpose |
 |------|------|---------|
-| Dashboard | `fotohub/dashboard/index` | Credit balance, recent jobs, connection health, MCP setup |
+| Dashboard | `fotohub/dashboard/index` | Wallet balance, recent jobs, connection health, MCP setup |
 | Bulk Generate | `fotohub/generate/index` | The 5-step job wizard |
 | Jobs | `fotohub/job/index` | Job grid with per-item detail |
 | Drafts | `fotohub/draft/index` | Review queue with approve and reject |
@@ -128,13 +128,13 @@ The fastest route is the product grid mass action.
 | 2. Operation | What to generate — see the operations table below |
 | 3. Model and preset | Image model plus a preset from the shared library |
 | 4. Options | Aspect ratio, images per product, or for copy: tone, language and which fields |
-| 5. Review | Credit estimate against your balance, then submit |
+| 5. Review | USD cost estimate against your wallet balance, then submit |
 
-The estimate is live: it shows *"N products × M images = X credits, you have Y"* and blocks submission when your balance is short, so a job never dies halfway through a catalog.
+The estimate is live: it shows *"N products × M images = $X USD, you have $Y USD"* and blocks submission when your balance is short, so a job never dies halfway through a catalog.
 
 ### Operations
 
-| Operation | Produces | Credits per product |
+| Operation | Produces | Cost per product (USD) |
 |-----------|----------|---------------------|
 | Generate image | A new product photo from the preset | 2–5.3 depending on model |
 | Edit image | An edited version of an existing photo | 2–5.3 |
@@ -157,7 +157,7 @@ Results land in **FOTOhub AI → Drafts** rather than on your products.
 - **Approve** writes the result to the product: images are added to the gallery, copy to the relevant attributes, alt text to the gallery entry label
 - **Reject** discards it
 
-Approve individually or select several and use the grid mass action. Because approval is the only write path, a bad preset costs you credits but never damages your catalog.
+Approve individually or select several and use the grid mass action. Because approval is the only write path, a bad preset costs you balance but never damages your catalog.
 
 For configurable products, per-variant jobs write to the matching child product's image on approval.
 
@@ -242,7 +242,7 @@ See the [MCP integration guide](/integrations/mcp) for the full tool list.
 | "Invalid or revoked API key" | Re-enter the key in Stores → Configuration → FOTOhub AI. Confirm it is active in the console and starts with `fh_live_`. |
 | Jobs stay queued | Magento cron is not running, or `poll_enabled` is off. Run `bin/magento cron:run --group=default` and check `var/log/`. |
 | Drafts never appear | The job may still be running — check FOTOhub AI → Jobs. If it completed, verify cron polling or the callback URL. |
-| `402` insufficient credits | Top up in the console, then use **Retry failed only** on the job. The batch parked itself instead of charging item by item. |
+| `402` insufficient funds | Top up in the console, then use **Retry failed only** on the job. The batch parked itself instead of charging item by item. |
 | Images approved but not visible | Flush the cache and reindex: `bin/magento indexer:reindex catalog_product_price` and regenerate media if you use a CDN. |
 | Bulk action absent from the grid | Clear generated code and flush: `rm -rf generated/* && bin/magento cache:flush`. |
 

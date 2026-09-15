@@ -99,7 +99,6 @@ Only `person_image_url` plus one of `garment_image_url` / `garment_id` are stric
   "billing": {
     "method": "wallet",
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "estimated_seconds": 8,
   "poll_url": "https://apis.fotohub.app/v1/ai/tryon/7c1e9f42-3a5b-4d8e-9f01-2b3c4d5e6f70"
@@ -172,7 +171,7 @@ Identical in shape to a single-garment submit, with the outfit's cost and estima
   "status": "queued",
   "category": "tops",
   "usd_charged": 3.0,
-  "billing": { "method": "wallet", "usd_charged": 0, "pln_charged": 0 },
+  "billing": { "method": "wallet", "usd_charged": 0 },
   "estimated_seconds": 16,
   "poll_url": "https://apis.fotohub.app/v1/ai/tryon/381e0971-c3e9-499c-b927-4bced6103160"
 }
@@ -361,7 +360,7 @@ def try_on(person_url: str, garment_url: str, category: str = "tops") -> list[st
     submit.raise_for_status()
 
     job = submit.json()
-    print(f"queued {job['job_id']}, ~{job['estimated_seconds']}s, {job['credits_used']} credits")
+    print(f"queued {job['job_id']}, ~{job['estimated_seconds']}s, {job['usd_charged']:.4f} USD")
 
     # ~11s per image, so poll rather than hold the connection open.
     deadline = time.time() + job["estimated_seconds"] * 4 + 30
@@ -421,7 +420,7 @@ async function tryOn(personUrl: string, garmentUrl: string, category = "tops") {
   if (submit.status === 402) throw new Error(`out of credits: ${job.detail}`);
   if (!submit.ok) throw new Error(`submit failed: ${submit.status}`);
 
-  console.log(`queued ${job.job_id}, ~${job.estimated_seconds}s, ${job.credits_used} credits`);
+  console.log(`queued ${job.job_id}, ~${job.estimated_seconds}s, ${job.usd_charged} USD charged`);
 
   // ~11s per image, so poll rather than hold the connection open.
   const deadline = Date.now() + job.estimated_seconds * 4000 + 30_000;

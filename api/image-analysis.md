@@ -214,7 +214,7 @@ response = requests.post(
 )
 
 data = response.json()
-print(f"Credits used: {data['billing']['usd_charged']}")
+print(f"USD charged: {data['billing']['usd_charged']}")
 
 # Access labels
 for label in data["labels"]:
@@ -252,7 +252,7 @@ const response = await fetch("https://apis.fotohub.app/v1/ai/analyze/image", {
 });
 
 const data = await response.json();
-console.log(`Credits used: ${data.credits_used}`);
+console.log(`USD charged: ${data.usd_charged}`);
 
 // Access labels
 for (const label of data.labels) {
@@ -462,7 +462,6 @@ POST /v1/ai/enhance-prompt
     "usd_charged": 0.003,
     "balance_usd": 49.997,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "original_prompt": "a cat on a roof",
   "enhanced_prompt": "A sleek tabby cat perched on the edge of a terracotta rooftop at golden hour, silhouetted against a warm sunset sky with streaks of orange and purple. The cat gazes into the distance with alert, luminous eyes. Shallow depth of field with the background city skyline softly blurred. Shot from a low angle, cinematic composition with natural warm lighting.",

@@ -55,7 +55,7 @@ answers `410` with `{"error": "api_subscriptions_retired"}`, and every
 `price_monthly: null` with `purchasable: false`.
 
 They were the wrong shape for a prepaid product, and the numbers said so:
-`sub-developer` was 49 PLN/mo for **60 rpm — half of what `payg-standard` gives
+`sub-developer` (legacy plan) offered **60 rpm — half of what `payg-standard` gives
 you free** at a $25 balance. A plan never funded a single generation either, since
 every call has always been charged to the USD wallet.
 

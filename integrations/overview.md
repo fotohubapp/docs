@@ -42,7 +42,7 @@ Every integration is a thin client over one shared backend, the **Commerce Bridg
 └────────────────────┘        └──────────────────────┘
 ```
 
-That split is why every platform behaves the same way: the same presets, the same credit costs, the same retry semantics. Preset and pricing updates reach every store without a plugin release.
+That split is why every platform behaves the same way: the same presets, the same USD costs, the same retry semantics. Preset and pricing updates reach every store without a plugin release.
 
 If you are building your own integration, the bridge is a documented public API — see the [Commerce Bridge reference](/integrations/commerce-bridge).
 
@@ -50,9 +50,9 @@ If you are building your own integration, the bridge is a documented public API 
 
 **Bulk with a safety net.** Submit up to 500 products per job. Each product is processed independently, so one bad SKU does not sink the batch. Failed items retry on their own, and **Retry failed only** never charges you twice for products that already succeeded.
 
-**Cost known upfront.** Before a job starts you see *"N products × M images = X credits, you have Y"*. If your balance is short you get a clear refusal instead of a run that dies halfway through your catalog. When credits do run out mid-job, the batch parks itself rather than charging item by item — top up and retry to resume.
+**Cost known upfront.** Before a job starts you see *"N products × M images = $X USD, you have $Y USD"*. If your balance is short you get a clear refusal instead of a run that dies halfway through your catalog. When wallet funds do run out mid-job, the batch parks itself safely rather than failing ungracefully — top up and retry to resume.
 
-**Nothing goes live unreviewed.** Results land as drafts. Images show a before/after comparison, copy shows a word-level diff against the current text. Approve individually or in bulk. Approval is the only write path, so a bad preset costs credits but never damages your catalog.
+**Nothing goes live unreviewed.** Results land as drafts. Images show a before/after comparison, copy shows a word-level diff against the current text. Approve individually or in bulk. Approval is the only write path, so a bad preset costs wallet balance but never damages your catalog.
 
 **Copy that matches the product.** Descriptions are generated from real product data — title, category, attributes, price — in 6 tones and 3 languages (English, Polish, German), covering title, short and long description, SEO meta, alt text, FAQ and JSON-LD.
 
@@ -76,16 +76,16 @@ Channel presets carry hard constraints, so output is marketplace-compliant by co
 
 The same catalog is available everywhere:
 
-| Model | Credits | Best for |
+| Model | Price (USD) | Best for |
 |-------|---------|----------|
-| `seedream-5-0-260128` | 2 | Default. Strong quality at low cost, up to 4K |
-| `dola-seedream-5-0-pro-260628` | 3 | Highest detail and prompt adherence |
-| `gpt-image-2` | 2 | Text rendering in images |
-| `nano-banana-pro` | 5.3 | Premium photorealism |
-| `nano-banana-fast` | 2 | Fast iteration |
-| `imagen-4-standard` | 3 | Photorealistic product shots |
-| `imagen-4-ultra` | 5 | Native 4K |
-| `imagen-4-fast` | 2 | Budget batches |
+| `seedream-5-0-260128` | $0.0315 | Default. Strong quality at low cost, up to 4K |
+| `dola-seedream-5-0-pro-260628` | $0.0480 | Highest detail and prompt adherence |
+| `gpt-image-2` | $0.0350 | Text rendering in images |
+| `nano-banana-pro` | $0.1340 | Premium photorealism |
+| `nano-banana-fast` | $0.0400 | Fast iteration |
+| `imagen-4-standard` | $0.0400 | Photorealistic product shots |
+| `imagen-4-ultra` | $0.0800 | Native 4K |
+| `imagen-4-fast` | $0.0200 | Budget batches |
 
 See the [models catalog](/api/models) for capabilities and the full platform inventory.
 
@@ -94,11 +94,11 @@ See the [models catalog](/api/models) for capabilities and the full platform inv
 1. **Get an API key** at [fotohub.app/console](https://fotohub.app/console)
 2. **Install the integration** for your platform from the table above
 3. **Connect** — paste the key, the plugin validates it and shows your balance
-4. **Try a small batch first** — three or four products, so you can judge a preset before committing credits to the whole catalog
+4. **Try a small batch first** — three or four products, so you can judge a preset before committing budget to the whole catalog
 5. **Review the drafts**, approve what works, and scale up
 
 ::: tip Validate presets on a handful of products
-Presets behave differently across product categories. A ten-product trial costs a few credits and tells you far more than reading preset names.
+Presets behave differently across product categories. A ten-product trial costs only a few cents and tells you far more than reading preset names.
 :::
 
 ## Roadmap

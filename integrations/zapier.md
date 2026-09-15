@@ -63,7 +63,7 @@ The upcoming official Zapier app will include:
 - Image generation completed
 - Video generation completed
 - Batch job completed
-- Credit balance low
+- Wallet balance low
 
 **Actions:**
 - Generate image

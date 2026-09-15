@@ -73,7 +73,7 @@ result = client.generate_image(
     model="seedream-5-0-260128"
 )
 print(f"Generated: {result.images[0].url}")
-print(f"Credits used: {result.usd_charged}")
+print(f"USD charged: {result.usd_charged}")
 ```
 
 ---
@@ -133,7 +133,7 @@ const result = await client.generateImage({
   model: "seedream-5-0-260128",
 });
 console.log(`Generated: ${result.images[0].url}`);
-console.log(`Credits: ${result.creditsUsed}`);
+console.log(`USD charged: ${result.usdCharged}`);
 ```
 
 ---

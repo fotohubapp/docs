@@ -64,12 +64,11 @@ generation fails the charge is refunded automatically.
 ```json
 {
   "model": "minimax",
-  "credits_used": 5,
+  "usd_charged": 0.2250,
   "billing": {
-    "method": "credits",
-    "credits_used": 5,
+    "method": "wallet",
+    "usd_charged": 0.2250,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/generations/audio/mj_xyz789.mp3",
   "duration": 30,
@@ -111,7 +110,7 @@ response = requests.post(
 result = response.json()
 print(f"Audio URL: {result['audio_url']}")
 print(f"Duration: {result['duration']}s")
-print(f"Credits used: {result['credits_used']}")
+print(f"USD charged: ${result['usd_charged']:.4f}")
 ```
 
 ```typescript [TypeScript]
@@ -140,7 +139,7 @@ const response = await fetch(
 const result = await response.json();
 console.log("Audio URL:", result.audio_url);
 console.log(`Duration: ${result.duration}s`);
-console.log(`Credits used: ${result.credits_used}`);
+console.log(`USD charged: $${result.usd_charged}`);
 ```
 
 ```go [Go]
@@ -179,7 +178,7 @@ func main() {
 	json.NewDecoder(resp.Body).Decode(&result)
 	fmt.Printf("Audio URL: %s\n", result["audio_url"])
 	fmt.Printf("Duration: %vs\n", result["duration"])
-	fmt.Printf("Credits used: %v\n", result["credits_used"])
+	fmt.Printf("USD charged: %.4f\n", result["usd_charged"])
 }
 ```
 
@@ -223,12 +222,11 @@ POST /v1/ai/generate/sfx
 
 ```json
 {
-  "credits_used": 3,
+  "usd_charged": 0.1350,
   "billing": {
-    "method": "credits",
-    "credits_used": 3,
+    "method": "wallet",
+    "usd_charged": 0.1350,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/generations/sfx/sfx_r4nd0m.mp3",
   "duration": 5,
@@ -398,7 +396,7 @@ Grok responses report the voice used and the billed character count:
 ```json
 {
   "model": "grok",
-  "credits_used": 0.7,
+  "usd_charged": 0.0315,
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/audio/.../grok-tts.mp3",
   "format": "mp3",
   "voice": "eve",
@@ -411,12 +409,11 @@ Grok responses report the voice used and the billed character count:
 ```json
 {
   "model": "google",
-  "credits_used": 1,
+  "usd_charged": 0.0450,
   "billing": {
-    "method": "credits",
-    "credits_used": 1,
+    "method": "wallet",
+    "usd_charged": 0.0450,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/generations/speech/tts_k8m2n1.mp3",
   "duration": 12.4,
@@ -735,7 +732,7 @@ POST /v1/ai/generate/speech/gpt
 
 ```json
 {
-  "credits_used": 2,
+  "usd_charged": 0.0900,
   "audio_url": "https://s1.fotohub.app/storage/v1/object/public/audio/gpt-tts/...",
   "transcript": "The text as spoken by the model",
   "model": "gpt-audio-1.5",
@@ -962,7 +959,7 @@ minute and does not do diarization or emotion analysis.
 ```json
 {
   "model": "grok",
-  "credits_used": 0.3,
+  "usd_charged": 0.0135,
   "text": "Transkrypcja publicznego API ze znacznikami czasu.",
   "language": "pl",
   "duration": 3.7,
@@ -978,12 +975,11 @@ minute and does not do diarization or emotion analysis.
 
 ```json
 {
-  "credits_used": 3,
+  "usd_charged": 0.1350,
   "billing": {
-    "method": "credits",
-    "credits_used": 3,
+    "method": "wallet",
+    "usd_charged": 0.1350,
     "usd_charged": 0,
-    "pln_charged": 0
   },
   "text": "Dzien dobry, chcialbym zamowic projekt graficzny dla mojej firmy...",
   "language_detected": "pl",
@@ -1186,10 +1182,10 @@ speech_resp = requests.post(
 )
 result = speech_resp.json()
 print(f"Dubbed audio: {result['audio_url']}")
-total_credits = (transcript["credits_used"] +
-                 translation["credits_used"] +
-                 result["credits_used"])
-print(f"Total credits: {total_credits}")
+total_usd_charged = (transcript["usd_charged"] +
+                 translation["usd_charged"] +
+                 result["usd_charged"])
+print(f"Total credits: {total_usd_charged}")
 ```
 
 ```typescript [TypeScript]
@@ -1238,8 +1234,8 @@ const speechResp = await fetch(`${BASE}/v1/ai/generate/speech/gpt`, {
 });
 const result = await speechResp.json();
 console.log(`Dubbed audio: ${result.audio_url}`);
-const totalCredits = transcript.credits_used + translation.credits_used + result.credits_used;
-console.log(`Total credits: ${totalCredits}`);
+const totalUSDCharged = transcript.usd_charged + translation.usd_charged + result.usd_charged;
+console.log(`Total credits: ${totalUSDCharged}`);
 ```
 
 ```go [Go]
@@ -1435,7 +1431,7 @@ Quick reference for choosing the right model for your use case.
 Character-billed endpoints charge fractional blocks above the first (2500 chars =
 2.5 blocks); minute-billed endpoints round up to the whole minute, so a 95-second
 file bills 2 minutes. Every response reports what was charged — `cost_usd` on the
-USD-priced endpoints, `credits_used` on the rest — alongside
+all endpoints use `usd_charged` — alongside
 `characters_processed` or `minutes_billed`.
 
 `GET /v1/pricing` returns the live figures with their units and an itemised

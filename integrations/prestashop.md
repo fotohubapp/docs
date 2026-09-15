@@ -82,7 +82,7 @@ The module adds a dedicated admin page at **Catalog → FOTOhub Bulk** with:
 - Batch selection (checkbox per product)
 - Action selector (generate / remove-bg / upscale)
 - Queue progress with thumbnails
-- Credit balance display
+- Prepaid USD wallet balance display
 - Generation history log
 
 ## Hooks
@@ -102,7 +102,7 @@ In custom templates, access FOTOhub data:
 ```smarty
 {* Check if FOTOhub is configured *}
 {if $fotohub_configured}
-  <p>Credits remaining: {$fotohub_credits}</p>
+  <p>Wallet balance: ${$fotohub_wallet_balance} USD</p>
   <p>Plan: {$fotohub_plan}</p>
 {/if}
 ```
@@ -152,7 +152,7 @@ The module respects PrestaShop's multi-language system:
 | Issue | Solution |
 |-------|----------|
 | "Connection failed" | Check API key in module configuration |
-| "Insufficient credits" | Top up at fotohub.app/console |
+| "Insufficient funds" | Top up wallet balance at fotohub.app/console |
 | Images not saving | Check `img/p/` directory permissions (755) |
 | Module not appearing | Clear PrestaShop cache: Advanced Parameters → Performance |
 | Timeout on bulk | Reduce batch size or increase PHP `max_execution_time` |

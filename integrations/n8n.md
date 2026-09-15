@@ -50,8 +50,8 @@ Webhook-based trigger node that fires on FOTOhub events:
 |-------|-------------|
 | `generation.completed` | An AI generation job completed successfully |
 | `generation.failed` | A generation job failed |
-| `credits.low` | Account credits dropped below threshold |
-| `credits.depleted` | Credits exhausted; further calls bill the USD wallet |
+| `wallet.balance_low` | Wallet balance dropped below threshold |
+| `wallet.balance_depleted` | Prepaid USD wallet balance depleted ($0.00) |
 | `billing.charged` | A wallet charge was settled |
 | `key.used` | An API key was used |
 | `images.batch.completed` | A batch image job completed |
@@ -107,7 +107,7 @@ Video and 3D generation can take 30-60 seconds. The node uses a 120-second timeo
 
 ## Pricing
 
-Using FOTOhub through n8n consumes credits from your FOTOhub account at the same rates as direct API calls. See [Billing & Pricing](/api/billing) for credit costs per operation.
+Using FOTOhub through n8n bills directly against your prepaid USD wallet balance at transparent 1:1 pass-through rates. See [Billing & Pricing](/api/billing) for exact model pricing.
 
 ## Support
 

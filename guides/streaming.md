@@ -46,7 +46,7 @@ data: {"type":"text_delta","text":"Quantum"}
 
 data: {"type":"text_delta","text":" computing"}
 
-data: {"type":"done","stop_reason":"end_turn","usage":{"input_tokens":12,"output_tokens":5,"total_tokens":17},"billing":{"method":"credits","credits_used":2,"usd_charged":0}}
+data: {"type":"done","stop_reason":"end_turn","usage":{"input_tokens":12,"output_tokens":5,"total_tokens":17},"billing":{"method":"wallet","usd_charged":0.090}}
 
 data: [DONE]
 ```
@@ -121,7 +121,7 @@ for line in resp.iter_lines():
         usage = frame["usage"]
         print(f"\n\n[Tokens: {usage['input_tokens']} in, "
               f"{usage['output_tokens']} out]")
-        print(f"[Billed: {frame['billing']['credits_used']} credits, "
+        print(f"[Billed: {frame['billing']['usd_charged']:.4f}, "
               f"${frame['billing']['usd_charged']}]")
     elif frame["type"] == "error":
         raise RuntimeError(frame["message"])
@@ -207,7 +207,7 @@ type StreamFrame struct {
     } `json:"usage"`
     Billing struct {
         Method      string  `json:"method"`
-        CreditsUsed int     `json:"credits_used"`
+        USDCharged  float64 `json:"usd_charged"`
         USDCharged  float64 `json:"usd_charged"`
     } `json:"billing"`
     // error
@@ -263,7 +263,7 @@ func main() {
         case "tool_use":
             fmt.Printf("\n[tool_use %s %s %v]\n", frame.ID, frame.Name, frame.Input)
         case "done":
-            fmt.Printf("\n\n[Tokens: %d in, %d out] [Credits: %d]\n",
+            fmt.Printf("\n\n[Tokens: %d in, %d out] [USD charged: %d]\n",
                 frame.Usage.InputTokens, frame.Usage.OutputTokens,
                 frame.Billing.CreditsUsed)
         case "error":

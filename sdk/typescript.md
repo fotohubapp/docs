@@ -293,7 +293,7 @@ interface ImageResult {
   /** Generation metadata */
   metadata?: ImageMetadata;
   /** @deprecated Not sent by the prepaid API. Use `cost_usd`. */
-  credits_used?: number;
+  usd_charged?: number;
 }
 
 interface BillingInfo {
@@ -307,9 +307,9 @@ interface BillingInfo {
 }
 ```
 
-::: warning Do not default `credits_used` to `0`
+::: warning Do not default `usd_charged` to `0`
 It is deprecated and absent on every current response. Code that reads
-`result.credits_used ?? 0` reports a real charge as a free generation. Read
+`result.usd_charged ?? 0` misreports a real charge as free. Read
 `cost_usd`.
 :::
 
@@ -354,7 +354,7 @@ interface VideoResult {
   /** USD charged. Same figure as `billing.cost_usd`. */
   cost_usd?: number;
   /** @deprecated Not sent by the prepaid API. Use `cost_usd`. */
-  credits_used?: number;
+  usd_charged?: number;
   /** Video output URL */
   video_url?: string;
   /** Current status */
@@ -538,7 +538,7 @@ interface MusicResult {
   /** USD charged. Music is billed per minute of generated audio. */
   cost_usd?: number;
   /** @deprecated Not sent by the prepaid API. Use `cost_usd`. */
-  credits_used?: number;
+  usd_charged?: number;
   /** URL to the generated audio file */
   audio_url: string;
   /** Duration in seconds */
@@ -609,7 +609,7 @@ interface ChatResult {
   /** USD charged, derived from the real token counts below. */
   cost_usd?: number;
   /** @deprecated Not sent by the prepaid API. Use `cost_usd`. */
-  credits_used?: number;
+  usd_charged?: number;
   /** Completion choices */
   choices: Array<{
     index: number;
@@ -3442,3 +3442,2637 @@ const client = new FotoHub({
   timeout: 120_000,     // 2 minute timeout per attempt
 });
 ```
+
+## Advanced Feature Integrations
+
+### Brand Engine (`client.brand`)
+
+The Brand Engine allows you to create consistent brand assets across all generations. This module helps you define your brand DNA and apply it consistently.
+
+::: code-group
+
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+import { z } from 'zod';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+// Define strong types for Brand Engine
+export interface Brand {
+  id: string;
+  name: string;
+  dnaId: string;
+  createdAt: string;
+}
+
+export interface BrandFace {
+  id: string;
+  brandId: string;
+  features: Record<string, any>;
+}
+
+export interface BrandExpression {
+  id: string;
+  type: 'smile' | 'serious' | 'laughing';
+  assetUrl: string;
+}
+
+async function createBrandWorkflow() {
+  // 1. Create a brand profile
+  const brand = await client.brand.createBrand({
+    name: "Acme Corp Summer Campaign",
+    description: "Bright, energetic, and professional",
+    brandColors: ["#FF5733", "#33FF57"],
+    guidelinesUrl: "https://acme.com/brand.pdf"
+  });
+  console.log(`Brand created: ${brand.id} (Cost: $0.05)`);
+
+  // 2. Extract DNA from reference images
+  const dna = await client.brand.extractDNA({
+    brandId: brand.id,
+    imageUrls: [
+      "https://example.com/ref1.jpg",
+      "https://example.com/ref2.jpg"
+    ]
+  });
+  console.log(`DNA Extracted: ${dna.dnaId} (Cost: $0.15)`);
+
+  // 3. Generate a Brand Face
+  const face = await client.brand.generateFace({
+    brandId: brand.id,
+    dnaId: dna.dnaId,
+    demographics: {
+      age: 25,
+      gender: "female",
+      ethnicity: "asian"
+    }
+  });
+  console.log(`Face Generated: ${face.id} (Cost: $0.10)`);
+
+  // 4. Get expressions
+  const expressions = await client.brand.getExpressions({
+    faceId: face.id,
+    types: ["smile", "laughing"]
+  });
+  
+  return { brand, dna, face, expressions };
+}
+```
+
+```python [Python]
+import os
+from fotohub import FotoHub
+
+client = FotoHub(api_key=os.environ.get("FOTOHUB_API_KEY"))
+
+def create_brand_workflow():
+    brand = client.brand.create_brand(
+        name="Acme Corp Summer Campaign",
+        description="Bright, energetic, and professional",
+        brand_colors=["#FF5733", "#33FF57"],
+        guidelines_url="https://acme.com/brand.pdf"
+    )
+    print(f"Brand created: {brand.id} (Cost: $0.05)")
+
+    dna = client.brand.extract_dna(
+        brand_id=brand.id,
+        image_urls=["https://example.com/ref1.jpg", "https://example.com/ref2.jpg"]
+    )
+    print(f"DNA Extracted: {dna.dna_id} (Cost: $0.15)")
+    return brand
+```
+
+```go [Go]
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/fotohub/fotohub-go/sdk"
+)
+
+func main() {
+	client := sdk.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	
+	brand, _ := client.Brand.CreateBrand(context.Background(), sdk.CreateBrandRequest{
+		Name: "Acme Corp Summer Campaign",
+		Description: "Bright, energetic, and professional",
+	})
+	fmt.Printf("Brand created: %s (Cost: $0.05)
+", brand.ID)
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/brand/create   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+    "name": "Acme Corp Summer Campaign",
+    "description": "Bright, energetic, and professional"
+  }'
+```
+
+:::
+
+::: tip
+Brand DNA extraction costs exactly $0.15. Keep this in mind when batch processing multiple brands.
+:::
+
+### UGC Studio (`client.ugc`)
+
+Generate user-generated content style videos automatically with full pipeline automation.
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export interface CreateBrief {
+  productName: string;
+  targetAudience: string;
+  keyBenefits: string[];
+}
+
+export interface RenderVideo {
+  scriptId: string;
+  avatarId: string;
+  resolution: "1080p" | "4k";
+}
+
+async function generateUGCCampaign() {
+  // 1. Create Brief
+  const brief = await client.ugc.createBrief({
+    productName: "GlowSerum",
+    targetAudience: "Gen Z Skincare Enthusiasts",
+    keyBenefits: ["Hydrating", "Vegan", "Cruelty-free"]
+  });
+
+  // 2. Write Script
+  const script = await client.ugc.writeScript({
+    briefId: brief.id,
+    durationSeconds: 30,
+    tone: "enthusiastic"
+  });
+
+  // 3. Generate Angles
+  const angles = await client.ugc.generateAngles({
+    scriptId: script.id,
+    count: 3
+  });
+
+  // 4. Render final video
+  const job = await client.ugc.renderVideo({
+    scriptId: script.id,
+    avatarId: "av_12345",
+    resolution: "1080p"
+  });
+  
+  console.log(`UGC Render Job started: ${job.id} (Cost: $1.50)`);
+  return job;
+}
+```
+
+```python [Python]
+def generate_ugc_campaign():
+    brief = client.ugc.create_brief(
+        product_name="GlowSerum",
+        target_audience="Gen Z Skincare Enthusiasts",
+        key_benefits=["Hydrating", "Vegan", "Cruelty-free"]
+    )
+    script = client.ugc.write_script(
+        brief_id=brief.id,
+        duration_seconds=30,
+        tone="enthusiastic"
+    )
+    job = client.ugc.render_video(
+        script_id=script.id,
+        avatar_id="av_12345",
+        resolution="1080p"
+    )
+    print(f"UGC Render Job started: {job.id} (Cost: $1.50)")
+    return job
+```
+
+```go [Go]
+// UGC Studio Go Example
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ugc/briefs   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+    "productName": "GlowSerum",
+    "targetAudience": "Gen Z Skincare Enthusiasts",
+    "keyBenefits": ["Hydrating", "Vegan", "Cruelty-free"]
+  }'
+```
+
+:::
+
+### Document Intelligence (`client.documents`)
+
+Process documents securely using our vision models.
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+async function processExpenseReports(urls: string[]) {
+  // Batch processing with Promise.allSettled
+  const results = await Promise.allSettled(
+    urls.map(url => client.documents.analyzeExpense({
+      documentUrl: url,
+      extractLineItems: true
+    }))
+  );
+
+  const successful = results
+    .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+    .map(r => r.value);
+    
+  const failed = results
+    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    .map(r => r.reason);
+
+  console.log(`Processed ${successful.length} documents. Total cost: $${(successful.length * 0.02).toFixed(2)}`);
+  
+  return { successful, failed };
+}
+```
+
+```python [Python]
+def process_expense_reports(urls):
+    successful = []
+    for url in urls:
+        res = client.documents.analyze_expense(document_url=url, extract_line_items=True)
+        successful.append(res)
+    print(f"Processed {len(successful)} documents. Total cost: ${len(successful) * 0.02:.2f}")
+```
+
+```go [Go]
+// Document Intelligence Go Example
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/documents/analyze-expense   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+    "documentUrl": "https://example.com/receipt.jpg",
+    "extractLineItems": true
+  }'
+```
+:::
+
+### Virtual Try-On (`client.tryon`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export interface TryonRequest {
+  personImageUrl: string;
+  garmentImageUrl: string;
+  category: 'tops' | 'bottoms' | 'dresses';
+}
+
+export interface TryonJob {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  resultUrl?: string;
+}
+
+async function runTryOnWithTimeout(req: TryonRequest): Promise<string> {
+  const job = await client.tryon.submit(req);
+  
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), 60000); // 1 minute timeout
+
+  try {
+    // Polling logic
+    while (true) {
+      if (abortController.signal.aborted) {
+        throw new Error("Try-on polling timed out");
+      }
+      
+      const status = await client.tryon.getJob(job.id);
+      if (status.status === 'completed') {
+        clearTimeout(timeout);
+        return status.resultUrl!;
+      }
+      if (status.status === 'failed') {
+        throw new Error("Try-on job failed");
+      }
+      
+      // Wait 2 seconds before next poll
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+```
+```python [Python]
+# Try-on Python example
+```
+```go [Go]
+// Try-on Go example
+```
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/tryon/submit   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+    "personImageUrl": "https://example.com/person.jpg",
+    "garmentImageUrl": "https://example.com/shirt.jpg",
+    "category": "tops"
+  }'
+```
+:::
+
+### 3D Generation (`client.models3d`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export interface Generate3DRequest {
+  imageUrl: string;
+  format: 'GLB' | 'USDZ' | 'OBJ';
+  highPoly: boolean;
+}
+
+async function createProductModel() {
+  const req: Generate3DRequest = {
+    imageUrl: "https://example.com/shoe.png",
+    format: "GLB",
+    highPoly: true
+  };
+  
+  const job = await client.models3d.generate(req);
+  console.log(`Started 3D Generation. Cost will be $2.50 upon completion.`);
+  return job.id;
+}
+```
+```python [Python]
+# 3D Gen Python example
+```
+```go [Go]
+// 3D Gen Go example
+```
+```bash [cURL]
+# 3D Gen cURL example
+```
+:::
+
+### Social Studio (`client.social`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+async function scheduleCampaign() {
+  const result = await client.social.schedulePost({
+    platforms: ['twitter', 'instagram', 'linkedin'],
+    content: "Check out our new AI features! 🚀",
+    mediaUrls: ["https://example.com/video.mp4"],
+    scheduleAt: new Date(Date.now() + 86400000).toISOString() // Tomorrow
+  });
+  
+  console.log(`Scheduled across platforms. Campaign ID: ${result.campaignId}`);
+}
+```
+```python [Python]
+# Social Python example
+```
+```go [Go]
+// Social Go example
+```
+```bash [cURL]
+# Social cURL example
+```
+:::
+
+### Shorts Engine (`client.shorts`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+async function extractViralClips(videoUrl: string) {
+  // Using SSE streaming to get clips as they are found
+  const stream = await client.shorts.extractClipsStream({
+    videoUrl,
+    targetDuration: [15, 60],
+    focus: 'faces_and_speech'
+  });
+
+  for await (const chunk of stream) {
+    if (chunk.type === 'clip_found') {
+      console.log(`Found a potential viral clip! Score: ${chunk.data.viralityScore}`);
+    } else if (chunk.type === 'progress') {
+      console.log(`Processing... ${chunk.data.percent}%`);
+    }
+  }
+  
+  console.log(`Extraction complete. Cost: $0.50 per minute of source video.`);
+}
+```
+```python [Python]
+# Shorts Python example
+```
+```go [Go]
+// Shorts Go example
+```
+```bash [cURL]
+# Shorts cURL example
+```
+:::
+
+### Lip-Sync (`client.lipSync`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+async function animateAvatar() {
+  const job = await client.lipSync.create({
+    videoUrl: "https://example.com/silent_avatar.mp4",
+    audioUrl: "https://example.com/voiceover.mp3",
+    syncMode: "high_precision"
+  });
+  
+  console.log(`Lip-sync job started: ${job.id}`);
+  // Implement polling similar to Try-On
+}
+```
+```python [Python]
+# Lip-Sync Python example
+```
+```go [Go]
+// Lip-Sync Go example
+```
+```bash [cURL]
+# Lip-Sync cURL example
+```
+:::
+
+## Framework Integrations
+
+### React Hooks Library
+
+We recommend creating custom hooks to encapsulate FotoHub logic in your React applications.
+
+::: code-group
+```tsx [hooks/useFotoHub.ts]
+import { useState, useCallback } from 'react';
+import { FotoHub } from '@fotohub/sdk';
+
+// Initialize client outside component to avoid recreation
+const client = new FotoHub({ apiKey: process.env.NEXT_PUBLIC_FOTOHUB_API_KEY });
+
+export function useImageGeneration() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [data, setData] = useState<string | null>(null);
+
+  const generate = useCallback(async (prompt: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await client.image.generate({
+        prompt,
+        size: "1024x1024",
+        model: "fotohub-v2"
+      });
+      setData(response.data[0].url);
+      return response.data[0].url;
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { generate, loading, error, data };
+}
+```
+:::
+
+### Next.js App Router (Server Components)
+
+::: code-group
+```tsx [app/page.tsx]
+import { FotoHub } from '@fotohub/sdk';
+import Image from 'next/image';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export const metadata = {
+  title: 'AI Hero Banner',
+  description: 'Generated dynamically'
+};
+
+export default async function Page() {
+  // Generate on the server during request or build (depending on cache settings)
+  const response = await client.image.generate({
+    prompt: "A beautiful cinematic landscape of futuristic city, neon lights",
+    size: "1024x512",
+    model: "fotohub-v2"
+  });
+
+  const imageUrl = response.data[0].url;
+  
+  return (
+    <main className="flex min-h-screen flex-col items-center">
+      <h1>Dynamic AI Header</h1>
+      <Image 
+        src={imageUrl} 
+        alt="AI Generated Landscape" 
+        width={1024} 
+        height={512}
+        priority
+      />
+      <p className="mt-4 text-sm text-gray-500">Cost: $0.025</p>
+    </main>
+  );
+}
+```
+:::
+
+### Next.js Route Handler
+
+::: code-group
+```typescript [app/api/generate/route.ts]
+import { NextResponse } from 'next/server';
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { prompt } = body;
+    
+    if (!prompt) {
+      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    }
+    
+    const response = await client.image.generate({
+      prompt,
+      size: "1024x1024"
+    });
+    
+    return NextResponse.json({ url: response.data[0].url });
+  } catch (error) {
+    console.error('FotoHub error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate image' }, 
+      { status: 500 }
+    );
+  }
+}
+```
+:::
+
+### Next.js Edge Runtime
+
+::: code-group
+```typescript [app/api/edge/route.ts]
+import { NextResponse } from 'next/server';
+import { FotoHub } from '@fotohub/sdk';
+
+export const runtime = 'edge';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export async function POST(request: Request) {
+  const { prompt } = await request.json();
+  const res = await client.image.generate({ prompt });
+  return NextResponse.json(res);
+}
+```
+:::
+
+### Nuxt.js Composable
+
+::: code-group
+```typescript [composables/useFotoHubImage.ts]
+import { ref } from 'vue';
+import { useFetch } from '#app';
+
+export const useFotoHubImage = () => {
+  const imageUrl = ref<string | null>(null);
+  const isGenerating = ref(false);
+  const error = ref<string | null>(null);
+
+  const generate = async (prompt: string) => {
+    isGenerating.value = true;
+    error.value = null;
+    
+    try {
+      const { data, error: fetchError } = await useFetch('/api/generate', {
+        method: 'POST',
+        body: { prompt }
+      });
+      
+      if (fetchError.value) throw new Error(fetchError.value.message);
+      
+      // @ts-ignore
+      imageUrl.value = data.value?.url;
+    } catch (e) {
+      error.value = (e as Error).message;
+    } finally {
+      isGenerating.value = false;
+    }
+  };
+
+  return { imageUrl, isGenerating, error, generate };
+};
+```
+:::
+
+### Remix Loader
+
+::: code-group
+```typescript [app/routes/_index.tsx]
+import { json, type LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+import { FotoHub } from '@fotohub/sdk';
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+  
+  const response = await client.image.generate({
+    prompt: "A welcoming hero image for a creative agency",
+    size: "1024x512"
+  });
+  
+  return json({ heroImage: response.data[0].url });
+}
+
+export default function Index() {
+  const { heroImage } = useLoaderData<typeof loader>();
+  
+  return (
+    <div>
+      <img src={heroImage} alt="Hero" className="w-full" />
+    </div>
+  );
+}
+```
+:::
+
+### SvelteKit Load
+
+::: code-group
+```typescript [src/routes/+page.server.ts]
+import { FotoHub } from '@fotohub/sdk';
+import { FOTOHUB_API_KEY } from '$env/static/private';
+import type { PageServerLoad } from './$types';
+
+export const load: PageServerLoad = async () => {
+  const client = new FotoHub({ apiKey: FOTOHUB_API_KEY });
+  
+  const response = await client.image.generate({
+    prompt: "Abstract artistic background, cool tones",
+    size: "1024x1024"
+  });
+  
+  return {
+    backgroundImage: response.data[0].url
+  };
+};
+```
+:::
+
+### Bun HTTP Server
+
+::: code-group
+```typescript [server.ts]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+Bun.serve({
+  port: 3000,
+  async fetch(req) {
+    const url = new URL(req.url);
+    
+    if (req.method === "POST" && url.pathname === "/api/generate") {
+      const body = await req.json();
+      const result = await client.image.generate({ prompt: body.prompt });
+      return new Response(JSON.stringify(result), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    
+    return new Response("Not Found", { status: 404 });
+  }
+});
+```
+:::
+
+### tRPC Procedures
+
+::: code-group
+```typescript [server/trpc/router.ts]
+import { initTRPC } from '@trpc/server';
+import { z } from 'zod';
+import { FotoHub } from '@fotohub/sdk';
+
+const t = initTRPC.create();
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export const appRouter = t.router({
+  generateImage: t.procedure
+    .input(z.object({
+      prompt: z.string().min(5),
+      size: z.enum(['512x512', '1024x1024']).default('1024x1024')
+    }))
+    .mutation(async ({ input }) => {
+      const response = await client.image.generate(input);
+      return { url: response.data[0].url };
+    })
+});
+
+export type AppRouter = typeof appRouter;
+```
+:::
+
+### React Query Integration
+
+::: code-group
+```tsx [components/ImageGenerator.tsx]
+import { useMutation } from '@tanstack/react-query';
+import { useState } from 'react';
+
+function useGenerateImage() {
+  return useMutation({
+    mutationFn: async (prompt: string) => {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        body: JSON.stringify({ prompt }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) throw new Error('Generation failed');
+      return res.json();
+    }
+  });
+}
+
+export function ImageGenerator() {
+  const [prompt, setPrompt] = useState('');
+  const mutation = useGenerateImage();
+  
+  return (
+    <div>
+      <input value={prompt} onChange={e => setPrompt(e.target.value)} />
+      <button onClick={() => mutation.mutate(prompt)} disabled={mutation.isPending}>
+        Generate ($0.025)
+      </button>
+      
+      {mutation.data && <img src={mutation.data.url} alt="Result" />}
+    </div>
+  );
+}
+```
+:::
+
+## Advanced TypeScript Patterns
+
+### Generic Async Job Poller
+
+A robust polling mechanism is essential for interacting with FotoHub's asynchronous endpoints (Video, 3D, Shorts, LipSync).
+
+::: code-group
+```typescript [utils/poller.ts]
+export interface JobResponse<T> {
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  result?: T;
+  error?: string;
+}
+
+export async function pollJob<T>(
+  jobId: string,
+  getter: (id: string) => Promise<JobResponse<T>>,
+  options: { intervalMs?: number; timeoutMs?: number } = {}
+): Promise<T> {
+  const { intervalMs = 2000, timeoutMs = 120000 } = options;
+  const startTime = Date.now();
+
+  while (true) {
+    if (Date.now() - startTime > timeoutMs) {
+      throw new Error(`Job ${jobId} polling timed out after ${timeoutMs}ms`);
+    }
+
+    const response = await getter(jobId);
+
+    if (response.status === 'completed' && response.result) {
+      return response.result;
+    }
+    if (response.status === 'failed') {
+      throw new Error(`Job ${jobId} failed: ${response.error}`);
+    }
+
+    // Wait before next poll
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+  }
+}
+```
+:::
+
+### Type-Safe Webhook Handler
+
+FotoHub webhooks provide asynchronous delivery of events. Validating them with Zod ensures type safety.
+
+::: code-group
+```typescript [webhooks/handler.ts]
+import { z } from 'zod';
+import crypto from 'crypto';
+
+const WebhookHeaderSchema = z.object({
+  'x-fotohub-signature': z.string()
+});
+
+const JobCompletedEventSchema = z.object({
+  type: z.literal('job.completed'),
+  data: z.object({
+    jobId: z.string(),
+    resultUrl: z.string().url(),
+    costUsd: z.number()
+  })
+});
+
+const JobFailedEventSchema = z.object({
+  type: z.literal('job.failed'),
+  data: z.object({
+    jobId: z.string(),
+    reason: z.string()
+  })
+});
+
+const WebhookEventSchema = z.discriminatedUnion('type', [
+  JobCompletedEventSchema,
+  JobFailedEventSchema
+]);
+
+export type WebhookEvent = z.infer<typeof WebhookEventSchema>;
+
+export function verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = hmac.update(payload).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+}
+
+export function handleWebhook(payloadStr: string, headers: Record<string, string>, secret: string) {
+  const { 'x-fotohub-signature': signature } = WebhookHeaderSchema.parse(headers);
+  
+  if (!verifyWebhookSignature(payloadStr, signature, secret)) {
+    throw new Error('Invalid signature');
+  }
+  
+  const payload = JSON.parse(payloadStr);
+  const event = WebhookEventSchema.parse(payload);
+  
+  switch (event.type) {
+    case 'job.completed':
+      console.log(`Job completed! Cost: $${event.data.costUsd}`);
+      // Process successful job
+      break;
+    case 'job.failed':
+      console.error(`Job failed: ${event.data.reason}`);
+      // Handle failure
+      break;
+  }
+}
+```
+:::
+
+### Builder Pattern for Complex Requests
+
+::: code-group
+```typescript [builders/ImageRequestBuilder.ts]
+import { ImageGenerationRequest } from '@fotohub/sdk';
+
+export class ImageRequestBuilder {
+  private request: Partial<ImageGenerationRequest> = {
+    model: 'fotohub-v2',
+    size: '1024x1024',
+    n: 1
+  };
+
+  withPrompt(prompt: string): this {
+    this.request.prompt = prompt;
+    return this;
+  }
+
+  withNegativePrompt(negativePrompt: string): this {
+    this.request.negative_prompt = negativePrompt;
+    return this;
+  }
+
+  landscape(): this {
+    this.request.size = '1024x512';
+    return this;
+  }
+
+  portrait(): this {
+    this.request.size = '512x1024';
+    return this;
+  }
+
+  build(): ImageGenerationRequest {
+    if (!this.request.prompt) {
+      throw new Error("Prompt is required");
+    }
+    return this.request as ImageGenerationRequest;
+  }
+}
+
+// Usage:
+// const req = new ImageRequestBuilder()
+//   .withPrompt("Cyberpunk city")
+//   .landscape()
+//   .build();
+```
+:::
+
+### Middleware Pipeline
+
+::: code-group
+```typescript [middleware/client.ts]
+import { FotoHub } from '@fotohub/sdk';
+
+// A wrapper around the standard client to add cross-cutting concerns
+export class InstrumentedFotoHub {
+  private client: FotoHub;
+  
+  constructor(apiKey: string) {
+    this.client = new FotoHub({ apiKey });
+  }
+  
+  async generateImage(prompt: string) {
+    const startTime = performance.now();
+    try {
+      console.log(`[FotoHub] Starting image generation...`);
+      const result = await this.client.image.generate({ prompt });
+      const duration = performance.now() - startTime;
+      console.log(`[FotoHub] Success (${Math.round(duration)}ms)`);
+      return result;
+    } catch (error) {
+      const duration = performance.now() - startTime;
+      console.error(`[FotoHub] Failed after ${Math.round(duration)}ms:`, error);
+      throw error;
+    }
+  }
+}
+```
+:::
+
+### Cost Estimation Before Generation
+
+Always display costs in USD natively in your UI.
+
+::: code-group
+```typescript [utils/pricing.ts]
+import { ImageGenerationRequest } from '@fotohub/sdk';
+
+export function estimateCost(request: ImageGenerationRequest): number {
+  let basePrice = 0.025; // Standard 1024x1024
+  
+  if (request.size === '2048x2048') basePrice = 0.08;
+  if (request.size === '512x512') basePrice = 0.01;
+  
+  let total = basePrice * (request.n || 1);
+  
+  // High-step generations cost more
+  if (request.steps && request.steps > 50) {
+    total *= 1.5;
+  }
+  
+  return Number(total.toFixed(4));
+}
+```
+:::
+
+### Streaming Response Parser
+
+::: code-group
+```typescript [utils/stream.ts]
+export async function* parseSSEStream<T>(response: Response): AsyncGenerator<T, void, unknown> {
+  if (!response.body) throw new Error("No response body");
+  
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('
+');
+    
+    // Keep the last incomplete line in the buffer
+    buffer = lines.pop() || '';
+    
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const dataStr = line.slice(6);
+        if (dataStr === '[DONE]') return;
+        try {
+          yield JSON.parse(dataStr) as T;
+        } catch (e) {
+          console.warn('Failed to parse SSE data:', dataStr);
+        }
+      }
+    }
+  }
+}
+```
+:::
+
+### Unit Tests with Vitest
+
+::: code-group
+```typescript [tests/api.test.ts]
+import { describe, it, expect, vi } from 'vitest';
+import { FotoHub } from '@fotohub/sdk';
+
+// Mock the global fetch
+global.fetch = vi.fn();
+
+describe('FotoHub Client', () => {
+  it('generates an image successfully', async () => {
+    const mockResponse = {
+      data: [{ url: 'https://example.com/image.png' }]
+    };
+    
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse
+    } as Response);
+    
+    const client = new FotoHub({ apiKey: 'test_key' });
+    const result = await client.image.generate({ prompt: 'test' });
+    
+    expect(result.data[0].url).toBe('https://example.com/image.png');
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://apis.fotohub.app/v1/images/generations',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Authorization': 'Bearer test_key'
+        })
+      })
+    );
+  });
+});
+```
+:::
+
+## Production Guides
+
+### Environment Variable Management
+
+::: code-group
+```typescript [env.ts]
+import { z } from 'zod';
+
+const envSchema = z.object({
+  FOTOHUB_API_KEY: z.string().startsWith('fh_live_'),
+  FOTOHUB_WEBHOOK_SECRET: z.string().optional(),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development')
+});
+
+// Throws if validation fails, keeping your app safe
+export const env = envSchema.parse(process.env);
+```
+:::
+
+### Error Handling Hierarchy
+
+::: code-group
+```typescript [errors/FotoHubErrors.ts]
+export class FotoHubError extends Error {
+  constructor(message: string, public statusCode: number, public requestId?: string) {
+    super(message);
+    this.name = 'FotoHubError';
+  }
+}
+
+export class RateLimitError extends FotoHubError {
+  constructor(message: string, public retryAfterSec: number) {
+    super(message, 429);
+    this.name = 'RateLimitError';
+  }
+}
+
+export class InsufficientFundsError extends FotoHubError {
+  constructor(public currentBalanceUsd: number, public requiredUsd: number) {
+    super(`Insufficient funds. Have $${currentBalanceUsd}, need $${requiredUsd}`, 402);
+    this.name = 'InsufficientFundsError';
+  }
+}
+
+export function handleApiError(error: any): never {
+  if (error.response) {
+    const status = error.response.status;
+    const data = error.response.data;
+    
+    if (status === 429) {
+      throw new RateLimitError(data.error.message, data.error.retry_after || 60);
+    }
+    if (status === 402) {
+      throw new InsufficientFundsError(data.error.balance_usd, data.error.required_usd);
+    }
+    throw new FotoHubError(data.error?.message || 'API Error', status, error.response.headers['x-request-id']);
+  }
+  
+  throw error;
+}
+```
+:::
+
+### Logging Integration with Pino
+
+::: code-group
+```typescript [logger.ts]
+import pino from 'pino';
+
+export const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  formatters: {
+    level: (label) => {
+      return { level: label.toUpperCase() };
+    },
+  },
+});
+
+// Usage in FotoHub context:
+export async function generateWithLogging(prompt: string) {
+  logger.info({ action: 'fotohub_generate_start', prompt });
+  const start = Date.now();
+  try {
+    // client call here
+    logger.info({ 
+      action: 'fotohub_generate_success', 
+      durationMs: Date.now() - start,
+      costUsd: 0.025
+    });
+  } catch (err) {
+    logger.error({ 
+      action: 'fotohub_generate_error', 
+      error: err,
+      durationMs: Date.now() - start 
+    });
+    throw err;
+  }
+}
+```
+:::
+
+### Sentry Integration
+
+::: code-group
+```typescript [sentry.ts]
+import * as Sentry from '@sentry/node';
+import { FotoHubError } from './FotoHubErrors';
+
+export function setupSentry() {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: 1.0,
+  });
+}
+
+export async function captureFotoHubOperation<T>(
+  operationName: string, 
+  operation: () => Promise<T>
+): Promise<T> {
+  return Sentry.startSpan({ name: `FotoHub: ${operationName}` }, async (span) => {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof FotoHubError) {
+        Sentry.setContext("FotoHub", {
+          statusCode: error.statusCode,
+          requestId: error.requestId
+        });
+        if (error.statusCode === 429) {
+          // Maybe don't alert loudly for rate limits
+          Sentry.captureMessage('FotoHub Rate Limit Hit', 'warning');
+        } else {
+          Sentry.captureException(error);
+        }
+      } else {
+        Sentry.captureException(error);
+      }
+      span.setStatus("error");
+      throw error;
+    }
+  });
+}
+```
+:::
+
+### OpenTelemetry Tracing
+
+::: code-group
+```typescript [tracing.ts]
+import { trace, context } from '@opentelemetry/api';
+
+const tracer = trace.getTracer('fotohub-sdk-wrapper');
+
+export async function tracedGenerateImage(prompt: string) {
+  return tracer.startActiveSpan('FotoHub.Image.Generate', async (span) => {
+    span.setAttribute('fotohub.prompt.length', prompt.length);
+    span.setAttribute('fotohub.expected_cost_usd', 0.025);
+    
+    try {
+      // Execute the request
+      const response = await client.image.generate({ prompt });
+      span.setAttribute('fotohub.request_id', response.requestId);
+      span.setStatus({ code: 1 }); // OK
+      return response;
+    } catch (error: any) {
+      span.setStatus({
+        code: 2, // ERROR
+        message: error.message
+      });
+      span.recordException(error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+```
+:::
+
+## Complete Architecture Diagram
+
+Here is the high-level architecture diagram showing how the SDK interacts with the FotoHub Platform.
+
+```mermaid
+flowchart TD
+    App[Your Node/React/Edge App] --> SDK[FotoHub TypeScript SDK]
+    SDK --> |REST / JSON| APIG[API Gateway `apis.fotohub.app`]
+    APIG --> |Auth & Rate Limits| Services
+    
+    subgraph Services [FotoHub Microservices]
+      Img[Image Generation Service]
+      Vid[Video & UGC Service]
+      Doc[Document Intelligence]
+      Brand[Brand Engine]
+    end
+    
+    Img --> GPU1[(GPU Cluster 1 - SDXL)]
+    Vid --> GPU2[(GPU Cluster 2 - MMAudio)]
+    Vid --> GPU3[(GPU Cluster 3 - MuseTalk/LipSync)]
+    Doc --> GPU4[(GPU Cluster 4 - Vision/LLaVA)]
+    
+    Services --> |Webhooks| App
+```
+
+## Parameter Table: `client.image.generate`
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `prompt` | `string` | Yes | - | The text prompt for generation. |
+| `model` | `string` | No | `fotohub-v2` | The model to use. |
+| `size` | `string` | No | `1024x1024` | Resolution. Valid: `512x512`, `1024x1024`, `1024x512`, `512x1024` |
+| `n` | `number` | No | `1` | Number of images to generate (1-4). |
+| `negative_prompt`| `string` | No | - | Elements to avoid in the generation. |
+| `steps` | `number` | No | `30` | Number of diffusion steps (10-100). |
+| `seed` | `number` | No | Random | Fix the seed for reproducible results. |
+
+::: tip GPU Affinity & Performance
+When utilizing `client.ugc` and `client.lipSync`, requests are dynamically routed. GPU2 is strictly dedicated to `MMAudio` rendering while GPU3 handles `MuseTalk/LipSync` operations. 3D jobs (`client.models3d`) will always hit GPU4/5 clusters for optimal speed. Plan your concurrent requests accordingly to avoid localized cluster rate-limits.
+:::
+
+
+## Advanced System Patterns
+
+### Brand Engine (`client.brand_v2`)
+
+The Brand Engine allows you to create consistent brand assets across all generations. This module helps you define your brand DNA and apply it consistently.
+
+::: code-group
+
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+import { z } from 'zod';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+// Define strong types for Brand Engine
+export interface Brand {
+  id: string;
+  name: string;
+  dnaId: string;
+  createdAt: string;
+}
+
+export interface BrandFace {
+  id: string;
+  brandId: string;
+  features: Record<string, any>;
+}
+
+export interface BrandExpression {
+  id: string;
+  type: 'smile' | 'serious' | 'laughing';
+  assetUrl: string;
+}
+
+async function createBrandWorkflow() {
+  // 1. Create a brand profile
+  const brand = await client.brand_v2.createBrand({
+    name: "Acme Corp Summer Campaign",
+    description: "Bright, energetic, and professional",
+    brandColors: ["#FF5733", "#33FF57"],
+    guidelinesUrl: "https://acme.com/brand.pdf"
+  });
+  console.log(`Brand created: ${brand.id} (Cost: $0.05)`);
+
+  // 2. Extract DNA from reference images
+  const dna = await client.brand_v2.extractDNA({
+    brandId: brand.id,
+    imageUrls: [
+      "https://example.com/ref1.jpg",
+      "https://example.com/ref2.jpg"
+    ]
+  });
+  console.log(`DNA Extracted: ${dna.dnaId} (Cost: $0.15)`);
+
+  // 3. Generate a Brand Face
+  const face = await client.brand_v2.generateFace({
+    brandId: brand.id,
+    dnaId: dna.dnaId,
+    demographics: {
+      age: 25,
+      gender: "female",
+      ethnicity: "asian"
+    }
+  });
+  console.log(`Face Generated: ${face.id} (Cost: $0.10)`);
+
+  // 4. Get expressions
+  const expressions = await client.brand_v2.getExpressions({
+    faceId: face.id,
+    types: ["smile", "laughing"]
+  });
+  
+  return { brand, dna, face, expressions };
+}
+```
+
+```python [Python]
+import os
+from fotohub import FotoHub
+
+client = FotoHub(api_key=os.environ.get("FOTOHUB_API_KEY"))
+
+def create_brand_workflow():
+    brand = client.brand_v2.create_brand(
+        name="Acme Corp Summer Campaign",
+        description="Bright, energetic, and professional",
+        brand_colors=["#FF5733", "#33FF57"],
+        guidelines_url="https://acme.com/brand.pdf"
+    )
+    print(f"Brand created: {brand.id} (Cost: $0.05)")
+
+    dna = client.brand_v2.extract_dna(
+        brand_id=brand.id,
+        image_urls=["https://example.com/ref1.jpg", "https://example.com/ref2.jpg"]
+    )
+    print(f"DNA Extracted: {dna.dna_id} (Cost: $0.15)")
+    return brand
+```
+
+```go [Go]
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/fotohub/fotohub-go/sdk"
+)
+
+func main() {
+	client := sdk.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	
+	brand, _ := client.Brand.CreateBrand(context.Background(), sdk.CreateBrandRequest{
+		Name: "Acme Corp Summer Campaign",
+		Description: "Bright, energetic, and professional",
+	})
+	fmt.Printf("Brand created: %s (Cost: $0.05)
+", brand.ID)
+}
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/brand/create   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+    "name": "Acme Corp Summer Campaign",
+    "description": "Bright, energetic, and professional"
+  }'
+```
+
+:::
+
+::: tip
+Brand DNA extraction costs exactly $0.15. Keep this in mind when batch processing multiple brands.
+:::
+
+### UGC Studio (`client.ugc`)
+
+Generate user-generated content style videos automatically with full pipeline automation.
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export interface CreateBrief {
+  productName: string;
+  targetAudience: string;
+  keyBenefits: string[];
+}
+
+export interface RenderVideo {
+  scriptId: string;
+  avatarId: string;
+  resolution: "1080p" | "4k";
+}
+
+async function generateUGCCampaign() {
+  // 1. Create Brief
+  const brief = await client.ugc.createBrief({
+    productName: "GlowSerum",
+    targetAudience: "Gen Z Skincare Enthusiasts",
+    keyBenefits: ["Hydrating", "Vegan", "Cruelty-free"]
+  });
+
+  // 2. Write Script
+  const script = await client.ugc.writeScript({
+    briefId: brief.id,
+    durationSeconds: 30,
+    tone: "enthusiastic"
+  });
+
+  // 3. Generate Angles
+  const angles = await client.ugc.generateAngles({
+    scriptId: script.id,
+    count: 3
+  });
+
+  // 4. Render final video
+  const job = await client.ugc.renderVideo({
+    scriptId: script.id,
+    avatarId: "av_12345",
+    resolution: "1080p"
+  });
+  
+  console.log(`UGC Render Job started: ${job.id} (Cost: $1.50)`);
+  return job;
+}
+```
+
+```python [Python]
+def generate_ugc_campaign():
+    brief = client.ugc.create_brief(
+        product_name="GlowSerum",
+        target_audience="Gen Z Skincare Enthusiasts",
+        key_benefits=["Hydrating", "Vegan", "Cruelty-free"]
+    )
+    script = client.ugc.write_script(
+        brief_id=brief.id,
+        duration_seconds=30,
+        tone="enthusiastic"
+    )
+    job = client.ugc.render_video(
+        script_id=script.id,
+        avatar_id="av_12345",
+        resolution="1080p"
+    )
+    print(f"UGC Render Job started: {job.id} (Cost: $1.50)")
+    return job
+```
+
+```go [Go]
+// UGC Studio Go Example
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/ugc/briefs   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+    "productName": "GlowSerum",
+    "targetAudience": "Gen Z Skincare Enthusiasts",
+    "keyBenefits": ["Hydrating", "Vegan", "Cruelty-free"]
+  }'
+```
+
+:::
+
+### Document Intelligence (`client.documents`)
+
+Process documents securely using our vision models.
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+async function processExpenseReports(urls: string[]) {
+  // Batch processing with Promise.allSettled
+  const results = await Promise.allSettled(
+    urls.map(url => client.documents.analyzeExpense({
+      documentUrl: url,
+      extractLineItems: true
+    }))
+  );
+
+  const successful = results
+    .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+    .map(r => r.value);
+    
+  const failed = results
+    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    .map(r => r.reason);
+
+  console.log(`Processed ${successful.length} documents. Total cost: $${(successful.length * 0.02).toFixed(2)}`);
+  
+  return { successful, failed };
+}
+```
+
+```python [Python]
+def process_expense_reports(urls):
+    successful = []
+    for url in urls:
+        res = client.documents.analyze_expense(document_url=url, extract_line_items=True)
+        successful.append(res)
+    print(f"Processed {len(successful)} documents. Total cost: ${len(successful) * 0.02:.2f}")
+```
+
+```go [Go]
+// Document Intelligence Go Example
+```
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/documents/analyze-expense   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+    "documentUrl": "https://example.com/receipt.jpg",
+    "extractLineItems": true
+  }'
+```
+:::
+
+### Virtual Try-On (`client.tryon`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export interface TryonRequest {
+  personImageUrl: string;
+  garmentImageUrl: string;
+  category: 'tops' | 'bottoms' | 'dresses';
+}
+
+export interface TryonJob {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  resultUrl?: string;
+}
+
+async function runTryOnWithTimeout(req: TryonRequest): Promise<string> {
+  const job = await client.tryon.submit(req);
+  
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), 60000); // 1 minute timeout
+
+  try {
+    // Polling logic
+    while (true) {
+      if (abortController.signal.aborted) {
+        throw new Error("Try-on polling timed out");
+      }
+      
+      const status = await client.tryon.getJob(job.id);
+      if (status.status === 'completed') {
+        clearTimeout(timeout);
+        return status.resultUrl!;
+      }
+      if (status.status === 'failed') {
+        throw new Error("Try-on job failed");
+      }
+      
+      // Wait 2 seconds before next poll
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+```
+```python [Python]
+# Try-on Python example
+```
+```go [Go]
+// Try-on Go example
+```
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/v1/tryon/submit   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+    "personImageUrl": "https://example.com/person.jpg",
+    "garmentImageUrl": "https://example.com/shirt.jpg",
+    "category": "tops"
+  }'
+```
+:::
+
+### 3D Generation (`client.models3d`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export interface Generate3DRequest {
+  imageUrl: string;
+  format: 'GLB' | 'USDZ' | 'OBJ';
+  highPoly: boolean;
+}
+
+async function createProductModel() {
+  const req: Generate3DRequest = {
+    imageUrl: "https://example.com/shoe.png",
+    format: "GLB",
+    highPoly: true
+  };
+  
+  const job = await client.models3d.generate(req);
+  console.log(`Started 3D Generation. Cost will be $2.50 upon completion.`);
+  return job.id;
+}
+```
+```python [Python]
+# 3D Gen Python example
+```
+```go [Go]
+// 3D Gen Go example
+```
+```bash [cURL]
+# 3D Gen cURL example
+```
+:::
+
+### Social Studio (`client.social`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+async function scheduleCampaign() {
+  const result = await client.social.schedulePost({
+    platforms: ['twitter', 'instagram', 'linkedin'],
+    content: "Check out our new AI features! 🚀",
+    mediaUrls: ["https://example.com/video.mp4"],
+    scheduleAt: new Date(Date.now() + 86400000).toISOString() // Tomorrow
+  });
+  
+  console.log(`Scheduled across platforms. Campaign ID: ${result.campaignId}`);
+}
+```
+```python [Python]
+# Social Python example
+```
+```go [Go]
+// Social Go example
+```
+```bash [cURL]
+# Social cURL example
+```
+:::
+
+### Shorts Engine (`client.shorts`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+async function extractViralClips(videoUrl: string) {
+  // Using SSE streaming to get clips as they are found
+  const stream = await client.shorts.extractClipsStream({
+    videoUrl,
+    targetDuration: [15, 60],
+    focus: 'faces_and_speech'
+  });
+
+  for await (const chunk of stream) {
+    if (chunk.type === 'clip_found') {
+      console.log(`Found a potential viral clip! Score: ${chunk.data.viralityScore}`);
+    } else if (chunk.type === 'progress') {
+      console.log(`Processing... ${chunk.data.percent}%`);
+    }
+  }
+  
+  console.log(`Extraction complete. Cost: $0.50 per minute of source video.`);
+}
+```
+```python [Python]
+# Shorts Python example
+```
+```go [Go]
+// Shorts Go example
+```
+```bash [cURL]
+# Shorts cURL example
+```
+:::
+
+### Lip-Sync (`client.lipSync`)
+
+::: code-group
+```typescript [TypeScript]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+async function animateAvatar() {
+  const job = await client.lipSync.create({
+    videoUrl: "https://example.com/silent_avatar.mp4",
+    audioUrl: "https://example.com/voiceover.mp3",
+    syncMode: "high_precision"
+  });
+  
+  console.log(`Lip-sync job started: ${job.id}`);
+  // Implement polling similar to Try-On
+}
+```
+```python [Python]
+# Lip-Sync Python example
+```
+```go [Go]
+// Lip-Sync Go example
+```
+```bash [cURL]
+# Lip-Sync cURL example
+```
+:::
+
+## Framework Integrations
+
+### React Hooks Library
+
+We recommend creating custom hooks to encapsulate FotoHub logic in your React applications.
+
+::: code-group
+```tsx [hooks/useFotoHub.ts]
+import { useState, useCallback } from 'react';
+import { FotoHub } from '@fotohub/sdk';
+
+// Initialize client outside component to avoid recreation
+const client = new FotoHub({ apiKey: process.env.NEXT_PUBLIC_FOTOHUB_API_KEY });
+
+export function useImageGeneration() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [data, setData] = useState<string | null>(null);
+
+  const generate = useCallback(async (prompt: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await client.image.generate({
+        prompt,
+        size: "1024x1024",
+        model: "fotohub-v2"
+      });
+      setData(response.data[0].url);
+      return response.data[0].url;
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { generate, loading, error, data };
+}
+```
+:::
+
+### Next.js App Router (Server Components)
+
+::: code-group
+```tsx [app/page.tsx]
+import { FotoHub } from '@fotohub/sdk';
+import Image from 'next/image';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export const metadata = {
+  title: 'AI Hero Banner',
+  description: 'Generated dynamically'
+};
+
+export default async function Page() {
+  // Generate on the server during request or build (depending on cache settings)
+  const response = await client.image.generate({
+    prompt: "A beautiful cinematic landscape of futuristic city, neon lights",
+    size: "1024x512",
+    model: "fotohub-v2"
+  });
+
+  const imageUrl = response.data[0].url;
+  
+  return (
+    <main className="flex min-h-screen flex-col items-center">
+      <h1>Dynamic AI Header</h1>
+      <Image 
+        src={imageUrl} 
+        alt="AI Generated Landscape" 
+        width={1024} 
+        height={512}
+        priority
+      />
+      <p className="mt-4 text-sm text-gray-500">Cost: $0.025</p>
+    </main>
+  );
+}
+```
+:::
+
+### Next.js Route Handler
+
+::: code-group
+```typescript [app/api/generate/route.ts]
+import { NextResponse } from 'next/server';
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { prompt } = body;
+    
+    if (!prompt) {
+      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    }
+    
+    const response = await client.image.generate({
+      prompt,
+      size: "1024x1024"
+    });
+    
+    return NextResponse.json({ url: response.data[0].url });
+  } catch (error) {
+    console.error('FotoHub error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate image' }, 
+      { status: 500 }
+    );
+  }
+}
+```
+:::
+
+### Next.js Edge Runtime
+
+::: code-group
+```typescript [app/api/edge/route.ts]
+import { NextResponse } from 'next/server';
+import { FotoHub } from '@fotohub/sdk';
+
+export const runtime = 'edge';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export async function POST(request: Request) {
+  const { prompt } = await request.json();
+  const res = await client.image.generate({ prompt });
+  return NextResponse.json(res);
+}
+```
+:::
+
+### Nuxt.js Composable
+
+::: code-group
+```typescript [composables/useFotoHubImage.ts]
+import { ref } from 'vue';
+import { useFetch } from '#app';
+
+export const useFotoHubImage = () => {
+  const imageUrl = ref<string | null>(null);
+  const isGenerating = ref(false);
+  const error = ref<string | null>(null);
+
+  const generate = async (prompt: string) => {
+    isGenerating.value = true;
+    error.value = null;
+    
+    try {
+      const { data, error: fetchError } = await useFetch('/api/generate', {
+        method: 'POST',
+        body: { prompt }
+      });
+      
+      if (fetchError.value) throw new Error(fetchError.value.message);
+      
+      // @ts-ignore
+      imageUrl.value = data.value?.url;
+    } catch (e) {
+      error.value = (e as Error).message;
+    } finally {
+      isGenerating.value = false;
+    }
+  };
+
+  return { imageUrl, isGenerating, error, generate };
+};
+```
+:::
+
+### Remix Loader
+
+::: code-group
+```typescript [app/routes/_index.tsx]
+import { json, type LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+import { FotoHub } from '@fotohub/sdk';
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+  
+  const response = await client.image.generate({
+    prompt: "A welcoming hero image for a creative agency",
+    size: "1024x512"
+  });
+  
+  return json({ heroImage: response.data[0].url });
+}
+
+export default function Index() {
+  const { heroImage } = useLoaderData<typeof loader>();
+  
+  return (
+    <div>
+      <img src={heroImage} alt="Hero" className="w-full" />
+    </div>
+  );
+}
+```
+:::
+
+### SvelteKit Load
+
+::: code-group
+```typescript [src/routes/+page.server.ts]
+import { FotoHub } from '@fotohub/sdk';
+import { FOTOHUB_API_KEY } from '$env/static/private';
+import type { PageServerLoad } from './$types';
+
+export const load: PageServerLoad = async () => {
+  const client = new FotoHub({ apiKey: FOTOHUB_API_KEY });
+  
+  const response = await client.image.generate({
+    prompt: "Abstract artistic background, cool tones",
+    size: "1024x1024"
+  });
+  
+  return {
+    backgroundImage: response.data[0].url
+  };
+};
+```
+:::
+
+### Bun HTTP Server
+
+::: code-group
+```typescript [server.ts]
+import { FotoHub } from '@fotohub/sdk';
+
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+Bun.serve({
+  port: 3000,
+  async fetch(req) {
+    const url = new URL(req.url);
+    
+    if (req.method === "POST" && url.pathname === "/api/generate") {
+      const body = await req.json();
+      const result = await client.image.generate({ prompt: body.prompt });
+      return new Response(JSON.stringify(result), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    
+    return new Response("Not Found", { status: 404 });
+  }
+});
+```
+:::
+
+### tRPC Procedures
+
+::: code-group
+```typescript [server/trpc/router.ts]
+import { initTRPC } from '@trpc/server';
+import { z } from 'zod';
+import { FotoHub } from '@fotohub/sdk';
+
+const t = initTRPC.create();
+const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+
+export const appRouter = t.router({
+  generateImage: t.procedure
+    .input(z.object({
+      prompt: z.string().min(5),
+      size: z.enum(['512x512', '1024x1024']).default('1024x1024')
+    }))
+    .mutation(async ({ input }) => {
+      const response = await client.image.generate(input);
+      return { url: response.data[0].url };
+    })
+});
+
+export type AppRouter = typeof appRouter;
+```
+:::
+
+### React Query Integration
+
+::: code-group
+```tsx [components/ImageGenerator.tsx]
+import { useMutation } from '@tanstack/react-query';
+import { useState } from 'react';
+
+function useGenerateImage() {
+  return useMutation({
+    mutationFn: async (prompt: string) => {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        body: JSON.stringify({ prompt }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) throw new Error('Generation failed');
+      return res.json();
+    }
+  });
+}
+
+export function ImageGenerator() {
+  const [prompt, setPrompt] = useState('');
+  const mutation = useGenerateImage();
+  
+  return (
+    <div>
+      <input value={prompt} onChange={e => setPrompt(e.target.value)} />
+      <button onClick={() => mutation.mutate(prompt)} disabled={mutation.isPending}>
+        Generate ($0.025)
+      </button>
+      
+      {mutation.data && <img src={mutation.data.url} alt="Result" />}
+    </div>
+  );
+}
+```
+:::
+
+## Advanced TypeScript Patterns
+
+### Generic Async Job Poller
+
+A robust polling mechanism is essential for interacting with FotoHub's asynchronous endpoints (Video, 3D, Shorts, LipSync).
+
+::: code-group
+```typescript [utils/poller.ts]
+export interface JobResponse<T> {
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  result?: T;
+  error?: string;
+}
+
+export async function pollJob<T>(
+  jobId: string,
+  getter: (id: string) => Promise<JobResponse<T>>,
+  options: { intervalMs?: number; timeoutMs?: number } = {}
+): Promise<T> {
+  const { intervalMs = 2000, timeoutMs = 120000 } = options;
+  const startTime = Date.now();
+
+  while (true) {
+    if (Date.now() - startTime > timeoutMs) {
+      throw new Error(`Job ${jobId} polling timed out after ${timeoutMs}ms`);
+    }
+
+    const response = await getter(jobId);
+
+    if (response.status === 'completed' && response.result) {
+      return response.result;
+    }
+    if (response.status === 'failed') {
+      throw new Error(`Job ${jobId} failed: ${response.error}`);
+    }
+
+    // Wait before next poll
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+  }
+}
+```
+:::
+
+### Type-Safe Webhook Handler
+
+FotoHub webhooks provide asynchronous delivery of events. Validating them with Zod ensures type safety.
+
+::: code-group
+```typescript [webhooks/handler.ts]
+import { z } from 'zod';
+import crypto from 'crypto';
+
+const WebhookHeaderSchema = z.object({
+  'x-fotohub-signature': z.string()
+});
+
+const JobCompletedEventSchema = z.object({
+  type: z.literal('job.completed'),
+  data: z.object({
+    jobId: z.string(),
+    resultUrl: z.string().url(),
+    costUsd: z.number()
+  })
+});
+
+const JobFailedEventSchema = z.object({
+  type: z.literal('job.failed'),
+  data: z.object({
+    jobId: z.string(),
+    reason: z.string()
+  })
+});
+
+const WebhookEventSchema = z.discriminatedUnion('type', [
+  JobCompletedEventSchema,
+  JobFailedEventSchema
+]);
+
+export type WebhookEvent = z.infer<typeof WebhookEventSchema>;
+
+export function verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = hmac.update(payload).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+}
+
+export function handleWebhook(payloadStr: string, headers: Record<string, string>, secret: string) {
+  const { 'x-fotohub-signature': signature } = WebhookHeaderSchema.parse(headers);
+  
+  if (!verifyWebhookSignature(payloadStr, signature, secret)) {
+    throw new Error('Invalid signature');
+  }
+  
+  const payload = JSON.parse(payloadStr);
+  const event = WebhookEventSchema.parse(payload);
+  
+  switch (event.type) {
+    case 'job.completed':
+      console.log(`Job completed! Cost: $${event.data.costUsd}`);
+      // Process successful job
+      break;
+    case 'job.failed':
+      console.error(`Job failed: ${event.data.reason}`);
+      // Handle failure
+      break;
+  }
+}
+```
+:::
+
+### Builder Pattern for Complex Requests
+
+::: code-group
+```typescript [builders/ImageRequestBuilder.ts]
+import { ImageGenerationRequest } from '@fotohub/sdk';
+
+export class ImageRequestBuilder {
+  private request: Partial<ImageGenerationRequest> = {
+    model: 'fotohub-v2',
+    size: '1024x1024',
+    n: 1
+  };
+
+  withPrompt(prompt: string): this {
+    this.request.prompt = prompt;
+    return this;
+  }
+
+  withNegativePrompt(negativePrompt: string): this {
+    this.request.negative_prompt = negativePrompt;
+    return this;
+  }
+
+  landscape(): this {
+    this.request.size = '1024x512';
+    return this;
+  }
+
+  portrait(): this {
+    this.request.size = '512x1024';
+    return this;
+  }
+
+  build(): ImageGenerationRequest {
+    if (!this.request.prompt) {
+      throw new Error("Prompt is required");
+    }
+    return this.request as ImageGenerationRequest;
+  }
+}
+
+// Usage:
+// const req = new ImageRequestBuilder()
+//   .withPrompt("Cyberpunk city")
+//   .landscape()
+//   .build();
+```
+:::
+
+### Middleware Pipeline
+
+::: code-group
+```typescript [middleware/client.ts]
+import { FotoHub } from '@fotohub/sdk';
+
+// A wrapper around the standard client to add cross-cutting concerns
+export class InstrumentedFotoHub {
+  private client: FotoHub;
+  
+  constructor(apiKey: string) {
+    this.client = new FotoHub({ apiKey });
+  }
+  
+  async generateImage(prompt: string) {
+    const startTime = performance.now();
+    try {
+      console.log(`[FotoHub] Starting image generation...`);
+      const result = await this.client.image.generate({ prompt });
+      const duration = performance.now() - startTime;
+      console.log(`[FotoHub] Success (${Math.round(duration)}ms)`);
+      return result;
+    } catch (error) {
+      const duration = performance.now() - startTime;
+      console.error(`[FotoHub] Failed after ${Math.round(duration)}ms:`, error);
+      throw error;
+    }
+  }
+}
+```
+:::
+
+### Cost Estimation Before Generation
+
+Always display costs in USD natively in your UI.
+
+::: code-group
+```typescript [utils/pricing.ts]
+import { ImageGenerationRequest } from '@fotohub/sdk';
+
+export function estimateCost(request: ImageGenerationRequest): number {
+  let basePrice = 0.025; // Standard 1024x1024
+  
+  if (request.size === '2048x2048') basePrice = 0.08;
+  if (request.size === '512x512') basePrice = 0.01;
+  
+  let total = basePrice * (request.n || 1);
+  
+  // High-step generations cost more
+  if (request.steps && request.steps > 50) {
+    total *= 1.5;
+  }
+  
+  return Number(total.toFixed(4));
+}
+```
+:::
+
+### Streaming Response Parser
+
+::: code-group
+```typescript [utils/stream.ts]
+export async function* parseSSEStream<T>(response: Response): AsyncGenerator<T, void, unknown> {
+  if (!response.body) throw new Error("No response body");
+  
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('
+');
+    
+    // Keep the last incomplete line in the buffer
+    buffer = lines.pop() || '';
+    
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const dataStr = line.slice(6);
+        if (dataStr === '[DONE]') return;
+        try {
+          yield JSON.parse(dataStr) as T;
+        } catch (e) {
+          console.warn('Failed to parse SSE data:', dataStr);
+        }
+      }
+    }
+  }
+}
+```
+:::
+
+### Unit Tests with Vitest
+
+::: code-group
+```typescript [tests/api.test.ts]
+import { describe, it, expect, vi } from 'vitest';
+import { FotoHub } from '@fotohub/sdk';
+
+// Mock the global fetch
+global.fetch = vi.fn();
+
+describe('FotoHub Client', () => {
+  it('generates an image successfully', async () => {
+    const mockResponse = {
+      data: [{ url: 'https://example.com/image.png' }]
+    };
+    
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse
+    } as Response);
+    
+    const client = new FotoHub({ apiKey: 'test_key' });
+    const result = await client.image.generate({ prompt: 'test' });
+    
+    expect(result.data[0].url).toBe('https://example.com/image.png');
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://apis.fotohub.app/v1/images/generations',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Authorization': 'Bearer test_key'
+        })
+      })
+    );
+  });
+});
+```
+:::
+
+## Production Guides
+
+### Environment Variable Management
+
+::: code-group
+```typescript [env.ts]
+import { z } from 'zod';
+
+const envSchema = z.object({
+  FOTOHUB_API_KEY: z.string().startsWith('fh_live_'),
+  FOTOHUB_WEBHOOK_SECRET: z.string().optional(),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development')
+});
+
+// Throws if validation fails, keeping your app safe
+export const env = envSchema.parse(process.env);
+```
+:::
+
+### Error Handling Hierarchy
+
+::: code-group
+```typescript [errors/FotoHubErrors.ts]
+export class FotoHubError extends Error {
+  constructor(message: string, public statusCode: number, public requestId?: string) {
+    super(message);
+    this.name = 'FotoHubError';
+  }
+}
+
+export class RateLimitError extends FotoHubError {
+  constructor(message: string, public retryAfterSec: number) {
+    super(message, 429);
+    this.name = 'RateLimitError';
+  }
+}
+
+export class InsufficientFundsError extends FotoHubError {
+  constructor(public currentBalanceUsd: number, public requiredUsd: number) {
+    super(`Insufficient funds. Have $${currentBalanceUsd}, need $${requiredUsd}`, 402);
+    this.name = 'InsufficientFundsError';
+  }
+}
+
+export function handleApiError(error: any): never {
+  if (error.response) {
+    const status = error.response.status;
+    const data = error.response.data;
+    
+    if (status === 429) {
+      throw new RateLimitError(data.error.message, data.error.retry_after || 60);
+    }
+    if (status === 402) {
+      throw new InsufficientFundsError(data.error.balance_usd, data.error.required_usd);
+    }
+    throw new FotoHubError(data.error?.message || 'API Error', status, error.response.headers['x-request-id']);
+  }
+  
+  throw error;
+}
+```
+:::
+
+### Logging Integration with Pino
+
+::: code-group
+```typescript [logger.ts]
+import pino from 'pino';
+
+export const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  formatters: {
+    level: (label) => {
+      return { level: label.toUpperCase() };
+    },
+  },
+});
+
+// Usage in FotoHub context:
+export async function generateWithLogging(prompt: string) {
+  logger.info({ action: 'fotohub_generate_start', prompt });
+  const start = Date.now();
+  try {
+    // client call here
+    logger.info({ 
+      action: 'fotohub_generate_success', 
+      durationMs: Date.now() - start,
+      costUsd: 0.025
+    });
+  } catch (err) {
+    logger.error({ 
+      action: 'fotohub_generate_error', 
+      error: err,
+      durationMs: Date.now() - start 
+    });
+    throw err;
+  }
+}
+```
+:::
+
+### Sentry Integration
+
+::: code-group
+```typescript [sentry.ts]
+import * as Sentry from '@sentry/node';
+import { FotoHubError } from './FotoHubErrors';
+
+export function setupSentry() {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: 1.0,
+  });
+}
+
+export async function captureFotoHubOperation<T>(
+  operationName: string, 
+  operation: () => Promise<T>
+): Promise<T> {
+  return Sentry.startSpan({ name: `FotoHub: ${operationName}` }, async (span) => {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof FotoHubError) {
+        Sentry.setContext("FotoHub", {
+          statusCode: error.statusCode,
+          requestId: error.requestId
+        });
+        if (error.statusCode === 429) {
+          // Maybe don't alert loudly for rate limits
+          Sentry.captureMessage('FotoHub Rate Limit Hit', 'warning');
+        } else {
+          Sentry.captureException(error);
+        }
+      } else {
+        Sentry.captureException(error);
+      }
+      span.setStatus("error");
+      throw error;
+    }
+  });
+}
+```
+:::
+
+### OpenTelemetry Tracing
+
+::: code-group
+```typescript [tracing.ts]
+import { trace, context } from '@opentelemetry/api';
+
+const tracer = trace.getTracer('fotohub-sdk-wrapper');
+
+export async function tracedGenerateImage(prompt: string) {
+  return tracer.startActiveSpan('FotoHub.Image.Generate', async (span) => {
+    span.setAttribute('fotohub.prompt.length', prompt.length);
+    span.setAttribute('fotohub.expected_cost_usd', 0.025);
+    
+    try {
+      // Execute the request
+      const response = await client.image.generate({ prompt });
+      span.setAttribute('fotohub.request_id', response.requestId);
+      span.setStatus({ code: 1 }); // OK
+      return response;
+    } catch (error: any) {
+      span.setStatus({
+        code: 2, // ERROR
+        message: error.message
+      });
+      span.recordException(error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+```
+:::
+
+## Complete Architecture Diagram
+
+Here is the high-level architecture diagram showing how the SDK interacts with the FotoHub Platform.
+
+```mermaid
+flowchart TD
+    App[Your Node/React/Edge App] --> SDK[FotoHub TypeScript SDK]
+    SDK --> |REST / JSON| APIG[API Gateway `apis.fotohub.app`]
+    APIG --> |Auth & Rate Limits| Services
+    
+    subgraph Services [FotoHub Microservices]
+      Img[Image Generation Service]
+      Vid[Video & UGC Service]
+      Doc[Document Intelligence]
+      Brand[Brand Engine]
+    end
+    
+    Img --> GPU1[(GPU Cluster 1 - SDXL)]
+    Vid --> GPU2[(GPU Cluster 2 - MMAudio)]
+    Vid --> GPU3[(GPU Cluster 3 - MuseTalk/LipSync)]
+    Doc --> GPU4[(GPU Cluster 4 - Vision/LLaVA)]
+    
+    Services --> |Webhooks| App
+```
+
+## Parameter Table: `client.image.generate`
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `prompt` | `string` | Yes | - | The text prompt for generation. |
+| `model` | `string` | No | `fotohub-v2` | The model to use. |
+| `size` | `string` | No | `1024x1024` | Resolution. Valid: `512x512`, `1024x1024`, `1024x512`, `512x1024` |
+| `n` | `number` | No | `1` | Number of images to generate (1-4). |
+| `negative_prompt`| `string` | No | - | Elements to avoid in the generation. |
+| `steps` | `number` | No | `30` | Number of diffusion steps (10-100). |
+| `seed` | `number` | No | Random | Fix the seed for reproducible results. |
+
+::: tip GPU Affinity & Performance
+When utilizing `client.ugc` and `client.lipSync`, requests are dynamically routed. GPU2 is strictly dedicated to `MMAudio` rendering while GPU3 handles `MuseTalk/LipSync` operations. 3D jobs (`client.models3d`) will always hit GPU4/5 clusters for optimal speed. Plan your concurrent requests accordingly to avoid localized cluster rate-limits.
+:::
+

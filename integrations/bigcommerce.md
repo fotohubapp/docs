@@ -74,7 +74,7 @@ Credentials are encrypted with this secret. Losing or changing it means reconnec
 ## Connecting the store
 
 1. Open the app
-2. Enter your FOTOhub API key — **Validate** shows your live credit balance
+2. Enter your FOTOhub API key — **Validate** shows your available USD wallet balance
 3. Enter the store hash and access token
 4. **Connect** — the app registers a connection with the Commerce Bridge and stores the webhook secret
 
@@ -84,7 +84,7 @@ Credentials are encrypted with this secret. Losing or changing it means reconnec
 
 | Screen | Purpose |
 |--------|---------|
-| Dashboard | Credits, active jobs, pending drafts, products missing descriptions |
+| Dashboard | Wallet balance, active jobs, pending drafts, products missing descriptions |
 | Product photos | Bulk job wizard for images |
 | Descriptions | Wizard for copy: title, descriptions, SEO meta, alt text |
 | Jobs | Progress with per-item detail and retry |
@@ -108,7 +108,7 @@ Paging uses BigCommerce cursors, and **Select all matching** covers the whole fi
 
 ## Cost preflight
 
-Before a job runs, the wizard calls the estimate endpoint and shows *"N products × M images = X credits, you have Y"*. Submission is blocked when your balance is short, so a run never dies partway through the catalog.
+Before a job runs, the wizard calls the estimate endpoint and shows *"N products × M images = $X USD, you have $Y USD"*. Submission is blocked when your balance is short, so a run never dies partway through the catalog.
 
 ## Reviewing drafts
 
@@ -165,7 +165,7 @@ With `SCHEDULER_ENABLED` set, the Schedules screen can run recurring work such a
 - Generate descriptions for products added since the last run
 - Generate alt text for images that have none
 
-Each schedule carries a per-run credit cap, so a runaway schedule cannot drain your balance. Last-run time and outcome are shown per schedule.
+Each schedule carries a per-run USD spending cap, so a runaway schedule cannot drain your balance. Last-run time and outcome are shown per schedule.
 
 ## App API
 
@@ -186,7 +186,7 @@ The UI is backed by these endpoints.
 | `GET`, `POST /api/jobs` | List and create jobs |
 | `GET /api/batches` | Grouped job batches |
 | `GET /api/drafts` | Drafts, approve and reject |
-| `GET /api/credits` | Credit balance |
+| `GET /api/wallet` | Wallet balance (USD) |
 | `GET`, `POST /api/schedules` | Recurring jobs |
 | `POST /api/webhooks` | Bridge callback receiver |
 | `GET /api/mcp-config` | MCP configuration snippet |
@@ -203,7 +203,7 @@ Mutating requests require an `X-CSRF-Token` header with the token from `/api/sta
 - Product-derived strings are escaped before rendering — product titles are attacker-controlled input
 
 ::: danger Do not expose the app publicly without protection
-It holds credentials for your store and your FOTOhub credits. It listens on `127.0.0.1` by default. If you expose it, put HTTPS and authentication in front, and set `TRUST_PROXY` and `ALLOWED_HOSTS`.
+It holds credentials for your store and your FOTOhub API key. It listens on `127.0.0.1` by default. If you expose it, put HTTPS and authentication in front, and set `TRUST_PROXY` and `ALLOWED_HOSTS`.
 :::
 
 ## Managing your catalog from an AI assistant
@@ -233,7 +233,7 @@ See the [MCP integration guide](/integrations/mcp) for the full tool list.
 | No products listed | Filters too narrow, or the token lacks catalog access |
 | Job stays queued | Check `/api/health`; large jobs are dispatched gradually on purpose |
 | Drafts stay pending after approve | The write to BigCommerce failed — the error is shown on the item |
-| `402` insufficient credits | Top up, then use **Retry failed only** |
+| `402` insufficient funds | Top up wallet balance in Console, then use **Retry failed only** |
 | Image approved but not visible | BigCommerce processes remote images asynchronously; refresh after a moment |
 | `429` from BigCommerce | Expected under load — the client backs off and continues |
 

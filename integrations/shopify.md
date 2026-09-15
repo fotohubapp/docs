@@ -166,7 +166,7 @@ const result = await fotohub.bulkGeneratePhotos(products, {
 
 console.log(`Completed: ${result.completed}`);
 console.log(`Failed: ${result.failed}`);
-console.log(`Total credits: ${result.creditsUsed}`);
+console.log(`USD Charged: $${result.usdCharged.toFixed(4)} USD`);
 
 for (const item of result.items) {
   if (item.status === 'completed') {
@@ -208,8 +208,8 @@ const fotohub = new FotoHubShopify({ apiKey: 'fh_live_...' });
 try {
   const result = await fotohub.generateProductPhoto(product, { style: 'product' });
 } catch (error) {
-  if (error.code === 'insufficient_credits') {
-    console.error('Not enough credits. Top up at fotohub.app/console');
+  if (error.code === 'insufficient_funds') {
+    console.error('Insufficient wallet balance. Top up at fotohub.app/console');
   } else if (error.code === 'rate_limit_exceeded') {
     console.error(`Rate limited. Retry after ${error.retryAfter}s`);
   } else {
@@ -269,7 +269,8 @@ interface BulkOptions extends GenerateOptions {
 interface BulkResult {
   completed: number;
   failed: number;
-  creditsUsed: number;
+  usdCharged: number;
+  balanceUsd: number;
   items: Array<{
     product: ShopifyProduct;
     status: 'completed' | 'failed';

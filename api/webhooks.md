@@ -55,8 +55,8 @@ All webhook deliveries use the same envelope: `{ "event", "timestamp", "data", "
     "output_url": "https://s3point.fotohub.app/generations/vj_xyz.mp4",
     "duration": 5,
     "billing": {
-      "method": "credits",
-      "credits_used": 10,
+      "method": "wallet",
+      "usd_charged": 0.4500,
       "usd_charged": 0
     }
   }
@@ -77,8 +77,8 @@ All webhook deliveries use the same envelope: `{ "event", "timestamp", "data", "
     "error": "content_policy_violation",
     "error_message": "The prompt was rejected by the safety filter.",
     "billing": {
-      "method": "credits",
-      "credits_used": 0,
+      "method": "wallet",
+      "usd_charged": 0.0000,
       "usd_charged": 0
     }
   }
@@ -1327,7 +1327,7 @@ func main() {
 # Test your webhook handler locally with a simulated delivery
 
 # 1. Generate a test signature
-PAYLOAD='{"event":"generation.completed","timestamp":"2026-07-17T12:00:00Z","attempt":1,"data":{"job_id":"vj_xyz","generation_type":"video","model":"veo-2.0-generate-001","output_url":"https://s3point.fotohub.app/generations/vj_xyz.mp4","duration":5,"billing":{"method":"credits","credits_used":155,"usd_charged":0}}}'
+PAYLOAD='{"event":"generation.completed","timestamp":"2026-07-17T12:00:00Z","attempt":1,"data":{"job_id":"vj_xyz","generation_type":"video","model":"veo-2.0-generate-001","output_url":"https://s3point.fotohub.app/generations/vj_xyz.mp4","duration":5,"billing":{"method":"wallet","usd_charged":6.975,"usd_charged":0}}}'
 SECRET="your_webhook_secret_here"
 SIGNATURE="$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')"
 

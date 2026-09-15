@@ -40,7 +40,7 @@ Classify user intent and return a routing decision with optimal model selection,
 | Field | Type | Description |
 |-------|------|-------------|
 | `user_tier` | string | User's subscription tier (`"free"`, `"pro"`, `"business"`) |
-| `credits_remaining` | integer | Current credit balance |
+| `wallet_balance_usd` | float | Current prepaid USD wallet balance |
 | `recent_tools` | string[] | Last 5 features the user used |
 | `brand_id` | string | Active brand kit ID (for brand-aware suggestions) |
 
@@ -104,7 +104,7 @@ const client = new FotoHub({ apiKey: 'your-api-key' });
 const result = await client.gabriel.classify({
   prompt: 'Make a 5-second video of a cat walking through a garden',
   language: 'en',
-  context: { credits_remaining: 50 }
+  context: { wallet_balance_usd: 50 }
 });
 
 // {
@@ -128,7 +128,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/gabriel \
     "enhance_prompt": true,
     "context": {
       "user_tier": "pro",
-      "credits_remaining": 100
+      "wallet_balance_usd": 100
     }
   }'
 ```
@@ -322,7 +322,7 @@ Proactive context-aware recommendations. Returns 1-3 relevant tips based on the 
 |-------|------|----------|-------------|
 | `page` | string | No | Current page path |
 | `recent_actions` | string[] | No | Last few actions taken |
-| `credits_remaining` | integer | No | User's credit balance |
+| `wallet_balance_usd` | float | No | User's prepaid USD wallet balance |
 | `has_brand` | boolean | No | Whether user has a brand kit |
 
 ### Response
@@ -346,7 +346,7 @@ curl -X POST https://apis.fotohub.app/v1/ai/gabriel/recommend \
   -H "Content-Type: application/json" \
   -d '{
     "page": "/generate/new",
-    "credits_remaining": 5,
+    "wallet_balance_usd": 5,
     "has_brand": false
   }'
 
@@ -631,7 +631,7 @@ const { recommendations } = await fetch(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       page: '/generate/new',
-      credits_remaining: user.credits,
+      wallet_balance_usd: user.credits,
       has_brand: user.brands.length > 0,
       recent_actions: ['image_generation', 'image_generation']
     })
