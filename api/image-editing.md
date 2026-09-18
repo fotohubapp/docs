@@ -772,7 +772,7 @@ Two things to know about that string:
 
 - **The refund sentence is the part to trust.** `Your wallet was not charged for this
   request.` is appended **only** when the reversal actually committed. Its absence
-  means check `GET /v1/billing/usage` rather than assume. The `"refunded"` flag inside
+  means check `GET /v1/tiers/usage` rather than assume. The `"refunded"` flag inside
   the quoted body refers to the internal credit ledger, not your wallet — ignore it.
 - **`detail` is a string, not an object,** and the upstream text embedded in it is
   passed through verbatim, so it is sometimes JSON and sometimes Polish. Do not parse
@@ -902,8 +902,8 @@ the tools that do not sample (the upscalers, `remove-background`).
 
 Size limits are checked **before** the charge: an image above 9.4 MP or below 4096 pixels
 total is a `400` and costs nothing. A missing `mask` on `erase-object` or `inpaint` is
-also a free `400`. Anything that fails at Bedrock after that is a `502` with the charge
-reversed and `Your wallet was not charged for this request.` appended.
+also a free `400`. Anything that fails at the upstream provider after that is a `502`
+with the charge reversed and `Your wallet was not charged for this request.` appended.
 
 ### Stability AI Code Examples
 

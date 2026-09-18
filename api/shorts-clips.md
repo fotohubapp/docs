@@ -24,7 +24,7 @@ A stateless, step-based REST API for building your own pipelines or calling from
 | | |
 |---|---|
 | **Base URL** | `https://apis.fotohub.app` |
-| **Paths** | `POST /v1/shorts/<step>` — `ingest`, `transcribe`, `detect-scenes`, `generate-clips`, `captions`, `reframe`, `render`, `agent` |
+| **Paths** | `POST /v1/shorts/{step}`, where `{step}` is one of: `ingest`, `transcribe`, `detect-scenes`, `generate-clips`, `captions`, `reframe`, `render`, `agent` (e.g. `POST /v1/shorts/ingest`). There is no bare `/v1/shorts` route — always call a specific step. |
 | **Auth** | API key — `Authorization: Bearer fh_live_...` |
 | **Model** | Stateless. Each call takes a `video_url` and returns the step result plus billing info. No projects or clips are stored. |
 

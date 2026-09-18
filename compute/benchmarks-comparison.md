@@ -6,7 +6,18 @@ Transparent performance benchmarks, cold-start latency measurements, hardware th
 
 ## Comprehensive Benchmark Methodology
 
-All benchmarks published on this page are strictly empirical, reproducible, and executed under production-like conditions in our **Frankfurt (`eu-central-1`)** region. 
+::: warning About the numbers on this page
+The hardware specifications and the price table below are verified against the
+live instance catalogue (`GET https://apis.fotohub.app/compute/v1/catalog`).
+
+The **throughput figures** further down — images/min, tokens/sec, TTFT — are
+indicative, not measured under a published harness we can point you at. Size
+your own workload on a spot instance for an hour before you commit to a number;
+that costs well under a dollar and is worth more than any table.
+:::
+
+Benchmarks are executed under production-like conditions in our
+**Frankfurt (`eu-central-1`)** region. 
 
 - **OS:** Ubuntu 22.04 LTS (Kernel 6.2+)
 - **NVIDIA Drivers:** 550.90.07 / CUDA 12.4
@@ -22,23 +33,24 @@ All benchmarks published on this page are strictly empirical, reproducible, and 
 
 | GPU Architecture | VRAM | FP16 TFLOPS | INT8 TOPS | Memory Bandwidth | FOTOhub Instance Type | On-Demand | Spot Price |
 |:---|:---|:---|:---|:---|:---|:---|:---|
-| **NVIDIA T4** | 16 GB GDDR6 | 65.0 | 130.0 | 320 GB/s | `g4dn.xlarge` | $0.53 / hr | **$0.20 / hr** |
-| **NVIDIA T4** (2x) | 32 GB GDDR6 | 130.0 | 260.0 | 640 GB/s | `g4dn.2xlarge` | $0.75 / hr | **$0.27 / hr** |
-| **NVIDIA A10G** | 24 GB GDDR6 | 125.0 | 250.0 | 600 GB/s | `g5.xlarge` | $1.01 / hr | **$0.38 / hr** |
-| **NVIDIA A10G** | 24 GB GDDR6 | 125.0 | 250.0 | 600 GB/s | `g5.2xlarge` | $1.20 / hr | **$0.45 / hr** |
-| **NVIDIA A10G** | 24 GB GDDR6 | 125.0 | 250.0 | 600 GB/s | `g5.4xlarge` | $1.61 / hr | **$0.60 / hr** |
-| **NVIDIA A10G** (4x)| 96 GB GDDR6 | 500.0 | 1000.0 | 2,400 GB/s | `g5.12xlarge` | $5.67 / hr | **$2.13 / hr** |
+| **NVIDIA T4** | 16 GB GDDR6 | 65.0 | 130.0 | 320 GB/s | `g4dn.xlarge` | $0.5284 / hr | **$0.1975 / hr** |
+| **NVIDIA T4** | 16 GB GDDR6 | 65.0 | 130.0 | 320 GB/s | `g4dn.2xlarge` | $0.7531 / hr | **$0.2716 / hr** |
+| **NVIDIA A10G** | 24 GB GDDR6X | 125.0 | 250.0 | 600 GB/s | `g5.xlarge` | $1.0123 / hr | **$0.3827 / hr** |
+| **NVIDIA A10G** | 24 GB GDDR6X | 125.0 | 250.0 | 600 GB/s | `g5.2xlarge` | $1.2025 / hr | **$0.4494 / hr** |
+| **NVIDIA A10G** | 24 GB GDDR6X | 125.0 | 250.0 | 600 GB/s | `g5.4xlarge` | $1.6123 / hr | **$0.6025 / hr** |
 
-### Multi-GPU Scaling Efficiency
+Five GPU instance types are offered, and **every one of them carries a single
+GPU**. `g4dn.2xlarge` gives the same one T4 as `g4dn.xlarge` with more vCPU and
+RAM, not a second card; the three `g5` sizes likewise differ only in CPU and RAM
+around one A10G. The 22 instance types in the catalogue, GPU and CPU alike, are
+returned by `GET /compute/v1/catalog` with these exact rates.
 
-When moving from a single GPU to a distributed multi-GPU setup (e.g., `g5.12xlarge` with 4x A10G), scaling is rarely perfectly linear due to PCIe interconnect overhead and gradient synchronization.
+### Multi-GPU workloads
 
-| Setup | Expected Linear Speedup | Actual Measured Speedup | Efficiency Loss |
-|:---|:---|:---|:---|
-| 1x A10G | 1.00x | 1.00x | 0% |
-| 2x A10G | 2.00x | 1.92x | 4% |
-| 4x A10G | 4.00x | 3.75x | 6.25% |
-| 8x A10G | 8.00x | 7.10x | 11.25% |
+FOTOhub Compute does not offer a multi-GPU instance today. If your model does not
+fit in 24 GB of VRAM on a single A10G, this is not currently the right platform
+for it — scale down the model, quantise it, or run it elsewhere. We would rather
+say that here than have you discover it after provisioning.
 
 ---
 
@@ -49,7 +61,7 @@ Real-world AI operations are the best indicator of true price-to-performance rat
 ### 1. SDXL 1.0 Text-to-Image (1024x1024, 30 steps)
 - **`g4dn.xlarge` (T4):** 3.2 images/min at $0.53/hr on-demand -> **$0.00276 / image**
 - **`g5.xlarge` (A10G):** 8.1 images/min at $0.38/hr spot -> **$0.00078 / image**
-- **`g5.4xlarge` (A10G, better CPU):** 24.3 images/min at $0.60/hr spot -> **$0.00041 / image**
+- **`g5.4xlarge` (A10G, more CPU/RAM):** broadly the same as `g5.xlarge` — SDXL is GPU-bound, and all three `g5` sizes carry the same single A10G, so the extra vCPU buys pipeline headroom, not image throughput.
 
 ### 2. FLUX.1 Schnell Image Generation (1024x1024, 4 steps)
 - **`g5.xlarge` (A10G):** 5.4 images/min at $0.38/hr spot -> **$0.00117 / image**
@@ -66,11 +78,12 @@ Real-world AI operations are the best indicator of true price-to-performance rat
 
 ### 5. SDXL LoRA Training (1000 steps, 100 images, batch=1)
 - **`g5.xlarge` (A10G):** Completes in 28 minutes at $0.38/hr spot -> **$0.178 total cost**.
-- **`g5.4xlarge` (A10G):** Completes in 8 minutes at $0.60/hr spot -> **$0.080 total cost**. *(Faster processing yields cheaper total cost).*
+- **`g5.4xlarge` (A10G, more CPU/RAM):** LoRA training on a single A10G is GPU-bound, so treat this as broadly the same wall-clock time as `g5.xlarge` — the extra vCPU/RAM buys headroom for your dataloader, not more training throughput. We are not publishing a specific speedup number here; it isn't physically plausible for two instances sharing the identical GPU.
 
 ### 6. Llama 3.1 8B Fine-Tuning (LoRA, 1 epoch, 10K samples)
 - **`g5.xlarge` (A10G):** 45 minutes at $0.38/hr -> **$0.285 total cost**.
-- **`g5.12xlarge` (4x A10G):** 12 minutes at $2.13/hr -> **$0.426 total cost**. *(Despite being 3.75x faster via scale-out, total cost increases slightly due to scaling inefficiency).*
+
+FOTOhub does not offer a multi-GPU instance, so there is no scale-out option for this workload today — see [Multi-GPU workloads](#multi-gpu-workloads) above.
 
 ---
 
@@ -82,12 +95,16 @@ High-performance AI workloads rely heavily on fast weight loading from disk to G
 - **EBS gp3 sequential read:** 590 MB/s
 - **EBS gp3 random 4K read:** 3,000 IOPS
 - **EBS io2 sequential read:** 1,950 MB/s
-- **EBS io2 random 4K read:** 64,000 IOPS
-- **io2 Block Express:** 4,000 MB/s sustained, 256,000 IOPS
-- **RAID-0 4x io2 Block Express:** >8,000 MB/s aggregate
+- **EBS io2 random 4K read:** up to 64,000 IOPS
+
+:::warning io2 Block Express is not reachable through this platform
+The volume-attach API caps the `iops` request parameter at **64,000** regardless of volume
+size. AWS's io2 Block Express tier (256,000 IOPS, 4,000 MB/s) only activates above that
+ceiling, so it is not something you can provision here — do not plan around it.
+:::
 
 ### FIO Benchmark Verification Commands
-To verify the 4,000 MB/s throughput on `io2 Block Express`, use the following commands on your instance:
+Run this yourself to measure your actual sequential-read throughput on an attached volume:
 ```bash
 # Install fio
 sudo apt-get install fio -y
@@ -104,7 +121,6 @@ fio --name=seqread \
     --group_reporting \
     --filename=/dev/nvme1n1
 ```
-*Expected Output: `READ: bw=4000MiB/s (4194MB/s), 4000MiB/s-4000MiB/s (4194MB/s-4194MB/s), io=234GiB (251GB), run=60001-60001msec`*
 
 ---
 
@@ -177,7 +193,6 @@ class FOTOhubCostCalculator:
             "g4dn.xlarge_spot": 0.20,
             "g5.xlarge_spot": 0.38,
             "g5.4xlarge_spot": 0.60,
-            "g5.12xlarge_spot": 2.13,
             "gp3_storage": 0.08, # per GB-mo
             "s3_storage": 0.0245, # per GB-mo
         }
@@ -251,16 +266,20 @@ Our tests confirm the A10G (24GB) can load FLUX.1 Schnell with 19.8GB active uti
 
 ## Extended Workload Deep Dives
 
-### vLLM Architecture & Distributed Inference
-Our multi-node benchmarks (like the Llama 3.3 70B test on 8x A10G) utilize Ray for distributed cluster management.
+### vLLM Architecture & Horizontal Scaling
+FOTOhub does not offer a multi-GPU instance or a Ray/NCCL tensor-parallel cluster, so a model
+that doesn't fit in 24 GB on a single A10G is not a fit for this platform (quantize it, or run
+a smaller checkpoint). What you *can* do is scale a model that fits on one GPU **horizontally**
+— run identical vLLM instances on several single-GPU nodes and fan requests out across them with
+the real [Load Balancer](/compute/load-balancing-autoscaling) API (`POST /compute/load-balancers`
++ `POST /compute/target-groups/register`), which is genuinely implemented.
 
-#### Multi-Node Topology
+#### Horizontal Topology
 ```mermaid
 graph TD
-    LB[API Load Balancer] --> Head[Ray Head Node - g5.4xlarge]
-    Head --> Worker1[Ray Worker 1 - g5.12xlarge]
-    Head --> Worker2[Ray Worker 2 - g5.12xlarge]
-    Worker1 <-->|NCCL 100Gbps ENA| Worker2
+    LB[FOTOhub Load Balancer] --> Worker1[g5.xlarge - vLLM instance 1]
+    LB --> Worker2[g5.xlarge - vLLM instance 2]
+    LB --> Worker3[g5.xlarge - vLLM instance N]
 ```
 
 ### Comprehensive TCO Matrix Calculator (Python)
@@ -300,286 +319,13 @@ if __name__ == "__main__":
 **Q: Are there any hidden networking fees for intra-AZ traffic?**
 A: No. FOTOhub compute instances communicating with FOTOhub S3 or other instances in `eu-central-1` incur exactly $0.00 in egress/ingress charges.
 
-**Q: Does io2 Block Express cost extra?**
-A: Yes, it is billed at $0.125/GB-month plus provisioned IOPS, whereas gp3 is $0.080/GB-month with 3000 IOPS included.
+**Q: Is io2 Block Express available?**
+A: No — the platform caps provisioned IOPS at 64,000, below the threshold where AWS activates
+Block Express. Regular `io2` is billed at $0.125/GB-month, vs. `gp3` at $0.080/GB-month with
+3,000 IOPS included.
 
 **Q: How do custom AMIs impact cold starts?**
 A: A stock Ubuntu image takes ~45s to boot, followed by 10-15 minutes of `pip install` and `huggingface-cli download`. A custom AMI boots in ~30s with all dependencies ready, eliminating the 15-minute setup phase entirely.
-
-### Hardware Validation Scenario 0
-**Scenario Name:** Stress Test Alpha-0
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress0 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 1
-**Scenario Name:** Stress Test Alpha-1
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress1 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 2
-**Scenario Name:** Stress Test Alpha-2
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress2 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 3
-**Scenario Name:** Stress Test Alpha-3
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress3 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 4
-**Scenario Name:** Stress Test Alpha-4
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress4 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 5
-**Scenario Name:** Stress Test Alpha-5
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress5 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 6
-**Scenario Name:** Stress Test Alpha-6
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress6 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 7
-**Scenario Name:** Stress Test Alpha-7
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress7 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 8
-**Scenario Name:** Stress Test Alpha-8
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress8 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 9
-**Scenario Name:** Stress Test Alpha-9
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress9 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 10
-**Scenario Name:** Stress Test Alpha-10
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress10 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 11
-**Scenario Name:** Stress Test Alpha-11
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress11 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 12
-**Scenario Name:** Stress Test Alpha-12
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress12 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 13
-**Scenario Name:** Stress Test Alpha-13
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress13 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 14
-**Scenario Name:** Stress Test Alpha-14
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress14 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 15
-**Scenario Name:** Stress Test Alpha-15
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress15 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 16
-**Scenario Name:** Stress Test Alpha-16
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress16 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 17
-**Scenario Name:** Stress Test Alpha-17
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress17 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 18
-**Scenario Name:** Stress Test Alpha-18
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress18 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 19
-**Scenario Name:** Stress Test Alpha-19
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress19 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 20
-**Scenario Name:** Stress Test Alpha-20
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress20 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 21
-**Scenario Name:** Stress Test Alpha-21
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress21 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 22
-**Scenario Name:** Stress Test Alpha-22
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress22 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 23
-**Scenario Name:** Stress Test Alpha-23
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress23 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
-
-### Hardware Validation Scenario 24
-**Scenario Name:** Stress Test Alpha-24
-To ensure 100% uptime, our automated fleets run stress tests like this continually:
-```bash
-#!/bin/bash
-# High intensity memory test
-gpu-burn 60
-fio --name=stress24 --rw=randwrite --bs=4k --size=5G
-```
-This ensures hardware degradation is caught before customer instances are provisioned.
 
 ## Extended Inference Deployment Code
 When comparing platforms, code simplicity is also a benchmark. Here is a massive end-to-end deployment script combining FOTOhub Compute, Storage, and BYOB Output.
@@ -623,26 +369,25 @@ if __name__ == "__main__":
 ```
 
 ## Hardware Network Topology Diagrams
-To understand why FOTOhub outpaces traditional cloud VMs, look at the Nitro Enclave topology:
 ```mermaid
 graph TD
     User --> API[FOTOhub API Gateway]
     API --> Control[Control Plane]
-    Control --> NodeA[Bare Metal Node A]
-    Control --> NodeB[Bare Metal Node B]
-    NodeA --> Nitro[AWS Nitro Card 100Gbps]
-    NodeB --> Nitro
-    Nitro --> EBS[EBS io2 Block Express Array]
+    Control --> NodeA[Instance Node]
+    NodeA --> Nitro[AWS Nitro Card, up to 25 Gbps on GPU instances]
+    Nitro --> EBS[EBS gp3 / io2 Volume]
     Nitro --> S3[FOTOhub S3 Cloud Storage]
 ```
 
 ## Extended Benchmarks: 10 Specialized Workloads
 
 ### Benchmark 7: Whisper Large-v3 Multi-Lingual Batch
-Processing 10,000 hours of Spanish and French audio.
-- **Hardware:** g4dn.2xlarge (2x T4)
+Processing 10,000 hours of Spanish and French audio, fanned out across a fleet of
+`g4dn.2xlarge` instances (each one 1x T4 — `g4dn.2xlarge` is the same single-GPU T4 card as
+`g4dn.xlarge`, just with more vCPU/RAM).
+- **Hardware:** 10x `g4dn.2xlarge` spot instances, run in parallel
 - **Time:** 4.5 days
-- **Cost:** $29.16 (at $0.27/hr spot)
+- **Cost:** $29.16 (at $0.27/hr spot per instance)
 ```python
 # Deployment code for Whisper batch
 import requests
@@ -651,12 +396,6 @@ def launch_whisper_cluster():
     # Launches 10 spot instances for distributed STT
     pass
 ```
-
-### Benchmark 8: Llama 3 70B Multi-Node Inference
-- **Hardware:** 8x A10G (2x g5.12xlarge via Ray)
-- **Time to First Token:** 85ms
-- **Throughput:** 1,200 tokens/sec total cluster capacity.
-- **Cost:** $4.26 / hr
 
 ### Benchmark 9: ComfyUI Video Generation (AnimateDiff)
 Generating 10-second 1080p clips using AnimateDiff.
@@ -689,11 +428,6 @@ Creating embeddings for 10 million documents.
 - **Real-Time Factor (RTF):** 0.08
 - **Cost:** $0.0001 per minute of audio generated
 
-### Benchmark 14: Protein Folding (AlphaFold 3)
-- **Hardware:** g5.4xlarge
-- **Time:** 2.5 hours per complex sequence
-- **Cost:** $1.50
-
 ### Benchmark 15: DeepFace Facial Recognition
 - **Hardware:** g4dn.xlarge (CPU optimized + T4 fallback)
 - **Throughput:** 500 frames/sec
@@ -703,87 +437,6 @@ Creating embeddings for 10 million documents.
 - **Hardware:** g5.xlarge
 - **Time:** 12 seconds for 3 minutes of audio
 - **Cost:** $0.0012 per track
-
-### Benchmark 17: Advanced Synthetic Workload 17
-- **Hardware:** g5.xlarge
-- **Metric:** Analyzes throughput for synthetic ML process 17
-- **Performance:** High parallel efficiency.
-```python
-def run_synthetic_benchmark():
-    print("Benchmark complete")
-```
-
-### Benchmark 18: Advanced Synthetic Workload 18
-- **Hardware:** g5.xlarge
-- **Metric:** Analyzes throughput for synthetic ML process 18
-- **Performance:** High parallel efficiency.
-```python
-def run_synthetic_benchmark():
-    print("Benchmark complete")
-```
-
-### Benchmark 19: Advanced Synthetic Workload 19
-- **Hardware:** g5.xlarge
-- **Metric:** Analyzes throughput for synthetic ML process 19
-- **Performance:** High parallel efficiency.
-```python
-def run_synthetic_benchmark():
-    print("Benchmark complete")
-```
-
-### Benchmark 20: Advanced Synthetic Workload 20
-- **Hardware:** g5.xlarge
-- **Metric:** Analyzes throughput for synthetic ML process 20
-- **Performance:** High parallel efficiency.
-```python
-def run_synthetic_benchmark():
-    print("Benchmark complete")
-```
-
-### Benchmark 21: Advanced Synthetic Workload 21
-- **Hardware:** g5.xlarge
-- **Metric:** Analyzes throughput for synthetic ML process 21
-- **Performance:** High parallel efficiency.
-```python
-def run_synthetic_benchmark():
-    print("Benchmark complete")
-```
-
-### Benchmark 22: Advanced Synthetic Workload 22
-- **Hardware:** g5.xlarge
-- **Metric:** Analyzes throughput for synthetic ML process 22
-- **Performance:** High parallel efficiency.
-```python
-def run_synthetic_benchmark():
-    print("Benchmark complete")
-```
-
-### Benchmark 23: Advanced Synthetic Workload 23
-- **Hardware:** g5.xlarge
-- **Metric:** Analyzes throughput for synthetic ML process 23
-- **Performance:** High parallel efficiency.
-```python
-def run_synthetic_benchmark():
-    print("Benchmark complete")
-```
-
-### Benchmark 24: Advanced Synthetic Workload 24
-- **Hardware:** g5.xlarge
-- **Metric:** Analyzes throughput for synthetic ML process 24
-- **Performance:** High parallel efficiency.
-```python
-def run_synthetic_benchmark():
-    print("Benchmark complete")
-```
-
-### Benchmark 25: Advanced Synthetic Workload 25
-- **Hardware:** g5.xlarge
-- **Metric:** Analyzes throughput for synthetic ML process 25
-- **Performance:** High parallel efficiency.
-```python
-def run_synthetic_benchmark():
-    print("Benchmark complete")
-```
 
 ## Benchmark Troubleshooting & Reproducibility
 
@@ -796,12 +449,5 @@ If you've heavily modified the kernel, ensure `nvidia-smi` shows the correct pow
 sudo nvidia-smi -pl 350
 ```
 
-### 2. NUMA Node Misalignment
-On multi-GPU nodes (`g5.12xlarge`), ensure your PyTorch workloads are pinning CPU threads to the correct NUMA node closest to the PCIe root complex of the active GPU.
-```python
-import torch
-# Example code to bind processes to NUMA nodes
-```
-
-### 3. S3 Read Latency
+### 2. S3 Read Latency
 If your model loading takes >30 seconds, verify you are using `s1.fotohub.app` (Frankfurt) and not inadvertently fetching weights from a US-East AWS bucket. Cross-atlantic latency will cap single-thread downloads at 25MB/s regardless of the Nitro NIC.

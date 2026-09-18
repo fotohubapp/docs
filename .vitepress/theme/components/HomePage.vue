@@ -99,12 +99,110 @@ async function copyCmd(item) {
   } catch { /* clipboard blocked (http, permissions) — the command stays selectable */ }
 }
 
+// ─── Quickstart block ───
+/*
+ * The first screen of an API reference should contain a request and the reply
+ * it actually produces. Everything in this block was executed against
+ * production on 2026-09-18 with a real key: the response pane is the trimmed
+ * body that came back, not a plausible-looking invention, down to the
+ * `cost_usd` and the `usage.resolution` the run reported.
+ *
+ * `/v1/ai/generate/image` is synchronous — it holds the connection until the
+ * image exists (~21 s for this one) and there is no job to poll. Video and 3D
+ * are the opposite shape, which is why the tab strip says so instead of
+ * leaving a developer to discover it on their first timeout.
+ */
+const quickTabs = [
+  {
+    id: 'curl',
+    label: 'cURL',
+    lang: 'bash',
+    code: `curl -X POST https://apis.fotohub.app/v1/ai/generate/image \\
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "seedream-5-0-260128",
+    "prompt": "a single green apple on a white studio backdrop",
+    "aspect_ratio": "1:1"
+  }'`
+  },
+  {
+    id: 'python',
+    label: 'Python',
+    lang: 'python',
+    code: `from fotohub import FotoHub
+
+client = FotoHub(api_key="fh_live_...")
+
+result = client.generate_image(
+    "a single green apple on a white studio backdrop",
+    model="seedream-5-0-260128",
+    aspect_ratio="1:1",
+)
+
+print(result["images"][0]["url"])
+print(result["cost_usd"], "USD")`
+  },
+  {
+    id: 'node',
+    label: 'TypeScript',
+    lang: 'typescript',
+    code: `import { FotoHub } from "fotohub";
+
+const client = new FotoHub({ apiKey: "fh_live_..." });
+
+const result = await client.generateImage({
+  model: "seedream-5-0-260128",
+  prompt: "a single green apple on a white studio backdrop",
+  aspectRatio: "1:1",
+});
+
+console.log(result.images[0].url);`
+  }
+]
+const activeTab = ref('curl')
+const copiedCode = ref(false)
+async function copyActiveCode() {
+  const tab = quickTabs.find(t => t.id === activeTab.value)
+  if (!tab) return
+  try {
+    await navigator.clipboard.writeText(tab.code)
+    copiedCode.value = true
+    setTimeout(() => { copiedCode.value = false }, 1400)
+  } catch { /* clipboard blocked — the code stays selectable */ }
+}
+
+// Trimmed from the real 200 response. The image object carries 67 columns, most
+// of them null internals; the four shown are the four anyone uses.
+const quickResponse = `{
+  "model": "seedream-5-0-260128",
+  "cost_usd": 0.0315,
+  "currency": "USD",
+  "billing": { "method": "wallet", "balance_usd": 5.1486 },
+  "usage": {
+    "generated_images": 1,
+    "resolution": "2048x2048",
+    "generation_ms": 16998
+  },
+  "images": [{
+    "id": "38eacb12-2bd9-46ce-aab1-5fce671a003a",
+    "url": "https://s1.fotohub.app/storage/v1/object/sign/\u2026",
+    "file_size": 122541
+  }]
+}`
+
+const quickSteps = [
+  { n: '01', title: 'Get a key', body: 'Create one in Console \u2192 Keys and top up the prepaid wallet. Keys look like <code>fh_live_\u2026</code> and are shown once.', link: '/api/authentication', linkText: 'Authentication' },
+  { n: '02', title: 'Pick a model', body: '<code>GET /v1/models</code> is public \u2014 no key needed. It answers the live catalogue with per-request USD rates, so you can price a run before you make it.', link: '/api/models', linkText: 'Model catalogue' },
+  { n: '03', title: 'Handle the two shapes', body: 'Image, chat and speech return the result on the same request. Video, 3D and IDA Q return a <code>job_id</code> you poll. Nothing else differs.', link: '/api/surface-map', linkText: 'API surface map' }
+]
+
 // ─── Static data ───
 const products = [
   {
     icon: `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`,
     title: 'API Platform',
-    description: 'Use our APIs and 200+ models to build your own AI experiences — images, video, audio, chat, 3D.',
+    description: 'One REST API over 100+ models — images, video, audio, chat, 3D — with the billing, storage and job handling already done.',
     link: '/api/getting-started'
   },
   {
@@ -257,12 +355,27 @@ const guides = [
   { title: 'MCP Integration', category: 'Integrations', link: '/guides/mcp-integration', image: 'https://static.fotohub.app/images/docs/guide-mcp-integration.webp' }
 ]
 
+/*
+ * Platform figures.
+ *
+ * Every number here is read off a live endpoint, not off a slide. The counts
+ * come from `GET https://apis.fotohub.app/v1/models` (public, no key needed)
+ * and `GET https://apis.fotohub.app/mcp/health`, both checked 2026-09-18.
+ *
+ * What used to sit here was "200+ AI models", "21 providers", "99.9% Uptime
+ * SLA" and "<200ms API latency". The catalogue answers 106 models from 19
+ * providers, and no uptime SLA is contracted and no latency budget is measured
+ * or published — the same two claims were removed from the marketing site for
+ * exactly that reason. Docs are the one surface a developer is entitled to
+ * treat as literal, so the row now carries only things they can re-check
+ * themselves with curl.
+ */
 const stats = [
-  { value: '200+', label: 'AI models' },
-  { value: '6+', label: 'Proprietary models' },
-  { value: '21', label: 'Providers' },
-  { value: '99.9%', label: 'Uptime SLA' },
-  { value: '<200ms', label: 'API latency' }
+  { value: '106', label: 'Models in the catalogue' },
+  { value: '19', label: 'Upstream providers' },
+  { value: '57', label: 'MCP tools' },
+  { value: '4', label: 'Run on our own GPUs' },
+  { value: '1', label: 'API key for all of it' }
 ]
 
 const resources = [
@@ -288,7 +401,7 @@ const tickerWords = features.map(f => f.title)
           <h1 class="hero-title">Build with the full power of generative AI</h1>
           <p class="hero-subtitle">Images, video, music, 3D, chat and agents behind one API key, one SDK and one bill.</p>
           <ul class="hero-points">
-            <li><span class="hero-point-check">✓</span>200+ models from every major provider — one SDK, zero juggling</li>
+            <li><span class="hero-point-check">✓</span>100+ models from 19 providers — one key, one SDK, one bill</li>
             <li><span class="hero-point-check">✓</span>Chain image &rarr; video &rarr; audio in just a few lines</li>
             <li><span class="hero-point-check">✓</span>Typed Python &amp; TypeScript SDKs — streaming and auto-retry built in</li>
           </ul>
@@ -321,12 +434,65 @@ const tickerWords = features.map(f => f.title)
       </div>
     </section>
 
+    <!-- ───────── Quickstart ─────────
+         The first thing below the fold is a request and the reply production
+         actually returned for it. A docs home that opens on feature cards makes
+         a developer hunt for the one paragraph they came for. -->
+    <section class="section quickstart" data-reveal="quickstart">
+      <div class="rule-head">
+        <span class="rule-no">01</span>
+        <span class="rule-line"></span>
+        <span class="rule-label">Your first call</span>
+        <a href="/guides/quickstart" class="view-all">Full quickstart &rarr;</a>
+      </div>
+
+      <div class="qs-split" :class="{ 'is-visible': revealed.has('quickstart') }">
+        <div class="qs-pane qs-pane--request">
+          <div class="qs-pane-head">
+            <div class="qs-tabs" role="tablist">
+              <button
+                v-for="tab in quickTabs"
+                :key="tab.id"
+                type="button"
+                role="tab"
+                class="qs-tab"
+                :class="{ 'is-active': activeTab === tab.id }"
+                :aria-selected="activeTab === tab.id"
+                @click="activeTab = tab.id"
+              >{{ tab.label }}</button>
+            </div>
+            <button type="button" class="qs-copy" @click="copyActiveCode">
+              {{ copiedCode ? 'copied' : 'copy' }}
+            </button>
+          </div>
+          <pre class="qs-code"><code>{{ quickTabs.find(t => t.id === activeTab).code }}</code></pre>
+        </div>
+
+        <div class="qs-pane qs-pane--response">
+          <div class="qs-pane-head">
+            <span class="qs-status"><span class="qs-status-dot"></span>200 OK &middot; 21.0 s</span>
+            <span class="qs-verified">real response, trimmed</span>
+          </div>
+          <pre class="qs-code qs-code--json"><code>{{ quickResponse }}</code></pre>
+        </div>
+      </div>
+
+      <ol class="qs-steps">
+        <li v-for="(step, i) in quickSteps" :key="step.n" class="qs-step" :class="{ 'is-visible': revealed.has('quickstart') }" :style="{ transitionDelay: `${200 + i * 90}ms` }">
+          <span class="qs-step-no">{{ step.n }}</span>
+          <h4 class="qs-step-title">{{ step.title }}</h4>
+          <p class="qs-step-body" v-html="step.body"></p>
+          <a :href="step.link" class="qs-step-link">{{ step.linkText }} &rarr;</a>
+        </li>
+      </ol>
+    </section>
+
     <!-- ───────── In-house systems ─────────
          Inverted cells: the only two blocks on the page rendered on ink, so the
          platform's own models are unmistakably the loudest thing after the hero. -->
     <section class="section proprietary" data-reveal="prop">
       <div class="rule-head">
-        <span class="rule-no">01</span>
+        <span class="rule-no">02</span>
         <span class="rule-line"></span>
         <span class="rule-label">Built in-house</span>
       </div>
@@ -357,7 +523,7 @@ const tickerWords = features.map(f => f.title)
     <!-- ───────── Three ways in ───────── -->
     <section class="section products" data-reveal="products">
       <div class="rule-head">
-        <span class="rule-no">02</span>
+        <span class="rule-no">03</span>
         <span class="rule-line"></span>
         <span class="rule-label">Three ways in</span>
       </div>
@@ -386,7 +552,7 @@ const tickerWords = features.map(f => f.title)
          only appears on hover, so the page never shows more than one accent. -->
     <section class="section features" data-reveal="features">
       <div class="rule-head">
-        <span class="rule-no">03</span>
+        <span class="rule-no">04</span>
         <span class="rule-line"></span>
         <span class="rule-label">Capabilities</span>
         <a href="/api/getting-started" class="view-all">View all APIs &rarr;</a>
@@ -419,7 +585,7 @@ const tickerWords = features.map(f => f.title)
         <div class="featured-content">
           <span class="featured-label">Featured</span>
           <h3 class="featured-title">Gabriel AI Orchestrator</h3>
-          <p class="featured-desc">Natural language routing to 200+ models. Intent classification, prompt enhancement, auto-failover. Just describe what you need — Gabriel picks the best model and optimizes your prompt automatically.</p>
+          <p class="featured-desc">Natural language routing across the whole catalogue. Intent classification, prompt enhancement, auto-failover. Just describe what you need — Gabriel picks the best model and optimizes your prompt automatically.</p>
           <a href="/api/gabriel-ai" class="featured-link">Read the Gabriel AI guide &rarr;</a>
         </div>
         <div class="featured-visual" style="background-image: url(https://static.fotohub.app/images/docs/gabriel-orchestrator.png)">
@@ -431,7 +597,7 @@ const tickerWords = features.map(f => f.title)
     <!-- ───────── Use cases / Showcase ───────── -->
     <section class="section use-cases" data-reveal="usecases">
       <div class="rule-head">
-        <span class="rule-no">04</span>
+        <span class="rule-no">05</span>
         <span class="rule-line"></span>
         <span class="rule-label">In production</span>
       </div>
@@ -452,7 +618,7 @@ const tickerWords = features.map(f => f.title)
          cases would have been the fourth identical grid in a row. -->
     <section class="section blog" v-if="blogPosts.length" data-reveal="blog">
       <div class="rule-head">
-        <span class="rule-no">05</span>
+        <span class="rule-no">06</span>
         <span class="rule-line"></span>
         <span class="rule-label">Latest from the blog</span>
         <a href="https://fotohub.app/news" class="view-all" target="_blank">View all &rarr;</a>
@@ -476,7 +642,7 @@ const tickerWords = features.map(f => f.title)
     <!-- ───────── Guides ───────── -->
     <section class="section guides" data-reveal="guides">
       <div class="rule-head">
-        <span class="rule-no">06</span>
+        <span class="rule-no">07</span>
         <span class="rule-line"></span>
         <span class="rule-label">Guides &amp; tutorials</span>
         <a href="/guides/quickstart" class="view-all">View all &rarr;</a>
@@ -869,6 +1035,198 @@ const tickerWords = features.map(f => f.title)
 }
 
 .install-foot:hover { color: var(--accent); background: var(--vp-c-bg-soft); }
+
+/* ─── Quickstart ───
+ * Two panes on one hairline grid: the request you send and the body production
+ * sent back. They share a border rather than floating as two cards, so the pair
+ * reads as one transaction instead of two unrelated code samples.
+ */
+.quickstart { }
+
+.qs-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.qs-split.is-visible { opacity: 1; transform: none; }
+
+.qs-pane { display: flex; flex-direction: column; min-width: 0; }
+.qs-pane--request { border-right: 1px solid var(--edge); }
+
+/* The response pane sits on a faintly tinted ground so the eye can tell at a
+   glance which half it is looking at without a second heading. */
+.qs-pane--response { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+
+.qs-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--edge-soft);
+  min-height: 44px;
+}
+
+.qs-tabs { display: flex; gap: 2px; }
+
+.qs-tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.qs-tab:hover { color: var(--ink); background: var(--edge-soft); }
+
+.qs-tab.is-active {
+  color: var(--on-ink);
+  background: var(--ink);
+}
+
+.qs-copy {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.qs-copy:hover { color: var(--ink); border-color: var(--ink); }
+
+.qs-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
+}
+
+.qs-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #15803d;
+  flex: none;
+}
+
+.dark .qs-status-dot { background: #4ade80; }
+
+.qs-verified {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+.qs-code {
+  margin: 0;
+  padding: 18px 16px 20px;
+  /* Capped rather than free-growing: the two panes share a row, so an
+     unbounded response pane leaves the request pane as several hundred pixels
+     of empty box next to it. */
+  max-height: 460px;
+  overflow: auto;
+  flex: 1;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ink);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.qs-code code { font: inherit; color: inherit; background: none; padding: 0; }
+
+.qs-code--json { color: color-mix(in srgb, var(--ink) 78%, transparent); }
+
+/* ─── Quickstart steps ─── */
+.qs-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--edge);
+}
+
+.qs-step {
+  padding: 22px 22px 22px 0;
+  border-right: 1px solid var(--edge-soft);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.qs-step:not(:first-child) { padding-left: 22px; }
+.qs-step:last-child { border-right: 0; }
+.qs-step.is-visible { opacity: 1; transform: none; }
+
+.qs-step-no {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: var(--accent-ink);
+}
+
+.qs-step-title {
+  margin: 8px 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.qs-step-body {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ink) 66%, transparent);
+}
+
+.qs-step-body :deep(code) {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--edge-soft);
+  color: var(--ink);
+}
+
+.qs-step-link {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--edge);
+  padding-bottom: 2px;
+  transition: border-color 0.15s;
+}
+
+.qs-step-link:hover { border-color: var(--ink); }
 
 /* ─── In-house cells (inverted) ─── */
 .prop-grid {
@@ -1440,6 +1798,22 @@ const tickerWords = features.map(f => f.title)
 }
 
 /* ─── Responsive ─── */
+@media (max-width: 860px) {
+  .qs-split { grid-template-columns: 1fr; }
+  /* The shared hairline has to move with the axis, or the two panes stack with
+     a rule down the side of nothing. */
+  .qs-pane--request { border-right: 0; border-bottom: 1px solid var(--edge); }
+  .qs-steps { grid-template-columns: 1fr; }
+  .qs-step { border-right: 0; border-bottom: 1px solid var(--edge-soft); padding: 18px 0; }
+  .qs-step:not(:first-child) { padding-left: 0; }
+  .qs-step:last-child { border-bottom: 0; }
+}
+
+@media (max-width: 560px) {
+  .qs-code { font-size: 11.5px; padding: 14px 12px 16px; }
+  .qs-pane-head { flex-wrap: wrap; row-gap: 6px; }
+}
+
 @media (max-width: 1023px) {
   .hero-split { grid-template-columns: 1fr; gap: 40px; }
   .products-grid { grid-template-columns: repeat(2, 1fr); }

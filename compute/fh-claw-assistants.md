@@ -1,11 +1,11 @@
 # FH Claw: Persistent Autonomous AI Assistants
 
-Deploy dedicated, containerized autonomous agents powered by the **FH Claw Engine** (`server/agent-compute/app/routes_claw.py`).
+Deploy dedicated, containerized autonomous agents powered by the **FH Claw Engine**.
 
 Unlike ephemeral one-shot task scripts, **FH Claw** instances maintain persistent state, memory, customized personalities ("Souls"), external communication channels (Telegram, Discord, Slack, WhatsApp, Email), and recurring background cron automations.
 
 ::: info
-**Base URL:** `https://apis.fotohub.app/compute/v1`
+**Base URL:** `https://comp1.fotohub.app`
 **Endpoints Route:** `/v1/claws`
 :::
 
@@ -36,7 +36,7 @@ flowchart TD
 
     subgraph User Isolated Execution Environment
         ClawDocker["Dedicated OpenClaw Container"]
-        MemStore["Persistent Vector Memory (Pinecone/Milvus)"]
+        MemStore["Conversation History Store"]
         Workspace["Virtual Workspace Filesystem (EBS)"]
         Sandboxes["Firecracker MicroVMs (Code Execution)"]
     end
@@ -53,8 +53,8 @@ flowchart TD
   Manages ingress and egress for your agent, translating messages from various platforms into standardized Claw Actions. Handles rate limiting, authentication, and websocket streaming.
 - **Soul Engine:** 
   Injects system prompts, context constraints, tone adjustments, and hardcoded boundaries into every reasoning step. This ensures that a customer support bot doesn't start talking like a pirate, unless instructed to.
-- **Persistent Vector Memory:** 
-  Automatically embeds conversational history and file context, providing semantic recall across months of interactions. Uses highly optimized HNSW indexes for sub-millisecond retrieval.
+- **Conversation History Store:** 
+  Persists every message exchanged with the Claw (`GET /v1/claws/:id/messages`) and replays it back into the model as context on subsequent turns.
 - **Firecracker MicroVMs:** 
   Allows your Claw to safely write and execute Python, Node, and bash scripts to solve complex analytical tasks without compromising the host. Each execution gets a fresh microVM launched in < 100ms.
 - **Autonomous Scheduler (Cron Engine):**
@@ -71,7 +71,7 @@ Authorization: Bearer fh_live_YOUR_API_KEY
 ```
 
 ::: warning Security Best Practices
-Never expose your `fh_live_` keys in client-side code (e.g., React, Vue, iOS apps). Always route requests through your backend to protect your billing account. Use `fh_test_` keys for development, which mock responses and do not incur USD charges.
+Never expose your `fh_live_` keys in client-side code (e.g., React, Vue, iOS apps). Always route requests through your backend to protect your billing account. There is no test-key type and no mock mode, so use a key with a low `rate_limit_per_minute` and a cheap model while developing.
 :::
 
 ---
@@ -87,7 +87,7 @@ FH Claw billing is derived directly from your **USD Wallet**. We charge a hybrid
 | **Starter** | 1 vCPU / 2GB RAM | $0.02 / hr | ~$14.40 / mo | Hobby projects, simple chat bots. | 10 GB | 100 |
 | **Pro** | 2 vCPU / 4GB RAM | $0.08 / hr | ~$57.60 / mo | Production workloads, team bots. | 50 GB | 1,000 |
 | **Ultimate** | 4 vCPU / 8GB RAM | $0.20 / hr | ~$144.00 / mo | Heavy code execution, cron tasks. | 200 GB | 10,000 |
-| **Enterprise** | Custom | Custom | Custom | VPC Peering, SOC2 compliance. | Unlimited | Unlimited |
+| **Enterprise** | Custom | Custom | Custom | VPC peering, dedicated capacity. | Unlimited | Unlimited |
 
 ### 3.2. Reasoning Model Costs (Per 1K Tokens)
 
@@ -97,7 +97,7 @@ FH Claw billing is derived directly from your **USD Wallet**. We charge a hybrid
 | `deep` | $0.0030 | $0.0150 | Claude 3.5 Sonnet | Complex reasoning, coding, professional writing, RAG. |
 | `reasoning`| $0.0050 | $0.0200 | DeepSeek R1 / Opus | Multi-step agentic planning, mathematical proofs. |
 
-*Note: All billing is automatically deducted from your FotoHub USD wallet balance. If your balance hits $0.00, your Claws will be paused. Vectors are retained for 30 days post-pause.*
+*Note: All billing is automatically deducted from your FotoHub USD wallet balance. If your balance hits $0.00, your Claws will be paused.*
 
 ---
 
@@ -132,7 +132,7 @@ Creates a new Claw instance and immediately begins provisioning the container. R
 import os
 import requests
 
-url = "https://apis.fotohub.app/compute/v1/claws"
+url = "https://comp1.fotohub.app/v1/claws"
 headers = {
     "Authorization": f"Bearer {os.getenv('FOTOHUB_API_KEY')}",
     "Content-Type": "application/json"
@@ -158,7 +158,7 @@ print(response.json())
 import axios from 'axios';
 
 async function createClaw() {
-  const response = await axios.post('https://apis.fotohub.app/compute/v1/claws', {
+  const response = await axios.post('https://comp1.fotohub.app/v1/claws', {
     name: "data-cruncher",
     display_name: "Data Cruncher Pro",
     tier: "pro",
@@ -192,7 +192,7 @@ import (
 )
 
 func main() {
-	url := "https://apis.fotohub.app/compute/v1/claws"
+	url := "https://comp1.fotohub.app/v1/claws"
 	payload := map[string]interface{}{
 		"name":         "data-cruncher",
 		"display_name": "Data Cruncher Pro",
@@ -223,7 +223,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+curl -X POST https://comp1.fotohub.app/v1/claws   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
     "name": "data-cruncher",
     "display_name": "Data Cruncher Pro",
     "tier": "pro",
@@ -244,12 +244,12 @@ Retrieve a list of all your provisioned Claws.
 
 ::: code-group
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/compute/v1/claws   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+curl -X GET https://comp1.fotohub.app/v1/claws   -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
 
 ```python [Python]
 response = requests.get(
-    "https://apis.fotohub.app/compute/v1/claws", 
+    "https://comp1.fotohub.app/v1/claws", 
     headers={"Authorization": f"Bearer {api_key}"}
 )
 print(response.json())
@@ -277,7 +277,7 @@ Retrieve metadata, uptime, and configuration of a specific Claw.
 
 ::: code-group
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/compute/v1/claws/data-cruncher   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+curl -X GET https://comp1.fotohub.app/v1/claws/data-cruncher   -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
 :::
 
@@ -296,96 +296,67 @@ curl -X GET https://apis.fotohub.app/compute/v1/claws/data-cruncher   -H "Author
     "tone": "professional",
     "language": "en"
   },
-  "memory_vectors_count": 1450
+  "container": { "status": "running" },
+  "subscription": { "status": "active", "tier": "pro" }
 }
 ```
 
 ### 4.4. Update Claw (`PATCH /v1/claws/:id`)
 
-Modify a Claw's tier, model mode, or soul configuration without dropping its memory or restarting the core container.
+Update a Claw's display settings — `display_name`, `avatar_url`, `quick_commands` — without dropping its memory or restarting the core container. To change the reasoning model use `PATCH /v1/claws/:id/model`; to change the personality use `PATCH /v1/claws/:id/soul`.
 
 ::: code-group
 ```bash [cURL]
-curl -X PATCH https://apis.fotohub.app/compute/v1/claws/data-cruncher   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "model_mode": "reasoning",
-    "tier": "ultimate",
-    "soul_config": {
-      "tone": "urgent"
-    }
+curl -X PATCH https://comp1.fotohub.app/v1/claws/data-cruncher   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+    "display_name": "Data Cruncher Pro (v2)"
   }'
 ```
 :::
 
 ### 4.5. Delete Claw (`DELETE /v1/claws/:id`)
 
-Permanently destroys a Claw, its isolated container, and all associated vector memory. **This action cannot be undone.**
+Permanently destroys a Claw and its isolated container. **This action cannot be undone.**
 
 ::: code-group
 ```bash [cURL]
-curl -X DELETE https://apis.fotohub.app/compute/v1/claws/data-cruncher   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+curl -X DELETE https://comp1.fotohub.app/v1/claws/data-cruncher   -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
 :::
 
-### 4.6. Send Message (`POST /v1/claws/:id/messages`)
+### 4.6. Send Message (`POST /v1/claws/:id/message`)
 
-Interact directly with your Claw via API. The Claw will evaluate the message, update its memory, potentially run tools/skills, and respond. Responses are streamed by default if `stream=true`.
+Interact directly with your Claw via API. The Claw evaluates the message, potentially runs tools/skills, and responds synchronously. Use `GET /v1/claws/:id/messages` to fetch the conversation history.
 
 ::: code-group
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws/data-cruncher/messages   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "role": "user",
-    "content": "Please analyze the Q3 revenue CSV I uploaded earlier.",
-    "stream": false
+curl -X POST https://comp1.fotohub.app/v1/claws/data-cruncher/message   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
+    "message": "Please analyze the Q3 revenue CSV I uploaded earlier.",
+    "channel": "web"
   }'
 ```
 
 ```python [Python]
 payload = {
-    "role": "user",
-    "content": "Please analyze the Q3 revenue CSV I uploaded earlier.",
-    "stream": False
+    "message": "Please analyze the Q3 revenue CSV I uploaded earlier.",
+    "channel": "web"
 }
 response = requests.post(
-    "https://apis.fotohub.app/compute/v1/claws/data-cruncher/messages",
+    "https://comp1.fotohub.app/v1/claws/data-cruncher/message",
     json=payload,
     headers={"Authorization": f"Bearer {api_key}"}
 )
-print(response.json()['message']['content'])
+print(response.json()["response"])
 ```
 :::
 
-### 4.7. Get Memory State (`GET /v1/claws/:id/memory`)
-
-Retrieve a summary of the Claw's current contextual memory and conversation history length.
-
-::: code-group
-```bash [cURL]
-curl -X GET https://apis.fotohub.app/compute/v1/claws/data-cruncher/memory   -H "Authorization: Bearer $FOTOHUB_API_KEY"
+**Response:**
+```json
+{
+  "success": true,
+  "response": "I found 3 anomalies in Q3 revenue...",
+  "claw_id": "claw_123abc"
+}
 ```
-:::
-
-### 4.8. Clear Memory (`POST /v1/claws/:id/memory/clear`)
-
-Wipe the Claw's contextual vector memory, giving it a fresh start. Does not affect the Soul configuration or installed skills.
-
-::: code-group
-```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws/data-cruncher/memory/clear   -H "Authorization: Bearer $FOTOHUB_API_KEY"
-```
-:::
-
-### 4.9. Trigger Background Run (`POST /v1/claws/:id/runs`)
-
-Dispatch an asynchronous background task to the Claw. The Claw will execute the instructions in the background and optionally notify external channels when complete. Perfect for long-running scripts or batch jobs.
-
-::: code-group
-```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws/data-cruncher/runs   -H "Authorization: Bearer $FOTOHUB_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "instructions": "Scan the AWS bucket for new logs, parse them, and generate a PDF report.",
-    "callback_url": "https://my-app.com/webhooks/claw-done"
-  }'
-```
-:::
 
 ---
 
@@ -678,22 +649,15 @@ Explore these 8 massive, highly detailed configuration templates to inspire your
 
 ---
 
-## 7. The Memory Architecture In-Depth
+## 7. Conversation Memory
 
-Claws possess two distinct forms of memory, enabling them to maintain context over vast timeframes:
-
-1. **Short-Term Context (Sliding Window):** 
-   The immediate conversation history. Older messages are progressively summarized and shifted out of the direct LLM context window to save token costs and prevent context degradation.
-2. **Long-Term Vector Memory (RAG):** 
-   Behind the scenes, the Claw automatically embeds key facts, user preferences, and file contents into an isolated Vector Store (using Pinecone or Milvus). 
-   - When a user asks "What did we decide last month regarding the database migration?", the Claw queries its vector memory using semantic search.
-   - It retrieves the relevant historical context chunks and injects them into the current prompt, allowing it to answer accurately as if it remembered the conversation perfectly.
+Each Claw's conversation history is persisted per-instance (`GET /v1/claws/:id/messages`) and sent back into the model as context on every turn, so a Claw remembers earlier parts of the same conversation across `POST /v1/claws/:id/message` calls. There is currently no separate long-term vector-memory API — this page previously described a Pinecone/Milvus-backed semantic recall layer, but no such store or endpoint exists in the running service, so that claim has been removed rather than left undocumented-but-implied.
 
 ---
 
 ## 8. Conclusion
 
-FH Claw represents a paradigm shift from traditional API endpoints to persistent, thinking AI companions. By combining isolated execution environments, stateful vector memory, and rich communication channels, you can automate complex, multi-step workflows that previously required entire engineering teams to build and maintain.
+FH Claw represents a paradigm shift from traditional API endpoints to persistent, thinking AI companions. By combining isolated execution environments, persistent conversation history, and rich communication channels, you can automate complex, multi-step workflows that previously required entire engineering teams to build and maintain.
 
 Start building your first Claw today by issuing a `POST /v1/claws` request!
 
@@ -702,7 +666,7 @@ Start building your first Claw today by issuing a `POST /v1/claws` request!
 ## 9. Troubleshooting & FAQ
 
 **Q: My Claw keeps losing context after 100 messages, why?**
-A: Ensure that Vector Memory is fully enabled for your tier. While the short-term sliding window handles recent messages, long-term semantic recall relies on the background embedding process. Check the `/v1/claws/:id/memory` endpoint to verify that `memory_vectors_count` is increasing.
+A: Conversation history is passed back to the model as context on every turn, but very long conversations can exceed the model's context window. Use `GET /v1/claws/:id/messages` to inspect how much history has accumulated, and consider starting a fresh conversation thread for unrelated tasks.
 
 **Q: Can I run custom Docker images in the Sandbox?**
 A: Currently, the Firecracker MicroVM sandboxes run a hardened, standard Python/Node environment pre-loaded with common data science and utility libraries. Custom Docker images are only supported on the **Enterprise** tier via dedicated VPC peering.
@@ -710,14 +674,14 @@ A: Currently, the Firecracker MicroVM sandboxes run a hardened, standard Python/
 **Q: How do I handle authentication for third-party APIs inside a Claw?**
 A: Never hardcode API keys in the `soul_config`. Instead, use the FotoHub Secrets Manager. You can inject secrets into the Claw's environment variables by linking them during creation. The Claw can then access them securely via `os.environ`.
 
-**Q: Why did my background run timeout?**
-A: Background runs (`POST /v1/claws/:id/runs`) have a default timeout based on your tier. Starter tier times out at 5 minutes, Pro at 15 minutes, and Ultimate at 60 minutes. If your task requires more time, break it into smaller sub-tasks and have the Claw chain them using its internal scheduler.
+**Q: How do I run a recurring background job on my Claw?**
+A: There is no one-off "trigger a background run" endpoint — use `POST /v1/claws/:id/crons` to schedule a recurring reasoning loop instead (see [Cron Schedules](/compute/cron-schedules)). If a run doesn't finish within your tier's execution window, break the task into smaller cron-triggered steps.
 
 **Q: How do I monitor my Claw's token usage in real-time?**
 A: Use the FotoHub Web Console and navigate to **Billing > Agents**. You can also set up budget alerts that will notify you via email or Slack if a specific Claw exceeds its daily token allocation.
 
 **Q: What happens to my data if I delete a Claw?**
-A: Deleting a Claw via `DELETE /v1/claws/:id` is a hard delete. The container is destroyed, and the isolated Pinecone namespace containing its vector memory is permanently purged. Please export any important memories using the API before initiating a delete.
+A: Deleting a Claw via `DELETE /v1/claws/:id` is a hard delete. The container is destroyed and its conversation history is removed. Please export any important conversations via `GET /v1/claws/:id/messages` before initiating a delete.
 
 ---
 

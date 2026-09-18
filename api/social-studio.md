@@ -1,8 +1,8 @@
 # FotoHUB Social Studio API
 
-FotoHUB Social Studio (`/v1/social`) provides multi-platform social media publishing, scheduling, calendar management, and AI content assistance across Facebook, Instagram, LinkedIn, Twitter/X, and TikTok.
+FotoHUB Social Studio (`/social/v1`) provides multi-platform social media publishing, scheduling, calendar management, and AI content assistance across Facebook, Instagram, LinkedIn, Twitter/X, and TikTok.
 
-Base URL: `https://apis.fotohub.app/v1`
+Base URL: `https://apis.fotohub.app/social/v1`
 
 ::: tip
 All API requests must be authenticated using your live API key. Test keys cannot interact with live social platform endpoints.
@@ -16,7 +16,7 @@ The FotoHUB Social Studio engine relies on a unified event bus to handle synchro
 
 ```mermaid
 flowchart TD
-    Client["Client App"] --> API["Social Studio API (v1/social)"]
+    Client["Client App"] --> API["Social Studio API (social/v1)"]
     API --> Accounts["Account Management"]
     API --> AI["AI Content Generation"]
     API --> Pub["Publishing Engine"]
@@ -84,7 +84,7 @@ Each platform enforces different request thresholds. Rate limit headers (`X-Rate
 Retrieve a list of all social accounts currently authenticated and linked to your workspace.
 
 ```
-GET /v1/accounts
+GET /social/v1/accounts
 ```
 
 #### Response Parameters
@@ -106,12 +106,12 @@ headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json",
 }
-resp = requests.get("https://apis.fotohub.app/v1/accounts", headers=headers)
+resp = requests.get("https://apis.fotohub.app/social/v1/accounts", headers=headers)
 print(resp.json())
 ```
 
 ```typescript [TypeScript]
-const resp = await fetch("https://apis.fotohub.app/v1/accounts", {
+const resp = await fetch("https://apis.fotohub.app/social/v1/accounts", {
   method: "GET",
   headers: {
     "Authorization": "Bearer fh_live_your_api_key",
@@ -132,7 +132,7 @@ import (
 )
 
 func main() {
-	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/accounts", nil)
+	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/social/v1/accounts", nil)
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
 
@@ -146,7 +146,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/accounts \
+curl -X GET https://apis.fotohub.app/social/v1/accounts \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json"
 ```
@@ -158,15 +158,24 @@ curl -X GET https://apis.fotohub.app/v1/accounts \
 Initiates the OAuth 2.0 flow for a specified platform.
 
 ```
-POST /v1/accounts/connect
+POST /social/v1/accounts/connect/{platform}
 ```
 
-#### Request Parameters
+#### Path Parameters
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `platform` | string | **Yes** | Options: `instagram`, `tiktok`, `facebook`, `linkedin`, `twitter` |
+
+#### Request Body
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `platform` | string | **Yes** | - | Options: `instagram`, `tiktok`, `facebook`, `linkedin`, `twitter` |
-| `redirect_uri` | string | **Yes** | - | URL to redirect users back to after authorization. |
+| `redirect_uri` | string | No | account default | URL to redirect users back to after authorization. |
+| `account_type` | string | No | - | `page`, `profile`, or `business`. |
+| `scopes` | array of strings | No | - | Additional OAuth scopes to request. |
+
+This returns an `oauth_url` to redirect the user to, plus a `state` token to verify on callback — it does not connect the account synchronously.
 
 ::: code-group
 
@@ -178,22 +187,20 @@ headers = {
     "Content-Type": "application/json",
 }
 payload = {
-    "platform": "tiktok",
     "redirect_uri": "https://myapp.com/callbacks/social"
 }
-resp = requests.post("https://apis.fotohub.app/v1/accounts/connect", headers=headers, json=payload)
+resp = requests.post("https://apis.fotohub.app/social/v1/accounts/connect/tiktok", headers=headers, json=payload)
 print(resp.json())
 ```
 
 ```typescript [TypeScript]
-const resp = await fetch("https://apis.fotohub.app/v1/accounts/connect", {
+const resp = await fetch("https://apis.fotohub.app/social/v1/accounts/connect/tiktok", {
   method: "POST",
   headers: {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    platform: "tiktok",
     redirect_uri: "https://myapp.com/callbacks/social"
   })
 });
@@ -214,12 +221,11 @@ import (
 
 func main() {
 	payload := map[string]string{
-		"platform":     "tiktok",
 		"redirect_uri": "https://myapp.com/callbacks/social",
 	}
 	jsonValue, _ := json.Marshal(payload)
 	
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/accounts/connect", bytes.NewBuffer(jsonValue))
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/social/v1/accounts/connect/tiktok", bytes.NewBuffer(jsonValue))
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
 
@@ -233,10 +239,10 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/accounts/connect \
+curl -X POST https://apis.fotohub.app/social/v1/accounts/connect/tiktok \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"platform":"tiktok","redirect_uri":"https://myapp.com/callbacks/social"}'
+  -d '{"redirect_uri":"https://myapp.com/callbacks/social"}'
 ```
 
 :::
@@ -246,7 +252,7 @@ curl -X POST https://apis.fotohub.app/v1/accounts/connect \
 Revokes the OAuth token and removes the account from your workspace.
 
 ```
-DELETE /v1/accounts/{id}
+DELETE /social/v1/accounts/{account_id}
 ```
 
 ::: code-group
@@ -257,12 +263,12 @@ import requests
 headers = {
     "Authorization": "Bearer fh_live_your_api_key"
 }
-resp = requests.delete("https://apis.fotohub.app/v1/accounts/acc_12345", headers=headers)
+resp = requests.delete("https://apis.fotohub.app/social/v1/accounts/acc_12345", headers=headers)
 print(resp.status_code)
 ```
 
 ```typescript [TypeScript]
-const resp = await fetch("https://apis.fotohub.app/v1/accounts/acc_12345", {
+const resp = await fetch("https://apis.fotohub.app/social/v1/accounts/acc_12345", {
   method: "DELETE",
   headers: {
     "Authorization": "Bearer fh_live_your_api_key"
@@ -280,7 +286,7 @@ import (
 )
 
 func main() {
-	req, _ := http.NewRequest("DELETE", "https://apis.fotohub.app/v1/accounts/acc_12345", nil)
+	req, _ := http.NewRequest("DELETE", "https://apis.fotohub.app/social/v1/accounts/acc_12345", nil)
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 
 	client := &http.Client{}
@@ -292,7 +298,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X DELETE https://apis.fotohub.app/v1/accounts/acc_12345 \
+curl -X DELETE https://apis.fotohub.app/social/v1/accounts/acc_12345 \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 
@@ -302,24 +308,31 @@ curl -X DELETE https://apis.fotohub.app/v1/accounts/acc_12345 \
 
 ## Publishing Engine
 
+There is no single "publish now" call. You create a post resource, then either
+publish it immediately or let it auto-publish at a `scheduled_at` time.
+
 ### 1. Publish Immediately
 
-Execute a synchronous or near-synchronous post to target platforms. Note that some API calls might still return `202 Accepted` if video transcoding is required.
+Create a post, then trigger a publish on it.
 
 ```
-POST /v1/social/publish
+POST /social/v1/posts
+POST /social/v1/posts/{post_id}/publish
 ```
 
-#### Request Parameters
+#### Request Parameters — `POST /social/v1/posts`
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `account_ids` | array of strings | **Yes** | - | Target account IDs to publish to. |
-| `media_url` | string | **Yes** | - | URL of the media (image/video) to publish. |
-| `caption` | string | No | `""` | The post text or caption. |
+| `account_ids` | array of strings | No | `[]` | Target account IDs to publish to. |
+| `media_urls` | array of strings | No | `[]` | URLs of the media (image/video) to publish. |
+| `text` | string | No | `""` | The post text or caption. |
 | `hashtags` | array of strings | No | `[]` | List of hashtags. |
 | `first_comment` | string | No | `""` | The comment to post immediately after publishing. |
-| `location_id` | string | No | `null` | Platform-specific location ID. |
+| `post_type` | string | No | `post` | `post`, `story`, `reel`, `carousel`, `thread`, `poll`. |
+
+Omit `scheduled_at` to create it as a `draft`, then call `.../publish` (optionally
+with a `target_accounts` override) to push it live.
 
 ::: code-group
 
@@ -332,29 +345,37 @@ headers = {
 }
 payload = {
     "account_ids": ["acc_ig_01", "acc_tk_02"],
-    "media_url": "https://s3.amazonaws.com/mybucket/video.mp4",
-    "caption": "Check out this amazing new feature! 🔥",
+    "media_urls": ["https://s3.amazonaws.com/mybucket/video.mp4"],
+    "text": "Check out this amazing new feature! 🔥",
     "hashtags": ["#feature", "#launch", "#tech"],
     "first_comment": "Link in bio!"
 }
-resp = requests.post("https://apis.fotohub.app/v1/social/publish", headers=headers, json=payload)
+post = requests.post("https://apis.fotohub.app/social/v1/posts", headers=headers, json=payload).json()
+resp = requests.post(f"https://apis.fotohub.app/social/v1/posts/{post['id']}/publish", headers=headers, json={})
 print(resp.json())
 ```
 
 ```typescript [TypeScript]
-const resp = await fetch("https://apis.fotohub.app/v1/social/publish", {
+const headers = {
+  "Authorization": "Bearer fh_live_your_api_key",
+  "Content-Type": "application/json",
+};
+const post = await (await fetch("https://apis.fotohub.app/social/v1/posts", {
   method: "POST",
-  headers: {
-    "Authorization": "Bearer fh_live_your_api_key",
-    "Content-Type": "application/json",
-  },
+  headers,
   body: JSON.stringify({
     account_ids: ["acc_ig_01", "acc_tk_02"],
-    media_url: "https://s3.amazonaws.com/mybucket/video.mp4",
-    caption: "Check out this amazing new feature! 🔥",
+    media_urls: ["https://s3.amazonaws.com/mybucket/video.mp4"],
+    text: "Check out this amazing new feature! 🔥",
     hashtags: ["#feature", "#launch", "#tech"],
     first_comment: "Link in bio!"
   })
+})).json();
+
+const resp = await fetch(`https://apis.fotohub.app/social/v1/posts/${post.id}/publish`, {
+  method: "POST",
+  headers,
+  body: JSON.stringify({})
 });
 console.log(await resp.json());
 ```
@@ -373,55 +394,63 @@ import (
 func main() {
 	payload := map[string]interface{}{
 		"account_ids":   []string{"acc_ig_01", "acc_tk_02"},
-		"media_url":     "https://s3.amazonaws.com/mybucket/video.mp4",
-		"caption":       "Check out this amazing new feature! 🔥",
+		"media_urls":    []string{"https://s3.amazonaws.com/mybucket/video.mp4"},
+		"text":          "Check out this amazing new feature! 🔥",
 		"hashtags":      []string{"#feature", "#launch", "#tech"},
 		"first_comment": "Link in bio!",
 	}
 	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/social/publish", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/social/v1/posts", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, _ := client.Do(req)
 	defer resp.Body.Close()
-	
+
 	respBody, _ := io.ReadAll(resp.Body)
 	fmt.Println(string(respBody))
+	// Then POST https://apis.fotohub.app/social/v1/posts/{post_id}/publish with an empty body.
 }
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/social/publish \
+curl -X POST https://apis.fotohub.app/social/v1/posts \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
     "account_ids": ["acc_ig_01", "acc_tk_02"],
-    "media_url": "https://s3.amazonaws.com/mybucket/video.mp4",
-    "caption": "Check out this amazing new feature! 🔥",
+    "media_urls": ["https://s3.amazonaws.com/mybucket/video.mp4"],
+    "text": "Check out this amazing new feature! 🔥",
     "hashtags": ["#feature", "#launch", "#tech"],
     "first_comment": "Link in bio!"
   }'
+# then, with the returned post id:
+curl -X POST https://apis.fotohub.app/social/v1/posts/post_abc123/publish \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
 
 :::
 
 ### 2. Schedule Post
 
-Schedule a post for a future date/time. The time must be provided in ISO 8601 format and must be at least 15 minutes in the future.
+Same endpoint as creating a post — pass `scheduled_at` and the post is stored with
+status `scheduled` and published automatically at that time. No separate call is
+needed.
 
 ```
-POST /v1/social/schedule
+POST /social/v1/posts
 ```
 
 #### Request Parameters
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `account_ids` | array of strings | **Yes** | - | Target account IDs to publish to. |
-| `media_url` | string | **Yes** | - | URL of the media (image/video). |
-| `caption` | string | No | `""` | The post text or caption. |
+| `account_ids` | array of strings | No | `[]` | Target account IDs to publish to. |
+| `media_urls` | array of strings | No | `[]` | URLs of the media (image/video). |
+| `text` | string | No | `""` | The post text or caption. |
 | `scheduled_at` | string | **Yes** | - | ISO 8601 timestamp in UTC. |
 
 ::: code-group
@@ -435,16 +464,16 @@ headers = {
 }
 payload = {
     "account_ids": ["acc_tw_01"],
-    "media_url": "https://s3.amazonaws.com/mybucket/image.png",
-    "caption": "Coming next week...",
+    "media_urls": ["https://s3.amazonaws.com/mybucket/image.png"],
+    "text": "Coming next week...",
     "scheduled_at": "2027-10-01T12:00:00Z"
 }
-resp = requests.post("https://apis.fotohub.app/v1/social/schedule", headers=headers, json=payload)
+resp = requests.post("https://apis.fotohub.app/social/v1/posts", headers=headers, json=payload)
 print(resp.json())
 ```
 
 ```typescript [TypeScript]
-const resp = await fetch("https://apis.fotohub.app/v1/social/schedule", {
+const resp = await fetch("https://apis.fotohub.app/social/v1/posts", {
   method: "POST",
   headers: {
     "Authorization": "Bearer fh_live_your_api_key",
@@ -452,8 +481,8 @@ const resp = await fetch("https://apis.fotohub.app/v1/social/schedule", {
   },
   body: JSON.stringify({
     account_ids: ["acc_tw_01"],
-    media_url: "https://s3.amazonaws.com/mybucket/image.png",
-    caption: "Coming next week...",
+    media_urls: ["https://s3.amazonaws.com/mybucket/image.png"],
+    text: "Coming next week...",
     scheduled_at: "2027-10-01T12:00:00Z"
   })
 });
@@ -474,12 +503,12 @@ import (
 func main() {
 	payload := map[string]interface{}{
 		"account_ids":  []string{"acc_tw_01"},
-		"media_url":    "https://s3.amazonaws.com/mybucket/image.png",
-		"caption":      "Coming next week...",
+		"media_urls":   []string{"https://s3.amazonaws.com/mybucket/image.png"},
+		"text":         "Coming next week...",
 		"scheduled_at": "2027-10-01T12:00:00Z",
 	}
 	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/social/schedule", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/social/v1/posts", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
 
@@ -493,13 +522,13 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/social/schedule \
+curl -X POST https://apis.fotohub.app/social/v1/posts \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
     "account_ids": ["acc_tw_01"],
-    "media_url": "https://s3.amazonaws.com/mybucket/image.png",
-    "caption": "Coming next week...",
+    "media_urls": ["https://s3.amazonaws.com/mybucket/image.png"],
+    "text": "Coming next week...",
     "scheduled_at": "2027-10-01T12:00:00Z"
   }'
 ```
@@ -511,16 +540,17 @@ curl -X POST https://apis.fotohub.app/v1/social/schedule \
 Retrieve a paginated list of posts.
 
 ```
-GET /v1/social/posts
+GET /social/v1/posts
 ```
 
 #### Request Parameters (Query Strings)
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `status` | string | No | `all` | Filter by `published`, `scheduled`, `draft`, or `failed`. |
-| `limit` | integer | No | `50` | Number of results per page (max 100). |
-| `cursor` | string | No | `null` | Pagination cursor. |
+| `status` | string | No | - | Filter by `draft`, `scheduled`, `publishing`, `published`, or `failed`. |
+| `platform` | string | No | - | Filter by platform. |
+| `limit` | integer | No | `50` | Number of results per page (max 200). |
+| `offset` | integer | No | `0` | Pagination offset. |
 
 ::: code-group
 
@@ -530,12 +560,12 @@ import requests
 headers = {
     "Authorization": "Bearer fh_live_your_api_key"
 }
-resp = requests.get("https://apis.fotohub.app/v1/social/posts?status=published&limit=10", headers=headers)
+resp = requests.get("https://apis.fotohub.app/social/v1/posts?status=published&limit=10", headers=headers)
 print(resp.json())
 ```
 
 ```typescript [TypeScript]
-const resp = await fetch("https://apis.fotohub.app/v1/social/posts?status=published&limit=10", {
+const resp = await fetch("https://apis.fotohub.app/social/v1/posts?status=published&limit=10", {
   method: "GET",
   headers: {
     "Authorization": "Bearer fh_live_your_api_key",
@@ -554,7 +584,7 @@ import (
 )
 
 func main() {
-	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/social/posts?status=published&limit=10", nil)
+	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/social/v1/posts?status=published&limit=10", nil)
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 
 	client := &http.Client{}
@@ -567,7 +597,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/social/posts?status=published&limit=10" \
+curl -X GET "https://apis.fotohub.app/social/v1/posts?status=published&limit=10" \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 
@@ -576,25 +606,32 @@ curl -X GET "https://apis.fotohub.app/v1/social/posts?status=published&limit=10"
 ### 4. Get Post Details
 
 ```
-GET /v1/social/posts/{id}
+GET /social/v1/posts/{post_id}
 ```
 
-Fetches complete metadata and current analytics for a specific post.
+Fetches the post plus a `results` array with per-platform publish outcomes (used
+for per-post analytics — there is no separate analytics-by-post-id endpoint).
 
-### 5. Cancel Scheduled Post
-
-```
-DELETE /v1/social/posts/{id}
-```
-
-Cancels a post that is currently scheduled. Does not delete it entirely, moves it to `draft`.
-
-### 6. Bulk Publish
-
-Publish the identical payload to multiple platforms concurrently. 
+### 5. Delete Post
 
 ```
-POST /v1/social/bulk
+DELETE /social/v1/posts/{post_id}
+```
+
+Permanently deletes the post and its publish results. This is a hard delete, not
+a move to `draft` — cancel a scheduled post by `PATCH`-ing its `status` instead if
+you want to keep the record.
+
+### 6. Bulk Import Posts
+
+Create up to `MAX_POSTS_PER_IMPORT` posts in one call — each entry can carry its
+own text, media, target accounts and `scheduled_at`. This is for importing a batch
+of *different* posts (e.g. a content calendar), not for fanning one payload out to
+several platforms — a single `POST /social/v1/posts` call already publishes to every
+account listed in `account_ids`.
+
+```
+POST /social/v1/posts/bulk-import
 ```
 
 ---
@@ -608,19 +645,21 @@ Our AI models (running on GPU4/5 clusters) assist with creative captioning and h
 Generate an optimized caption tailored to the platform.
 
 ```
-POST /v1/social/captions/generate
+POST /social/v1/ai/generate-caption
 ```
 
 #### Request Parameters
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `media_url` | string | No | `null` | Vision analysis will be performed if provided. |
-| `platform` | string | **Yes** | - | e.g. `instagram`, `linkedin`. |
-| `tone` | string | No | `professional` | `funny`, `casual`, `formal`, `viral`. |
+| `platform` | string | **Yes** | - | e.g. `instagram`, `linkedin`, `facebook`, `twitter`, `tiktok`. |
+| `topic` | string | No | - | What the post is about. |
+| `context` | string | No | - | Additional context about the post. |
+| `tone` | string | No | `professional` | `professional`, `casual`, `humorous`, `inspirational`, `educational`. |
 | `language` | string | No | `en` | ISO 639-1 code. |
-| `include_hashtags` | boolean | No | `true` | Include tags in output. |
-| `num_hashtags` | integer | No | `5` | Between 5 and 30. |
+| `include_emojis` | boolean | No | `true` | Include emojis in output. |
+| `include_cta` | boolean | No | `false` | Include a call-to-action. |
+| `count` | integer | No | `3` | Number of caption variants to generate (1-10). |
 
 ::: code-group
 
@@ -633,16 +672,17 @@ headers = {
 }
 payload = {
     "platform": "instagram",
-    "tone": "viral",
-    "include_hashtags": True,
-    "num_hashtags": 10
+    "topic": "our new feature launch",
+    "tone": "casual",
+    "include_emojis": True,
+    "count": 3
 }
-resp = requests.post("https://apis.fotohub.app/v1/social/captions/generate", headers=headers, json=payload)
+resp = requests.post("https://apis.fotohub.app/social/v1/ai/generate-caption", headers=headers, json=payload)
 print(resp.json())
 ```
 
 ```typescript [TypeScript]
-const resp = await fetch("https://apis.fotohub.app/v1/social/captions/generate", {
+const resp = await fetch("https://apis.fotohub.app/social/v1/ai/generate-caption", {
   method: "POST",
   headers: {
     "Authorization": "Bearer fh_live_your_api_key",
@@ -650,9 +690,10 @@ const resp = await fetch("https://apis.fotohub.app/v1/social/captions/generate",
   },
   body: JSON.stringify({
     platform: "instagram",
-    tone: "viral",
-    include_hashtags: true,
-    num_hashtags: 10
+    topic: "our new feature launch",
+    tone: "casual",
+    include_emojis: true,
+    count: 3
   })
 });
 console.log(await resp.json());
@@ -671,13 +712,14 @@ import (
 
 func main() {
 	payload := map[string]interface{}{
-		"platform":         "instagram",
-		"tone":             "viral",
-		"include_hashtags": true,
-		"num_hashtags":     10,
+		"platform":       "instagram",
+		"topic":          "our new feature launch",
+		"tone":           "casual",
+		"include_emojis": true,
+		"count":          3,
 	}
 	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/social/captions/generate", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/social/v1/ai/generate-caption", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
 
@@ -691,14 +733,15 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/social/captions/generate \
+curl -X POST https://apis.fotohub.app/social/v1/ai/generate-caption \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "instagram",
-    "tone": "viral",
-    "include_hashtags": true,
-    "num_hashtags": 10
+    "topic": "our new feature launch",
+    "tone": "casual",
+    "include_emojis": true,
+    "count": 3
   }'
 ```
 
@@ -706,19 +749,45 @@ curl -X POST https://apis.fotohub.app/v1/social/captions/generate \
 
 ### 2. Translate Caption
 
-```
-POST /v1/social/captions/translate
-```
-
-Translates an existing caption to a target language while preserving emojis, hashtags, and formatting.
-
-### 3. Trending Hashtags
+There is no social-specific caption translator. Use FOTOhub's general-purpose
+translation endpoint instead; it does not make platform-specific guarantees about
+preserving hashtag/emoji placement, so review the output before posting.
 
 ```
-POST /v1/social/hashtags/trending
+POST /v1/ai/translate
 ```
 
-Fetches regional trending hashtags. Note: This requires active social graph sync.
+### 3. Trending / Suggested Hashtags
+
+```
+POST /social/v1/ai/suggest-hashtags
+```
+
+#### Request Parameters
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `content` | string | **Yes** | - | The post text to suggest hashtags for. |
+| `platform` | string | No | `instagram` | Platform to optimize hashtags for. |
+| `count` | integer | No | `15` | Number of hashtags to return (1-30). |
+| `include_trending` | boolean | No | `true` | Include currently-trending tags. |
+| `include_niche` | boolean | No | `true` | Include smaller, niche-audience tags. |
+| `language` | string | No | `en` | ISO 639-1 code. |
+
+::: code-group
+
+```bash [cURL]
+curl -X POST https://apis.fotohub.app/social/v1/ai/suggest-hashtags \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Launching our new feature today!",
+    "platform": "instagram",
+    "include_trending": true
+  }'
+```
+
+:::
 
 ---
 
@@ -728,19 +797,26 @@ Retrieve deep engagement metrics and account-level summaries.
 
 ### 1. Post Analytics
 
+There is no analytics-by-post-id endpoint. Per-post results come back inline on
+`GET /social/v1/posts/{post_id}` (its `results` array), or in bulk, sortable by
+engagement, via:
+
 ```
-GET /v1/social/analytics/{post_id}
+GET /social/v1/analytics/posts
 ```
 
-Returns `views`, `likes`, `shares`, `comments`, `saves`, `reach`, and `impressions`. 
+Query params: `account_id`, `date_from`, `date_to`, `sort_by`
+(`engagement_rate`, `impressions`, `reach`, `likes`), `limit`, `offset`.
 
 ### 2. Account Summary
 
 ```
-GET /v1/social/analytics/summary?period=30d
+GET /social/v1/analytics/overview
 ```
 
-Valid periods: `7d`, `30d`, `90d`.
+Query params: `account_ids` (comma-separated), `date_from`, `date_to`. Returns
+aggregate followers, reach, impressions, engagement and per-account breakdowns —
+there is no `period=7d/30d/90d` shorthand; pass explicit `date_from`/`date_to`.
 
 ---
 
@@ -861,20 +937,20 @@ def populate_calendar():
     for i, img in enumerate(images):
         # 2. Generate Caption
         cap_resp = requests.post(
-            "https://apis.fotohub.app/v1/social/captions/generate",
+            "https://apis.fotohub.app/social/v1/ai/generate-caption",
             headers={"Authorization": "Bearer fh_live_your_api_key"},
-            json={"media_url": img, "platform": "instagram"}
+            json={"platform": "instagram", "topic": "daily photo drop"}
         ).json()
         
         # 3. Schedule for Tomorrow
         run_date = datetime.datetime.utcnow() + datetime.timedelta(days=i+1)
         requests.post(
-            "https://apis.fotohub.app/v1/social/schedule",
+            "https://apis.fotohub.app/social/v1/posts",
             headers={"Authorization": "Bearer fh_live_your_api_key"},
             json={
                 "account_ids": ["acc_ig_01"],
-                "media_url": img,
-                "caption": cap_resp.get("caption", ""),
+                "media_urls": [img],
+                "text": (cap_resp.get("captions") or [""])[0],
                 "scheduled_at": run_date.isoformat() + "Z"
             }
         )
@@ -919,81 +995,58 @@ You do not need to implement manual retries for HTTP 502 or 503 errors from our 
 
 ---
 
-## Advanced: Bring Your Own Bucket (BYOB)
+## Advanced: Exporting Analytics Data
 
-For enterprise users, FotoHUB supports exporting transcoded media and analytics reports directly to your own AWS S3 or Cloudflare R2 bucket.
+::: warning Not a bucket-sync feature
+There is no "Bring Your Own Bucket" capability — Social Studio does not accept
+AWS/R2 IAM credentials and does not push data to a customer-owned bucket on a
+schedule. What exists is an on-demand analytics export you pull yourself.
+:::
 
-### 1. Configure S3 Export
+### 1. Export Analytics
 
 ```
-POST /v1/social/config/export
+GET /social/v1/analytics/export
 ```
 
-#### Request Parameters
+#### Query Parameters
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `provider` | string | **Yes** | `aws` or `r2`. |
-| `bucket_name` | string | **Yes** | Destination bucket name. |
-| `region` | string | **Yes** | Bucket region (e.g., `us-east-1`). |
-| `access_key` | string | **Yes** | IAM access key. |
-| `secret_key` | string | **Yes** | IAM secret key. |
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `format` | string | No | `csv` | `csv` or `json`. |
+| `account_ids` | string | No | - | Comma-separated account IDs to filter by. |
+| `date_from` | string | No | - | ISO date, inclusive lower bound. |
+| `date_to` | string | No | - | ISO date, inclusive upper bound. |
 
 ::: code-group
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/social/config/export \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "provider": "aws",
-    "bucket_name": "my-enterprise-bucket",
-    "region": "us-east-1",
-    "access_key": "AKIA...",
-    "secret_key": "..."
-  }'
+curl -X GET "https://apis.fotohub.app/social/v1/analytics/export?format=json&date_from=2027-09-01" \
+  -H "Authorization: Bearer fh_live_your_api_key"
 ```
 
 ```python [Python]
 import requests
 
-headers = {
-    "Authorization": "Bearer fh_live_your_api_key",
-    "Content-Type": "application/json",
-}
-payload = {
-    "provider": "aws",
-    "bucket_name": "my-enterprise-bucket",
-    "region": "us-east-1",
-    "access_key": "AKIA...",
-    "secret_key": "..."
-}
-requests.post("https://apis.fotohub.app/v1/social/config/export", headers=headers, json=payload)
+headers = {"Authorization": "Bearer fh_live_your_api_key"}
+resp = requests.get(
+    "https://apis.fotohub.app/social/v1/analytics/export",
+    headers=headers,
+    params={"format": "json", "date_from": "2027-09-01"},
+)
+print(resp.json())
 ```
 
 ```typescript [TypeScript]
-fetch("https://apis.fotohub.app/v1/social/config/export", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer fh_live_your_api_key",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    provider: "aws",
-    bucket_name: "my-enterprise-bucket",
-    region: "us-east-1",
-    access_key: "AKIA...",
-    secret_key: "..."
-  })
+const resp = await fetch("https://apis.fotohub.app/social/v1/analytics/export?format=json&date_from=2027-09-01", {
+  headers: { "Authorization": "Bearer fh_live_your_api_key" }
 });
+console.log(await resp.json());
 ```
 
-```go [Go]
-// Equivalent Go implementation omitted for brevity
-```
 :::
 
-Once configured, FotoHUB will automatically sync post media and daily JSON analytics summaries to your bucket at 00:00 UTC.
+The response is the raw CSV/JSON payload, returned directly in the API response — not delivered to a bucket you configure.
 
 
 ---

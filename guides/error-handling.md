@@ -10,54 +10,51 @@ Every production integration should implement: (1) signature verification, (2) e
 
 ## Error Response Format
 
-All FOTOhub API errors follow a consistent JSON structure:
+The API is FastAPI, so every error sits under a single `detail` key -- there is
+**no** `{"error": {"code", "message", "status", "retry_after", "request_id"}}`
+envelope. `detail` is a plain string for most failures, and an object (or, on
+`422`, an array) for the handful that carry structured context:
 
 ```json
 {
-  "error": {
-    "code": "rate_limit_exceeded",
-    "message": "Too many requests. Retry after 2.5 seconds.",
-    "status": 429,
-    "retry_after": 2.5,
-    "request_id": "req_abc123xyz"
+  "detail": {
+    "error": "insufficient_funds",
+    "message": "Insufficient funds: this request costs $0.045 but your balance is $0.002. Top up at least $0.043 to continue.",
+    "required_usd": 0.045,
+    "balance_usd": 0.002,
+    "shortfall_usd": 0.043,
+    "topup_url": "https://fotohub.app/console/wallet"
   }
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `code` | string | Machine-readable error code |
-| `message` | string | Human-readable description |
-| `status` | int | HTTP status code |
-| `retry_after` | float | Seconds to wait (rate limits only) |
-| `request_id` | string | Unique ID for support debugging |
+| Field | Type | Always present | Description |
+|-------|------|-----------------|-------------|
+| `detail` | string \| object \| array | Yes | The only field most endpoints return. A string for simple failures; an object for the ones with context; an array of `{type, loc, msg, input}` on a `422`. |
+| `detail.error` | string | No | Machine-readable code in snake_case, only on the specific endpoints listed in [Error Codes Reference](/api/errors#error-codes-reference). Most failures — 400, 401, and every 5xx — carry none. |
+| `detail.message` | string | No | Human-readable description, where `detail` is an object. |
+| `request_id` | string | Only on `500` | Present as the `X-Request-Id` **response header** on every call; only duplicated into the body on a `500`. Prefer the header. |
+
+For the full, endpoint-by-endpoint catalog of which status carries which shape, see [Error Handling reference](/api/errors).
 
 ---
 
 ## Error Codes Reference
 
-### Client Errors (4xx)
+There is no universal code catalog spanning every status the way a REST API with a single envelope would have. The codes that do exist, grouped by what they refuse, live in [`/api/errors`](/api/errors#error-codes-reference) — this guide does not duplicate that table, because a stale copy here would drift from it. The load-bearing fact for building a client is simpler than a catalog:
 
-| Code | HTTP | Cause | Recovery |
-|------|------|-------|----------|
-| `validation_error` | 400 | Invalid parameters | Fix request body |
-| `invalid_model` | 400 | Model ID not found | Check [models catalog](/api/models) |
-| `unauthorized` | 401 | Missing/invalid API key | Check key at fotohub.app/settings/api |
-| `forbidden` | 403 | Key lacks permission | Upgrade key scope |
-| `not_found` | 404 | Resource doesn't exist | Verify resource ID |
-| `rate_limit_exceeded` | 429 | Too many requests | Wait `retry_after` seconds |
-| `insufficient_funds` | 402 | No credits or wallet balance | Top up at fotohub.app/billing |
-| `content_policy` | 400 | Prompt violates policy | Modify prompt content |
-| `payload_too_large` | 413 | Request body > 10MB | Reduce image/file size |
+| Status | Has an `error` code? | Recovery |
+|--------|----------------------|----------|
+| `400` | No — plain string in `detail` | Fix the request. Log `detail` for the reason. |
+| `401` | No — plain string in `detail` | Check the API key; see [Authentication](/api/authentication#error-responses). |
+| `402` | **Yes**, always `insufficient_funds` (or `plan_gate_exceeded` for a resource cap) | Top up, or upgrade the plan. |
+| `403` | Sometimes — `insufficient_scope`, `api_access_required`, `feature_not_available`, and a few others are structured; an IP-allowlist 403 is a plain string. | Depends on the code — see the reference. |
+| `404` | No — plain string | Verify the id/path. |
+| `422` | No — FastAPI's own array of `{type, loc, msg, input}` | Log the array; `loc` names the offending field. |
+| `429` | Sometimes — the per-key limiter's body has `error: "rate_limit_exceeded"`; the earlier gateway limiter's body has no `detail` wrapper at all (`{"error": "Rate limit exceeded..."}`, a plain string, not an object). | Respect `Retry-After`. |
+| `5xx` | No — plain string, the same shape for a timeout, an overloaded model, or a malformed upstream response | Retry with backoff; branch on the HTTP status, not on parsed text. |
 
-### Server Errors (5xx)
-
-| Code | HTTP | Cause | Recovery |
-|------|------|-------|----------|
-| `internal_error` | 500 | Server bug | Retry with backoff |
-| `model_unavailable` | 503 | Model temporarily down | Retry or use fallback model |
-| `timeout` | 504 | Generation took too long | Retry or reduce complexity |
-| `overloaded` | 503 | System under heavy load | Retry with backoff |
+Always branch on the **HTTP status code** first. Only read `detail.error` where the reference above says a given status/route actually carries one.
 
 ---
 
@@ -69,10 +66,9 @@ from fotohub import FotoHub
 from fotohub.exceptions import (
     FotoHubError,
     ValidationError,
-    AuthenticationError,
+    AuthError,
     RateLimitError,
     InsufficientFundsError,
-    ModelUnavailableError,
     ServerError,
 )
 
@@ -86,33 +82,33 @@ try:
     print(result.images[0].url)
 
 except ValidationError as e:
-    # 400 — fix your request
+    # 400 or 422 — fix your request. `errors` is FastAPI's per-field list on a
+    # 422 (empty on a plain-string 400).
     print(f"Invalid request: {e.message}")
-    print(f"Field: {e.field}")  # which parameter is wrong
+    for field_error in e.errors:
+        print(f"  {field_error}")
 
-except AuthenticationError:
-    # 401 — bad API key
+except AuthError:
+    # 401/403 — bad, expired or revoked API key
     print("Check your FOTOHUB_API_KEY environment variable")
 
 except RateLimitError as e:
     # 429 — slow down
     print(f"Rate limited. Retry after {e.retry_after}s")
 
-except InsufficientFundsError:
-    # 402 — no balance
-    print("Top up credits at fotohub.app/billing")
-
-except ModelUnavailableError as e:
-    # 503 — model down
-    print(f"Model {e.model} is temporarily unavailable")
+except InsufficientFundsError as e:
+    # 402 — no balance. Nothing was charged (e.charged is always False).
+    print(f"Need ${e.shortfall_usd} more — top up: {e.topup_url}")
 
 except ServerError as e:
-    # 500/503/504 — transient
-    print(f"Server error (request_id: {e.request_id}). Retrying...")
+    # 5xx — transient, including a model that is temporarily unavailable.
+    # There is no separate "model unavailable" exception — branch on
+    # e.status_code (502/503/504) if you need to try a fallback model.
+    print(f"Server error (HTTP {e.status_code}). Retrying...")
 
 except FotoHubError as e:
-    # Catch-all for any API error
-    print(f"API error [{e.code}]: {e.message}")
+    # Catch-all for any other API error
+    print(f"API error: {e.message} (HTTP {e.status_code})")
 ```
 ```typescript [TypeScript]
 import { FotoHub } from "fotohub";
@@ -122,9 +118,8 @@ import {
   AuthenticationError,
   RateLimitError,
   InsufficientFundsError,
-  ModelUnavailableError,
   ServerError,
-} from "fotohub/errors";
+} from "fotohub";
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
 
@@ -136,17 +131,17 @@ try {
   console.log(result.images[0].url);
 } catch (e) {
   if (e instanceof ValidationError) {
-    console.error(`Invalid request: ${e.message} (field: ${e.field})`);
+    console.error(`Invalid request: ${e.message}`, e.fieldErrors);
   } else if (e instanceof AuthenticationError) {
     console.error("Check your FOTOHUB_API_KEY");
   } else if (e instanceof RateLimitError) {
     console.error(`Rate limited. Retry after ${e.retryAfter}s`);
   } else if (e instanceof InsufficientFundsError) {
-    console.error("Top up at fotohub.app/billing");
-  } else if (e instanceof ModelUnavailableError) {
-    console.error(`Model ${e.model} unavailable, try fallback`);
+    console.error(`Need $${e.shortfallUsd} more — top up: ${e.topupUrl}`);
   } else if (e instanceof ServerError) {
-    console.error(`Server error (${e.requestId}). Retrying...`);
+    // No separate "model unavailable" class — branch on e.statusCode
+    // (502/503/504) if you need to try a fallback model.
+    console.error(`Server error (HTTP ${e.statusCode}). Retrying...`);
   } else if (e instanceof FotoHubError) {
     console.error(`API error [${e.code}]: ${e.message}`);
   } else {
@@ -166,16 +161,20 @@ import (
     "os"
 )
 
-type APIError struct {
-    Code       string  `json:"code"`
-    Message    string  `json:"message"`
-    Status     int     `json:"status"`
-    RetryAfter float64 `json:"retry_after"`
-    RequestID  string  `json:"request_id"`
+// The API is FastAPI: every error sits under `detail`, a plain string for most
+// failures or an object for the ones with structured context (402, some 403s).
+// There is no top-level `error` object and no `retry_after` in the body --
+// that value, when present, comes from the `Retry-After` response header.
+type ErrorDetail struct {
+    Error   string `json:"error"`
+    Message string `json:"message"`
 }
 
 type ErrorResponse struct {
-    Error APIError `json:"error"`
+    // `Detail` is a string on most endpoints. `json.RawMessage` lets the
+    // caller decide whether to unmarshal it as a string or as ErrorDetail,
+    // rather than guessing wrong and losing the message.
+    Detail json.RawMessage `json:"detail"`
 }
 
 func generateImage(prompt string) (string, error) {
@@ -202,15 +201,24 @@ func generateImage(prompt string) (string, error) {
         var errResp ErrorResponse
         json.Unmarshal(body, &errResp)
 
+        // Try the structured shape first; fall back to a plain string.
+        var detail ErrorDetail
+        _ = json.Unmarshal(errResp.Detail, &detail)
+        var plain string
+        _ = json.Unmarshal(errResp.Detail, &plain)
+
         switch resp.StatusCode {
         case 429:
-            return "", fmt.Errorf("rate limited, retry after %.1fs", errResp.Error.RetryAfter)
+            return "", fmt.Errorf("rate limited, retry after %s", resp.Header.Get("Retry-After"))
         case 401:
-            return "", fmt.Errorf("authentication failed")
+            return "", fmt.Errorf("authentication failed: %s", plain)
         case 402:
-            return "", fmt.Errorf("insufficient credits")
+            return "", fmt.Errorf("insufficient funds: %s", detail.Message)
         default:
-            return "", fmt.Errorf("[%s] %s", errResp.Error.Code, errResp.Error.Message)
+            if detail.Error != "" {
+                return "", fmt.Errorf("[%s] %s", detail.Error, detail.Message)
+            }
+            return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, plain)
         }
     }
 
@@ -240,14 +248,15 @@ HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" -ge 400 ]; then
-  ERROR_CODE=$(echo "$BODY" | jq -r '.error.code')
-  ERROR_MSG=$(echo "$BODY" | jq -r '.error.message')
-  echo "Error [$ERROR_CODE]: $ERROR_MSG" >&2
+  # `detail` is a plain string on most endpoints, an object with
+  # error/message on the ones that carry context (mainly 402).
+  ERROR_MSG=$(echo "$BODY" | jq -r 'if (.detail | type) == "object" then .detail.message else .detail end')
+  echo "Error (HTTP $HTTP_CODE): $ERROR_MSG" >&2
 
   case $HTTP_CODE in
     429) echo "Rate limited. Wait and retry." ;;
     401) echo "Check your API key." ;;
-    402) echo "Insufficient credits." ;;
+    402) echo "Insufficient funds — top up the wallet." ;;
     *)   echo "Server error. Retry with backoff." ;;
   esac
   exit 1
@@ -307,7 +316,7 @@ result = retry_with_backoff(
 ```
 ```typescript [TypeScript]
 import { FotoHub } from "fotohub";
-import { RateLimitError, ServerError } from "fotohub/errors";
+import { RateLimitError, ServerError } from "fotohub";
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
 
@@ -532,7 +541,7 @@ except Exception as e:
 ```
 ```typescript [TypeScript]
 import { FotoHub } from "fotohub";
-import { ServerError } from "fotohub/errors";
+import { ServerError } from "fotohub";
 
 enum CircuitState {
   CLOSED = "closed",
@@ -735,7 +744,11 @@ fi
 
 ## SDK Built-In Retry Configuration
 
-Both SDKs have configurable retry behavior:
+Both SDKs retry automatically with a fixed internal exponential-backoff curve.
+`max_retries`/`maxRetries` and `timeout` are configurable at the client level;
+there is no `retry_delay`/`retryDelay` or `retry_max_delay`/`retryMaxDelay`
+parameter in either SDK -- the backoff curve itself is not tunable, only how
+many attempts it gets:
 
 ::: code-group
 ```python [Python]
@@ -743,10 +756,8 @@ from fotohub import FotoHub
 
 # Configure retry behavior at client level
 client = FotoHub(
-    max_retries=3,           # Number of retries (default: 2)
-    retry_delay=1.0,         # Base delay in seconds
-    retry_max_delay=30.0,    # Maximum delay cap
-    timeout=60.0,            # Request timeout in seconds
+    max_retries=3,   # Default is 3
+    timeout=120.0,   # Default is 120.0 seconds
 )
 
 # Or disable retries entirely
@@ -757,10 +768,8 @@ import { FotoHub } from "fotohub";
 
 const client = new FotoHub({
   apiKey: process.env.FOTOHUB_API_KEY!,
-  maxRetries: 3,
-  retryDelay: 1000,
-  retryMaxDelay: 30_000,
-  timeout: 60_000,
+  maxRetries: 3,      // Default is 3
+  timeout: 60_000,    // Default is 60000ms (60s)
 });
 
 // Disable retries
@@ -824,10 +833,15 @@ except RateLimitError as e:
     result = client.generate_image(prompt="...", model="seedream-5-0-260128")
 ```
 
-### Model Unavailable (503) — Fallback Model
+### Model Unavailable (502/503/504) — Fallback Model
+
+There is no separate "model unavailable" exception — a provider failure of any
+kind raises `ServerError`, and there is no error code to tell "overloaded" from
+"timed out" from "bad upstream response" apart. Branch on `status_code` only if
+you need to, and otherwise just treat any `ServerError` as fallback-worthy:
 
 ```python
-from fotohub.exceptions import ModelUnavailableError
+from fotohub.exceptions import ServerError
 
 FALLBACK_MODELS = ["seedream-5-0-260128", "grok-imagine-image", "flux-2-klein-4b"]
 
@@ -835,23 +849,22 @@ def generate_with_fallback(prompt: str):
     for model in FALLBACK_MODELS:
         try:
             return client.generate_image(prompt=prompt, model=model)
-        except ModelUnavailableError:
+        except ServerError:
             continue
     raise Exception("All models unavailable")
 ```
 
-### Insufficient Credits (402) — Graceful Degradation
+### Insufficient Funds (402) — Graceful Degradation
 
 ```python
 from fotohub.exceptions import InsufficientFundsError
 
 try:
     result = client.generate_image(prompt="...", model="imagen-4-standard")
-except InsufficientFundsError:
-    # Fall back to cheaper model
+except InsufficientFundsError as e:
+    # Fall back to a cheaper model. Nothing was charged for the refused call.
     result = client.generate_image(prompt="...", model="seedream-5-0-260128")
-    # Notify user
-    print("Using standard model (premium credits exhausted)")
+    print(f"Using standard model (wallet short ${e.shortfall_usd})")
 ```
 
 ### Timeout (504) — Simplify Request
@@ -866,7 +879,8 @@ try:
         duration=10,
     )
 except ServerError as e:
-    if e.code == "timeout":
+    # No error code for a provider failure — branch on the HTTP status.
+    if e.status_code == 504:
         # Reduce complexity
         result = client.generate_video(
             prompt="Simple scene...",
@@ -956,14 +970,17 @@ from a fresh, separately charged execution. If your first attempt is still
 running you get `409` with `Retry-After` — retry to collect its result. Reusing
 a key with a *different* body is `422`, not a replay.
 
-See [Idempotency](/api/errors#idempotency) for the full rules and which
+See [Idempotency Keys](/api/errors#idempotency-keys) for the full rules and which
 endpoints are covered.
 
 ---
 
 ## Logging Best Practices
 
-Always log the `request_id` for debugging with FOTOhub support:
+Always log the request id for debugging with FOTOhub support. It is reliably
+present as the `X-Request-Id` **response header** on every call; the SDK's base
+`FotoHubError` does not carry a `.request_id` attribute, but it does expose
+`.response_body`, which has a `request_id` key on a `500`:
 
 ```python
 import logging
@@ -972,16 +989,14 @@ logger = logging.getLogger("fotohub")
 
 try:
     result = client.generate_image(prompt="...", model="seedream-5-0-260128")
-    logger.info(f"Generated image", extra={
-        "request_id": result.request_id,
-        "model": "seedream-5-0-260128",
-        "duration_ms": result.duration_ms,
-    })
+    logger.info("Generated image", extra={"model": "seedream-5-0-260128"})
 except FotoHubError as e:
-    logger.error(f"API error", extra={
-        "request_id": e.request_id,
-        "error_code": e.code,
-        "status": e.status,
+    logger.error("API error", extra={
+        "status_code": e.status_code,
+        "message": e.message,
+        # Populated only on a 500 — otherwise rely on the X-Request-Id header
+        # captured by your HTTP client/proxy logging.
+        "request_id": (e.response_body or {}).get("request_id"),
     })
     # Include request_id when contacting support
 ```

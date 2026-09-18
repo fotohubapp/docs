@@ -212,7 +212,7 @@ POST /v1/ai/generate/image
 ```
 
 ```json [Remove Background]
-POST /v1/ai/remove-background
+POST /v1/images/remove-background
 {
   "image_url": "https://example.com/photo.jpg"
 }

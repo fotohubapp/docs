@@ -1,687 +1,273 @@
 # Realtime Voice Agents API
 
-The Realtime Voice Agents API enables the creation of conversational AI agents that operate with sub-second latency. Utilizing WebSockets for bidirectional audio streaming, these agents can answer phone calls, serve as language tutors, conduct interviews, or act as customer support representatives.
+The Realtime Voice Agents API creates conversational AI agents that talk over
+a WebSocket with sub-second latency, powered by xAI Grok Voice. Define a
+persona once (instructions, voice, greeting, language, function tools) and
+mint short-lived browser session tokens for it whenever a user starts talking.
 
-::: tip Powered by FOTOhub Realtime
-This system features server-side Voice Activity Detection (VAD), intelligent barge-in (interruption handling), and function calling natively built into the audio loop.
+::: tip Powered by xAI Grok Voice
+FOTOhub never exposes the underlying xAI API key to the browser. Every
+session call returns a ~10 minute ephemeral `client_secret` plus the exact
+WebSocket subprotocol array to connect with instead.
 :::
 
 ## Architecture and Lifecycle
 
-The interaction with a voice agent requires establishing a WebSocket connection. Once connected, audio streams directly between the client and the FOTOhub server.
-
 ```mermaid
 sequenceDiagram
-    participant C as Client (Browser/Node/Python)
+    participant C as Client (Browser)
     participant S as FOTOhub API
-    participant W as FOTOhub WebSocket
-    C->>S: POST /v1/voice-agents/{id}/sessions
-    S-->>C: Returns session_id & wss:// URL
-    C->>W: Connect to wss:// URL
-    W-->>C: Session Started Event
-    C->>W: Stream Audio (PCM16 chunks)
-    W-->>C: Transcript Events
-    W-->>C: Stream Audio Response (PCM16)
-    Note over C,W: User interrupts (Barge-in)
-    C->>W: Stream overlapping audio
-    W-->>C: Interruption Event (halts current response)
-    C->>W: Close Connection
+    participant W as xAI Realtime WebSocket
+    C->>S: POST /v1/voice/agents/{agent_id}/sessions
+    S-->>C: client_secret, websocket_url, subprotocols
+    C->>W: Connect with subprotocols
+    W-->>C: Session started
+    C->>W: Stream audio (PCM16)
+    W-->>C: Transcript + audio response events
+    C->>W: Close connection
 ```
 
-### Deep Dive: Architecture Component 1
+1. **Create an agent** once with `POST /v1/voice/agents` (persona, voice, tools).
+2. **Mint a session** for that agent with `POST /v1/voice/agents/{agent_id}/sessions`
+   whenever a user starts a call. This is the billed step.
+3. **Connect** the browser directly to `websocket_url` using the returned
+   `subprotocols` array — the real xAI credential never touches the client.
+4. For a persona computed per-call instead of stored, use
+   `POST /v1/voice/sessions` and skip step 1.
 
-The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. 
+---
 
-### Deep Dive: Architecture Component 2
+## Voices
 
-The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. 
+### List Voices
 
-### Deep Dive: Architecture Component 3
+```http
+GET /v1/voice/voices
+```
 
-The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. 
+Returns all realtime voices available to voice agents (26 multilingual xAI
+Grok Voice presets).
 
-### Deep Dive: Architecture Component 4
+#### Response
 
-The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. 
+```json
+{
+  "voices": [
+    { "id": "eve", "name": "Eve", "language": "multilingual" },
+    { "id": "ara", "name": "Ara", "language": "multilingual" }
+  ],
+  "count": 26
+}
+```
 
-### Deep Dive: Architecture Component 5
+#### Example
 
-The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. 
+::: code-group
 
-### Deep Dive: Architecture Component 6
+```bash [cURL]
+curl -X GET "https://apis.fotohub.app/v1/voice/voices" \
+  -H "Authorization: Bearer fh_live_your_api_key"
+```
 
-The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. 
+```python [Python]
+import requests
 
-### Deep Dive: Architecture Component 7
+resp = requests.get(
+    "https://apis.fotohub.app/v1/voice/voices",
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+)
+print(resp.json())
+```
 
-The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. 
+```typescript [TypeScript]
+const resp = await fetch("https://apis.fotohub.app/v1/voice/voices", {
+  headers: { Authorization: "Bearer fh_live_your_api_key" },
+});
+console.log(await resp.json());
+```
 
-### Deep Dive: Architecture Component 8
+:::
 
-The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. 
+---
 
-### Deep Dive: Architecture Component 9
+## Agents
 
-The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. The WebSocket protocol implemented in this layer ensures minimal latency and maximum throughput. 
-
-## Cost and Unit Economics
-
-The Voice Agents API uses **pure USD billing**, deducted from your wallet balance.
-
-| Operation | Cost (USD) | Description |
-|-----------|------------|-------------|
-
-| **Session Setup Fee** | $0.050 | Charged once per successful WebSocket connection. |
-
-| **Session Time** | $0.225 / minute | Billed per second while the WebSocket remains open. |
-
-| **Agent CRUD** | Free | Creating and configuring agent profiles costs nothing. |
+Agents are owned by the caller (`fh_live_*` key) and persisted, so they can
+be reused across sessions.
 
 ### Create Agent
 
 ```http
-POST /v1/voice-agents/create
+POST /v1/voice/agents
 ```
 
-#### Parameters
+Requires a write-scoped API key.
+
+#### Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
+| `name` | string | **Yes** | — | Display name, max 80 characters. |
+| `instructions` | string | **Yes** | — | System prompt / persona, max 8000 characters. |
+| `voice` | string | No | `eve` | One of the ids from `GET /v1/voice/voices`. |
+| `greeting` | string | No | `null` | Opening line, max 500 characters. |
+| `language` | string | No | `pl` | 2-8 character language hint (e.g. `pl`, `en`, `de`). |
+| `tools` | array | No | `[]` | Function tools: `[{name, description, parameters}]`, max 24, `name` must match `^[a-zA-Z0-9_-]{1,64}$`. |
+| `temperature` | number | No | `null` | Sampling temperature, `0.0`-`2.0`. |
+| `metadata` | object | No | `{}` | Free-form key/value store. |
 
-| `param_0` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
+#### Response — `201 Created`
 
-| `param_1` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
+```json
+{
+  "id": "5b1a...",
+  "name": "Support Agent",
+  "instructions": "You are a calm, concise customer support agent...",
+  "voice": "eve",
+  "greeting": "Hi, how can I help you today?",
+  "language": "en",
+  "tools": [],
+  "model": "fotohub-realtime-voice",
+  "temperature": null,
+  "metadata": {},
+  "is_active": true,
+  "created_at": "2026-09-18T10:00:00Z",
+  "updated_at": "2026-09-18T10:00:00Z"
+}
+```
 
-| `param_2` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_3` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_4` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_5` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_6` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_7` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_8` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_9` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_10` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_11` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_12` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_13` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_14` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-#### Code Example
+#### Example
 
 ::: code-group
+
+```bash [cURL]
+curl -X POST "https://apis.fotohub.app/v1/voice/agents" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Support Agent",
+    "instructions": "You are a calm, concise customer support agent for FOTOhub.",
+    "voice": "eve",
+    "greeting": "Hi, how can I help you today?",
+    "language": "en"
+  }'
+```
 
 ```python [Python]
 import requests
 
-# Setting up configuration for POST /v1/voice-agents/create phase 0
-
-# Setting up configuration for POST /v1/voice-agents/create phase 1
-
-# Setting up configuration for POST /v1/voice-agents/create phase 2
-
-# Setting up configuration for POST /v1/voice-agents/create phase 3
-
-# Setting up configuration for POST /v1/voice-agents/create phase 4
-
-# Setting up configuration for POST /v1/voice-agents/create phase 5
-
-# Setting up configuration for POST /v1/voice-agents/create phase 6
-
-# Setting up configuration for POST /v1/voice-agents/create phase 7
-
-# Setting up configuration for POST /v1/voice-agents/create phase 8
-
-# Setting up configuration for POST /v1/voice-agents/create phase 9
-
-# Setting up configuration for POST /v1/voice-agents/create phase 10
-
-# Setting up configuration for POST /v1/voice-agents/create phase 11
-
-# Setting up configuration for POST /v1/voice-agents/create phase 12
-
-# Setting up configuration for POST /v1/voice-agents/create phase 13
-
-# Setting up configuration for POST /v1/voice-agents/create phase 14
-
-# Setting up configuration for POST /v1/voice-agents/create phase 15
-
-# Setting up configuration for POST /v1/voice-agents/create phase 16
-
-# Setting up configuration for POST /v1/voice-agents/create phase 17
-
-# Setting up configuration for POST /v1/voice-agents/create phase 18
-
-# Setting up configuration for POST /v1/voice-agents/create phase 19
-
-url = 'https://apis.fotohub.app/v1/voice-agents/create'
-
-headers = {'Authorization': 'Bearer fh_live_your_api_key'}
-
-response = requests.request('GET', url, headers=headers)
-print(response.json())
+resp = requests.post(
+    "https://apis.fotohub.app/v1/voice/agents",
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+    json={
+        "name": "Support Agent",
+        "instructions": "You are a calm, concise customer support agent for FOTOhub.",
+        "voice": "eve",
+        "greeting": "Hi, how can I help you today?",
+        "language": "en",
+    },
+)
+agent = resp.json()
+print(agent["id"])
 ```
 
 ```typescript [TypeScript]
-
-// TS setup for POST /v1/voice-agents/create phase 0
-
-// TS setup for POST /v1/voice-agents/create phase 1
-
-// TS setup for POST /v1/voice-agents/create phase 2
-
-// TS setup for POST /v1/voice-agents/create phase 3
-
-// TS setup for POST /v1/voice-agents/create phase 4
-
-// TS setup for POST /v1/voice-agents/create phase 5
-
-// TS setup for POST /v1/voice-agents/create phase 6
-
-// TS setup for POST /v1/voice-agents/create phase 7
-
-// TS setup for POST /v1/voice-agents/create phase 8
-
-// TS setup for POST /v1/voice-agents/create phase 9
-
-// TS setup for POST /v1/voice-agents/create phase 10
-
-// TS setup for POST /v1/voice-agents/create phase 11
-
-// TS setup for POST /v1/voice-agents/create phase 12
-
-// TS setup for POST /v1/voice-agents/create phase 13
-
-// TS setup for POST /v1/voice-agents/create phase 14
-
-// TS setup for POST /v1/voice-agents/create phase 15
-
-// TS setup for POST /v1/voice-agents/create phase 16
-
-// TS setup for POST /v1/voice-agents/create phase 17
-
-// TS setup for POST /v1/voice-agents/create phase 18
-
-// TS setup for POST /v1/voice-agents/create phase 19
-
-const response = await fetch('https://apis.fotohub.app/v1/voice-agents/create', { headers: { 'Authorization': 'Bearer fh_live_your_api_key' } });
-console.log(await response.json());
+const resp = await fetch("https://apis.fotohub.app/v1/voice/agents", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    name: "Support Agent",
+    instructions: "You are a calm, concise customer support agent for FOTOhub.",
+    voice: "eve",
+    greeting: "Hi, how can I help you today?",
+    language: "en",
+  }),
+});
+const agent = await resp.json();
+console.log(agent.id);
 ```
 
-```go [Go]
-package main
-import "fmt"
-import "net/http"
-func main() {
+:::
 
-	// Go setup for POST /v1/voice-agents/create phase 0
+### List Agents
 
-	// Go setup for POST /v1/voice-agents/create phase 1
+```http
+GET /v1/voice/agents
+```
 
-	// Go setup for POST /v1/voice-agents/create phase 2
+| Query Parameter | Type | Default | Description |
+|------------------|------|---------|-------------|
+| `limit` | integer | `50` | Max results, 1-200. |
+| `offset` | integer | `0` | Pagination offset. |
 
-	// Go setup for POST /v1/voice-agents/create phase 3
+#### Response
 
-	// Go setup for POST /v1/voice-agents/create phase 4
-
-	// Go setup for POST /v1/voice-agents/create phase 5
-
-	// Go setup for POST /v1/voice-agents/create phase 6
-
-	// Go setup for POST /v1/voice-agents/create phase 7
-
-	// Go setup for POST /v1/voice-agents/create phase 8
-
-	// Go setup for POST /v1/voice-agents/create phase 9
-
-	// Go setup for POST /v1/voice-agents/create phase 10
-
-	// Go setup for POST /v1/voice-agents/create phase 11
-
-	// Go setup for POST /v1/voice-agents/create phase 12
-
-	// Go setup for POST /v1/voice-agents/create phase 13
-
-	// Go setup for POST /v1/voice-agents/create phase 14
-
-	// Go setup for POST /v1/voice-agents/create phase 15
-
-	// Go setup for POST /v1/voice-agents/create phase 16
-
-	// Go setup for POST /v1/voice-agents/create phase 17
-
-	// Go setup for POST /v1/voice-agents/create phase 18
-
-	// Go setup for POST /v1/voice-agents/create phase 19
-
-	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/voice-agents/create", nil)
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	client := &http.Client{}
-	resp, _ := client.Do(req)
-	fmt.Println(resp.Status)
+```json
+{
+  "agents": [ { "id": "5b1a...", "name": "Support Agent", "...": "..." } ],
+  "count": 1,
+  "limit": 50,
+  "offset": 0
 }
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/voice-agents/create \
+curl -X GET "https://apis.fotohub.app/v1/voice/agents?limit=20" \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
-
-:::
 
 ### Get Agent
 
 ```http
-GET /v1/voice-agents/{id}
+GET /v1/voice/agents/{agent_id}
 ```
 
-#### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-
-| `param_0` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_1` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_2` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_3` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_4` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_5` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_6` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_7` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_8` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_9` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_10` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_11` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_12` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_13` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_14` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-#### Code Example
-
-::: code-group
-
-```python [Python]
-import requests
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 0
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 1
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 2
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 3
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 4
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 5
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 6
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 7
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 8
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 9
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 10
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 11
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 12
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 13
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 14
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 15
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 16
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 17
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 18
-
-# Setting up configuration for GET /v1/voice-agents/{id} phase 19
-
-url = 'https://apis.fotohub.app/v1/voice-agents/{id}'
-
-headers = {'Authorization': 'Bearer fh_live_your_api_key'}
-
-response = requests.request('GET', url, headers=headers)
-print(response.json())
-```
-
-```typescript [TypeScript]
-
-// TS setup for GET /v1/voice-agents/{id} phase 0
-
-// TS setup for GET /v1/voice-agents/{id} phase 1
-
-// TS setup for GET /v1/voice-agents/{id} phase 2
-
-// TS setup for GET /v1/voice-agents/{id} phase 3
-
-// TS setup for GET /v1/voice-agents/{id} phase 4
-
-// TS setup for GET /v1/voice-agents/{id} phase 5
-
-// TS setup for GET /v1/voice-agents/{id} phase 6
-
-// TS setup for GET /v1/voice-agents/{id} phase 7
-
-// TS setup for GET /v1/voice-agents/{id} phase 8
-
-// TS setup for GET /v1/voice-agents/{id} phase 9
-
-// TS setup for GET /v1/voice-agents/{id} phase 10
-
-// TS setup for GET /v1/voice-agents/{id} phase 11
-
-// TS setup for GET /v1/voice-agents/{id} phase 12
-
-// TS setup for GET /v1/voice-agents/{id} phase 13
-
-// TS setup for GET /v1/voice-agents/{id} phase 14
-
-// TS setup for GET /v1/voice-agents/{id} phase 15
-
-// TS setup for GET /v1/voice-agents/{id} phase 16
-
-// TS setup for GET /v1/voice-agents/{id} phase 17
-
-// TS setup for GET /v1/voice-agents/{id} phase 18
-
-// TS setup for GET /v1/voice-agents/{id} phase 19
-
-const response = await fetch('https://apis.fotohub.app/v1/voice-agents/{id}', { headers: { 'Authorization': 'Bearer fh_live_your_api_key' } });
-console.log(await response.json());
-```
-
-```go [Go]
-package main
-import "fmt"
-import "net/http"
-func main() {
-
-	// Go setup for GET /v1/voice-agents/{id} phase 0
-
-	// Go setup for GET /v1/voice-agents/{id} phase 1
-
-	// Go setup for GET /v1/voice-agents/{id} phase 2
-
-	// Go setup for GET /v1/voice-agents/{id} phase 3
-
-	// Go setup for GET /v1/voice-agents/{id} phase 4
-
-	// Go setup for GET /v1/voice-agents/{id} phase 5
-
-	// Go setup for GET /v1/voice-agents/{id} phase 6
-
-	// Go setup for GET /v1/voice-agents/{id} phase 7
-
-	// Go setup for GET /v1/voice-agents/{id} phase 8
-
-	// Go setup for GET /v1/voice-agents/{id} phase 9
-
-	// Go setup for GET /v1/voice-agents/{id} phase 10
-
-	// Go setup for GET /v1/voice-agents/{id} phase 11
-
-	// Go setup for GET /v1/voice-agents/{id} phase 12
-
-	// Go setup for GET /v1/voice-agents/{id} phase 13
-
-	// Go setup for GET /v1/voice-agents/{id} phase 14
-
-	// Go setup for GET /v1/voice-agents/{id} phase 15
-
-	// Go setup for GET /v1/voice-agents/{id} phase 16
-
-	// Go setup for GET /v1/voice-agents/{id} phase 17
-
-	// Go setup for GET /v1/voice-agents/{id} phase 18
-
-	// Go setup for GET /v1/voice-agents/{id} phase 19
-
-	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/voice-agents/{id}", nil)
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	client := &http.Client{}
-	resp, _ := client.Do(req)
-	fmt.Println(resp.Status)
-}
-```
+Returns `404` if the agent does not exist or is not owned by the caller.
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/voice-agents/{id} \
+curl -X GET "https://apis.fotohub.app/v1/voice/agents/5b1a..." \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
-
-:::
 
 ### Update Agent
 
 ```http
-PUT /v1/voice-agents/{id}
+PATCH /v1/voice/agents/{agent_id}
 ```
 
-#### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-
-| `param_0` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_1` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_2` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_3` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_4` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_5` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_6` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_7` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_8` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_9` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_10` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_11` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_12` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_13` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_14` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-#### Code Example
+Requires a write-scoped API key. Partial update — send only the fields you
+want to change. Accepts the same body fields as create, plus `is_active`
+(boolean).
 
 ::: code-group
 
+```bash [cURL]
+curl -X PATCH "https://apis.fotohub.app/v1/voice/agents/5b1a..." \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{ "greeting": "Thanks for calling FOTOhub support.", "is_active": true }'
+```
+
 ```python [Python]
-import requests
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 0
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 1
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 2
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 3
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 4
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 5
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 6
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 7
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 8
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 9
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 10
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 11
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 12
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 13
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 14
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 15
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 16
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 17
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 18
-
-# Setting up configuration for PUT /v1/voice-agents/{id} phase 19
-
-url = 'https://apis.fotohub.app/v1/voice-agents/{id}'
-
-headers = {'Authorization': 'Bearer fh_live_your_api_key'}
-
-response = requests.request('GET', url, headers=headers)
-print(response.json())
+resp = requests.patch(
+    "https://apis.fotohub.app/v1/voice/agents/5b1a...",
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+    json={"greeting": "Thanks for calling FOTOhub support.", "is_active": True},
+)
 ```
 
 ```typescript [TypeScript]
-
-// TS setup for PUT /v1/voice-agents/{id} phase 0
-
-// TS setup for PUT /v1/voice-agents/{id} phase 1
-
-// TS setup for PUT /v1/voice-agents/{id} phase 2
-
-// TS setup for PUT /v1/voice-agents/{id} phase 3
-
-// TS setup for PUT /v1/voice-agents/{id} phase 4
-
-// TS setup for PUT /v1/voice-agents/{id} phase 5
-
-// TS setup for PUT /v1/voice-agents/{id} phase 6
-
-// TS setup for PUT /v1/voice-agents/{id} phase 7
-
-// TS setup for PUT /v1/voice-agents/{id} phase 8
-
-// TS setup for PUT /v1/voice-agents/{id} phase 9
-
-// TS setup for PUT /v1/voice-agents/{id} phase 10
-
-// TS setup for PUT /v1/voice-agents/{id} phase 11
-
-// TS setup for PUT /v1/voice-agents/{id} phase 12
-
-// TS setup for PUT /v1/voice-agents/{id} phase 13
-
-// TS setup for PUT /v1/voice-agents/{id} phase 14
-
-// TS setup for PUT /v1/voice-agents/{id} phase 15
-
-// TS setup for PUT /v1/voice-agents/{id} phase 16
-
-// TS setup for PUT /v1/voice-agents/{id} phase 17
-
-// TS setup for PUT /v1/voice-agents/{id} phase 18
-
-// TS setup for PUT /v1/voice-agents/{id} phase 19
-
-const response = await fetch('https://apis.fotohub.app/v1/voice-agents/{id}', { headers: { 'Authorization': 'Bearer fh_live_your_api_key' } });
-console.log(await response.json());
-```
-
-```go [Go]
-package main
-import "fmt"
-import "net/http"
-func main() {
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 0
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 1
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 2
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 3
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 4
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 5
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 6
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 7
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 8
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 9
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 10
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 11
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 12
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 13
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 14
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 15
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 16
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 17
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 18
-
-	// Go setup for PUT /v1/voice-agents/{id} phase 19
-
-	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/voice-agents/{id}", nil)
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	client := &http.Client{}
-	resp, _ := client.Do(req)
-	fmt.Println(resp.Status)
-}
-```
-
-```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/voice-agents/{id} \
-  -H "Authorization: Bearer fh_live_your_api_key"
+await fetch("https://apis.fotohub.app/v1/voice/agents/5b1a...", {
+  method: "PATCH",
+  headers: {
+    Authorization: "Bearer fh_live_your_api_key",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ greeting: "Thanks for calling FOTOhub support.", isActive: true }),
+});
 ```
 
 :::
@@ -689,1126 +275,136 @@ curl -X GET https://apis.fotohub.app/v1/voice-agents/{id} \
 ### Delete Agent
 
 ```http
-DELETE /v1/voice-agents/{id}
+DELETE /v1/voice/agents/{agent_id}
 ```
 
-#### Parameters
+Requires a write-scoped API key.
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-
-| `param_0` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_1` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_2` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_3` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_4` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_5` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_6` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_7` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_8` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_9` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_10` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_11` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_12` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_13` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_14` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-#### Code Example
-
-::: code-group
-
-```python [Python]
-import requests
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 0
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 1
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 2
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 3
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 4
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 5
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 6
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 7
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 8
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 9
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 10
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 11
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 12
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 13
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 14
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 15
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 16
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 17
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 18
-
-# Setting up configuration for DELETE /v1/voice-agents/{id} phase 19
-
-url = 'https://apis.fotohub.app/v1/voice-agents/{id}'
-
-headers = {'Authorization': 'Bearer fh_live_your_api_key'}
-
-response = requests.request('GET', url, headers=headers)
-print(response.json())
-```
-
-```typescript [TypeScript]
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 0
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 1
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 2
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 3
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 4
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 5
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 6
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 7
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 8
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 9
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 10
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 11
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 12
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 13
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 14
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 15
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 16
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 17
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 18
-
-// TS setup for DELETE /v1/voice-agents/{id} phase 19
-
-const response = await fetch('https://apis.fotohub.app/v1/voice-agents/{id}', { headers: { 'Authorization': 'Bearer fh_live_your_api_key' } });
-console.log(await response.json());
-```
-
-```go [Go]
-package main
-import "fmt"
-import "net/http"
-func main() {
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 0
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 1
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 2
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 3
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 4
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 5
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 6
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 7
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 8
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 9
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 10
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 11
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 12
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 13
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 14
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 15
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 16
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 17
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 18
-
-	// Go setup for DELETE /v1/voice-agents/{id} phase 19
-
-	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/voice-agents/{id}", nil)
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	client := &http.Client{}
-	resp, _ := client.Do(req)
-	fmt.Println(resp.Status)
-}
+```json
+{ "deleted": true, "id": "5b1a..." }
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/voice-agents/{id} \
+curl -X DELETE "https://apis.fotohub.app/v1/voice/agents/5b1a..." \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 
-:::
+---
 
-### Start Session
+## Sessions
+
+Sessions mint the browser's realtime credential. Nothing about a session is
+persisted or queryable afterwards — there is no list-sessions or
+transcript-lookup endpoint. Capture the transcript client-side from the
+WebSocket's own transcript events if you need one.
+
+Both session endpoints are **billed** and require a write-scoped API key.
+Check the current USD rate for `voice_realtime_session` with
+[`GET /v1/pricing`](/api/getting-started#pricing) before relying on a fixed
+number — the response's `usd_charged` / `balance_usd` fields always report
+what was actually charged.
+
+### Create Session for a Stored Agent
 
 ```http
-POST /v1/voice-agents/{id}/sessions
+POST /v1/voice/agents/{agent_id}/sessions
 ```
 
-#### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-
-| `param_0` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_1` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_2` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_3` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_4` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_5` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_6` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_7` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_8` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_9` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_10` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_11` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_12` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_13` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_14` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-#### Code Example
-
-::: code-group
-
-```python [Python]
-import requests
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 0
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 1
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 2
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 3
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 4
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 5
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 6
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 7
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 8
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 9
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 10
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 11
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 12
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 13
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 14
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 15
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 16
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 17
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 18
-
-# Setting up configuration for POST /v1/voice-agents/{id}/sessions phase 19
-
-url = 'https://apis.fotohub.app/v1/voice-agents/{id}/sessions'
-
-headers = {'Authorization': 'Bearer fh_live_your_api_key'}
-
-response = requests.request('GET', url, headers=headers)
-print(response.json())
-```
-
-```typescript [TypeScript]
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 0
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 1
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 2
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 3
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 4
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 5
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 6
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 7
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 8
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 9
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 10
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 11
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 12
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 13
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 14
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 15
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 16
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 17
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 18
-
-// TS setup for POST /v1/voice-agents/{id}/sessions phase 19
-
-const response = await fetch('https://apis.fotohub.app/v1/voice-agents/{id}/sessions', { headers: { 'Authorization': 'Bearer fh_live_your_api_key' } });
-console.log(await response.json());
-```
-
-```go [Go]
-package main
-import "fmt"
-import "net/http"
-func main() {
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 0
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 1
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 2
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 3
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 4
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 5
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 6
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 7
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 8
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 9
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 10
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 11
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 12
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 13
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 14
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 15
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 16
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 17
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 18
-
-	// Go setup for POST /v1/voice-agents/{id}/sessions phase 19
-
-	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/voice-agents/{id}/sessions", nil)
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	client := &http.Client{}
-	resp, _ := client.Do(req)
-	fmt.Println(resp.Status)
+Fails with `400` if the agent is `is_active: false`, and `503` if realtime
+voice is not configured on the server. Billing is refunded automatically if
+the upstream provider fails to issue a credential.
+
+#### Response — `201 Created`
+
+```json
+{
+  "client_secret": "sk_live_ephemeral...",
+  "expires_at": "2026-09-18T10:10:00Z",
+  "model": "fotohub-realtime-voice",
+  "websocket_url": "wss://api.x.ai/v1/realtime?model=grok-voice-latest",
+  "subprotocols": ["realtime", "openai-insecure-api-key.sk_live_ephemeral..."],
+  "session": {
+    "voice": "eve",
+    "instructions": "You are a calm, concise customer support agent...",
+    "greeting": "Hi, how can I help you today?",
+    "language": "en",
+    "tools": [],
+    "temperature": null
+  },
+  "agent_id": "5b1a...",
+  "usd_charged": 0.267953,
+  "balance_usd": 12.40
 }
 ```
 
+::: code-group
+
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/voice-agents/{id}/sessions \
+curl -X POST "https://apis.fotohub.app/v1/voice/agents/5b1a.../sessions" \
   -H "Authorization: Bearer fh_live_your_api_key"
+```
+
+```python [Python]
+resp = requests.post(
+    "https://apis.fotohub.app/v1/voice/agents/5b1a.../sessions",
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+)
+session = resp.json()
+print(session["websocket_url"], session["subprotocols"])
+```
+
+```typescript [TypeScript]
+const resp = await fetch(
+  "https://apis.fotohub.app/v1/voice/agents/5b1a.../sessions",
+  { method: "POST", headers: { Authorization: "Bearer fh_live_your_api_key" } },
+);
+const session = await resp.json();
+const ws = new WebSocket(session.websocket_url, session.subprotocols);
 ```
 
 :::
 
-### List Sessions
+### Create Ad-hoc Session
 
 ```http
-GET /v1/voice-agents/{id}/sessions
+POST /v1/voice/sessions
 ```
 
-#### Parameters
+Same billing and response shape as above, but nothing is stored — use this
+when the persona is computed per call instead of reused.
+
+#### Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-
-| `param_0` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_1` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_2` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_3` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_4` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_5` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_6` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_7` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_8` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_9` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_10` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_11` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_12` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_13` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_14` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-#### Code Example
-
-::: code-group
-
-```python [Python]
-import requests
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 0
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 1
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 2
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 3
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 4
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 5
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 6
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 7
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 8
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 9
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 10
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 11
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 12
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 13
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 14
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 15
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 16
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 17
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 18
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions phase 19
-
-url = 'https://apis.fotohub.app/v1/voice-agents/{id}/sessions'
-
-headers = {'Authorization': 'Bearer fh_live_your_api_key'}
-
-response = requests.request('GET', url, headers=headers)
-print(response.json())
-```
-
-```typescript [TypeScript]
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 0
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 1
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 2
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 3
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 4
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 5
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 6
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 7
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 8
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 9
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 10
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 11
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 12
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 13
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 14
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 15
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 16
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 17
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 18
-
-// TS setup for GET /v1/voice-agents/{id}/sessions phase 19
-
-const response = await fetch('https://apis.fotohub.app/v1/voice-agents/{id}/sessions', { headers: { 'Authorization': 'Bearer fh_live_your_api_key' } });
-console.log(await response.json());
-```
-
-```go [Go]
-package main
-import "fmt"
-import "net/http"
-func main() {
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 0
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 1
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 2
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 3
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 4
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 5
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 6
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 7
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 8
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 9
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 10
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 11
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 12
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 13
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 14
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 15
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 16
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 17
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 18
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions phase 19
-
-	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/voice-agents/{id}/sessions", nil)
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	client := &http.Client{}
-	resp, _ := client.Do(req)
-	fmt.Println(resp.Status)
-}
-```
+| `instructions` | string | No | `""` | System prompt, max 8000 characters. |
+| `voice` | string | No | `eve` | One of the ids from `GET /v1/voice/voices`. |
+| `greeting` | string | No | `null` | Opening line, max 500 characters. |
+| `language` | string | No | `pl` | 2-8 character language hint. |
+| `tools` | array | No | `[]` | Function tools, same shape as agent creation. |
+| `temperature` | number | No | `null` | `0.0`-`2.0`. |
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/voice-agents/{id}/sessions \
-  -H "Authorization: Bearer fh_live_your_api_key"
+curl -X POST "https://apis.fotohub.app/v1/voice/sessions" \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instructions": "You are a friendly Polish-language tour guide.",
+    "voice": "luna",
+    "language": "pl"
+  }'
 ```
 
-:::
-
-### Get Session Transcript
-
-```http
-GET /v1/voice-agents/{id}/sessions/{session_id}
-```
-
-#### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-
-| `param_0` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_1` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_2` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_3` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_4` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_5` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_6` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_7` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_8` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_9` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_10` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_11` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_12` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_13` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-| `param_14` | string | No | `null` | Extended parameter description detailing its specific use case, limits, and integration requirements. |
-
-#### Code Example
-
-::: code-group
-
-```python [Python]
-import requests
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 0
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 1
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 2
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 3
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 4
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 5
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 6
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 7
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 8
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 9
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 10
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 11
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 12
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 13
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 14
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 15
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 16
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 17
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 18
-
-# Setting up configuration for GET /v1/voice-agents/{id}/sessions/{session_id} phase 19
-
-url = 'https://apis.fotohub.app/v1/voice-agents/{id}/sessions/{session_id}'
-
-headers = {'Authorization': 'Bearer fh_live_your_api_key'}
-
-response = requests.request('GET', url, headers=headers)
-print(response.json())
-```
-
-```typescript [TypeScript]
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 0
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 1
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 2
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 3
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 4
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 5
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 6
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 7
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 8
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 9
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 10
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 11
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 12
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 13
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 14
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 15
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 16
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 17
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 18
-
-// TS setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 19
-
-const response = await fetch('https://apis.fotohub.app/v1/voice-agents/{id}/sessions/{session_id}', { headers: { 'Authorization': 'Bearer fh_live_your_api_key' } });
-console.log(await response.json());
-```
-
-```go [Go]
-package main
-import "fmt"
-import "net/http"
-func main() {
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 0
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 1
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 2
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 3
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 4
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 5
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 6
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 7
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 8
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 9
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 10
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 11
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 12
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 13
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 14
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 15
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 16
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 17
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 18
-
-	// Go setup for GET /v1/voice-agents/{id}/sessions/{session_id} phase 19
-
-	req, _ := http.NewRequest("GET", "https://apis.fotohub.app/v1/voice-agents/{id}/sessions/{session_id}", nil)
-	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
-	client := &http.Client{}
-	resp, _ := client.Do(req)
-	fmt.Println(resp.Status)
-}
-```
-
-```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/voice-agents/{id}/sessions/{session_id} \
-  -H "Authorization: Bearer fh_live_your_api_key"
-```
-
-:::
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
-
-#### Advanced Voice Agent Implementation Details
-
-When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. When integrating the voice agents into production environments, several edge cases regarding WebSocket connection stability must be handled gracefully. 
-
-```typescript
-// Auto-reconnect logic for WebSocket drops
-function connectWithRetry(url, maxRetries = 5) {
-    let attempts = 0;
-    function connect() {
-        const ws = new WebSocket(url);
-        ws.onclose = () => {
-            if (attempts < maxRetries) {
-                attempts++;
-                setTimeout(connect, 1000 * attempts);
-            }
-        };
-    }
-    connect();
-}
-```
+---
+
+## Errors
+
+| HTTP Code | Meaning |
+|-----------|---------|
+| 400 | Invalid parameter, or agent is `is_active: false` |
+| 401 | Missing or invalid API key |
+| 402 | Insufficient wallet balance for the session |
+| 403 | Read-only key used on a write endpoint (create/update/delete/session) |
+| 404 | Agent not found, or not owned by the caller |
+| 502 | Voice provider (xAI) unreachable or rejected the request |
+| 503 | Realtime voice is not configured on the server |

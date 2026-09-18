@@ -247,21 +247,22 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/video \
 
 ## Audio & TTS
 
-API endpoints and wrappers for Audio & TTS. Ensure proper pure USD tracking.
+Calls `POST /v1/ai/generate/speech`. In the Python and TypeScript SDKs this is `generate_speech()` /
+`generateSpeech()` — there is no `client.audio` namespace.
 
 ::: code-group
 
 ```python [Python]
 from fotohub import FotoHub
 client = FotoHub(api_key="fh_live_your_api_key")
-res = client.audio.tts(param="value")
+res = client.generate_speech(text="Hello from FOTOhub")
 print(res)
 ```
 
 ```typescript [TypeScript]
 import { FotoHub } from "fotohub";
 const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
-const res = await client.audio.tts({ param: "value" });
+const res = await client.generateSpeech({ text: "Hello from FOTOhub" });
 console.log(res);
 ```
 
@@ -285,7 +286,7 @@ type GenerateAudioResponse struct {
 }
 
 func GenerateAudio(ctx context.Context, client *FotoHubClient, req GenerateAudioRequest) (*GenerateAudioResponse, error) {
-    respData, err := client.Post(ctx, "/audio/tts", req)
+    respData, err := client.Post(ctx, "/v1/ai/generate/speech", req)
     if err != nil {
         return nil, err
     }
@@ -299,7 +300,7 @@ func GenerateAudio(ctx context.Context, client *FotoHubClient, req GenerateAudio
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/audio/tts \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/speech \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"param": "value"}'
@@ -316,21 +317,27 @@ curl -X POST https://apis.fotohub.app/v1/audio/tts \
 
 ## Document Intelligence
 
-API endpoints and wrappers for Document Intelligence. Ensure proper pure USD tracking.
+Calls `POST /v1/ai/document/analyze`. No SDK ships a `documents` wrapper — call the endpoint
+directly.
 
 ::: code-group
 
 ```python [Python]
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_your_api_key")
-res = client.documents.analyze(param="value")
+import httpx
+res = httpx.post(
+    "https://apis.fotohub.app/v1/ai/document/analyze",
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+    json={"document_base64": "..."},
+).json()
 print(res)
 ```
 
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
-const res = await client.documents.analyze({ param: "value" });
+const res = await fetch("https://apis.fotohub.app/v1/ai/document/analyze", {
+  method: "POST",
+  headers: { Authorization: "Bearer fh_live_your_api_key", "Content-Type": "application/json" },
+  body: JSON.stringify({ document_base64: "..." }),
+}).then((r) => r.json());
 console.log(res);
 ```
 
@@ -354,7 +361,7 @@ type AnalyzeDocumentResponse struct {
 }
 
 func AnalyzeDocument(ctx context.Context, client *FotoHubClient, req AnalyzeDocumentRequest) (*AnalyzeDocumentResponse, error) {
-    respData, err := client.Post(ctx, "/documents/analyze", req)
+    respData, err := client.Post(ctx, "/v1/ai/document/analyze", req)
     if err != nil {
         return nil, err
     }
@@ -368,7 +375,7 @@ func AnalyzeDocument(ctx context.Context, client *FotoHubClient, req AnalyzeDocu
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/documents/analyze \
+curl -X POST https://apis.fotohub.app/v1/ai/document/analyze \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"param": "value"}'
@@ -385,21 +392,26 @@ curl -X POST https://apis.fotohub.app/v1/documents/analyze \
 
 ## Brand Engine
 
-API endpoints and wrappers for Brand Engine. Ensure proper pure USD tracking.
+Calls `POST /brand/v1/brands`. No SDK ships a `brands` wrapper — call the endpoint directly.
 
 ::: code-group
 
 ```python [Python]
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_your_api_key")
-res = client.brands.create(param="value")
+import httpx
+res = httpx.post(
+    "https://apis.fotohub.app/brand/v1/brands",
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+    json={"name": "Acme Corp"},
+).json()
 print(res)
 ```
 
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
-const res = await client.brands.create({ param: "value" });
+const res = await fetch("https://apis.fotohub.app/brand/v1/brands", {
+  method: "POST",
+  headers: { Authorization: "Bearer fh_live_your_api_key", "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "Acme Corp" }),
+}).then((r) => r.json());
 console.log(res);
 ```
 
@@ -423,7 +435,7 @@ type CreateBrandResponse struct {
 }
 
 func CreateBrand(ctx context.Context, client *FotoHubClient, req CreateBrandRequest) (*CreateBrandResponse, error) {
-    respData, err := client.Post(ctx, "/brand/create", req)
+    respData, err := client.Post(ctx, "/brand/v1/brands", req)
     if err != nil {
         return nil, err
     }
@@ -437,7 +449,7 @@ func CreateBrand(ctx context.Context, client *FotoHubClient, req CreateBrandRequ
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/brand/create \
+curl -X POST https://apis.fotohub.app/brand/v1/brands \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"param": "value"}'
@@ -454,21 +466,27 @@ curl -X POST https://apis.fotohub.app/v1/brand/create \
 
 ## Social Studio
 
-API endpoints and wrappers for Social Studio. Ensure proper pure USD tracking.
+Calls `POST /social/v1/posts` (create a post; include a `scheduled_at` field to schedule it). No
+SDK ships a `social` wrapper — call the endpoint directly.
 
 ::: code-group
 
 ```python [Python]
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_your_api_key")
-res = client.social.schedule(param="value")
+import httpx
+res = httpx.post(
+    "https://apis.fotohub.app/social/v1/posts",
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+    json={"caption": "New drop!", "scheduled_at": "2026-10-01T14:00:00Z"},
+).json()
 print(res)
 ```
 
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
-const res = await client.social.schedule({ param: "value" });
+const res = await fetch("https://apis.fotohub.app/social/v1/posts", {
+  method: "POST",
+  headers: { Authorization: "Bearer fh_live_your_api_key", "Content-Type": "application/json" },
+  body: JSON.stringify({ caption: "New drop!", scheduled_at: "2026-10-01T14:00:00Z" }),
+}).then((r) => r.json());
 console.log(res);
 ```
 
@@ -492,7 +510,7 @@ type SchedulePostResponse struct {
 }
 
 func SchedulePost(ctx context.Context, client *FotoHubClient, req SchedulePostRequest) (*SchedulePostResponse, error) {
-    respData, err := client.Post(ctx, "/social/schedule", req)
+    respData, err := client.Post(ctx, "/social/v1/posts", req)
     if err != nil {
         return nil, err
     }
@@ -506,7 +524,7 @@ func SchedulePost(ctx context.Context, client *FotoHubClient, req SchedulePostRe
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/social/schedule \
+curl -X POST https://apis.fotohub.app/social/v1/posts \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"param": "value"}'
@@ -523,21 +541,30 @@ curl -X POST https://apis.fotohub.app/v1/social/schedule \
 
 ## Virtual Try-On
 
-API endpoints and wrappers for Virtual Try-On. Ensure proper pure USD tracking.
+Calls `POST /v1/ai/tryon`. The Python SDK exposes this as the flat `client.tryon()` — there is no
+`client.tryon.submit()`.
 
 ::: code-group
 
 ```python [Python]
 from fotohub import FotoHub
 client = FotoHub(api_key="fh_live_your_api_key")
-res = client.tryon.submit(param="value")
+res = client.tryon(
+    person_image_url="https://example.com/person.jpg",
+    garment_image_url="https://example.com/shirt.jpg",
+    category="tops",
+)
 print(res)
 ```
 
 ```typescript [TypeScript]
 import { FotoHub } from "fotohub";
 const client = new FotoHub({ apiKey: "fh_live_your_api_key" });
-const res = await client.tryon.submit({ param: "value" });
+const res = await client.tryOn({
+  personImageUrl: "https://example.com/person.jpg",
+  garmentImageUrl: "https://example.com/shirt.jpg",
+  category: "tops",
+});
 console.log(res);
 ```
 
@@ -561,7 +588,7 @@ type SubmitTryonResponse struct {
 }
 
 func SubmitTryon(ctx context.Context, client *FotoHubClient, req SubmitTryonRequest) (*SubmitTryonResponse, error) {
-    respData, err := client.Post(ctx, "/tryon/submit", req)
+    respData, err := client.Post(ctx, "/v1/ai/tryon", req)
     if err != nil {
         return nil, err
     }
@@ -575,7 +602,7 @@ func SubmitTryon(ctx context.Context, client *FotoHubClient, req SubmitTryonRequ
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/tryon/submit \
+curl -X POST https://apis.fotohub.app/v1/ai/tryon \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"param": "value"}'
@@ -2888,7 +2915,7 @@ func RunBenchmarks(ctx context.Context) error {
 
 ```mermaid
 flowchart TD
-    Client[Go Application] --> |POST /v1/ai/generate| API[FotoHub API Gateway]
+    Client[Go Application] --> |POST /v1/ai/generate/image| API[FotoHub API Gateway]
     API --> GPU2[GPU2: MMAudio / Stable Diffusion]
     API --> GPU3[GPU3: MuseTalk / LipSync]
     API --> GPU4[GPU4/5: 3D / Heavy Workloads]

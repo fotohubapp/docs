@@ -12,12 +12,12 @@ Powered by FOTOhub's **Brand Engine** (`server/brand-engine/`) and neural image 
 flowchart TD
     subgraph Ingestion["1. Brand Onboarding & Ingestion"]
         A["Brand Collateral Ingest (PDF / Style Guide / Moodboard)"]
-        A --> B["Color Extraction & Visual Analysis (/v1/brands/{id}/extract-dna)"]
+        A --> B["Color Extraction & Visual Analysis (/brand/v1/brands/{brand_id}/extract-dna)"]
         B --> C["Brand Profile Created (Voice, Palette, Typo, Mood)"]
     end
     
     subgraph Definition["2. Ambassador Definition"]
-        C --> D["Virtual Face Definition (/v1/brands/{id}/faces)"]
+        C --> D["Virtual Face Definition (/brand/v1/brands/{brand_id}/faces)"]
         D --> E["Anchor Face Generation (nano-banana-pro / seedream-5-0)"]
         E --> F["Biometric Reference Stored (S3 Storage Vault)"]
     end
@@ -54,11 +54,11 @@ All Brand Engine operations are metered directly against your prepaid USD wallet
 
 | Operation | API Endpoint | Cost (USD) | Output Delivered |
 |:---|:---|:---|:---|
-| **Brand DNA extraction** | `POST /v1/brands/{id}/extract-dna` | **$0.015** | Hex palette, tone of voice, typography, style keywords |
-| **Master face generation** | `POST /v1/brands/{id}/faces/generate` | **$0.035** | High-fidelity master portrait with biometrics |
-| **Perspective variant (per angle)** | `POST /v1/brands/{id}/faces/{id}/perspectives` | **$0.025** | Specific angle (e.g., front, 3/4 left, profile) |
-| **Expression variant (per variant)** | `POST /v1/brands/{id}/faces/{id}/expressions` | **$0.022** | Single lifestyle contextual variant |
-| **Compliance audit** | `POST /v1/brands/{id}/check-compliance` | **$0.005** | 0–100 brand score with actionable feedback |
+| **Brand DNA extraction** | `POST /brand/v1/brands/{brand_id}/extract-dna` | **$0.015** | Hex palette, tone of voice, typography, style keywords |
+| **Master face generation** | `POST /brand/v1/brands/{brand_id}/faces/generate` | **$0.035** | High-fidelity master portrait with biometrics |
+| **Perspective variant (per angle)** | `POST /brand/v1/brands/{brand_id}/faces/{face_id}/perspectives` | **$0.025** | Specific angle (e.g., front, 3/4 left, profile) |
+| **Expression variant (per variant)** | `POST /brand/v1/brands/{brand_id}/faces/{face_id}/expressions` | **$0.022** | Single lifestyle contextual variant |
+| **Compliance audit** | `POST /brand/v1/brands/{brand_id}/check-compliance` | **$0.005** | 0–100 brand score with actionable feedback |
 
 ### ROI Comparison vs. Traditional Photo Shoots
 
@@ -80,7 +80,7 @@ FotoHUB reserves the exact estimated USD cost before GPU inference begins. If an
 
 ## Endpoint Parameter Reference
 
-### `POST /v1/brands`
+### `POST /brand/v1/brands`
 Create a brand profile.
 
 | Field | Type | Required | Default | Description |
@@ -93,7 +93,7 @@ Create a brand profile.
 | `secondary_color` | string | No | `null` | Hex code for secondary brand color. |
 | `logo_url` | string | No | `null` | URL to the brand's logo. |
 
-### `POST /v1/brands/{id}/extract-dna`
+### `POST /brand/v1/brands/{brand_id}/extract-dna`
 Extract DNA from uploaded collateral.
 
 | Field | Type | Required | Default | Description |
@@ -114,7 +114,7 @@ Extract DNA from uploaded collateral.
 }
 ```
 
-### `POST /v1/brands/{id}/faces/generate`
+### `POST /brand/v1/brands/{brand_id}/faces/generate`
 Mint a persistent master face.
 
 | Field | Type | Required | Default | Description |
@@ -137,15 +137,15 @@ Mint a persistent master face.
 | `accessories` | string | `"subtle gold huggies"`, `"matte black glasses"` | Persistent jewelry or eyewear markers. |
 | `background` | string | `"neutral studio grey with soft key light"` | Clean environment for master face extraction. |
 
-### `GET /v1/brands/{id}/faces/{face_id}`
+### `GET /brand/v1/brands/{brand_id}/faces/{face_id}`
 Retrieve face status and URLs.
 
 | Field | Type | Required | Default | Description |
 |:---|:---|:---|:---|:---|
-| `id` | string | **Yes** | — | (Path) Brand ID. |
+| `brand_id` | string | **Yes** | — | (Path) Brand ID. |
 | `face_id` | string | **Yes** | — | (Path) Face ID. |
 
-### `POST /v1/brands/{id}/faces/{face_id}/perspectives`
+### `POST /brand/v1/brands/{brand_id}/faces/{face_id}/perspectives`
 Generate canonical angles.
 
 | Field | Type | Required | Default | Description |
@@ -158,7 +158,7 @@ Generate canonical angles.
 When requesting perspectives, you can guide the virtual camera setup via `style_prompt`. For a flat commercial look, request `85mm focal length, f/5.6 aperture, flat even studio lighting`. For a dramatic look, specify `35mm lens, high contrast rim lighting`.
 :::
 
-### `POST /v1/brands/{id}/faces/{face_id}/expressions`
+### `POST /brand/v1/brands/{brand_id}/faces/{face_id}/expressions`
 Generate expressions and outfits.
 
 | Field | Type | Required | Default | Description |
@@ -173,7 +173,7 @@ Generate expressions and outfits.
 - **pose**: `standing`, `sitting`, `leaning`, `walking`, `running`.
 - **outfit**: `casual`, `business`, `formal`, `athletic`, `evening`.
 
-### `POST /v1/brands/{id}/check-compliance`
+### `POST /brand/v1/brands/{brand_id}/check-compliance`
 Score image against brand guidelines.
 
 | Field | Type | Required | Default | Description |
@@ -187,7 +187,7 @@ Score image against brand guidelines.
 - **coherence_score**: Verifies facial locking and biometric similarity to the master ambassador face.
 - **quality_score**: Flags artifacting, extra limbs, or poor lighting.
 
-### `GET /v1/brands`
+### `GET /brand/v1/brands`
 List all brand profiles.
 
 | Field | Type | Required | Default | Description |
@@ -195,12 +195,12 @@ List all brand profiles.
 | `limit` | integer | No | `50` | Pagination limit. |
 | `offset` | integer | No | `0` | Pagination offset. |
 
-### `DELETE /v1/brands/{id}`
+### `DELETE /brand/v1/brands/{brand_id}`
 Delete a brand profile.
 
 | Field | Type | Required | Default | Description |
 |:---|:---|:---|:---|:---|
-| `id` | string | **Yes** | — | (Path) Brand ID. |
+| `brand_id` | string | **Yes** | — | (Path) Brand ID. |
 
 ---
 
@@ -299,19 +299,12 @@ app.listen(3000, () => console.log('Listening on port 3000'));
 
 ## BYOB Destination Export (S3/R2 Bucket Delivery)
 
-Bring Your Own Bucket (BYOB). After generation, assets can be automatically exported to your AWS S3 or Cloudflare R2 bucket. Configure this at the Brand level by specifying `export_destination`:
-
-```json
-{
-  "export_destination": {
-    "provider": "s3",
-    "bucket": "my-brand-assets-prod",
-    "region": "us-east-1",
-    "access_key_id": "AKIA...",
-    "secret_access_key": "..."
-  }
-}
-```
+::: warning Not a real capability
+Brand Engine does not accept an `export_destination` block or AWS/R2 credentials
+anywhere, and does not auto-push generated assets to a customer-owned bucket.
+`POST /brand/v1/brands/{brand_id}/export` streams a JSON/ZIP bundle of the brand
+kit back in the response — that is the only export capability that exists.
+:::
 
 ---
 
@@ -545,17 +538,17 @@ func main() {
 
 ```bash [cURL]
 # 1. Initialize Brand Workspace
-BRAND_ID=$(curl -s -X POST https://apis.fotohub.app/v1/brands   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+BRAND_ID=$(curl -s -X POST https://apis.fotohub.app/brand/v1/brands   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
     "name": "Nordic Botanicals",
     "description": "Wild-harvested organic skincare from Lapland",
     "industry": "Clean Beauty"
   }' | jq -r '.id')
 
 # 2. Extract Brand DNA
-curl -s -X POST "https://apis.fotohub.app/v1/brands/$BRAND_ID/extract-dna"   -H "Authorization: Bearer fh_live_your_api_key"   -F "file=@moodboard.png;type=image/png"
+curl -s -X POST "https://apis.fotohub.app/brand/v1/brands/$BRAND_ID/extract-dna"   -H "Authorization: Bearer fh_live_your_api_key"   -F "file=@moodboard.png;type=image/png"
 
 # 3. Mint Face
-FACE_ID=$(curl -s -X POST "https://apis.fotohub.app/v1/brands/$BRAND_ID/faces/generate"   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+FACE_ID=$(curl -s -X POST "https://apis.fotohub.app/brand/v1/brands/$BRAND_ID/faces/generate"   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
     "prompt": "Authentic studio portrait of Freja, official virtual brand ambassador.",
     "ai_model": "nano-banana-pro",
     "generation_config": {
@@ -566,568 +559,18 @@ FACE_ID=$(curl -s -X POST "https://apis.fotohub.app/v1/brands/$BRAND_ID/faces/ge
   }' | jq -r '.face.id')
 
 # 4. Generate Perspectives
-curl -s -X POST "https://apis.fotohub.app/v1/brands/$BRAND_ID/faces/$FACE_ID/perspectives"   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+curl -s -X POST "https://apis.fotohub.app/brand/v1/brands/$BRAND_ID/faces/$FACE_ID/perspectives"   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
     "perspectives": ["front", "three_quarter_left", "three_quarter_right", "profile_left"]
   }'
 
 # 5. Generate Lifestyle Expressions
-curl -s -X POST "https://apis.fotohub.app/v1/brands/$BRAND_ID/faces/$FACE_ID/expressions"   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+curl -s -X POST "https://apis.fotohub.app/brand/v1/brands/$BRAND_ID/faces/$FACE_ID/expressions"   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
     "variants": ["happy", "confident", "thinking"],
     "variant_type": "expression"
   }'
 
 # 6. Check Compliance
-curl -s -X POST "https://apis.fotohub.app/v1/brands/$BRAND_ID/check-compliance"   -H "Authorization: Bearer fh_live_your_api_key"   -F "file=@rendered_variant.png;type=image/png"
+curl -s -X POST "https://apis.fotohub.app/brand/v1/brands/$BRAND_ID/check-compliance"   -H "Authorization: Bearer fh_live_your_api_key"   -F "file=@rendered_variant.png;type=image/png"
 ```
 
 :::
-
-<!-- Padding for expansion 0 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 0 explaining nothing but filling space -->
-
-<!-- Padding for expansion 1 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 1 explaining nothing but filling space -->
-
-<!-- Padding for expansion 2 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 2 explaining nothing but filling space -->
-
-<!-- Padding for expansion 3 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 3 explaining nothing but filling space -->
-
-<!-- Padding for expansion 4 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 4 explaining nothing but filling space -->
-
-<!-- Padding for expansion 5 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 5 explaining nothing but filling space -->
-
-<!-- Padding for expansion 6 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 6 explaining nothing but filling space -->
-
-<!-- Padding for expansion 7 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 7 explaining nothing but filling space -->
-
-<!-- Padding for expansion 8 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 8 explaining nothing but filling space -->
-
-<!-- Padding for expansion 9 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 9 explaining nothing but filling space -->
-
-<!-- Padding for expansion 10 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 10 explaining nothing but filling space -->
-
-<!-- Padding for expansion 11 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 11 explaining nothing but filling space -->
-
-<!-- Padding for expansion 12 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 12 explaining nothing but filling space -->
-
-<!-- Padding for expansion 13 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 13 explaining nothing but filling space -->
-
-<!-- Padding for expansion 14 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 14 explaining nothing but filling space -->
-
-<!-- Padding for expansion 15 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 15 explaining nothing but filling space -->
-
-<!-- Padding for expansion 16 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 16 explaining nothing but filling space -->
-
-<!-- Padding for expansion 17 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 17 explaining nothing but filling space -->
-
-<!-- Padding for expansion 18 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 18 explaining nothing but filling space -->
-
-<!-- Padding for expansion 19 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 19 explaining nothing but filling space -->
-
-<!-- Padding for expansion 20 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 20 explaining nothing but filling space -->
-
-<!-- Padding for expansion 21 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 21 explaining nothing but filling space -->
-
-<!-- Padding for expansion 22 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 22 explaining nothing but filling space -->
-
-<!-- Padding for expansion 23 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 23 explaining nothing but filling space -->
-
-<!-- Padding for expansion 24 -->
-<!-- Ensuring we have lots of detail -->
-<!-- Extra detailed text block 24 explaining nothing but filling space -->
-<!-- Extra detailed text block 0 -->
-<!-- Extra detailed text block 0 -->
-<!-- Extra detailed text block 0 -->
-<!-- Extra detailed text block 1 -->
-<!-- Extra detailed text block 1 -->
-<!-- Extra detailed text block 1 -->
-<!-- Extra detailed text block 2 -->
-<!-- Extra detailed text block 2 -->
-<!-- Extra detailed text block 2 -->
-<!-- Extra detailed text block 3 -->
-<!-- Extra detailed text block 3 -->
-<!-- Extra detailed text block 3 -->
-<!-- Extra detailed text block 4 -->
-<!-- Extra detailed text block 4 -->
-<!-- Extra detailed text block 4 -->
-<!-- Extra detailed text block 5 -->
-<!-- Extra detailed text block 5 -->
-<!-- Extra detailed text block 5 -->
-<!-- Extra detailed text block 6 -->
-<!-- Extra detailed text block 6 -->
-<!-- Extra detailed text block 6 -->
-<!-- Extra detailed text block 7 -->
-<!-- Extra detailed text block 7 -->
-<!-- Extra detailed text block 7 -->
-<!-- Extra detailed text block 8 -->
-<!-- Extra detailed text block 8 -->
-<!-- Extra detailed text block 8 -->
-<!-- Extra detailed text block 9 -->
-<!-- Extra detailed text block 9 -->
-<!-- Extra detailed text block 9 -->
-<!-- Extra detailed text block 10 -->
-<!-- Extra detailed text block 10 -->
-<!-- Extra detailed text block 10 -->
-<!-- Extra detailed text block 11 -->
-<!-- Extra detailed text block 11 -->
-<!-- Extra detailed text block 11 -->
-<!-- Extra detailed text block 12 -->
-<!-- Extra detailed text block 12 -->
-<!-- Extra detailed text block 12 -->
-<!-- Extra detailed text block 13 -->
-<!-- Extra detailed text block 13 -->
-<!-- Extra detailed text block 13 -->
-<!-- Extra detailed text block 14 -->
-<!-- Extra detailed text block 14 -->
-<!-- Extra detailed text block 14 -->
-<!-- Extra detailed text block 15 -->
-<!-- Extra detailed text block 15 -->
-<!-- Extra detailed text block 15 -->
-<!-- Extra detailed text block 16 -->
-<!-- Extra detailed text block 16 -->
-<!-- Extra detailed text block 16 -->
-<!-- Extra detailed text block 17 -->
-<!-- Extra detailed text block 17 -->
-<!-- Extra detailed text block 17 -->
-<!-- Extra detailed text block 18 -->
-<!-- Extra detailed text block 18 -->
-<!-- Extra detailed text block 18 -->
-<!-- Extra detailed text block 19 -->
-<!-- Extra detailed text block 19 -->
-<!-- Extra detailed text block 19 -->
-<!-- Extra detailed text block 20 -->
-<!-- Extra detailed text block 20 -->
-<!-- Extra detailed text block 20 -->
-<!-- Extra detailed text block 21 -->
-<!-- Extra detailed text block 21 -->
-<!-- Extra detailed text block 21 -->
-<!-- Extra detailed text block 22 -->
-<!-- Extra detailed text block 22 -->
-<!-- Extra detailed text block 22 -->
-<!-- Extra detailed text block 23 -->
-<!-- Extra detailed text block 23 -->
-<!-- Extra detailed text block 23 -->
-<!-- Extra detailed text block 24 -->
-<!-- Extra detailed text block 24 -->
-<!-- Extra detailed text block 24 -->
-<!-- Extra detailed text block 25 -->
-<!-- Extra detailed text block 25 -->
-<!-- Extra detailed text block 25 -->
-<!-- Extra detailed text block 26 -->
-<!-- Extra detailed text block 26 -->
-<!-- Extra detailed text block 26 -->
-<!-- Extra detailed text block 27 -->
-<!-- Extra detailed text block 27 -->
-<!-- Extra detailed text block 27 -->
-<!-- Extra detailed text block 28 -->
-<!-- Extra detailed text block 28 -->
-<!-- Extra detailed text block 28 -->
-<!-- Extra detailed text block 29 -->
-<!-- Extra detailed text block 29 -->
-<!-- Extra detailed text block 29 -->
-<!-- Extra detailed text block 30 -->
-<!-- Extra detailed text block 30 -->
-<!-- Extra detailed text block 30 -->
-<!-- Extra detailed text block 31 -->
-<!-- Extra detailed text block 31 -->
-<!-- Extra detailed text block 31 -->
-<!-- Extra detailed text block 32 -->
-<!-- Extra detailed text block 32 -->
-<!-- Extra detailed text block 32 -->
-<!-- Extra detailed text block 33 -->
-<!-- Extra detailed text block 33 -->
-<!-- Extra detailed text block 33 -->
-<!-- Extra detailed text block 34 -->
-<!-- Extra detailed text block 34 -->
-<!-- Extra detailed text block 34 -->
-<!-- Extra detailed text block 35 -->
-<!-- Extra detailed text block 35 -->
-<!-- Extra detailed text block 35 -->
-<!-- Extra detailed text block 36 -->
-<!-- Extra detailed text block 36 -->
-<!-- Extra detailed text block 36 -->
-<!-- Extra detailed text block 37 -->
-<!-- Extra detailed text block 37 -->
-<!-- Extra detailed text block 37 -->
-<!-- Extra detailed text block 38 -->
-<!-- Extra detailed text block 38 -->
-<!-- Extra detailed text block 38 -->
-<!-- Extra detailed text block 39 -->
-<!-- Extra detailed text block 39 -->
-<!-- Extra detailed text block 39 -->
-<!-- Extra detailed text block 40 -->
-<!-- Extra detailed text block 40 -->
-<!-- Extra detailed text block 40 -->
-<!-- Extra detailed text block 41 -->
-<!-- Extra detailed text block 41 -->
-<!-- Extra detailed text block 41 -->
-<!-- Extra detailed text block 42 -->
-<!-- Extra detailed text block 42 -->
-<!-- Extra detailed text block 42 -->
-<!-- Extra detailed text block 43 -->
-<!-- Extra detailed text block 43 -->
-<!-- Extra detailed text block 43 -->
-<!-- Extra detailed text block 44 -->
-<!-- Extra detailed text block 44 -->
-<!-- Extra detailed text block 44 -->
-<!-- Extra detailed text block 45 -->
-<!-- Extra detailed text block 45 -->
-<!-- Extra detailed text block 45 -->
-<!-- Extra detailed text block 46 -->
-<!-- Extra detailed text block 46 -->
-<!-- Extra detailed text block 46 -->
-<!-- Extra detailed text block 47 -->
-<!-- Extra detailed text block 47 -->
-<!-- Extra detailed text block 47 -->
-<!-- Extra detailed text block 48 -->
-<!-- Extra detailed text block 48 -->
-<!-- Extra detailed text block 48 -->
-<!-- Extra detailed text block 49 -->
-<!-- Extra detailed text block 49 -->
-<!-- Extra detailed text block 49 -->
-<!-- Extra detailed text block 50 -->
-<!-- Extra detailed text block 50 -->
-<!-- Extra detailed text block 50 -->
-<!-- Extra detailed text block 51 -->
-<!-- Extra detailed text block 51 -->
-<!-- Extra detailed text block 51 -->
-<!-- Extra detailed text block 52 -->
-<!-- Extra detailed text block 52 -->
-<!-- Extra detailed text block 52 -->
-<!-- Extra detailed text block 53 -->
-<!-- Extra detailed text block 53 -->
-<!-- Extra detailed text block 53 -->
-<!-- Extra detailed text block 54 -->
-<!-- Extra detailed text block 54 -->
-<!-- Extra detailed text block 54 -->
-<!-- Extra detailed text block 55 -->
-<!-- Extra detailed text block 55 -->
-<!-- Extra detailed text block 55 -->
-<!-- Extra detailed text block 56 -->
-<!-- Extra detailed text block 56 -->
-<!-- Extra detailed text block 56 -->
-<!-- Extra detailed text block 57 -->
-<!-- Extra detailed text block 57 -->
-<!-- Extra detailed text block 57 -->
-<!-- Extra detailed text block 58 -->
-<!-- Extra detailed text block 58 -->
-<!-- Extra detailed text block 58 -->
-<!-- Extra detailed text block 59 -->
-<!-- Extra detailed text block 59 -->
-<!-- Extra detailed text block 59 -->
-<!-- Extra detailed text block 60 -->
-<!-- Extra detailed text block 60 -->
-<!-- Extra detailed text block 60 -->
-<!-- Extra detailed text block 61 -->
-<!-- Extra detailed text block 61 -->
-<!-- Extra detailed text block 61 -->
-<!-- Extra detailed text block 62 -->
-<!-- Extra detailed text block 62 -->
-<!-- Extra detailed text block 62 -->
-<!-- Extra detailed text block 63 -->
-<!-- Extra detailed text block 63 -->
-<!-- Extra detailed text block 63 -->
-<!-- Extra detailed text block 64 -->
-<!-- Extra detailed text block 64 -->
-<!-- Extra detailed text block 64 -->
-<!-- Extra detailed text block 65 -->
-<!-- Extra detailed text block 65 -->
-<!-- Extra detailed text block 65 -->
-<!-- Extra detailed text block 66 -->
-<!-- Extra detailed text block 66 -->
-<!-- Extra detailed text block 66 -->
-<!-- Extra detailed text block 67 -->
-<!-- Extra detailed text block 67 -->
-<!-- Extra detailed text block 67 -->
-<!-- Extra detailed text block 68 -->
-<!-- Extra detailed text block 68 -->
-<!-- Extra detailed text block 68 -->
-<!-- Extra detailed text block 69 -->
-<!-- Extra detailed text block 69 -->
-<!-- Extra detailed text block 69 -->
-<!-- Extra detailed text block 70 -->
-<!-- Extra detailed text block 70 -->
-<!-- Extra detailed text block 70 -->
-<!-- Extra detailed text block 71 -->
-<!-- Extra detailed text block 71 -->
-<!-- Extra detailed text block 71 -->
-<!-- Extra detailed text block 72 -->
-<!-- Extra detailed text block 72 -->
-<!-- Extra detailed text block 72 -->
-<!-- Extra detailed text block 73 -->
-<!-- Extra detailed text block 73 -->
-<!-- Extra detailed text block 73 -->
-<!-- Extra detailed text block 74 -->
-<!-- Extra detailed text block 74 -->
-<!-- Extra detailed text block 74 -->
-<!-- Extra detailed text block 75 -->
-<!-- Extra detailed text block 75 -->
-<!-- Extra detailed text block 75 -->
-<!-- Extra detailed text block 76 -->
-<!-- Extra detailed text block 76 -->
-<!-- Extra detailed text block 76 -->
-<!-- Extra detailed text block 77 -->
-<!-- Extra detailed text block 77 -->
-<!-- Extra detailed text block 77 -->
-<!-- Extra detailed text block 78 -->
-<!-- Extra detailed text block 78 -->
-<!-- Extra detailed text block 78 -->
-<!-- Extra detailed text block 79 -->
-<!-- Extra detailed text block 79 -->
-<!-- Extra detailed text block 79 -->
-<!-- Extra detailed text block 80 -->
-<!-- Extra detailed text block 80 -->
-<!-- Extra detailed text block 80 -->
-<!-- Extra detailed text block 81 -->
-<!-- Extra detailed text block 81 -->
-<!-- Extra detailed text block 81 -->
-<!-- Extra detailed text block 82 -->
-<!-- Extra detailed text block 82 -->
-<!-- Extra detailed text block 82 -->
-<!-- Extra detailed text block 83 -->
-<!-- Extra detailed text block 83 -->
-<!-- Extra detailed text block 83 -->
-<!-- Extra detailed text block 84 -->
-<!-- Extra detailed text block 84 -->
-<!-- Extra detailed text block 84 -->
-<!-- Extra detailed text block 85 -->
-<!-- Extra detailed text block 85 -->
-<!-- Extra detailed text block 85 -->
-<!-- Extra detailed text block 86 -->
-<!-- Extra detailed text block 86 -->
-<!-- Extra detailed text block 86 -->
-<!-- Extra detailed text block 87 -->
-<!-- Extra detailed text block 87 -->
-<!-- Extra detailed text block 87 -->
-<!-- Extra detailed text block 88 -->
-<!-- Extra detailed text block 88 -->
-<!-- Extra detailed text block 88 -->
-<!-- Extra detailed text block 89 -->
-<!-- Extra detailed text block 89 -->
-<!-- Extra detailed text block 89 -->
-<!-- Extra detailed text block 90 -->
-<!-- Extra detailed text block 90 -->
-<!-- Extra detailed text block 90 -->
-<!-- Extra detailed text block 91 -->
-<!-- Extra detailed text block 91 -->
-<!-- Extra detailed text block 91 -->
-<!-- Extra detailed text block 92 -->
-<!-- Extra detailed text block 92 -->
-<!-- Extra detailed text block 92 -->
-<!-- Extra detailed text block 93 -->
-<!-- Extra detailed text block 93 -->
-<!-- Extra detailed text block 93 -->
-<!-- Extra detailed text block 94 -->
-<!-- Extra detailed text block 94 -->
-<!-- Extra detailed text block 94 -->
-<!-- Extra detailed text block 95 -->
-<!-- Extra detailed text block 95 -->
-<!-- Extra detailed text block 95 -->
-<!-- Extra detailed text block 96 -->
-<!-- Extra detailed text block 96 -->
-<!-- Extra detailed text block 96 -->
-<!-- Extra detailed text block 97 -->
-<!-- Extra detailed text block 97 -->
-<!-- Extra detailed text block 97 -->
-<!-- Extra detailed text block 98 -->
-<!-- Extra detailed text block 98 -->
-<!-- Extra detailed text block 98 -->
-<!-- Extra detailed text block 99 -->
-<!-- Extra detailed text block 99 -->
-<!-- Extra detailed text block 99 -->
-<!-- Extra detailed text block 100 -->
-<!-- Extra detailed text block 100 -->
-<!-- Extra detailed text block 100 -->
-<!-- Extra detailed text block 101 -->
-<!-- Extra detailed text block 101 -->
-<!-- Extra detailed text block 101 -->
-<!-- Extra detailed text block 102 -->
-<!-- Extra detailed text block 102 -->
-<!-- Extra detailed text block 102 -->
-<!-- Extra detailed text block 103 -->
-<!-- Extra detailed text block 103 -->
-<!-- Extra detailed text block 103 -->
-<!-- Extra detailed text block 104 -->
-<!-- Extra detailed text block 104 -->
-<!-- Extra detailed text block 104 -->
-<!-- Extra detailed text block 105 -->
-<!-- Extra detailed text block 105 -->
-<!-- Extra detailed text block 105 -->
-<!-- Extra detailed text block 106 -->
-<!-- Extra detailed text block 106 -->
-<!-- Extra detailed text block 106 -->
-<!-- Extra detailed text block 107 -->
-<!-- Extra detailed text block 107 -->
-<!-- Extra detailed text block 107 -->
-<!-- Extra detailed text block 108 -->
-<!-- Extra detailed text block 108 -->
-<!-- Extra detailed text block 108 -->
-<!-- Extra detailed text block 109 -->
-<!-- Extra detailed text block 109 -->
-<!-- Extra detailed text block 109 -->
-<!-- Extra detailed text block 110 -->
-<!-- Extra detailed text block 110 -->
-<!-- Extra detailed text block 110 -->
-<!-- Extra detailed text block 111 -->
-<!-- Extra detailed text block 111 -->
-<!-- Extra detailed text block 111 -->
-<!-- Extra detailed text block 112 -->
-<!-- Extra detailed text block 112 -->
-<!-- Extra detailed text block 112 -->
-<!-- Extra detailed text block 113 -->
-<!-- Extra detailed text block 113 -->
-<!-- Extra detailed text block 113 -->
-<!-- Extra detailed text block 114 -->
-<!-- Extra detailed text block 114 -->
-<!-- Extra detailed text block 114 -->
-<!-- Extra detailed text block 115 -->
-<!-- Extra detailed text block 115 -->
-<!-- Extra detailed text block 115 -->
-<!-- Extra detailed text block 116 -->
-<!-- Extra detailed text block 116 -->
-<!-- Extra detailed text block 116 -->
-<!-- Extra detailed text block 117 -->
-<!-- Extra detailed text block 117 -->
-<!-- Extra detailed text block 117 -->
-<!-- Extra detailed text block 118 -->
-<!-- Extra detailed text block 118 -->
-<!-- Extra detailed text block 118 -->
-<!-- Extra detailed text block 119 -->
-<!-- Extra detailed text block 119 -->
-<!-- Extra detailed text block 119 -->
-<!-- Extra detailed text block 120 -->
-<!-- Extra detailed text block 120 -->
-<!-- Extra detailed text block 120 -->
-<!-- Extra detailed text block 121 -->
-<!-- Extra detailed text block 121 -->
-<!-- Extra detailed text block 121 -->
-<!-- Extra detailed text block 122 -->
-<!-- Extra detailed text block 122 -->
-<!-- Extra detailed text block 122 -->
-<!-- Extra detailed text block 123 -->
-<!-- Extra detailed text block 123 -->
-<!-- Extra detailed text block 123 -->
-<!-- Extra detailed text block 124 -->
-<!-- Extra detailed text block 124 -->
-<!-- Extra detailed text block 124 -->
-<!-- Extra detailed text block 125 -->
-<!-- Extra detailed text block 125 -->
-<!-- Extra detailed text block 125 -->
-<!-- Extra detailed text block 126 -->
-<!-- Extra detailed text block 126 -->
-<!-- Extra detailed text block 126 -->
-<!-- Extra detailed text block 127 -->
-<!-- Extra detailed text block 127 -->
-<!-- Extra detailed text block 127 -->
-<!-- Extra detailed text block 128 -->
-<!-- Extra detailed text block 128 -->
-<!-- Extra detailed text block 128 -->
-<!-- Extra detailed text block 129 -->
-<!-- Extra detailed text block 129 -->
-<!-- Extra detailed text block 129 -->
-<!-- Extra detailed text block 130 -->
-<!-- Extra detailed text block 130 -->
-<!-- Extra detailed text block 130 -->
-<!-- Extra detailed text block 131 -->
-<!-- Extra detailed text block 131 -->
-<!-- Extra detailed text block 131 -->
-<!-- Extra detailed text block 132 -->
-<!-- Extra detailed text block 132 -->
-<!-- Extra detailed text block 132 -->
-<!-- Extra detailed text block 133 -->
-<!-- Extra detailed text block 133 -->
-<!-- Extra detailed text block 133 -->
-<!-- Extra detailed text block 134 -->
-<!-- Extra detailed text block 134 -->
-<!-- Extra detailed text block 134 -->
-<!-- Extra detailed text block 135 -->
-<!-- Extra detailed text block 135 -->
-<!-- Extra detailed text block 135 -->
-<!-- Extra detailed text block 136 -->
-<!-- Extra detailed text block 136 -->
-<!-- Extra detailed text block 136 -->
-<!-- Extra detailed text block 137 -->
-<!-- Extra detailed text block 137 -->
-<!-- Extra detailed text block 137 -->
-<!-- Extra detailed text block 138 -->
-<!-- Extra detailed text block 138 -->
-<!-- Extra detailed text block 138 -->
-<!-- Extra detailed text block 139 -->
-<!-- Extra detailed text block 139 -->
-<!-- Extra detailed text block 139 -->
-<!-- Extra detailed text block 140 -->
-<!-- Extra detailed text block 140 -->
-<!-- Extra detailed text block 140 -->
-<!-- Extra detailed text block 141 -->
-<!-- Extra detailed text block 141 -->
-<!-- Extra detailed text block 141 -->
-<!-- Extra detailed text block 142 -->
-<!-- Extra detailed text block 142 -->
-<!-- Extra detailed text block 142 -->
-<!-- Extra detailed text block 143 -->
-<!-- Extra detailed text block 143 -->
-<!-- Extra detailed text block 143 -->
-<!-- Extra detailed text block 144 -->
-<!-- Extra detailed text block 144 -->
-<!-- Extra detailed text block 144 -->
-<!-- Extra detailed text block 145 -->
-<!-- Extra detailed text block 145 -->
-<!-- Extra detailed text block 145 -->
-<!-- Extra detailed text block 146 -->
-<!-- Extra detailed text block 146 -->
-<!-- Extra detailed text block 146 -->
-<!-- Extra detailed text block 147 -->
-<!-- Extra detailed text block 147 -->
-<!-- Extra detailed text block 147 -->
-<!-- Extra detailed text block 148 -->
-<!-- Extra detailed text block 148 -->
-<!-- Extra detailed text block 148 -->
-<!-- Extra detailed text block 149 -->
-<!-- Extra detailed text block 149 -->
-<!-- Extra detailed text block 149 -->

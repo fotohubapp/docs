@@ -860,7 +860,7 @@ function fotohub_process_product_packshots(int $product_id): void {
     if (empty($api_key)) return;
 
     // Dispatch background replacement with studio marble podium
-    $response = wp_remote_post('https://apis.fotohub.app/v1/ai/image/replace-background', [
+    $response = wp_remote_post('https://apis.fotohub.app/v1/images/replace-background', [
         'headers' => [
             'Authorization' => 'Bearer ' . $api_key,
             'Content-Type' => 'application/json',
@@ -1003,11 +1003,11 @@ try {
 
 ## Domain 11: Document Intelligence & OCR
 
-The `$client->documents()` namespace provides enterprise-grade AI extraction for complex tables, unstructured invoices, handwritten forms, and automated PII redaction. Models are billed per page in pure USD.
-
-::: tip DLQ & Retry Strategy
-Always implement a Dead Letter Queue (DLQ) pattern when processing large document batches. If an invoice fails parsing, push it to a DLQ for manual review rather than failing the entire batch.
-:::
+FOTOhub's document intelligence surface covers structured extraction (`/v1/ai/document/analyze`) and
+invoice/expense parsing (`/v1/ai/document/analyze-expense`). Neither the PHP, Python nor TypeScript SDK
+ships a typed `documents()` wrapper for these yet — call the endpoints directly with the SDK's
+underlying HTTP client (or plain HTTP), as shown below. There is no batch-processing endpoint and no
+PII-redaction endpoint on this surface; do not build against either.
 
 ### Synchronous Document Analysis
 
@@ -1019,77 +1019,74 @@ Extract structured data from a single document synchronously.
 <?php
 declare(strict_types=1);
 
-use FotoHub\Client;
-
-$client = new Client();
+$apiKey = 'fh_live_your_api_key';
 $doc = base64_encode(file_get_contents('invoice.pdf'));
 
-$result = $client->documents()->analyzeDocument($doc, ['TABLES', 'FORMS', 'SIGNATURES']);
-$expense = $client->documents()->analyzeExpense($doc);
-$redacted = $client->documents()->redactPII($doc, ['PERSON', 'EMAIL', 'SSN']);
+$httpClient = new \GuzzleHttp\Client();
 
-echo "Expense Total: $" . $expense->totalAmount . "\n";
-echo "Cost: $" . $result->usdCharged . " USD\n";
+$result = $httpClient->post('https://apis.fotohub.app/v1/ai/document/analyze', [
+    'headers' => ['Authorization' => "Bearer {$apiKey}"],
+    'json' => ['document_base64' => $doc, 'features' => ['TABLES', 'FORMS', 'SIGNATURES']],
+])->getBody();
+
+$expense = $httpClient->post('https://apis.fotohub.app/v1/ai/document/analyze-expense', [
+    'headers' => ['Authorization' => "Bearer {$apiKey}"],
+    'json' => ['document_base64' => $doc],
+])->getBody();
+
+echo $result . "\n";
+echo $expense . "\n";
 ```
 
 ```python [Python]
 import base64
-from fotohub import Client
+import httpx
 
-client = Client(api_key="fh_live_your_api_key")
+api_key = "fh_live_your_api_key"
 with open('invoice.pdf', 'rb') as f:
     doc = base64.b64encode(f.read()).decode('utf-8')
 
-result = client.documents.analyze_document(doc, features=["TABLES", "FORMS", "SIGNATURES"])
-expense = client.documents.analyze_expense(doc)
-redacted = client.documents.redact_pii(doc, entities=["PERSON", "EMAIL", "SSN"])
+headers = {"Authorization": f"Bearer {api_key}"}
+result = httpx.post(
+    "https://apis.fotohub.app/v1/ai/document/analyze",
+    headers=headers,
+    json={"document_base64": doc, "features": ["TABLES", "FORMS", "SIGNATURES"]},
+).json()
+expense = httpx.post(
+    "https://apis.fotohub.app/v1/ai/document/analyze-expense",
+    headers=headers,
+    json={"document_base64": doc},
+).json()
 
-print(f"Expense Total: ${expense.total_amount}")
-print(f"Cost: ${result.usd_charged} USD")
+print(f"Cost: ${result.get('cost_usd')} USD")
+print(f"Expense Total: {expense.get('total_amount')}")
 ```
 
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
 import { readFileSync } from 'fs';
 
-const client = new FotoHub('fh_live_your_api_key');
+const apiKey = 'fh_live_your_api_key';
 const doc = readFileSync('invoice.pdf').toString('base64');
+const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
 
-const result = await client.documents.analyzeDocument(doc, ['TABLES', 'FORMS', 'SIGNATURES']);
-const expense = await client.documents.analyzeExpense(doc);
-const redacted = await client.documents.redactPII(doc, ['PERSON', 'EMAIL', 'SSN']);
+const result = await fetch('https://apis.fotohub.app/v1/ai/document/analyze', {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({ document_base64: doc, features: ['TABLES', 'FORMS', 'SIGNATURES'] }),
+}).then((r) => r.json());
 
-console.log(`Expense Total: $${expense.totalAmount}`);
-console.log(`Cost: $${result.usdCharged} USD`);
-```
+const expense = await fetch('https://apis.fotohub.app/v1/ai/document/analyze-expense', {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({ document_base64: doc }),
+}).then((r) => r.json());
 
-```go [Go]
-package main
-
-import (
-	"encoding/base64"
-	"fmt"
-	"os"
-
-	"github.com/fotohub/fotohub-go"
-)
-
-func main() {
-	client := fotohub.NewClient("fh_live_your_api_key")
-	data, _ := os.ReadFile("invoice.pdf")
-	doc := base64.StdEncoding.EncodeToString(data)
-
-	result, _ := client.Documents.AnalyzeDocument(doc, []string{"TABLES", "FORMS", "SIGNATURES"})
-	expense, _ := client.Documents.AnalyzeExpense(doc)
-	redacted, _ := client.Documents.RedactPII(doc, []string{"PERSON", "EMAIL", "SSN"})
-
-	fmt.Printf("Expense Total: $%v\n", expense.TotalAmount)
-	fmt.Printf("Cost: $%v USD\n", result.UsdCharged)
-}
+console.log(`Expense Total: ${expense.total_amount}`);
+console.log(`Cost: $${result.cost_usd} USD`);
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/documents/analyze \
+curl -X POST https://apis.fotohub.app/v1/ai/document/analyze \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1099,61 +1096,14 @@ curl -X POST https://apis.fotohub.app/v1/documents/analyze \
 ```
 :::
 
-### Batch Processing Invoices Workflow
-
-For massive volume, utilize the async batch processing pipeline which automatically routes data to BYOB (S3/R2) buckets and triggers webhooks upon completion.
-
-```mermaid
-sequenceDiagram
-    participant App as Application
-    participant Core as FotoHub API
-    participant GPU as Worker Node
-    participant Webhook as App Webhook
-    
-    App->>Core: POST /v1/documents/batch
-    Core-->>App: 202 Accepted (Batch ID)
-    Core->>GPU: Queue Documents
-    GPU-->>GPU: Extract & Validate
-    GPU->>Core: Results Ready
-    Core->>Webhook: POST Webhook (HMAC-SHA256 Signature)
-    Webhook-->>Core: 200 OK
-```
-
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `urls` | `array<string>` | Yes | - | List of remote document URLs (PDF, JPG, PNG). Max 1000 per batch. |
-| `operation` | `string` | Yes | - | `extract`, `analyze_expense`, or `redact`. |
-| `webhookUrl` | `string` | No | `null` | HTTP URL to receive the completion payload. |
-| `destinationId` | `string` | No | `null` | BYOB ID to write results to S3/R2 directly. |
-
-::: code-group
-```php [PHP]
-<?php
-$batch = $client->documents()->batchProcess(
-    urls: ['https://s3.aws.com/inv-1.pdf', 'https://s3.aws.com/inv-2.pdf'],
-    operation: 'extract',
-    webhookUrl: 'https://api.merchant.com/webhooks/fotohub/documents'
-);
-
-echo "Batch Job ID: " . $batch->id . "\n";
-```
-```python [Python]
-batch = client.documents.batch_process(
-    urls=["https://s3.aws.com/inv-1.pdf", "https://s3.aws.com/inv-2.pdf"],
-    operation="extract",
-    webhook_url="https://api.merchant.com/webhooks/fotohub/documents"
-)
-print(f"Batch Job ID: {batch.id}")
-```
-:::
-
 #### Unit Economics: Document Intelligence
-| Operation | Cost per Page (USD) | GPU Node |
-|---|---|---|
-| Basic OCR | $0.0015 | CPU / General |
-| Table Extraction | $0.005 | CPU / General |
-| Invoice / Expense Parsing | $0.015 | CPU / General |
-| PII Redaction | $0.010 | CPU / General |
+| Operation | Endpoint |
+|---|---|
+| Structured extraction (tables, forms, signatures) | `POST /v1/ai/document/analyze` |
+| Invoice / expense parsing | `POST /v1/ai/document/analyze-expense` |
+
+Pricing is returned per request in the response's `cost_usd` field — call `estimate_cost` /
+`estimateCost` beforehand if you need it ahead of time; there is no published flat per-page rate.
 
 ---
 
@@ -1265,15 +1215,61 @@ $caption = $client->social()->generateCaption(
 
 ```go [Go]
 package main
-import "github.com/fotohub/fotohub-go"
 
+import (
+    "bytes"
+    "context"
+    "encoding/json"
+    "fmt"
+    "io"
+    "log"
+    "net/http"
+    "os"
+)
+
+// See https://docs.fotohub.app/sdk/go for the FotoHubClient pattern.
+// /social/* is not under the /v1 prefix FotoHubClient.BaseURL uses, so this
+// builds the request directly: create the post, then publish it immediately.
 func main() {
-    client := fotohub.NewClient("fh_live_your_api_key")
-    client.Social.PublishNow(
-        []string{"li_789"},
-        "https://cdn.brand.com/news.jpg",
-        "Excited to announce our new product line.",
-    )
+    apiKey := os.Getenv("FOTOHUB_API_KEY")
+
+    payload, _ := json.Marshal(map[string]any{
+        "account_ids": []string{"li_789"},
+        "media_urls":  []string{"https://cdn.brand.com/news.jpg"},
+        "text":        "Excited to announce our new product line.",
+    })
+
+    req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://apis.fotohub.app/social/v1/posts", bytes.NewReader(payload))
+    if err != nil {
+        log.Fatal(err)
+    }
+    req.Header.Set("Authorization", "Bearer "+apiKey)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        log.Fatalf("request failed: %v", err)
+    }
+    defer resp.Body.Close()
+
+    raw, _ := io.ReadAll(resp.Body)
+    var post struct {
+        ID string `json:"id"`
+    }
+    if err := json.Unmarshal(raw, &post); err != nil {
+        log.Fatalf("decode failed: %v", err)
+    }
+
+    pubReq, err := http.NewRequestWithContext(context.Background(), http.MethodPost, fmt.Sprintf("https://apis.fotohub.app/social/v1/posts/%s/publish", post.ID), nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+    pubReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+    if _, err := http.DefaultClient.Do(pubReq); err != nil {
+        log.Fatalf("publish failed: %v", err)
+    }
+    fmt.Printf("Published post %s\n", post.ID)
 }
 ```
 :::
@@ -1322,48 +1318,45 @@ Virtual Try-On operations are heavily optimized for **GPU2 (MMAudio/Vision)** no
 
 ### Submit & Poll Virtual Try-On
 
+The real endpoint is `POST /v1/ai/tryon` (status: `GET /v1/ai/tryon/{job_id}`). The PHP SDK does not
+ship a typed `tryon()` method yet, so call it over raw HTTP as shown; the Python SDK does expose
+`tryon()` / `get_tryon_status()` / `wait_for_tryon()` natively. There is no batch try-on endpoint.
+
 ::: code-group
 ```php [PHP]
 <?php
-$job = $client->tryon()->submit(
-    personUrl: 'https://cdn.brand.com/models/jessie.jpg',
-    garmentUrl: 'https://cdn.brand.com/catalog/shirt_102.png',
-    category: 'tops'
-);
+$httpClient = new \GuzzleHttp\Client();
 
-// Async polling
+$job = json_decode($httpClient->post('https://apis.fotohub.app/v1/ai/tryon', [
+    'headers' => ['Authorization' => 'Bearer ' . FOTOHUB_API_KEY],
+    'json' => [
+        'person_image_url' => 'https://cdn.brand.com/models/jessie.jpg',
+        'garment_image_url' => 'https://cdn.brand.com/catalog/shirt_102.png',
+        'category' => 'tops',
+    ],
+])->getBody(), true);
+
+// Poll until the render completes
 while (true) {
-    $status = $client->tryon()->poll($job->id);
-    if ($status->state === 'completed') {
-        echo "Try-On Image: " . $status->resultUrl . "\n";
-        echo "Billed: $" . $status->usdCharged . " USD\n";
+    $status = json_decode($httpClient->get("https://apis.fotohub.app/v1/ai/tryon/{$job['job_id']}", [
+        'headers' => ['Authorization' => 'Bearer ' . FOTOHUB_API_KEY],
+    ])->getBody(), true);
+    if ($status['status'] === 'completed') {
+        echo "Try-On Images: " . json_encode($status['images']) . "\n";
         break;
     }
     sleep(2);
 }
-
-// Batch Submissions for new catalog items
-$batch = $client->tryon()->submitBatch(
-    garments: ['https://url.com/g1.png', 'https://url.com/g2.png'],
-    personUrl: 'https://cdn.brand.com/models/jessie.jpg'
-);
 ```
 ```python [Python]
-import time
-
-job = client.tryon.submit(
-    person_url="https://cdn.brand.com/models/jessie.jpg",
-    garment_url="https://cdn.brand.com/catalog/shirt_102.png",
-    category="tops"
+job = client.tryon(
+    person_image_url="https://cdn.brand.com/models/jessie.jpg",
+    garment_image_url="https://cdn.brand.com/catalog/shirt_102.png",
+    category="tops",
 )
 
-while True:
-    status = client.tryon.poll(job.id)
-    if status.state == 'completed':
-        print(f"Try-On Image: {status.result_url}")
-        print(f"Billed: ${status.usd_charged} USD")
-        break
-    time.sleep(2)
+result = client.wait_for_tryon(job["job_id"])
+print(f"Try-On Images: {result.get('images')}")
 ```
 :::
 
@@ -1379,14 +1372,14 @@ function fotohub_auto_tryon(int $product_id): void {
     $image_url = wp_get_attachment_url(wc_get_product($product_id)->get_image_id());
     
     // Send to FOTOhub
-    $response = wp_remote_post('https://apis.fotohub.app/v1/tryon/submit', [
+    $response = wp_remote_post('https://apis.fotohub.app/v1/ai/tryon', [
         'headers' => [
             'Authorization' => 'Bearer ' . FOTOHUB_API_KEY,
             'Content-Type' => 'application/json',
         ],
         'body' => json_encode([
-            'person_url' => 'https://brand.com/default-model.jpg',
-            'garment_url' => $image_url,
+            'person_image_url' => 'https://brand.com/default-model.jpg',
+            'garment_image_url' => $image_url,
             'category' => 'tops'
         ])
     ]);

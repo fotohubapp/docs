@@ -32,7 +32,7 @@ Activation (`FotohubAI::activate()`) seeds the default options and creates the t
 
 1. Create an account at [fotohub.app](https://fotohub.app).
 2. Open **Settings → API Keys** in the FOTOhub dashboard.
-3. Create a key (`fh_live_*` for production, `fh_test_*` for testing) and paste it into the plugin.
+3. Create a key (`fh_live_*` — there is no separate test key type) and paste it into the plugin.
 
 The key is encrypted at rest with AES-256-CBC using a SHA-256 key derived from your `AUTH_KEY` salt (`Fotohub_API::store_secret()` / `read_secret()`). It is never printed on a page, never sent to the browser and never written to the usage log.
 

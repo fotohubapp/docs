@@ -2,7 +2,7 @@
 
 Transform 2D product and object photographs into watertight, quad-remeshed, PBR-textured 3D models calibrated for Apple Vision Pro (USDZ), iOS AR Quick Look, WebXR, Three.js, React Three Fiber, and real-time game engines (GLB).
 
-This production blueprint harnesses FOTOhub's **3D Engine** (`server/3d-engine/` and `server/api-server/app/routes/generate_3d.py`) distributed across dedicated GPU compute nodes: **GPU4** (`54.194.19.168`, g5.4xlarge) for geometric post-processing (PyMeshLab, xatlas, Trimesh, manifold repair, decimation) and **GPU5** (`54.217.143.105`, NVIDIA A10G 24GB VRAM) for neural implicit field reconstruction and physically based rendering (PBR) texture synthesis.
+This blueprint uses FOTOhub's self-hosted **3D Engine**, which runs across two dedicated GPU nodes: one handles geometric post-processing (manifold repair, decimation, UV unwrapping) and the other handles neural reconstruction and physically based rendering (PBR) texture synthesis. You reach both through a single endpoint, `POST /v1/ai/generate/3d` — see the [3D quickstart](/guides/quickstart-3d).
 
 ---
 

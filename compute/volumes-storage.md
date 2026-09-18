@@ -25,9 +25,14 @@ flowchart LR
 | Volume Type | Technology | Max Capacity | Baseline IOPS | Max Throughput | Billed Rate (USD/GB-mo) | Best For |
 |:---|:---|:---|:---|:---|:---|:---|
 | **`gp3`** (Default) | General Purpose SSD | 4,096 GB | 3,000 baseline, up to 16,000 | 125 MB/s baseline, up to 1,000 MB/s | **$0.080** | General purpose, ML model checkpoints, OS boot disks, development |
-| **`io2`** | Provisioned IOPS SSD | 4,096 GB | Up to 64,000 IOPS | Up to 1,000 MB/s | **$0.125** + $0.065/IOPS | Databases, high-IOPS workloads, streaming vector search |
-| **`io2 Block Express`** | Extreme IOPS Nitro SSD | 4,096 GB | Up to 256,000 IOPS | Up to 4,000 MB/s | **$0.125** + $0.065/IOPS | Real-time inference, ultra-low latency, multi-GPU distributed training |
+| **`io2`** | Provisioned IOPS SSD | 4,096 GB | Up to 64,000 IOPS (platform cap) | Up to 1,000 MB/s | **$0.125** + $0.065/IOPS | Databases, high-IOPS workloads, streaming vector search |
 | **`st1`** | Throughput Optimized HDD | 4,096 GB | 500 IOPS | 500 MB/s | **$0.045** | Large video archives, cold sequential logging |
+
+:::info io2 Block Express is not offered
+AWS's io2 Block Express tier (256,000 IOPS, 4,000 MB/s) only kicks in above the platform's
+64,000 IOPS request cap on the volume-attach API, so it isn't reachable here — plan around
+regular `io2`'s limits above.
+:::
 
 ---
 
@@ -263,23 +268,24 @@ df -h /data/models
 
 ---
 
-## High-Performance Storage Tuning: io2 Block Express & NVMe Striping
+## High-Performance Storage Tuning: io2 & NVMe Striping
 
-For multi-GPU distributed training clusters, high-frequency vector indexing, and ultra-large checkpoint loading (such as FLUX.1 or Llama 3.3 70B), standard `gp3` storage (125–500 MB/s) can become an I/O bottleneck. FOTOhub supports **EBS io2 Block Express** volumes backed by AWS Nitro NVMe controllers.
+For high-frequency vector indexing and large checkpoint loading, standard `gp3` storage
+(125–500 MB/s) can become an I/O bottleneck. FOTOhub supports **EBS `io2`** volumes for this —
+note this is regular `io2`, not AWS's separate Block Express tier (see the callout above: our
+64,000 IOPS request cap never reaches the threshold where Block Express activates).
 
-### 1. io2 Block Express Specifications
+### 1. io2 Specifications
 
 | Parameter | Specification | Advantage for AI/ML Workloads |
 |:---|:---|:---|
-| **Max IOPS per Volume** | **Up to 256,000 IOPS** | 4x higher than standard `io2`; eliminates small random read latency |
-| **Max Throughput** | **Up to 4,000 MB/s** | 4x faster than standard `io2`; loads a 24 GB model checkpoint in under 6 seconds |
-| **4KB I/O Latency** | **Sub-millisecond (p99.9 < 800 μs)** | Near-zero wait states for KV-cache paging and embedding lookups |
-| **IOPS:GB Ratio** | **1,000:1** (provision 64,000 IOPS on a 64 GB volume) | Maximize IOPS without provisioning oversized disk capacity |
-| **Volume Durability** | **99.999% (Annual Failure Rate: 0.001%)** | 100x more durable than `gp3` (99.8% to 99.9%) |
+| **Max IOPS per Volume** | **Up to 64,000 IOPS** (platform cap) | Far higher than `gp3`'s baseline 3,000 IOPS |
+| **Max Throughput** | **Up to 1,000 MB/s** | Loads a 24 GB model checkpoint in well under a minute |
+| **Volume Durability** | **99.999%** (AWS's published spec for the io2 family) | 100x more durable than `gp3` (99.8%–99.9%) |
 
 ### 2. Linux Kernel & NVMe Block Layer Tuning
 
-To achieve the full 4,000 MB/s and 256,000 IOPS throughput on the host, configure the Linux kernel block subsystem on your instance:
+To get closer to the full 1,000 MB/s / 64,000 IOPS an `io2` volume can deliver, configure the Linux kernel block subsystem on your instance:
 
 ```bash
 # 1. Set the optimal I/O scheduler (bypass CPU elevator locks for NVMe)
@@ -302,12 +308,15 @@ sudo mount -o noatime,nodiratime,logbufs=8,logbsize=256k,largeio,allocsize=64M /
 echo "/dev/nvme1n1 /data/models xfs noatime,nodiratime,logbufs=8,logbsize=256k,largeio,allocsize=64M,nofail 0 2" | sudo tee -a /etc/fstab
 ```
 
-### 3. Software RAID-0 Striping for Extreme Bandwidth (>8,000 MB/s)
+### 3. Software RAID-0 Striping for Higher Aggregate Bandwidth
 
-When training multi-node distributed models or streaming uncompressed 4K video frames, stripe 2 to 4 `io2 Block Express` volumes using Linux `mdadm`:
+When streaming uncompressed 4K video frames or loading very large checkpoints, stripe 2 to 4
+`io2` volumes using Linux `mdadm` — each volume still caps at 1,000 MB/s / 64,000 IOPS, so 4
+striped volumes tops out around 4,000 MB/s aggregate, not the 8,000+ MB/s that only AWS's
+(unreachable, on this platform) io2 Block Express tier delivers:
 
 ```bash
-# Attach 4x 200 GB io2 Block Express volumes via API (/dev/xvdf, /dev/xvdg, /dev/xvdh, /dev/xvdi)
+# Attach 4x 200 GB io2 volumes via API (/dev/xvdf, /dev/xvdg, /dev/xvdh, /dev/xvdi)
 # They appear on Linux as /dev/nvme1n1, /dev/nvme2n1, /dev/nvme3n1, /dev/nvme4n1
 
 # 1. Install mdadm RAID utilities
@@ -333,7 +342,7 @@ sudo mount -o noatime,nodiratime,logbufs=8,logbsize=256k,largeio,allocsize=64M /
 Verify that your tuned storage pool achieves full hardware throughput before launching production training:
 
 ```bash
-# Random 4K Read IOPS Test (Target: >100,000 IOPS)
+# Random 4K Read IOPS Test (Target: theoretical striped ceiling ~200,000+ IOPS; real-world lower)
 fio --name=iops-test \
   --filename=/data/striped-weights/fio_bench \
   --rw=randread \
@@ -346,7 +355,7 @@ fio --name=iops-test \
   --runtime=20 \
   --group_reporting
 
-# Sequential 1M Read Throughput Test (Target: >7,500 MB/s on 4x striped array)
+# Sequential 1M Read Throughput Test (Target: ~3,500-4,000 MB/s on a 4x striped array)
 fio --name=throughput-test \
   --filename=/data/striped-weights/fio_bench \
   --rw=read \
@@ -804,7 +813,7 @@ If your architecture already uses an external cloud provider (AWS S3, Cloudflare
 
 Register via API:
 ```bash
-curl -X POST https://apis.fotohub.app/v1/storage/destinations \
+curl -X POST https://apis.fotohub.app/v1/destinations \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -829,7 +838,7 @@ Sometimes volumes may get stuck due to host-level NVMe locks.
 1. Wait 2 minutes for the timeout.
 2. Check instance health:
    ```bash
-   curl -X GET https://apis.fotohub.app/compute/v1/instances/inst_90f23b/health \
+   curl -X GET https://apis.fotohub.app/compute/v1/instances/inst_90f23b/status-checks \
      -H "Authorization: Bearer fh_live_YOUR_API_KEY"
    ```
 3. If unhealthy, restart the instance.
@@ -927,184 +936,5 @@ export async function upgradeVolume(instanceId: string, volumeId: string) {
     console.error('Failed to resize volume', error);
     throw error;
   }
-}
-```
-
-## Storage Lifecycle Event Webhooks
-
-You can subscribe to volume and snapshot lifecycle events via webhooks.
-
-### Supported Events
-- `volume.created`
-- `volume.attached`
-- `volume.resized`
-- `volume.detached`
-- `snapshot.started`
-- `snapshot.completed`
-- `image.available`
-
-### Webhook Payload Schema
-```json
-{
-  "event_id": "evt_9876543210",
-  "type": "volume.resized",
-  "created_at": "2026-09-06T15:00:00Z",
-  "data": {
-    "instance_id": "inst_90f23b",
-    "volume_id": "vol-0a812df934",
-    "previous_size_gb": 200,
-    "new_size_gb": 500,
-    "status": "optimizing"
-  }
-}
-```
-
-### Detailed Event Schema: Event Type 0
-When handling the data pipeline for webhook index 0, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 0",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 1
-When handling the data pipeline for webhook index 1, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 1",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 2
-When handling the data pipeline for webhook index 2, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 2",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 3
-When handling the data pipeline for webhook index 3, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 3",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 4
-When handling the data pipeline for webhook index 4, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 4",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 5
-When handling the data pipeline for webhook index 5, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 5",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 6
-When handling the data pipeline for webhook index 6, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 6",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 7
-When handling the data pipeline for webhook index 7, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 7",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 8
-When handling the data pipeline for webhook index 8, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 8",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 9
-When handling the data pipeline for webhook index 9, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 9",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 10
-When handling the data pipeline for webhook index 10, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 10",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 11
-When handling the data pipeline for webhook index 11, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 11",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 12
-When handling the data pipeline for webhook index 12, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 12",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 13
-When handling the data pipeline for webhook index 13, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 13",
-  "timestamp": "ISO-8601",
-  "actor": "system"
-}
-```
-
-### Detailed Event Schema: Event Type 14
-When handling the data pipeline for webhook index 14, ensure you validate the cryptographic signature in the `X-FOTOHUB-SIGNATURE` header. This protects against replay attacks. The HMAC-SHA256 hash is computed using your account's webhook secret.
-```json
-{
-  "metadata": "Detailed specification 14",
-  "timestamp": "ISO-8601",
-  "actor": "system"
 }
 ```

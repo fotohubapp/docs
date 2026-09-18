@@ -25,7 +25,7 @@ sequenceDiagram
     participant Webhook as Your Webhook Server
 
     App->>SDK: generate_video(kling-v2.1)
-    SDK->>API: POST /v1/video/generate
+    SDK->>API: POST /v1/ai/generate/video
     API-->>SDK: 202 Accepted (job_id)
     SDK-->>App: Job Object (status: processing)
     
@@ -127,35 +127,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"prompt": "Studio product photo on a white background",
+		"model": "seedream-5-0-260128",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Batch Product Photography...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/image", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Batch Product Photography
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "prompt": "Studio product photo on a white background",
+    "model": "seedream-5-0-260128"
   }'
 ```
 :::
@@ -252,35 +261,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"prompt": "A pair of running shoes, in the style of our minimalist brand identity",
+		"model": "seedream-5-0-260128",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Brand-consistent Image Generation...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/image", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Brand-consistent Image Generation
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "prompt": "A pair of running shoes, in the style of our minimalist brand identity",
+    "model": "seedream-5-0-260128"
   }'
 ```
 :::
@@ -374,35 +392,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"prompt": "A cup of coffee on a wooden table",
+		"model": "seedream-5-0-260128",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Multi-model Comparison...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/image", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Multi-model Comparison
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "prompt": "A cup of coffee on a wooden table",
+    "model": "seedream-5-0-260128"
   }'
 ```
 :::
@@ -497,35 +524,55 @@ runExample();
 package main
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient.
+// FotoHubClient.BaseURL hardcodes /v1; /stability/* sits outside that prefix,
+// so this builds the request directly instead of going through client.Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	apiKey := os.Getenv("FOTOHUB_API_KEY")
 
-	balance, err := client.GetBalance()
+	payload, _ := json.Marshal(map[string]any{
+		"image": "<base64-encoded-source-image>",
+		"reference": "<base64-encoded-style-reference>",
+		"output_format": "png",
+	})
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://apis.fotohub.app/stability/style-transfer", bytes.NewReader(payload))
 	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+		log.Fatal(err)
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
 
-	fmt.Println("Starting Image-to-image Style Transfer...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	result, _ := io.ReadAll(resp.Body)
+	fmt.Printf("Result: %s\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Image-to-image Style Transfer
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/stability/style-transfer \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "image": "<base64-encoded-source-image>",
+    "reference": "<base64-encoded-style-reference>",
+    "output_format": "png"
   }'
 ```
 :::
@@ -619,35 +666,42 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"prompt": "a red sports car",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Automatic Prompt Enhancement with Gabriel AI...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/enhance-prompt", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Automatic Prompt Enhancement with Gabriel AI
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/enhance-prompt \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "prompt": "a red sports car"
   }'
 ```
 :::
@@ -743,35 +797,48 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"image_url": "https://cdn.brand.com/product.jpg",
+		"prompt": "Slow rotation, studio lighting",
+		"model": "kling-v2.1",
+		"duration": 5,
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting I2V (Image-to-Video) Animation Pipeline...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/video", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for I2V (Image-to-Video) Animation Pipeline
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/video \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "image_url": "https://cdn.brand.com/product.jpg",
+    "prompt": "Slow rotation, studio lighting",
+    "model": "kling-v2.1",
+    "duration": 5
   }'
 ```
 :::
@@ -865,35 +932,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"clips": []any{"https://cdn.brand.com/clip1.mp4", "https://cdn.brand.com/clip2.mp4"},
+		"transition": "crossfade",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Long-form Video Assembly...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/video/merge", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Long-form Video Assembly
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/video/merge \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "clips": ["https://cdn.brand.com/clip1.mp4", "https://cdn.brand.com/clip2.mp4"],
+    "transition": "crossfade"
   }'
 ```
 :::
@@ -987,35 +1063,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"video_url": "https://cdn.brand.com/ad.mp4",
+		"target_language": "es",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Multi-language Ad Video Factory...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/video/lip-sync", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Multi-language Ad Video Factory
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/video/lip-sync \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "video_url": "https://cdn.brand.com/ad.mp4",
+    "target_language": "es"
   }'
 ```
 :::
@@ -1109,35 +1194,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"prompt": "Product hero shot, cinematic pan",
+		"model": "kling-v2.1",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Video with Synchronized Music...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/video", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Video with Synchronized Music
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/video \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "prompt": "Product hero shot, cinematic pan",
+    "model": "kling-v2.1"
   }'
 ```
 :::
@@ -1146,7 +1240,12 @@ curl -X POST https://apis.fotohub.app/v1/action/example \
 
 ## 10. Podcast Voice Cloning
 
-Clone a voice from 30-second sample, generate full podcast episode. Uses GPU3 (MuseTalk/LipSync).
+::: warning NOT AVAILABLE
+There is no voice-cloning endpoint on the public API — you cannot train a new voice from an audio
+sample. The example below uses standard TTS with one of the built-in preset voices instead.
+:::
+
+Generate a full podcast episode with a preset TTS voice.
 
 ::: warning ERROR HANDLING
 Always catch standard exceptions and check for `RateLimitError` or `InsufficientFundsError`. See API documentation for specifics.
@@ -1155,9 +1254,8 @@ Always catch standard exceptions and check for `RateLimitError` or `Insufficient
 ### Parameters
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `audio_sample` | String | Yes | - | URL to voice sample. |
 | `text` | String | Yes | - | Script to read. |
-| `model` | String | Yes | `voice-clone-v2` | TTS model. |
+| `voice_id` | String | Yes | - | Preset voice ID (see `GET /v1/ai/tts/polly/voices`). |
 
 ::: tip PRO OPTIMIZATION
 For batch operations, use concurrency to dramatically reduce wall-clock time. Check `wallet.available_usd` first to avoid mid-batch failure.
@@ -1232,35 +1330,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"text": "Welcome back to the show.",
+		"voice_id": "en-US-Matthew",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Podcast Voice Cloning...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/tts/polly/synthesize", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Podcast Voice Cloning
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/tts/polly/synthesize \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "text": "Welcome back to the show.",
+    "voice_id": "en-US-Matthew"
   }'
 ```
 :::
@@ -1354,35 +1461,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"text": "Bienvenido a FOTOhub",
+		"voice_id": "es-ES-Lucia",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Multilingual TTS Batch...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/tts/polly/synthesize", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Multilingual TTS Batch
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/tts/polly/synthesize \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "text": "Bienvenido a FOTOhub",
+    "voice_id": "es-ES-Lucia"
   }'
 ```
 :::
@@ -1476,35 +1592,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"prompt": "Upbeat corporate background loop",
+		"duration": 60,
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Music Bed Generation...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/music", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Music Bed Generation
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/music \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "prompt": "Upbeat corporate background loop",
+    "duration": 60
   }'
 ```
 :::
@@ -1598,35 +1723,42 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"prompt": "Footsteps on gravel, single step",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Sound Effect Library Builder...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/sfx", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Sound Effect Library Builder
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/sfx \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "prompt": "Footsteps on gravel, single step"
   }'
 ```
 :::
@@ -1720,35 +1852,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"image_url": "https://cdn.brand.com/product.jpg",
+		"format": "glb",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting E-commerce 3D Model Pipeline...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/3d", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for E-commerce 3D Model Pipeline
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "image_url": "https://cdn.brand.com/product.jpg",
+    "format": "glb"
   }'
 ```
 :::
@@ -1841,35 +1982,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"image_url": "https://cdn.brand.com/sku-001.jpg",
+		"format": "glb",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Batch 3D from Product Catalog...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/3d", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Batch 3D from Product Catalog
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "image_url": "https://cdn.brand.com/sku-001.jpg",
+    "format": "glb"
   }'
 ```
 :::
@@ -1963,35 +2113,42 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"document_base64": "JVBERi0xLjcK...",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Invoice Automation...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/document/analyze-expense", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Invoice Automation
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/document/analyze-expense \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "document_base64": "JVBERi0xLjcK..."
   }'
 ```
 :::
@@ -2085,35 +2242,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"document_base64": "JVBERi0xLjcK...",
+		"features": []any{"TABLES", "FORMS"},
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Contract Risk Analysis...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/document/analyze", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Contract Risk Analysis
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/document/analyze \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "document_base64": "JVBERi0xLjcK...",
+    "features": ["TABLES", "FORMS"]
   }'
 ```
 :::
@@ -2206,35 +2372,42 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"document_base64": "JVBERi0xLjcK...",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Receipt Batch Processor...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/document/analyze-expense", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Receipt Batch Processor
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/document/analyze-expense \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "document_base64": "JVBERi0xLjcK..."
   }'
 ```
 :::
@@ -2328,35 +2501,46 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"person_image_url": "https://cdn.brand.com/models/persona-1.jpg",
+		"garment_image_url": "https://cdn.brand.com/catalog/garment.png",
+		"category": "tops",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Fashion Catalog Generator...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/tryon", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Fashion Catalog Generator
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/tryon \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "person_image_url": "https://cdn.brand.com/models/persona-1.jpg",
+    "garment_image_url": "https://cdn.brand.com/catalog/garment.png",
+    "category": "tops"
   }'
 ```
 :::
@@ -2449,404 +2633,130 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"person_image_url": "https://cdn.brand.com/uploads/scan.jpg",
+		"garment_image_url": "https://cdn.brand.com/catalog/reference-garment.png",
+		"category": "tops",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Size Recommendation from Body Scan...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/tryon", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Size Recommendation from Body Scan
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/tryon \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "person_image_url": "https://cdn.brand.com/uploads/scan.jpg",
+    "garment_image_url": "https://cdn.brand.com/catalog/reference-garment.png",
+    "category": "tops"
   }'
 ```
 :::
 
 ---
 
-## 21. Rent A10G GPU and run custom training script
+## 21. Rent an A10G GPU and run your own training script
 
-Provision → SSH → run → terminate.
+Dedicated GPU rental is real and lives under `/compute/v1/*`. `GET /compute/v1/catalog`
+lists the 22 instance types with their hourly and spot rates, `POST /compute/v1/instances`
+provisions one, and you reach it over SSH like any other machine. That is the path for
+running your own code on a GPU.
 
-::: warning ERROR HANDLING
-Always catch standard exceptions and check for `RateLimitError` or `InsufficientFundsError`. See API documentation for specifics.
+::: warning There is no public code-execution endpoint
+FOTOhub runs a Firecracker microVM sandbox internally, but it is **not** exposed as a
+customer-callable API: the route is gated by an internal proxy secret and is only reached
+by the `code.python` node inside an Agent Engine workflow. Neither `/sandbox/exec-python`
+nor a `code` parameter on any public endpoint exists.
+
+If you want arbitrary Python executed by FOTOhub, the two supported routes are a
+`code.python` node in a workflow ([Agents](/api/agents)) or your own script on a rented
+instance. See [Compute](/compute/overview).
 :::
-
-### Parameters
-| Field | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `gpu_type` | String | Yes | - | E.g. `a10g`, `h100`. |
-| `duration_hours` | Integer | Yes | - | Lease time. |
-
-::: tip PRO OPTIMIZATION
-For batch operations, use concurrency to dramatically reduce wall-clock time. Check `wallet.available_usd` first to avoid mid-batch failure.
-:::
-
-::: code-group
-
-```python [Python]
-import asyncio
-import logging
-from fotohub import FotoHub, APIError
-
-logging.basicConfig(level=logging.INFO)
-client = FotoHub() # Uses FOTOHUB_API_KEY
-
-async def run_example():
-    try:
-        logging.info('Starting Rent A10G GPU and run custom training script...')
-        # Balance check pattern
-        balance = client.get_balance()
-        logging.info(f'Available USD: ${balance.wallet.available_usd:.2f}')
-
-        # Main API call
-        logging.info('Executing main operation...')
-        # Example specific logic
-        # result = client.some_action(...)
-        
-        # Simulate success
-        cost = round(random.uniform(0.01, 0.50), 4) # Mock cost
-        logging.info(f'Operation successful. Charged: ${cost} USD')
-        
-    except APIError as e:
-        logging.error(f'API Error: {e.status_code} - {e.message}')
-    except Exception as e:
-        logging.error(f'Unexpected error: {str(e)}')
-
-if __name__ == '__main__':
-    asyncio.run(run_example())
-```
-
-```typescript [TypeScript]
-import { FotoHub } from 'fotohub';
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
-async function runExample(): Promise<void> {
-  try {
-    console.log('Starting Rent A10G GPU and run custom training script...');
-    
-    const balance = await client.getBalance();
-    console.log(`Available USD: $${balance.wallet.availableUsd.toFixed(2)}`);
-
-    // Main API call
-    console.log('Executing main operation...');
-    // const result = await client.someAction(...);
-    
-    const cost = (Math.random() * 0.5).toFixed(4);
-    console.log(`Operation successful. Charged: $${cost} USD`);
-
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`);
-    if (error.status) {
-      console.error(`Status code: ${error.status}`);
-    }
-  }
-}
-
-runExample();
-```
-
-```go [Go]
-package main
-
-import (
-	"fmt"
-	"log"
-	"os"
-	"github.com/fotohubapp/sdk-go"
-)
-
-func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
-
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
-	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
-
-	fmt.Println("Starting Rent A10G GPU and run custom training script...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
-}
-```
 
 ```bash [cURL]
-# Example request for Rent A10G GPU and run custom training script
-curl -X POST https://apis.fotohub.app/v1/action/example \
-  -H "Authorization: Bearer fh_live_your_api_key" \
+# 1. See what is available and what it costs
+curl -s https://apis.fotohub.app/compute/v1/catalog \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY"
+
+# 2. Provision one
+curl -X POST https://apis.fotohub.app/compute/v1/instances \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "example_field": "value"
-  }'
+  -d '{"instance_type": "g5.xlarge", "spot_instance": true}'
 ```
-:::
+
+Spot pricing is real and roughly a third of on-demand — `g5.xlarge` is $1.0123/hr
+on-demand against $0.3827/hr spot. For a training run you can checkpoint and resume,
+spot is usually the right call.
 
 ---
 
-## 22. Firecracker Sandbox for Code Execution
+## 22. Test an integration without being charged
 
-Run untrusted Python in isolated microVM.
+`POST /v1/console/sandbox/execute` is a **dry-run tester for FOTOhub's own API**, not a
+code sandbox. You give it an endpoint and a body, and it returns a realistic mock response
+— or, with `billing_mode` set to `wallet` or `credits`, actually runs the call — so you can
+build and assert against your integration before spending anything.
 
-::: warning ERROR HANDLING
-Always catch standard exceptions and check for `RateLimitError` or `InsufficientFundsError`. See API documentation for specifics.
-:::
-
-### Parameters
-| Field | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `code` | String | Yes | - | Python code string. |
-| `timeout` | Integer | No | `30` | Max seconds to run. |
-
-::: tip PRO OPTIMIZATION
-For batch operations, use concurrency to dramatically reduce wall-clock time. Check `wallet.available_usd` first to avoid mid-batch failure.
-:::
-
-::: code-group
-
-```python [Python]
-import asyncio
-import logging
-from fotohub import FotoHub, APIError
-
-logging.basicConfig(level=logging.INFO)
-client = FotoHub() # Uses FOTOHUB_API_KEY
-
-async def run_example():
-    try:
-        logging.info('Starting Firecracker Sandbox for Code Execution...')
-        # Balance check pattern
-        balance = client.get_balance()
-        logging.info(f'Available USD: ${balance.wallet.available_usd:.2f}')
-
-        # Main API call
-        logging.info('Executing main operation...')
-        # Example specific logic
-        # result = client.some_action(...)
-        
-        # Simulate success
-        cost = round(random.uniform(0.01, 0.50), 4) # Mock cost
-        logging.info(f'Operation successful. Charged: ${cost} USD')
-        
-    except APIError as e:
-        logging.error(f'API Error: {e.status_code} - {e.message}')
-    except Exception as e:
-        logging.error(f'Unexpected error: {str(e)}')
-
-if __name__ == '__main__':
-    asyncio.run(run_example())
-```
-
-```typescript [TypeScript]
-import { FotoHub } from 'fotohub';
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
-async function runExample(): Promise<void> {
-  try {
-    console.log('Starting Firecracker Sandbox for Code Execution...');
-    
-    const balance = await client.getBalance();
-    console.log(`Available USD: $${balance.wallet.availableUsd.toFixed(2)}`);
-
-    // Main API call
-    console.log('Executing main operation...');
-    // const result = await client.someAction(...);
-    
-    const cost = (Math.random() * 0.5).toFixed(4);
-    console.log(`Operation successful. Charged: $${cost} USD`);
-
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`);
-    if (error.status) {
-      console.error(`Status code: ${error.status}`);
-    }
-  }
-}
-
-runExample();
-```
-
-```go [Go]
-package main
-
-import (
-	"fmt"
-	"log"
-	"os"
-	"github.com/fotohubapp/sdk-go"
-)
-
-func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
-
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
-	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
-
-	fmt.Println("Starting Firecracker Sandbox for Code Execution...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
-}
-```
+| Field | Notes |
+|---|---|
+| `endpoint` | **Required.** The FOTOhub endpoint you are testing, e.g. `/image/generate` |
+| `method` | Default `POST` |
+| `body` | The request body you would send |
+| `billing_mode` | `dry_run` (default, free), `wallet`, or `credits` |
+| `assertions` | Checks on `status_code`, `latency_ms` or a `json_field` |
+| `simulate_status` | Force a particular status code, to exercise your error paths |
+| `project_id` / `module_id` | Optional; the module is inferred from `endpoint` otherwise |
 
 ```bash [cURL]
-# Example request for Firecracker Sandbox for Code Execution
-curl -X POST https://apis.fotohub.app/v1/action/example \
-  -H "Authorization: Bearer fh_live_your_api_key" \
+curl -X POST https://apis.fotohub.app/v1/console/sandbox/execute \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "endpoint": "/image/generate",
+    "method": "POST",
+    "billing_mode": "dry_run",
+    "body": {"model": "seedream-5-0-260128", "prompt": "a green apple"},
+    "assertions": [{"type": "status_code", "expected": 200}]
   }'
 ```
-:::
+
+Forcing a failure with `simulate_status` is the cheapest way to prove your `402` and `429`
+handling works before a real one arrives at 3am.
 
 ---
 
-## 23. Parallel GPU Job Dispatch
+## 23. Fan out work across rented instances
 
-Fan-out rendering across 3 compute nodes.
-
-::: warning ERROR HANDLING
-Always catch standard exceptions and check for `RateLimitError` or `InsufficientFundsError`. See API documentation for specifics.
-:::
-
-### Parameters
-| Field | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `nodes` | Integer | Yes | - | Cluster size. |
-| `workload` | String | Yes | - | Workload definition URL. |
-
-::: tip PRO OPTIMIZATION
-For batch operations, use concurrency to dramatically reduce wall-clock time. Check `wallet.available_usd` first to avoid mid-batch failure.
-:::
-
-::: code-group
-
-```python [Python]
-import asyncio
-import logging
-from fotohub import FotoHub, APIError
-
-logging.basicConfig(level=logging.INFO)
-client = FotoHub() # Uses FOTOHUB_API_KEY
-
-async def run_example():
-    try:
-        logging.info('Starting Parallel GPU Job Dispatch...')
-        # Balance check pattern
-        balance = client.get_balance()
-        logging.info(f'Available USD: ${balance.wallet.available_usd:.2f}')
-
-        # Main API call
-        logging.info('Executing main operation...')
-        # Example specific logic
-        # result = client.some_action(...)
-        
-        # Simulate success
-        cost = round(random.uniform(0.01, 0.50), 4) # Mock cost
-        logging.info(f'Operation successful. Charged: ${cost} USD')
-        
-    except APIError as e:
-        logging.error(f'API Error: {e.status_code} - {e.message}')
-    except Exception as e:
-        logging.error(f'Unexpected error: {str(e)}')
-
-if __name__ == '__main__':
-    asyncio.run(run_example())
-```
-
-```typescript [TypeScript]
-import { FotoHub } from 'fotohub';
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
-
-async function runExample(): Promise<void> {
-  try {
-    console.log('Starting Parallel GPU Job Dispatch...');
-    
-    const balance = await client.getBalance();
-    console.log(`Available USD: $${balance.wallet.availableUsd.toFixed(2)}`);
-
-    // Main API call
-    console.log('Executing main operation...');
-    // const result = await client.someAction(...);
-    
-    const cost = (Math.random() * 0.5).toFixed(4);
-    console.log(`Operation successful. Charged: $${cost} USD`);
-
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`);
-    if (error.status) {
-      console.error(`Status code: ${error.status}`);
-    }
-  }
-}
-
-runExample();
-```
-
-```go [Go]
-package main
-
-import (
-	"fmt"
-	"log"
-	"os"
-	"github.com/fotohubapp/sdk-go"
-)
-
-func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
-
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
-	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
-
-	fmt.Println("Starting Parallel GPU Job Dispatch...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
-}
-```
-
-```bash [cURL]
-# Example request for Parallel GPU Job Dispatch
-curl -X POST https://apis.fotohub.app/v1/action/example \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "example_field": "value"
-  }'
-```
-:::
+There is no server-side batch queue and no fan-out primitive. Provision several instances
+from the catalogue, dispatch to them yourself, and terminate them when the run finishes.
+For generation work specifically, prefer calling the generation endpoints concurrently from
+your own client and rate-limiting to the per-endpoint cap in
+[Rate Limits](/api/rate-limits) — that needs no instances at all.
 
 ---
 
@@ -2936,35 +2846,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"url": "https://yourapp.com/webhook",
+		"events": []any{"job.completed", "job.failed"},
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Complete Webhook Receiver...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/console/webhooks", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Complete Webhook Receiver
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/console/webhooks \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "url": "https://yourapp.com/webhook",
+    "events": ["job.completed", "job.failed"]
   }'
 ```
 :::
@@ -3057,35 +2976,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"url": "https://yourapp.com/webhook",
+		"events": []any{"job.completed"},
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Event-driven Pipeline...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/console/webhooks", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Event-driven Pipeline
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/console/webhooks \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "url": "https://yourapp.com/webhook",
+    "events": ["job.completed"]
   }'
 ```
 :::
@@ -3178,35 +3106,42 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"webhook_id": "wh_your_webhook_id",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Webhook Retry Simulation...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/console/sandbox/webhook-test", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Webhook Retry Simulation
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/console/sandbox/webhook-test \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "webhook_id": "wh_your_webhook_id"
   }'
 ```
 :::
@@ -3299,36 +3234,40 @@ runExample();
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient.
+// GET isn't in the shared Post() helper, so this reuses the client's exported fields directly.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
 
-	balance, err := client.GetBalance()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, client.BaseURL+"/tiers/wallet", nil)
 	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+		log.Fatal(err)
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
+	req.Header.Set("Authorization", "Bearer "+client.APIKey)
 
-	fmt.Println("Starting Rate Limiter with Token Bucket...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	resp, err := client.HTTPClient.Do(req)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Printf("Result: %s\n", body)
 }
 ```
 
 ```bash [cURL]
 # Example request for Rate Limiter with Token Bucket
-curl -X POST https://apis.fotohub.app/v1/action/example \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "example_field": "value"
-  }'
+curl -X GET https://apis.fotohub.app/v1/tiers/wallet \
+  -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
 
@@ -3420,36 +3359,40 @@ runExample();
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient.
+// GET isn't in the shared Post() helper, so this reuses the client's exported fields directly.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
 
-	balance, err := client.GetBalance()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, client.BaseURL+"/tiers/wallet", nil)
 	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+		log.Fatal(err)
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
+	req.Header.Set("Authorization", "Bearer "+client.APIKey)
 
-	fmt.Println("Starting Wallet Balance Guard...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	resp, err := client.HTTPClient.Do(req)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Printf("Result: %s\n", body)
 }
 ```
 
 ```bash [cURL]
 # Example request for Wallet Balance Guard
-curl -X POST https://apis.fotohub.app/v1/action/example \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "example_field": "value"
-  }'
+curl -X GET https://apis.fotohub.app/v1/tiers/wallet \
+  -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
 
@@ -3541,36 +3484,40 @@ runExample();
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient.
+// GET isn't in the shared Post() helper, so this reuses the client's exported fields directly.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
 
-	balance, err := client.GetBalance()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, client.BaseURL+"/billing/transactions", nil)
 	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+		log.Fatal(err)
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
+	req.Header.Set("Authorization", "Bearer "+client.APIKey)
 
-	fmt.Println("Starting Cost Tracking Dashboard...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	resp, err := client.HTTPClient.Do(req)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Printf("Result: %s\n", body)
 }
 ```
 
 ```bash [cURL]
 # Example request for Cost Tracking Dashboard
-curl -X POST https://apis.fotohub.app/v1/action/example \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "example_field": "value"
-  }'
+curl -X GET https://apis.fotohub.app/v1/billing/transactions \
+  -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
 
@@ -3662,35 +3609,44 @@ runExample();
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 func main() {
-	client := fotohub.NewClient(os.Getenv("FOTOHUB_API_KEY"))
+	client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+	ctx := context.Background()
 
-	balance, err := client.GetBalance()
-	if err != nil {
-		log.Fatalf("Failed to get balance: %v", err)
+	body := map[string]any{
+		"prompt": "30s product ad, cinematic",
+		"model": "kling-v2.1",
 	}
-	fmt.Printf("Available USD: $%.2f\n", balance.Wallet.AvailableUSD)
 
-	fmt.Println("Starting Full Multi-step Creative Pipeline...")
-	// res, err := client.DoAction(&fotohub.Params{})
-	// Handle res, err
-	fmt.Println("Success.")
+	raw, err := client.Post(ctx, "/ai/generate/video", body)
+	if err != nil {
+		log.Fatalf("request failed: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		log.Fatalf("decode failed: %v", err)
+	}
+	fmt.Printf("Result: %+v\n", result)
 }
 ```
 
 ```bash [cURL]
 # Example request for Full Multi-step Creative Pipeline
-curl -X POST https://apis.fotohub.app/v1/action/example \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/video \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "example_field": "value"
+    "prompt": "30s product ad, cinematic",
+    "model": "kling-v2.1"
   }'
 ```
 :::

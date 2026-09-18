@@ -7,7 +7,7 @@ The **premium** endpoint provides access to premium chat models with token-based
 Both endpoints support multi-turn conversations, system prompts, and return detailed billing information in every response. Streaming via Server-Sent Events is available on the OpenAI-compatible endpoint.
 
 ::: info OpenAI SDK Compatible
-The `/v1/ai/chat/completions` endpoint is fully compatible with the OpenAI Python and TypeScript SDKs. Simply change the base URL to `https://apis.fotohub.app/v1/ai` and use your FOTOhub API key. See the [OpenAI Compatibility](#openai-sdk-compatibility) section below for drop-in usage examples.
+The `/v1/ai/chat/completions` endpoint is fully compatible with the OpenAI Python and TypeScript SDKs. Simply change the base URL to `https://apis.fotohub.app/v1/ai` and use your FOTOhub API key — the SDK appends `/chat/completions` itself, so there is no separate request to the bare base URL. See the [OpenAI Compatibility](#openai-sdk-compatibility) section below for drop-in usage examples.
 :::
 
 ---

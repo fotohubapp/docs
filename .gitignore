@@ -3,3 +3,7 @@ node_modules/
 .vitepress/cache/
 *.local
 .DS_Store
+
+# Internal audit working files — route inventories and infra notes.
+# This repository is PUBLIC; these must never be published.
+.audit/

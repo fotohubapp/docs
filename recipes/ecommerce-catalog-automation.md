@@ -2,7 +2,7 @@
 
 Orchestrate bulk multi-angle studio packshot generation, AI background replacement, physical contact shadows, multilingual SEO copywriting, and automated WCAG 2.2 Level AA alt-text enrichment across multi-thousand SKU enterprise storefronts.
 
-Powered by FOTOhub's **Commerce Bridge** (`server/commerce-bridge/`), this blueprint integrates Shopify, WooCommerce, Magento 2, BigCommerce, PrestaShop, and custom headless storefronts through an asynchronous batch engine backed by Celery, Redis (`commerce.items`), Supabase state storage, and direct Bring-Your-Own-Bucket (BYOB) delivery to Cloudflare R2 and AWS S3 (`server/api-server/app/routes/destinations.py`).
+Powered by FOTOhub's **Commerce Bridge**, this blueprint integrates Shopify, WooCommerce, Magento 2, BigCommerce, PrestaShop, and custom headless storefronts through an asynchronous batch engine backed by Celery, Redis (`commerce.items`), Supabase state storage, and direct Bring-Your-Own-Bucket (BYOB) delivery to Cloudflare R2 and AWS S3 via [`/v1/destinations`](/api/surface-map#account-keys-and-money).
 
 ---
 

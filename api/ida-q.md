@@ -1,99 +1,43 @@
-# IDA Q: Intelligent Creative Platform Assistant
+# IDA Q: Self-Hosted Image Model
 
-**IDA Q** (`/v1/ai/ida-q`) is FOTOhub's built-in intelligent assistant and creative copilot. Powered by an ensemble of **Claude 3.5 Sonnet** and **GPT-4o** with direct platform context awareness, IDA Q acts as an interactive bridge between your business logic and FOTOhub's 50+ generative AI and compute engines.
+::: warning This page previously described a different product
+Earlier revisions of this page documented **IDA Q** as an interactive "intelligent
+assistant" with its own chat endpoint (`POST /v1/ai/ida-q`), SSE streaming, a
+cost-preflight planner, multi-turn threads, and an embeddable iframe widget. None of
+that exists in production — there is no such endpoint and no such assistant.
 
-Unlike generic LLMs, IDA Q possesses real-time introspection into your account's execution history, active GPU tasks, wallet balance, and exact model capabilities—enabling automated prompt engineering, multimodal image diagnostics, error resolution, workflow architecture design, and pre-execution cost estimation down to fractions of a cent.
-
----
-
-## Core Capabilities
-
-```mermaid
-flowchart TD
-    User["Developer Request / Client App"] --> Gateway["POST /v1/ai/ida-q"]
-    Gateway --> Router{"IDA Q Intent Classifier"}
-
-    Router -->|"Prompt Optimization"| Opt["Prompt Engine (Negative prompts, CFG, LoRA syntax)"]
-    Router -->|"Visual Auditing"| Vision["Multimodal Perception (Artifacts, lighting, anatomy)"]
-    Router -->|"Workflow Blueprinting"| Blueprint["Multi-Engine Orchestrator (Image -> 3D -> Shorts)"]
-    Router -->|"Cost Preflight"| Cost["Pricing Calculator (Real-time USD wallet impact)"]
-    Router -->|"Incident Diagnosis"| Diag["Error Triage (HTTP 402, 429, CUDA OOM, Timeout)"]
-
-    Opt & Vision & Blueprint & Cost & Diag --> ModelCluster["Hybrid Ensemble (Claude 3.5 Sonnet / GPT-4o)"]
-    ModelCluster --> Output["Streaming SSE / JSON Response + Actionable Payload"]
-```
-
-1. **Prompt Optimization & Style Expansion**: Transforms rudimentary text descriptions into photorealistic, camera-calibrated prompts tailored to specific diffusion models (Seedream 5.0, FLUX 2 Pro, Midjourney v6, or BytePlus).
-2. **Multimodal Visual Diagnostics**: Ingests generated outputs to identify visual artifacts, anatomical flaws, suboptimal lighting, or compression banding, providing exact prompt and seed adjustments for rerolls.
-3. **Multi-Engine Pipeline Architecture**: Generates complete, runnable code blueprints chaining disparate modalities (e.g., text-to-image → background removal → 3D mesh → video animation).
-4. **Pre-Flight Cost Estimation**: Analyzes complex batch plans and calculates exact USD budget requirements across all involved engines before triggering provisioning.
-5. **Contextual Incident Debugging**: Accepts a `request_id` or HTTP error body and immediately diagnoses the failure mode (e.g., CUDA OOM on GPU2, missing IAM S3 policy, or rate limits) with actionable corrective code.
-6. **Multi-Turn Session Continuity**: Maintains conversation thread context across dozens of iterations using cryptographically verified `thread_id` identifiers.
+**IDA Q 1.0 is actually FOTOhub's proprietary, self-hosted image generation model.**
+It is submitted like any other image model through `POST /v1/ai/generate/image`
+with `model: "ida-q-image"`, and — because it runs on our own single-GPU queue
+rather than a synchronous provider — it is the one image model on the platform that
+is **asynchronous**: you get a `job_id` back and poll for the result.
+:::
 
 ---
 
-## API Specification
+## What it is
 
-### Endpoint Overview
+IDA Q 1.0 runs entirely on FOTOhub's own infrastructure rather than reselling a
+third-party image API. That keeps the marginal cost near zero, but it also means
+generation goes through a real, capacity-limited queue: expect **30 seconds to
+3.5 minutes** depending on resolution and how many images are ahead of yours, not
+the near-instant response you get from a synchronous provider.
 
-```http
-POST https://apis.fotohub.app/v1/ai/ida-q
-Authorization: Bearer fh_live_your_api_key
-Content-Type: application/json
-```
-
-All requests debit your **prepaid USD wallet** at a flat rate of **$0.003 USD per request** (or $0.003 per streaming session), regardless of backend model routing or whether visual analysis is attached.
-
----
-
-### Request Parameters
-
-| Parameter | Type | Required | Default | Description |
-|:---|:---|:---:|:---|:---|
-| `message` | string | **Yes** | — | The query, creative directive, or error log to submit. |
-| `thread_id` | string (UUID) | No | `null` | Identifier of an existing conversation thread to continue. |
-| `mode` | string | No | `"auto"` | Execution mode: `"auto"`, `"prompt_optimize"`, `"vision_audit"`, `"pipeline_architect"`, `"cost_estimate"`, or `"troubleshoot"`. |
-| `context` | object | No | `{}` | Contextual metadata to bind to the assistant's context window. |
-| `context.image_url` | string | No | `null` | Public or presigned image URL for visual diagnostics and style breakdown. |
-| `context.target_model` | string | No | `null` | Intended generation model (e.g., `"seedream-5-0-260128"`, `"flux-2-pro"`). |
-| `context.include_balance`| boolean | No | `false` | When `true`, injects current `wallet.available_usd` for precise budget sizing. |
-| `context.include_history`| boolean | No | `false` | When `true`, grants read access to metadata from your last 5 API transactions. |
-| `stream` | boolean | No | `false` | When `true`, returns Server-Sent Events (`text/event-stream`). |
-| `temperature` | float | No | `0.3` | Sampling temperature (0.0 to 1.0). Lower values yield more deterministic code. |
+| | |
+|---|---|
+| Model id | `ida-q-image` |
+| Submit | `POST /v1/ai/generate/image` |
+| Poll | `GET /v1/ai/generate/image/ida-q/{job_id}` |
+| Max images per request | 2 |
+| Resolutions | `1K` (~30s), `1.5K` (~92s), `2K` (~210s) — times are per image |
 
 ---
 
-### Response Structure (JSON Mode)
+## Submitting a job
 
-```json
-{
-  "thread_id": "thr_9f8e7d6c-5b4a-4321-8765-abcdef012345",
-  "response": "To generate an ultra-realistic cinematic shot of a titanium wristwatch with Seedream 5.0, adjust your prompt to specify optical characteristics, lighting geometry, and surface micro-textures.",
-  "optimized_prompt": "Editorial studio macro photograph of a brushed titanium chronograph wristwatch resting on dark polished volcanic slate, soft directional octabox key light from top-left, subtle rim light accentuating chamfered bezel, water droplet condensation on sapphire crystal, 85mm f/2.8 macro lens, shallow depth of field, 8k resolution, photorealistic",
-  "negative_prompt": "cartoon, plastic texture, render artifacts, distorted dial markers, overexposed highlights, chromatic aberration, low resolution",
-  "suggested_parameters": {
-    "model": "seedream-5-0-260128",
-    "aspect_ratio": "1:1",
-    "num_images": 1,
-    "seed": 4829104
-  },
-  "estimated_cost_usd": 0.0450,
-  "billing": {
-    "usd_charged": 0.0030,
-    "balance_usd": 48.7210,
-    "currency": "USD"
-  },
-  "execution_time_ms": 612
-}
-```
-
----
-
-## Interactive Modes & Blueprints
-
-### 1. Prompt Optimization Mode
-
-Send a raw, unrefined user input to receive model-tailored positive and negative prompts, optimal sampling seeds, and aspect ratio recommendations:
+Use the standard image generation endpoint and set `model` to `ida-q-image`. Because
+this model is async, the response is a `202` with a `job_id` and a `poll_url` —
+**not** an image.
 
 ::: code-group
 
@@ -105,350 +49,137 @@ API_KEY = os.environ["FOTOHUB_API_KEY"]
 headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
 
 payload = {
-    "message": "A woman drinking coffee in a modern cozy kitchen morning sunlight",
-    "mode": "prompt_optimize",
-    "context": {
-        "target_model": "seedream-5-0-260128"
-    }
+    "model": "ida-q-image",
+    "prompt": "Editorial studio macro photograph of a titanium chronograph wristwatch on dark polished slate, soft directional key light, 8k detail",
+    "num_images": 1,
+    "image_size": "1K",
+    "aspect_ratio": "1:1",
 }
 
-res = requests.post("https://apis.fotohub.app/v1/ai/ida-q", headers=headers, json=payload)
+res = requests.post("https://apis.fotohub.app/v1/ai/generate/image", headers=headers, json=payload)
 data = res.json()
-
-print(f"[✓] Optimized Prompt:\n{data['optimized_prompt']}")
-print(f"\n[✓] Negative Prompt:\n{data['negative_prompt']}")
-print(f"\n[✓] Estimated Cost: ${data['estimated_cost_usd']:.4f} USD")
+print(f"job_id: {data['job_id']}  status: {data['status']}  poll_url: {data['poll_url']}")
 ```
 
 ```typescript [TypeScript]
-import axios from "axios";
-
-const API_KEY = process.env.FOTOHUB_API_KEY!;
-const headers = { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" };
-
-async function optimizePrompt() {
-  const { data } = await axios.post("https://apis.fotohub.app/v1/ai/ida-q", {
-    message: "A woman drinking coffee in a modern cozy kitchen morning sunlight",
-    mode: "prompt_optimize",
-    context: { target_model: "seedream-5-0-260128" }
-  }, { headers });
-
-  console.log("Optimized Prompt:", data.optimized_prompt);
-  console.log("Negative Prompt:", data.negative_prompt);
-  console.log(`USD Charged: $${data.billing.usd_charged}`);
-}
-
-optimizePrompt().catch(console.error);
-```
-
-```go [Go]
-package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"os"
-)
-
-func main() {
-	apiKey := os.Getenv("FOTOHUB_API_KEY")
-	client := &http.Client{}
-
-	payload := map[string]interface{}{
-		"message": "A woman drinking coffee in a modern cozy kitchen morning sunlight",
-		"mode":    "prompt_optimize",
-		"context": map[string]string{
-			"target_model": "seedream-5-0-260128",
-		},
-	}
-	body, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/ida-q", bytes.NewBuffer(body))
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-	fmt.Printf("[✓] Optimized Prompt: %v\n", result["optimized_prompt"])
-}
+const res = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "ida-q-image",
+    prompt: "Editorial studio macro photograph of a titanium chronograph wristwatch on dark polished slate, soft directional key light, 8k detail",
+    num_images: 1,
+    image_size: "1K",
+    aspect_ratio: "1:1",
+  }),
+});
+const data = await res.json();
+console.log(data.job_id, data.status, data.poll_url);
 ```
 
 ```bash [cURL]
-curl -s -X POST "https://apis.fotohub.app/v1/ai/ida-q" \
+curl -s -X POST "https://apis.fotohub.app/v1/ai/generate/image" \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "A woman drinking coffee in a modern cozy kitchen morning sunlight",
-    "mode": "prompt_optimize",
-    "context": {
-      "target_model": "seedream-5-0-260128"
-    }
-  }' | jq '{optimized_prompt, negative_prompt, estimated_cost_usd}'
-```
-
-:::
-
----
-
-### 2. Multimodal Visual Diagnostics Mode
-
-Supply a generated image URL to receive automated critical review, aesthetic scoring, defect categorization, and a remedial action plan:
-
-```json
-// POST /v1/ai/ida-q Payload
-{
-  "message": "Analyze why this rendered portrait looks artificial and recommend exact prompt fixes",
-  "mode": "vision_audit",
-  "context": {
-    "image_url": "https://s3point.fotohub.app/generations/test_render_01.webp",
-    "target_model": "seedream-5-0-260128"
-  }
-}
-```
-
-#### Diagnostic Output Example
-
-```json
-{
-  "thread_id": "thr_4a3b2c1d-6e5f-4098-9876-123456789abc",
-  "audit": {
-    "photorealism_score": 78,
-    "anatomical_accuracy": 92,
-    "lighting_coherence": 64,
-    "texture_fidelity": 75,
-    "defects_detected": [
-      "Skin surface exhibits oversmoothed plastic diffusion glaze; lack of epidermal micro-pores",
-      "Conflicting specular highlights on the eyes indicate non-physical multi-source key lights",
-      "Hair strands blur into background alpha boundary"
-    ]
-  },
-  "remedial_prompt": "Candid 35mm photograph of a 28-year-old woman, authentic skin texture with natural pores, subtle freckles, soft peach fuzz, natural imperfect hair flyaways, single continuous diffused window light from left, Kodak Portra 400 color science, unretouched raw look",
-  "recommended_cfg": 5.5,
-  "billing": { "usd_charged": 0.0030, "currency": "USD" }
-}
-```
-
----
-
-### 3. Server-Sent Events (SSE) Streaming
-
-For interactive consoles and chat interfaces, stream token deltas in real-time by setting `stream: true`:
-
-::: code-group
-
-```python [Python Streaming Client]
-import os
-import httpx
-
-API_KEY = os.environ["FOTOHUB_API_KEY"]
-headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
-
-payload = {
-    "message": "Write a complete FastAPI webhook receiver in Python that handles FOTOhub video generation events with HMAC verification.",
-    "stream": True
-}
-
-with httpx.stream("POST", "https://apis.fotohub.app/v1/ai/ida-q", headers=headers, json=payload, timeout=60.0) as response:
-    for line in response.iter_lines():
-        if line.startswith("data: "):
-            content = line[6:]
-            if content == "[DONE]":
-                break
-            print(content, end="", flush=True)
-print("\n")
-```
-
-```typescript [TypeScript / Node.js Streaming]
-import axios from "axios";
-
-async function streamIdaQ() {
-  const response = await axios.post(
-    "https://apis.fotohub.app/v1/ai/ida-q",
-    {
-      message: "Explain the architectural difference between MuseTalk and LatentSync on GPU3.",
-      stream: true
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      responseType: "stream"
-    }
-  );
-
-  response.data.on("data", (chunk: Buffer) => {
-    const lines = chunk.toString().split("\n");
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const text = line.replace("data: ", "");
-        if (text === "[DONE]") return;
-        process.stdout.write(text);
-      }
-    }
-  });
-}
-
-streamIdaQ().catch(console.error);
-```
-
-```bash [cURL Stream]
-curl -N -X POST "https://apis.fotohub.app/v1/ai/ida-q" \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Design an e-commerce catalog generation pipeline using Commerce Bridge",
-    "stream": true
+    "model": "ida-q-image",
+    "prompt": "Editorial studio macro photograph of a titanium chronograph wristwatch on dark polished slate, soft directional key light, 8k detail",
+    "num_images": 1,
+    "image_size": "1K",
+    "aspect_ratio": "1:1"
   }'
 ```
 
 :::
 
----
-
-## Pre-Flight Cost Estimation & Architecture Blueprints
-
-When planning high-throughput batch operations, pass `mode: "cost_estimate"` with your proposed SKU count and modalities. IDA Q queries `server/api-server/app/services/usd_pricing.py` and returns a transparent breakdown of charges from your prepaid USD wallet balance:
-
-```http
-POST https://apis.fotohub.app/v1/ai/ida-q
-Authorization: Bearer fh_live_your_api_key
-Content-Type: application/json
-
-{
-  "message": "Estimate total USD spend to process 5,000 apparel SKUs: remove background, generate 3D GLB models, and produce 15-second virtual try-on video reels for each.",
-  "mode": "cost_estimate",
-  "context": {
-    "include_balance": true
-  }
-}
-```
-
-### Breakdown Response
+### Submit response (`202 Accepted`)
 
 ```json
 {
-  "total_estimated_usd": 1285.00,
-  "current_wallet_usd": 2500.00,
-  "balance_remaining_usd": 1215.00,
-  "sufficient_funds": true,
-  "unit_breakdown": [
-    {
-      "stage": "1. SAM2 Background Removal",
-      "unit_cost_usd": 0.0030,
-      "quantity": 5000,
-      "subtotal_usd": 15.00,
-      "hardware_tier": "GPU Cluster Node"
-    },
-    {
-      "stage": "2. FH Pro 3D Neural Mesh (GPU5 A10G)",
-      "unit_cost_usd": 0.1200,
-      "quantity": 5000,
-      "subtotal_usd": 600.00,
-      "hardware_tier": "GPU5 NVIDIA A10G 24GB"
-    },
-    {
-      "stage": "3. Virtual Try-On 15s Video Reel",
-      "unit_cost_usd": 0.1340,
-      "quantity": 5000,
-      "subtotal_usd": 670.00,
-      "hardware_tier": "GPU1 NVENC Compositor"
-    }
-  ],
-  "recommendations": [
-    "Execute in batches of 500 SKUs via async queue to maintain optimal GPU concurrency without triggering rate limit bounds.",
-    "Configure an external Cloudflare R2 BYOB destination via /v1/destinations to eliminate outbound egress storage fees."
-  ]
+  "model": "ida-q-image",
+  "job_id": "9f8e7d6c-5b4a-4321-8765-abcdef012345",
+  "status": "queued",
+  "usd_charged": 0.0450,
+  "balance_usd": 48.7210,
+  "estimated_seconds": 30,
+  "poll_url": "https://apis.fotohub.app/v1/ai/generate/image/ida-q/9f8e7d6c-5b4a-4321-8765-abcdef012345"
 }
 ```
 
+Billing happens at submit time, before the GPU runs the job. If the model is
+disabled or the queue is full, the charge is refunded and the request fails with
+`503`/`429` (see [Error Handling](#error-handling) below) — you are never charged
+for a job that never ran.
+
 ---
 
-## Multi-Turn Session Management
+## Polling for the result
 
-To maintain stateful multi-step consultations (such as iterative prompt refining or character design), capture and replay the `thread_id`:
+Poll `GET /v1/ai/generate/image/ida-q/{job_id}` — the same `job_id` from the submit
+response — until `status` is `completed` or `failed`.
 
-::: code-group
-
-```python [Python Multi-Turn]
-import requests
-import os
-
-API_KEY = os.environ["FOTOHUB_API_KEY"]
-url = "https://apis.fotohub.app/v1/ai/ida-q"
-headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
-
-# Turn 1: Initial Query
-r1 = requests.post(url, headers=headers, json={
-    "message": "I want to build a virtual influencer named Elena for an athletic wear brand."
-}).json()
-
-thread_id = r1["thread_id"]
-print(f"Session Thread: {thread_id}")
-print(f"IDA Q: {r1['response']}\n")
-
-# Turn 2: Follow-up referencing earlier discussion
-r2 = requests.post(url, headers=headers, json={
-    "thread_id": thread_id,
-    "message": "Now give me the exact POST /v1/brands/{id}/faces/generate payload for Elena."
-}).json()
-
-print(f"IDA Q Follow-Up: {r2['response']}")
+```bash
+curl -s "https://apis.fotohub.app/v1/ai/generate/image/ida-q/9f8e7d6c-5b4a-4321-8765-abcdef012345" \
+  -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```
 
-:::
+While queued/running:
 
----
-
-## Embedded Client Widget Integration
-
-Embed IDA Q directly into your internal admin portals, e-commerce dashboards, or creative suites using our secure `postMessage` cross-origin iframe protocol:
-
-```html
-<!-- Client Integration Snippet -->
-<iframe
-  id="fotohub-ida-q-frame"
-  src="https://console.fotohub.app/embed/ida-q?theme=dark"
-  style="width: 100%; height: 600px; border: 1px solid #27272a; border-radius: 8px;"
-></iframe>
-
-<script>
-  const iframe = document.getElementById("fotohub-ida-q-frame");
-
-  // Handshake and pass ephemeral session token
-  window.addEventListener("message", (event) => {
-    if (event.origin !== "https://console.fotohub.app") return;
-
-    if (event.data.type === "FOTOHUB_IDA_READY") {
-      iframe.contentWindow.postMessage({
-        type: "FOTOHUB_INIT_SESSION",
-        token: "fh_live_ephemeral_client_token",
-        initialContext: {
-          activePage: "catalog_creator",
-          brandId: "brd_982a17f"
-        }
-      }, "https://console.fotohub.app");
-    }
-  });
-</script>
+```json
+{
+  "job_id": "9f8e7d6c-5b4a-4321-8765-abcdef012345",
+  "status": "processing",
+  "progress": 40,
+  "estimated_seconds": 30
+}
 ```
 
+Once complete:
+
+```json
+{
+  "job_id": "9f8e7d6c-5b4a-4321-8765-abcdef012345",
+  "status": "completed",
+  "progress": 100,
+  "estimated_seconds": 30,
+  "images": ["https://s3point.fotohub.app/generations/img_abc123.webp"],
+  "metadata": { "model": "ida-q-image" }
+}
+```
+
+On failure:
+
+```json
+{
+  "job_id": "9f8e7d6c-5b4a-4321-8765-abcdef012345",
+  "status": "failed",
+  "progress": 0,
+  "error": "Generation failed. Please try again."
+}
+```
+
+A failed IDA Q job is **not** automatically refunded — check your transaction
+history (`GET /v1/console/billing/transactions`) if a job fails and you were
+charged.
+
 ---
 
-## Error Handling & Status Codes
+## Error Handling
 
-| Status Code | Error Key | Cause & Remediation |
-|:---|:---|:---|
-| `400 Bad Request` | `invalid_context` | Inaccessible `image_url` or malformed parameter payload. |
-| `401 Unauthorized` | `invalid_api_key` | Missing or revoked Bearer token. Ensure `fh_live_...` prefix. |
-| `402 Payment Required` | `insufficient_funds` | Wallet balance is below `$0.003 USD`. Top up via `/console/billing`. |
-| `429 Too Many Requests` | `rate_limit_exceeded` | Request burst exceeds account tier limit. Apply exponential backoff. |
-| `503 Service Unavailable`| `model_overload` | Temporary inference latency spike. Auto-retries transparently. |
+| Status Code | Cause |
+|:---|:---|
+| `400 Bad Request` | Missing `prompt`, or an invalid `image_size`/`aspect_ratio`. |
+| `401 Unauthorized` | Missing or revoked Bearer token. |
+| `402 Payment Required` | Wallet balance too low to cover the charge. |
+| `429 Too Many Requests` | `QUEUE_FULL` — more than 25 jobs already queued on the single-GPU worker. The charge is refunded automatically. |
+| `503 Service Unavailable` | `MODEL_DISABLED` — IDA Q 1.0 is temporarily switched off. You are not charged. |
+
+---
+
+## Related
+
+- **[Image Generation](/api/image-generation)** — the shared `/v1/ai/generate/image` endpoint IDA Q submits through, including the other (synchronous) models available on it.
+- **[Gabriel AI](/api/gabriel-ai)** — FOTOhub's actual prompt-routing/classification endpoint, if you were looking for an assistant that decides which model or pipeline to call.

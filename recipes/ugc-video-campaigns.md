@@ -4,6 +4,23 @@ A production blueprint for e-commerce brands, direct-to-consumer (DTC) operators
 
 This recipe automates the entire creative lifecycle: scraping product pages for selling points, generating viral hooks and multi-beat scripts, casting hyper-realistic AI actors with lip-sync, synthesizing voice tracks via Google Gemini TTS or Azure Speech, compositing dynamic B-roll and product overlays, and delivering finished 9:16 ads directly to Cloudflare R2 buckets or TikTok ad accounts.
 
+::: warning Two hosts, two credentials
+This pipeline crosses two different UGC surfaces, and every step below is labeled with which
+one it's on:
+
+- **Creative ideation & casting** (brief, angles, script, actor library) is `https://apis.fotohub.app/ugc/*`
+  (no `/v1`) — **first-party only**, authenticated with a Supabase user session JWT. It does
+  **not** accept an `fh_live_*` API key, whatever the examples below show in the `Authorization`
+  header.
+- **Project → blueprint → render → job status → estimate** is the real **API-key surface**,
+  at `https://apis.fotohub.app/v1/ugc/*` (note the `/v1`), authenticated with
+  `Authorization: Bearer fh_live_your_api_key`.
+
+There is no single credential that reaches both. A pure API-key integration has to produce the
+brief/angle/script content another way (your own LLM call) and start this pipeline at project
+creation, or hold a first-party session for the creative half of the run.
+:::
+
 ---
 
 ## Production Architecture
@@ -31,8 +48,8 @@ sequenceDiagram
     UGC-->>Client: Structured ScriptDraft & Scene blueprints
     Client->>TTS: 4. POST /v1/ai/tts/gemini/synthesize (Lines + Style)
     TTS-->>Client: 24 kHz Broadcast Audio WAV
-    Client->>UGC: 5. PUT /ugc/projects/{id}/blueprint (Scenes + Voice + Actor)
-    Client->>UGC: 6. POST /ugc/projects/{id}/render (Idempotency Key)
+    Client->>UGC: 5. PUT /v1/ugc/projects/{id}/blueprint (Scenes + Voice + Actor)
+    Client->>UGC: 6. POST /v1/ugc/projects/{id}/render (Idempotency Key)
     UGC->>Actor: Face likeness animation & lip-sync pass
     UGC->>Compositor: Stitch 9:16 video + captions + ducked music
     Compositor-->>UGC: Render completed (1080x1920 MP4)
@@ -43,6 +60,13 @@ sequenceDiagram
 ---
 
 ## Step-by-Step Implementation
+
+::: warning Steps 1-4 are first-party session auth only
+The `Authorization: Bearer fh_live_your_api_key` header shown in Steps 1-4 below is illustrative
+only — `/ugc/creative/*` and `/ugc/actors` do not accept an `fh_live_*` API key at all; that
+value has to be a Supabase user session JWT. Step 5 onward switches to the real, `/v1/ugc/*`
+API-key surface. See the warning at the top of this page.
+:::
 
 ### Step 1: Ingest Product Page into Creative Brief
 
@@ -177,10 +201,10 @@ Content-Type: application/json
 
 ### Step 5: Assemble Blueprint & Preflight USD Estimate
 
-FotoHUB validates every render against a strict Blueprint schema (`PUT /ugc/projects/{project_id}/blueprint`). You can inspect the exact dollar cost before spending a cent via `POST /ugc/estimate`:
+FotoHUB validates every render against a strict Blueprint schema (`PUT /v1/ugc/projects/{project_id}/blueprint`). You can inspect the exact dollar cost before spending a cent via `POST /v1/ugc/estimate`:
 
 ```http
-POST https://apis.fotohub.app/ugc/estimate
+POST https://apis.fotohub.app/v1/ugc/estimate
 Authorization: Bearer fh_live_your_api_key
 Content-Type: application/json
 
@@ -296,7 +320,15 @@ import time
 import requests
 
 API_KEY = os.environ.get("FOTOHUB_API_KEY", "fh_live_sample_key")
+SESSION_JWT = os.environ.get("FOTOHUB_SESSION_JWT")  # first-party session, NOT the API key
+
 BASE_URL = "https://apis.fotohub.app"
+# Creative ideation & casting: first-party session auth, no /v1 prefix.
+SESSION_HEADERS = {
+    "Authorization": f"Bearer {SESSION_JWT}",
+    "Content-Type": "application/json",
+}
+# Project/blueprint/render/estimate/jobs: the real fh_live_* API-key surface, under /v1/ugc.
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json",
@@ -306,7 +338,7 @@ def create_ugc_campaign(product_url: str) -> dict:
     print(f"[1/5] Ingesting product URL: {product_url}")
     brief_resp = requests.post(
         f"{BASE_URL}/ugc/creative/brief",
-        headers=HEADERS,
+        headers=SESSION_HEADERS,
         json={"url": product_url},
         timeout=30,
     )
@@ -317,7 +349,7 @@ def create_ugc_campaign(product_url: str) -> dict:
     print("[2/5] Generating 3 viral direct-response angles...")
     angles_resp = requests.post(
         f"{BASE_URL}/ugc/creative/angles",
-        headers=HEADERS,
+        headers=SESSION_HEADERS,
         json={
             "brief": brief,
             "count": 3,
@@ -332,7 +364,7 @@ def create_ugc_campaign(product_url: str) -> dict:
 
     print("[3/5] Creating UGC project and building script...")
     proj_resp = requests.post(
-        f"{BASE_URL}/ugc/projects",
+        f"{BASE_URL}/v1/ugc/projects",
         headers=HEADERS,
         json={
             "title": f"UGC Ad - {brief.get('product_name')[:30]}",
@@ -341,11 +373,11 @@ def create_ugc_campaign(product_url: str) -> dict:
         timeout=15,
     )
     proj_resp.raise_for_status()
-    project_id = proj_resp.json()["id"]
+    project_id = proj_resp.json()["project"]["id"]
 
     script_resp = requests.post(
         f"{BASE_URL}/ugc/creative/script",
-        headers=HEADERS,
+        headers=SESSION_HEADERS,
         json={"brief": brief, "angle": selected_angle, "speed": 1.05},
         timeout=30,
     )
@@ -392,7 +424,7 @@ def create_ugc_campaign(product_url: str) -> dict:
 
     print("[4/5] Saving blueprint to project...")
     bp_resp = requests.put(
-        f"{BASE_URL}/ugc/projects/{project_id}/blueprint",
+        f"{BASE_URL}/v1/ugc/projects/{project_id}/blueprint",
         headers=HEADERS,
         json={"document": blueprint},
         timeout=20,
@@ -403,7 +435,7 @@ def create_ugc_campaign(product_url: str) -> dict:
 
     print("[5/5] Triggering video render job...")
     render_resp = requests.post(
-        f"{BASE_URL}/ugc/projects/{project_id}/render",
+        f"{BASE_URL}/v1/ugc/projects/{project_id}/render",
         headers=HEADERS,
         json={
             "idempotency_key": f"render_{project_id}_{int(time.time())}",
@@ -424,7 +456,7 @@ def create_ugc_campaign(product_url: str) -> dict:
     print("      Waiting for rendering to complete...")
     for _ in range(60):
         status_resp = requests.get(
-            f"{BASE_URL}/ugc/jobs/{job_id}",
+            f"{BASE_URL}/v1/ugc/jobs/{job_id}",
             headers=HEADERS,
             timeout=15,
         )
@@ -465,17 +497,20 @@ interface CreativeAngle {
 
 interface RenderJobResponse {
   job: { id: string; state: string };
-  estimate: { usd_total: number; video_seconds: number };
+  price: { quoted_usd: number; currency: string; charged_usd: number };
 }
 
+// Creative ideation & casting: first-party session auth (no /v1 prefix, no fh_live_* key).
+const SESSION_JWT = process.env.FOTOHUB_SESSION_JWT || "";
+// Project/blueprint/render/estimate/jobs: the real fh_live_* API-key surface, under /v1/ugc.
 const API_KEY = process.env.FOTOHUB_API_KEY || "fh_live_sample_key";
 const BASE_URL = "https://apis.fotohub.app";
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+async function postJson<T>(path: string, body: unknown, token = API_KEY): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -489,9 +524,11 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 
 async function runUgcPipeline(productUrl: string) {
   console.log(`[1/5] Ingesting brief: ${productUrl}`);
-  const brief = await postJson<BriefResponse>("/ugc/creative/brief", {
-    url: productUrl,
-  });
+  const brief = await postJson<BriefResponse>(
+    "/ugc/creative/brief",
+    { url: productUrl },
+    SESSION_JWT
+  );
 
   console.log(`[2/5] Requesting viral hooks for ${brief.product_name}...`);
   const anglesData = await postJson<{ angles: CreativeAngle[] }>(
@@ -500,20 +537,21 @@ async function runUgcPipeline(productUrl: string) {
       brief,
       count: 3,
       formats: ["problem_solution", "testimonial", "unboxing"],
-    }
+    },
+    SESSION_JWT
   );
   const selectedAngle = anglesData.angles[0];
   console.log(`Selected Hook: "${selectedAngle.hook}"`);
 
   console.log("[3/5] Generating timed scene script...");
-  const scriptData = await postJson<{ scenes: any[] }>("/ugc/creative/script", {
-    brief,
-    angle: selectedAngle,
-    speed: 1.05,
-  });
+  const scriptData = await postJson<{ scenes: any[] }>(
+    "/ugc/creative/script",
+    { brief, angle: selectedAngle, speed: 1.05 },
+    SESSION_JWT
+  );
 
   console.log("[4/5] Creating UGC project...");
-  const project = await postJson<{ id: string }>("/ugc/projects", {
+  const project = await postJson<{ project: { id: string } }>("/v1/ugc/projects", {
     title: `UGC - ${brief.product_name.slice(0, 24)}`,
     brief,
   });
@@ -551,7 +589,9 @@ async function runUgcPipeline(productUrl: string) {
     },
   };
 
-  await fetch(`${BASE_URL}/ugc/projects/${project.id}/blueprint`, {
+  const projectId = project.project.id;
+
+  await fetch(`${BASE_URL}/v1/ugc/projects/${projectId}/blueprint`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${API_KEY}`,
@@ -562,9 +602,9 @@ async function runUgcPipeline(productUrl: string) {
 
   console.log("[5/5] Submitting video render...");
   const render = await postJson<RenderJobResponse>(
-    `/ugc/projects/${project.id}/render`,
+    `/v1/ugc/projects/${projectId}/render`,
     {
-      idempotency_key: `ugc_ts_${project.id}_${Date.now()}`,
+      idempotency_key: `ugc_ts_${projectId}_${Date.now()}`,
       variant_label: "hook_1_problem_solution",
       product_urls: {
         retinol_bottle: "https://storage.glowbotanics.com/serum.png",
@@ -573,7 +613,7 @@ async function runUgcPipeline(productUrl: string) {
   );
 
   console.log(`Render submitted! Job ID: ${render.job.id}`);
-  console.log(`Estimated Cost: $${render.estimate.usd_total.toFixed(4)} USD`);
+  console.log(`Quoted cost: $${render.price.quoted_usd.toFixed(4)} USD (settled per delivered scene)`);
 }
 
 runUgcPipeline("https://glowbotanics.com/products/retinol-glow-serum").catch(
@@ -611,8 +651,10 @@ type RenderRequest struct {
 	ProductURLs    map[string]string `json:"product_urls"`
 }
 
-func doRequest(method, endpoint string, payload interface{}) ([]byte, error) {
-	apiKey := os.Getenv("FOTOHUB_API_KEY")
+// doRequest takes an explicit bearer token because this pipeline crosses two
+// hosts/credentials: FOTOHUB_SESSION_JWT (first-party) for /ugc/creative/*,
+// and FOTOHUB_API_KEY (fh_live_*) for /v1/ugc/*.
+func doRequest(method, endpoint, bearerToken string, payload interface{}) ([]byte, error) {
 	var body io.Reader
 	if payload != nil {
 		data, err := json.Marshal(payload)
@@ -626,7 +668,7 @@ func doRequest(method, endpoint string, payload interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer "+bearerToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 60 * time.Second}
@@ -644,8 +686,11 @@ func doRequest(method, endpoint string, payload interface{}) ([]byte, error) {
 }
 
 func main() {
+	sessionJWT := os.Getenv("FOTOHUB_SESSION_JWT") // first-party, /ugc/creative/*
+	apiKey := os.Getenv("FOTOHUB_API_KEY")          // fh_live_*, /v1/ugc/*
+
 	fmt.Println("[1/4] Ingesting product URL into brief...")
-	briefBytes, err := doRequest("POST", "/ugc/creative/brief", BriefRequest{
+	briefBytes, err := doRequest("POST", "/ugc/creative/brief", sessionJWT, BriefRequest{
 		URL: "https://glowbotanics.com/products/retinol-glow-serum",
 	})
 	if err != nil {
@@ -657,7 +702,7 @@ func main() {
 	fmt.Printf("Parsed Product: %v\n", brief["product_name"])
 
 	fmt.Println("[2/4] Initializing project...")
-	projBytes, err := doRequest("POST", "/ugc/projects", ProjectRequest{
+	projBytes, err := doRequest("POST", "/v1/ugc/projects", apiKey, ProjectRequest{
 		Title: "Go UGC Campaign",
 		Brief: brief,
 	})
@@ -665,12 +710,13 @@ func main() {
 		panic(err)
 	}
 
-	var project map[string]interface{}
-	json.Unmarshal(projBytes, &project)
+	var projResp map[string]interface{}
+	json.Unmarshal(projBytes, &projResp)
+	project := projResp["project"].(map[string]interface{})
 	projectID := project["id"].(string)
 
 	fmt.Printf("[3/4] Triggering render for project %s...\n", projectID)
-	renderBytes, err := doRequest("POST", fmt.Sprintf("/ugc/projects/%s/render", projectID), RenderRequest{
+	renderBytes, err := doRequest("POST", fmt.Sprintf("/v1/ugc/projects/%s/render", projectID), apiKey, RenderRequest{
 		IdempotencyKey: fmt.Sprintf("go_render_%d", time.Now().Unix()),
 		VariantLabel:   "go_ugc_angle_1",
 		ProductURLs: map[string]string{
@@ -686,9 +732,12 @@ func main() {
 ```
 
 ```bash [cURL]
+# $FOTOHUB_SESSION_JWT is a first-party Supabase session token, NOT the fh_live_* API key —
+# steps 1-2 (creative ideation) only accept a session, never an API key.
+
 # 1. Parse e-commerce product URL into creative brief
 curl -s -X POST https://apis.fotohub.app/ugc/creative/brief \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Authorization: Bearer $FOTOHUB_SESSION_JWT" \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://glowbotanics.com/products/retinol-glow-serum"
@@ -696,7 +745,7 @@ curl -s -X POST https://apis.fotohub.app/ugc/creative/brief \
 
 # 2. Generate 3 direct-response angles and viral opening hooks
 curl -s -X POST https://apis.fotohub.app/ugc/creative/angles \
-  -H "Authorization: Bearer $FOTOHUB_API_KEY" \
+  -H "Authorization: Bearer $FOTOHUB_SESSION_JWT" \
   -H "Content-Type: application/json" \
   -d '{
     "brief": {
@@ -707,8 +756,10 @@ curl -s -X POST https://apis.fotohub.app/ugc/creative/angles \
     "formats": ["problem_solution", "testimonial", "unboxing"]
   }'
 
+# From here on: the real fh_live_* API-key surface, under /v1/ugc.
+
 # 3. Request preflight USD cost estimate before rendering
-curl -s -X POST https://apis.fotohub.app/ugc/estimate \
+curl -s -X POST https://apis.fotohub.app/v1/ugc/estimate \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -748,7 +799,7 @@ curl -s -X POST https://apis.fotohub.app/ugc/estimate \
   }'
 
 # 4. Trigger video render with idempotency key
-curl -s -X POST https://apis.fotohub.app/ugc/projects/proj_91204a/render \
+curl -s -X POST https://apis.fotohub.app/v1/ugc/projects/proj_91204a/render \
   -H "Authorization: Bearer $FOTOHUB_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -791,10 +842,10 @@ Content-Type: application/json
 
 ### 2. Auto-Publish to TikTok Ads / Creator Account
 
-Leverage FotoHUB Social Studio (`/v1/posts`) to post the rendered ad video directly:
+Leverage FotoHUB Social Studio (`/social/v1/posts`) to post the rendered ad video directly:
 
 ```http
-POST https://apis.fotohub.app/v1/posts
+POST https://apis.fotohub.app/social/v1/posts
 Authorization: Bearer fh_live_your_api_key
 Content-Type: application/json
 
@@ -804,7 +855,7 @@ Content-Type: application/json
   "media_urls": [
     "https://ugc-ads-cdn.glowbotanics.com/campaigns/2026-q3/ugc_render_91204a.mp4"
   ],
-  "publish_at": "2026-09-06T18:00:00Z"
+  "scheduled_at": "2026-09-06T18:00:00Z"
 }
 ```
 
@@ -878,6 +929,12 @@ Compare this to traditional UGC production costing between $150 and $300 per cre
 
 ## Parameter Specifications
 
+::: warning First-party session auth only
+The four endpoints immediately below (`/ugc/creative/brief`, `/ugc/creative/angles`,
+`/ugc/creative/script`, `/ugc/creative/cameras`) are on the first-party host and authenticate
+with a user session JWT, not an `fh_live_*` API key — see the warning at the top of this page.
+:::
+
 ### POST `/ugc/creative/brief`
 
 | Parameter | Type | Required | Default | Description |
@@ -931,7 +988,7 @@ Drop a preset's fields straight into `scenes[].camera`, or set the five terms yo
 | `pitch` | float | No | 1.0 | Pitch shifting factor. |
 | `emotion_style` | string | No | "neutral" | Emotional delivery hint (if supported by voice model). |
 
-### PUT `/ugc/projects/{id}/blueprint`
+### PUT `/v1/ugc/projects/{id}/blueprint`
 
 | Parameter | Type | Required | Default | Description |
 |:---|:---|:---:|:---|:---|
@@ -943,7 +1000,7 @@ Every save creates a **new immutable version** rather than editing the last one.
 There is no colour list on the render call. The caption accent is `captions.accent` and the end card's panel is `end_card.colour` (falling back to the accent), both stored in the document — so every variant of it is on-brand by construction. `brand_ref` names a **brand** asset in your library, whose palette and tone constrain the whole cut; pointing it at a product asset is refused rather than applied.
 :::
 
-### POST `/ugc/projects/{id}/render`
+### POST `/v1/ugc/projects/{id}/render`
 
 The render films the **saved** document, so everything about the cut — ratio, frame rate, captions, music, camera — is set in the blueprint, not here. This call only says *which* cut and *how it is identified*:
 
@@ -953,16 +1010,25 @@ The render films the **saved** document, so everything about the cut — ratio, 
 | `variant_label` | string | No | null | Names this cut of this version. The paid unit is version plus label: re-filming the same version deliberately — a second take, a corrected reference address — needs a new label, or the call returns the earlier job. |
 | `product_urls` | object | No | `{}` | Addresses for scenes that still name a product by `product_ref` rather than by a library asset. Supplied per run, not stored. A scene whose key has no address here films without its product and nothing reports it, so prefer attaching the product from the library. |
 
-### GET `/ugc/projects/{id}/render`
+### GET `/v1/ugc/jobs/{job_id}`
 
-Poll for render job status. Returns detailed progress for UX loading states.
+::: warning Not `GET .../render`
+There is no `GET /v1/ugc/projects/{id}/render` — that path only accepts `POST` (it's the render
+trigger, documented above). Job status is a separate route, by job id (or by the render's own
+id, once the job row has aged out).
+:::
+
+Poll for render job status.
 
 | Response Field | Type | Description |
 |:---|:---|:---|
-| `status` | string | State enum: `queued`, `lipsyncing`, `compositing`, `completed`, `failed`. |
-| `progress` | integer | Estimated completion percentage (0-100). |
-| `video_url` | string | Final asset URL (only populated if `status` is `completed`). |
-| `usd_charged` | float | Final billed amount deducted from `wallet.available_usd`. |
+| `job.state` | string | State enum, e.g. `queued`, `processing`, `completed`, `failed`. |
+| `terminal` | boolean | `true` once `job.state` is a final state — stop polling. |
+| `render.video_url` | string | Final asset URL, present once the render exists. |
+| `render` | object \| null | Null until at least one scene has landed. |
+| `scenes` | array | Per-scene rows, each carrying `usage.wallet_usd` for that scene's settle. |
+| `cost_usd` | float | Total billed to the wallet so far, summed from the scene settles. |
+| `currency` | string | Always `"USD"`. |
 
 ---
 
@@ -1024,7 +1090,16 @@ FOTOhub dynamically burns captions via ASS (Advanced SubStation Alpha) formattin
 
 ## 6. Multi-Variant Matrix & Batch Scripting
 
-To find winning ads, agencies must generate a high volume of variants. This Python script iterates 5 products × 3 angles × 2 actors = 30 variants.
+::: warning No `/ugc/projects/batch/render` route
+That path doesn't exist. The engine's real batch route is `POST /ugc/projects/{project_id}/batch`
+(first-party session auth, not proxied to the API-key surface — see the "Batch Variant
+Rendering" section of the [UGC Studio API reference](/api/ugc-studio)). An `fh_live_*` client
+fans out by calling `POST /v1/ugc/projects/{project_id}/render` once per variant instead,
+against a project already created for each variant, which is what the script below actually
+does.
+:::
+
+To find winning ads, agencies must generate a high volume of variants. This Python script iterates 5 products × 3 angles × 2 actors = 30 variants, one project + render per variant.
 
 ::: code-group
 ```python [Python (Batch Script)]
@@ -1032,24 +1107,23 @@ import asyncio
 import httpx
 import os
 
-API_KEY = os.environ.get("FOTOHUB_API_KEY")
+API_KEY = os.environ.get("FOTOHUB_API_KEY")  # fh_live_*
 BASE_URL = "https://apis.fotohub.app"
 
 PRODUCTS = ["https://glowbotanics.com/products/retinol-glow-serum", "https://glowbotanics.com/products/vitamin-c", "https://glowbotanics.com/products/cleanser", "https://glowbotanics.com/products/toner", "https://glowbotanics.com/products/moisturizer"]
 ACTORS = ["act_sarah_ugc_01", "act_mike_creator_04"]
 ANGLES = ["problem_solution", "unboxing", "testimonial"]
 
-async def generate_variant(client, product_url, actor, angle):
-    # 1. Brief & Angle logic (simplified)
-    # 2. Render dispatch
+async def generate_variant(client, project_id, actor, angle):
+    # Assumes a project + blueprint were already created for this (product, actor, angle)
+    # combination via POST/PUT /v1/ugc/projects — omitted here for brevity.
     payload = {
-        "idempotency_key": f"batch_{actor}_{angle}",
+        "idempotency_key": f"batch_{project_id}_{actor}_{angle}",
         "variant_label": f"{actor}_{angle}",
-        # ... blueprint details ...
     }
-    resp = await client.post(f"{BASE_URL}/ugc/projects/batch/render", json=payload)
+    resp = await client.post(f"{BASE_URL}/v1/ugc/projects/{project_id}/render", json=payload)
     data = resp.json()
-    print(f"Dispatched {actor}-{angle}: Cost {data['usd_charged']} USD")
+    print(f"Dispatched {actor}-{angle}: quoted {data['price']['quoted_usd']} USD")
     return data
 
 async def main():
@@ -1283,7 +1357,7 @@ By providing `custom_brief`, the AI bypasses the URL fetch and directly instanti
 
 ## 16. State Machine: Render Job Lifecycle
 
-Understanding the lifecycle of a FOTOhub render job is critical when building a user-facing dashboard that needs to poll `GET /ugc/projects/{id}/render`. 
+Understanding the lifecycle of a FOTOhub render job is critical when building a user-facing dashboard that needs to poll `GET /v1/ugc/jobs/{job_id}`. 
 
 ```mermaid
 stateDiagram-v2
@@ -1478,38 +1552,19 @@ def fotohub_webhook():
 
 When scaling from testing 10 ads to generating thousands of UGC variants per month for clients, keep the following FOTOhub optimizations in mind:
 
-1. **Pre-Cache Actors**: If you know you will generate 100 variants using `act_sarah_ugc_01`, ping the `/ugc/actors/act_sarah_ugc_01/warm` endpoint at the start of your script. This pre-loads the neural mesh onto an available GPU3 instance, saving 4-6 seconds of startup latency per render job.
-2. **Reuse Assets**: Avoid uploading the same product image repeatedly. Upload it once to FOTOhub's Asset Manager (`POST /v1/assets`) and pass the resulting `fh_asset_id` instead of a URL. This skips the S3 fetch phase during compositing.
+1. **Pre-Cache Actors**: there is no `/ugc/actors/{id}/warm` endpoint — that route does not exist on either UGC host. There's no documented way to pre-warm an actor ahead of a batch today.
+2. **Reuse Assets**: Avoid uploading the same product image repeatedly. Register it once in the UGC asset library (`POST /ugc/assets`, first-party session auth — no `fh_live_*` equivalent) and reference its `slug` in `scenes[].refs[].asset` instead of a raw URL. This skips the S3 fetch phase during compositing.
 3. **Idempotency Keys**: Always, always use idempotency keys (`idempotency_key`) formatted as `UUID` or `agency_client_campaign_date`. If your script crashes and restarts, FOTOhub will recognize the key and return the exact same render payload without deducting additional USD from your wallet.
 4. **Concurrent Rate Limits**: By default, agency tier accounts can process 50 concurrent render jobs. If you queue 500, the system automatically buffers them. Do not write custom pooling logic; simply fire all 500 requests asynchronously and let FOTOhub's queue manager handle node scheduling.
 
 ## 21. Generating Bulk Thumbnails
 
-In addition to video files, Facebook and Instagram Ads require high-converting static thumbnails. You can request FOTOhub to generate text-overlay variants of the best frame.
-
-Add the following to your `POST /ugc/projects/{id}/render` payload:
-
-```json
-{
-  "exports": {
-    "video": true,
-    "thumbnails": [
-      {
-        "type": "ai_highlight",
-        "text_overlay": "Will This Save My Skin?",
-        "style": "clickbait_yellow"
-      },
-      {
-        "type": "product_focus",
-        "text_overlay": "14 Day Results",
-        "style": "minimal_white"
-      }
-    ]
-  }
-}
-```
-
-This will output additional URLs in your webhook payload under `render.thumbnails`. These cost an additional `$0.005 USD` per thumbnail generated.
+::: warning Not a real request field
+`POST /v1/ugc/projects/{project_id}/render` (`RenderIn`) only accepts `idempotency_key`,
+`variant_label`, and `product_urls` — there is no `exports` block, and the render call does
+not generate separate text-overlay thumbnail variants. If you need static ad creatives from a
+render's frames, that's a separate step against the image endpoints, not a render-payload field.
+:::
 
 ## Final Launch Checklist
 
@@ -1517,7 +1572,7 @@ This will output additional URLs in your webhook payload under `render.thumbnail
 - [ ] Verify `custom_brief` constraints align with FDA/FTC regulations.
 - [ ] Confirm Webhook handler is returning `200 OK` instantly and processing asynchronously.
 - [ ] Test the pipeline on `quality: "draft"` (watermarked, lower resolution) for `$0.02 USD` before rendering full resolution.
-- [ ] Validate Cloudflare R2 / AWS S3 connection via `GET /v1/destinations/test`.
+- [ ] Validate Cloudflare R2 / AWS S3 connection via `POST /v1/destinations/{destination_id}/verify`.
 
 ---
 *Built for production scale. Start generating at [FOTOhub API Dashboard](https://dashboard.fotohub.app).*

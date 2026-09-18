@@ -1232,7 +1232,7 @@ Only `fh-lite-3d` and `fh-text-3d` are callable today, so every row naming `fh-p
 
 ## Rate Limits
 
-Rate limits are per API tier, not per endpoint — see `GET /v1/tiers` for your own. The lowest tier starts at 30 requests per minute and 3 concurrent jobs.
+Rate limits are per API tier, not per endpoint — see `GET /v1/tiers/current` for your own. The lowest tier starts at 30 requests per minute and 3 concurrent jobs.
 
 | Limit | Value |
 |-------|-------|

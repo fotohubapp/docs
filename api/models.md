@@ -847,7 +847,7 @@ curl -X GET "https://apis.fotohub.app/v1/models?includeInactive=true" \
 ```
 
 ::: tip Try Before You Commit
-Use the FOTOhub Playground at [fotohub.app/playground](https://fotohub.app/playground) to compare models side-by-side with the same prompt before choosing one for production use. Sandbox API keys (`fh_test_`) can be used for testing without incurring charges.
+Use the FOTOhub Playground at [fotohub.app/playground](https://fotohub.app/playground) to compare models side-by-side with the same prompt before choosing one for production use. Note that there is no sandbox key type — Playground runs bill your wallet like any other call.
 :::
 
 ---
@@ -856,7 +856,7 @@ Use the FOTOhub Playground at [fotohub.app/playground](https://fotohub.app/playg
 
 Professional image editing via Stability AI and FOTOhub proprietary engines. Everything here is a flat per-image charge.
 
-### Stability AI tools (`POST /v1/ai/stability/{tool}`)
+### Stability AI tools (`POST /stability/{tool}`)
 
 Price keys are `stability_{tool}`. All thirteen are ✅ verified against Stability's published credit-to-dollar rate.
 

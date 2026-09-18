@@ -34,7 +34,7 @@ Trigger: New image uploaded to Google Drive
 }
 ```
 
-POST to: `https://apis.fotohub.app/v1/ai/remove-background`
+POST to: `https://apis.fotohub.app/v1/images/remove-background`
 
 ### Video Generation + Webhook
 

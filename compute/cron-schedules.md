@@ -1,20 +1,23 @@
 # Scheduled Tasks & Recurring Cron Workflows (Claws)
 
-Automate recurring agent tasks, automated data audits, and batch generation pipelines using the **Agent Scheduler** and **Claws**. 
+Automate recurring agent tasks, automated data audits, and batch generation pipelines using **cron jobs attached to an FH Claw**.
 
-Schedules support full standard 5-part Linux cron syntax, custom timezone specifications (`Europe/Warsaw`, `UTC`, `America/New_York`), automated retry policies, and post-action dispatching.
+Schedules use standard 5-part Linux cron syntax. A cron job runs on an existing, already-provisioned Claw — see [FH Claw Assistants](/compute/fh-claw-assistants) for how to create one.
+
+> [!NOTE]
+> This page previously described a standalone "Agent Scheduler" service with its own `agent_config`, per-run USD budgets, retry policies and outbound webhooks. None of that exists in the running service — cron jobs are a thin sub-resource of an FH Claw (`server/agent-compute/app/routes_claw.py`) with exactly three fields: `description`, `schedule`, `task`. The content below has been rewritten to match what is actually deployed.
 
 ---
 
 ## Base URL & Authentication
 
-All requests to the Agent Scheduler API must be made to the following base URL:
+All requests to the FH Claw cron API must be made to the following base URL:
 
 ```text
-https://apis.fotohub.app/compute/v1
+https://comp1.fotohub.app
 ```
 
-Authentication is required for all endpoints. You must provide your live API key in the `Authorization` header as a Bearer token. 
+Authentication is required for all endpoints. You must provide your live API key in the `Authorization` header as a Bearer token.
 
 ```text
 Authorization: Bearer fh_live_YOUR_API_KEY
@@ -27,113 +30,48 @@ Authorization: Bearer fh_live_YOUR_API_KEY
 
 ## Claw Architecture
 
-Claws are our powerful abstractions for recurring agent workflows.
+Each cron job you create is dispatched as a recurring reasoning loop on an already-running Claw.
 
 ```mermaid
 flowchart TD
-    A["Cron Trigger (e.g. '0 9 * * 1')"] --> B["Claw Scheduler Engine"]
-    B --> C["Pre-Flight Budget & Wallet Check"]
-    C -->|Balance USD OK| D["Dispatch Claw Configuration"]
-    D --> E["Firecracker MicroVM / Agent Orchestrator"]
-    E --> F{"Task Result"}
-    
-    F -->|Success| G["Post Actions"]
-    G --> H["Trigger Webhook / Chain Task"]
-    
-    F -->|Failure| I{"Retry Policy Configured?"}
-    I -->|Yes (max retries)| J["Wait delay_minutes & Re-attempt"]
-    I -->|No| K["Dispatch Failure Webhook"]
+    A["Cron Trigger (e.g. '0 9 * * 1')"] --> B["Claw Cron Scheduler"]
+    B --> C["Dispatch task to the Claw's OpenClaw Gateway"]
+    C --> D["Firecracker MicroVM / Agent Reasoning Loop"]
+    D --> E["Task Result appended to the Claw's message history"]
 ```
 
 ---
 
-## Agent Scheduler API Reference
+## Cron API Reference
 
-Manage your Claws using the following REST API endpoints.
+Manage recurring cron jobs on an existing Claw using the following REST API endpoints.
 
-### `POST /v1/claws`
-Create a new recurring Claw configuration.
+### `POST /v1/claws/:claw_id/crons`
+Create a recurring cron job on an existing Claw.
 
-**Request Body:** (See *Complete Claw Configuration Schema*)
+**Request Body:** (See *Cron Job Schema*)
 
-### `GET /v1/claws`
-List all active and paused Claws.
+### `GET /v1/claws/:claw_id/crons`
+List the cron jobs configured on a Claw. The response is proxied from the Claw's own gateway, so its exact shape may vary by Claw version — treat it as a list of the cron objects you created.
 
-**Query Parameters:**
-- `status` (string, optional) - Filter by `active` or `paused`.
-- `limit` (integer, optional) - Pagination limit. Default 100.
-- `offset` (integer, optional) - Pagination offset. Default 0.
-
-### `GET /v1/claws/:claw_id`
-Retrieve a specific Claw by ID.
-
-### `PUT /v1/claws/:claw_id`
-Update a specific Claw configuration. Overwrites the existing configuration.
-
-### `DELETE /v1/claws/:claw_id`
-Delete a Claw. This action is irreversible. Future executions are cancelled immediately.
-
-### `POST /v1/claws/:claw_id/runs/trigger`
-Manually trigger an immediate run of a Claw, bypassing its cron schedule.
+> [!NOTE]
+> There is currently no endpoint to update or delete a single cron job, and no endpoint to manually trigger an off-schedule run. Both were documented on an earlier version of this page and have been removed rather than left pointing at a 404.
 
 ---
 
-## Complete Claw Configuration Schema
+## Cron Job Schema
 
-The JSON payload for a Claw configuration contains instructions, schedule details, budget limits, and webhooks.
+The JSON payload for a cron job has exactly three fields:
 
 ```json
 {
-  "name": "string", 
-  "description": "string",
-  "schedule": "string (cron expression)",
-  "timezone": "string (IANA timezone)",
-  "agent_config": {
-    "model": "string (e.g. 'agent-v4-pro')",
-    "system_prompt": "string",
-    "temperature": "number (0.0 - 1.0)",
-    "max_tokens": "integer"
-  },
-  "variables": {
-    "key": "value (string, number, boolean, or JSON)"
-  },
-  "budget_control": {
-    "max_cost_usd_per_run": "number",
-    "monthly_budget_usd": "number",
-    "action_on_budget_exceeded": "string ('pause' | 'alert_only' | 'terminate')"
-  },
-  "retry_policy": {
-    "max_retries": "integer",
-    "retry_delay_minutes": "integer",
-    "exponential_backoff": "boolean"
-  },
-  "webhooks": {
-    "on_success": "string (URL)",
-    "on_failure": "string (URL)",
-    "on_budget_alert": "string (URL)",
-    "secret_token": "string"
-  }
+  "description": "string — human-readable label for the job",
+  "schedule": "string — 5-part cron expression",
+  "task": "string — natural-language instructions given to the Claw on each run"
 }
 ```
 
----
-
-## Timezone Handling
-
-Timezones are specified using the standard IANA timezone database formats. 
-
-If no timezone is provided, `UTC` is used by default.
-
-**Examples:**
-- `America/Los_Angeles`
-- `America/New_York`
-- `Europe/London`
-- `Europe/Warsaw`
-- `Asia/Tokyo`
-- `UTC`
-
-> [!TIP]
-> Always explicitly define your timezone to prevent daylight saving time (DST) anomalies from affecting your schedules.
+There is no `timezone`, `agent_config`, `budget_control`, `retry_policy` or `webhooks` field — cost is billed the same way as any other message to the Claw (see [FH Claw Assistants](/compute/fh-claw-assistants) for pricing), and cron schedules run in UTC.
 
 ---
 
@@ -154,65 +92,9 @@ We support standard 5-part Linux cron syntax.
 
 ---
 
-## Budget and Cost Control (USD)
+## Cost & Monitoring
 
-Claws allow strict budget enforcement in USD. You can set a maximum spend limit per run and a cumulative monthly budget.
-
-- **`max_cost_usd_per_run`**: Limits the API and compute spend for a single invocation. If the agent consumes more tokens/compute than this USD value, the process is forcefully halted.
-- **`monthly_budget_usd`**: Cumulative limit for the calendar month.
-- **`action_on_budget_exceeded`**: Determines behavior when limits are reached.
-  - `pause`: Automatically suspends the Claw.
-  - `alert_only`: Fires a webhook but allows execution.
-  - `terminate`: Deletes the Claw entirely.
-
----
-
-## Webhook Schema
-
-When a webhook is triggered by a Claw execution (success or failure), the following JSON payload is dispatched to your configured endpoint via `POST`.
-
-```json
-{
-  "event_type": "claw.run.success",
-  "claw_id": "clw_9876543210",
-  "run_id": "run_0011223344",
-  "timestamp": "2026-09-06T16:56:37Z",
-  "cost_usd": 0.145,
-  "execution_time_seconds": 12.4,
-  "result": {
-    "output_text": "Agent completed the task...",
-    "extracted_data": {
-       "key": "value"
-    }
-  },
-  "error": null
-}
-```
-
-Validate webhooks using the `x-fotohub-signature` header, which is an HMAC-SHA256 hash of the payload using your `secret_token`.
-
----
-
-## Execution History
-
-You can fetch the execution history of a specific Claw to monitor its performance, logs, and cost over time.
-
-### `GET /v1/claws/:claw_id/runs`
-
-**Response Example:**
-```json
-{
-  "runs": [
-    {
-      "run_id": "run_0011223344",
-      "status": "success",
-      "started_at": "2026-09-06T16:56:00Z",
-      "completed_at": "2026-09-06T16:56:12Z",
-      "cost_usd": 0.145
-    }
-  ]
-}
-```
+There is no per-cron USD budget cap or outbound webhook mechanism — a cron run bills the same way as any other message to the Claw, deducted from your USD wallet. Monitor spend and history via the FotoHub Web Console (**Billing > Agents**) or by polling `GET /v1/claws/:claw_id/messages` for the Claw's conversation log.
 
 ---
 
@@ -228,40 +110,15 @@ Runs daily to scrape competitor sites, analyze price changes, and alert if our p
 
 ```python [Python]
 import requests
-import json
 
 api_key = "fh_live_YOUR_API_KEY"
-url = "https://apis.fotohub.app/compute/v1/claws"
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
+url = f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons"
 
 payload = {
-    "name": "Daily Price Scraper",
-    "description": "Scrapes competitors every midnight",
+    "description": "Daily Price Scraper — scrapes competitors every midnight",
     "schedule": "0 0 * * *",
-    "timezone": "America/New_York",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "You are a price scraping bot. Visit competitor URLs, find product prices, and compare with our catalog.",
-        "temperature": 0.1,
-        "max_tokens": 8000
-    },
-    "variables": {
-        "competitors": ["amazon.com", "bestbuy.com", "walmart.com"],
-        "our_catalog_db": "postgres://user:pass@host/db"
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 2.50,
-        "monthly_budget_usd": 75.00,
-        "action_on_budget_exceeded": "pause"
-    },
-    "retry_policy": {
-        "max_retries": 3,
-        "retry_delay_minutes": 5,
-        "exponential_backoff": True
-    },
-    "webhooks": {
-        "on_success": "https://api.yourbrand.com/webhooks/prices",
-        "secret_token": "super_secret"
-    }
+    "task": "Visit amazon.com, bestbuy.com and walmart.com, find current product prices for our catalog, and flag any of our SKUs that are no longer price-competitive."
 }
 
 headers = {
@@ -276,50 +133,27 @@ print(response.json())
 ```typescript [TypeScript]
 import fetch from 'node-fetch';
 
-const createScraperClaw = async () => {
-  const response = await fetch('https://apis.fotohub.app/compute/v1/claws', {
+const clawId = "clw_your_existing_claw_id"; // create with POST /v1/claws first
+
+const createScraperCron = async () => {
+  const response = await fetch(`https://comp1.fotohub.app/v1/claws/${clawId}/crons`, {
     method: 'POST',
     headers: {
       'Authorization': 'Bearer fh_live_YOUR_API_KEY',
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      name: "Daily Price Scraper",
-      description: "Scrapes competitors every midnight",
+      description: "Daily Price Scraper — scrapes competitors every midnight",
       schedule: "0 0 * * *",
-      timezone: "America/New_York",
-      agent_config: {
-        model: "agent-v4-pro",
-        system_prompt: "You are a price scraping bot. Visit competitor URLs, find product prices, and compare with our catalog.",
-        temperature: 0.1,
-        max_tokens: 8000
-      },
-      variables: {
-        competitors: ["amazon.com", "bestbuy.com", "walmart.com"],
-        our_catalog_db: "postgres://user:pass@host/db"
-      },
-      budget_control: {
-        max_cost_usd_per_run: 2.50,
-        monthly_budget_usd: 75.00,
-        action_on_budget_exceeded: "pause"
-      },
-      retry_policy: {
-        max_retries: 3,
-        retry_delay_minutes: 5,
-        exponential_backoff: true
-      },
-      webhooks: {
-        on_success: "https://api.yourbrand.com/webhooks/prices",
-        secret_token: "super_secret"
-      }
+      task: "Visit amazon.com, bestbuy.com and walmart.com, find current product prices for our catalog, and flag any of our SKUs that are no longer price-competitive."
     })
   });
-  
+
   const data = await response.json();
   console.log(data);
 };
 
-createScraperClaw();
+createScraperCron();
 ```
 
 ```go [Go]
@@ -333,36 +167,12 @@ import (
 )
 
 func main() {
-	url := "https://apis.fotohub.app/compute/v1/claws"
+	clawID := "clw_your_existing_claw_id" // create with POST /v1/claws first
+	url := "https://comp1.fotohub.app/v1/claws/" + clawID + "/crons"
 	payload := map[string]interface{}{
-		"name":        "Daily Price Scraper",
-		"description": "Scrapes competitors every midnight",
+		"description": "Daily Price Scraper — scrapes competitors every midnight",
 		"schedule":    "0 0 * * *",
-		"timezone":    "America/New_York",
-		"agent_config": map[string]interface{}{
-			"model":         "agent-v4-pro",
-			"system_prompt": "You are a price scraping bot. Visit competitor URLs, find product prices, and compare with our catalog.",
-			"temperature":   0.1,
-			"max_tokens":    8000,
-		},
-		"variables": map[string]interface{}{
-			"competitors":    []string{"amazon.com", "bestbuy.com", "walmart.com"},
-			"our_catalog_db": "postgres://user:pass@host/db",
-		},
-		"budget_control": map[string]interface{}{
-			"max_cost_usd_per_run":      2.50,
-			"monthly_budget_usd":        75.00,
-			"action_on_budget_exceeded": "pause",
-		},
-		"retry_policy": map[string]interface{}{
-			"max_retries":         3,
-			"retry_delay_minutes": 5,
-			"exponential_backoff": true,
-		},
-		"webhooks": map[string]interface{}{
-			"on_success":   "https://api.yourbrand.com/webhooks/prices",
-			"secret_token": "super_secret",
-		},
+		"task":        "Visit amazon.com, bestbuy.com and walmart.com, find current product prices for our catalog, and flag any of our SKUs that are no longer price-competitive.",
 	}
 
 	jsonValue, _ := json.Marshal(payload)
@@ -379,38 +189,13 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Daily Price Scraper",
-    "description": "Scrapes competitors every midnight",
+    "description": "Daily Price Scraper — scrapes competitors every midnight",
     "schedule": "0 0 * * *",
-    "timezone": "America/New_York",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "You are a price scraping bot. Visit competitor URLs, find product prices, and compare with our catalog.",
-        "temperature": 0.1,
-        "max_tokens": 8000
-    },
-    "variables": {
-        "competitors": ["amazon.com", "bestbuy.com", "walmart.com"],
-        "our_catalog_db": "postgres://user:pass@host/db"
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 2.50,
-        "monthly_budget_usd": 75.00,
-        "action_on_budget_exceeded": "pause"
-    },
-    "retry_policy": {
-        "max_retries": 3,
-        "retry_delay_minutes": 5,
-        "exponential_backoff": true
-    },
-    "webhooks": {
-        "on_success": "https://api.yourbrand.com/webhooks/prices",
-        "secret_token": "super_secret"
-    }
+    "task": "Visit amazon.com, bestbuy.com and walmart.com, find current product prices for our catalog, and flag any of our SKUs that are no longer price-competitive."
   }'
 ```
 
@@ -424,83 +209,37 @@ Automatically writes LinkedIn and Twitter posts summarizing the week's blog arti
 
 ```python [Python]
 import requests
-import json
 
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
 payload = {
-    "name": "Weekly Social Media Generator",
-    "description": "Generates tweets and LinkedIn posts every Friday at 4 PM",
+    "description": "Weekly Social Media Generator — posts every Friday at 4 PM",
     "schedule": "0 16 * * 5",
-    "timezone": "Europe/London",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "Read the company blog RSS feed and generate 5 engaging tweets and 2 professional LinkedIn posts.",
-        "temperature": 0.7,
-        "max_tokens": 4000
-    },
-    "variables": {
-        "rss_feed_url": "https://blog.yourbrand.com/rss.xml",
-        "brand_voice": "Professional but witty"
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 1.00,
-        "monthly_budget_usd": 10.00,
-        "action_on_budget_exceeded": "pause"
-    },
-    "retry_policy": {
-        "max_retries": 1,
-        "retry_delay_minutes": 10,
-        "exponential_backoff": False
-    },
-    "webhooks": {
-        "on_success": "https://hooks.slack.com/services/T000/B000/XXX",
-        "secret_token": "slack_secret"
-    }
+    "task": "Read the company blog RSS feed at https://blog.yourbrand.com/rss.xml and draft 5 engaging tweets and 2 professional LinkedIn posts in a professional but witty voice."
 }
 
-response = requests.post("https://apis.fotohub.app/compute/v1/claws", 
-                         json=payload, 
-                         headers={"Authorization": "Bearer fh_live_YOUR_API_KEY", "Content-Type": "application/json"})
+response = requests.post(
+    f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons",
+    json=payload,
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY", "Content-Type": "application/json"}
+)
 ```
 
 ```typescript [TypeScript]
 import fetch from 'node-fetch';
 
-const createSocialClaw = async () => {
-  await fetch('https://apis.fotohub.app/compute/v1/claws', {
+const clawId = "clw_your_existing_claw_id"; // create with POST /v1/claws first
+
+const createSocialCron = async () => {
+  await fetch(`https://comp1.fotohub.app/v1/claws/${clawId}/crons`, {
     method: 'POST',
     headers: {
       'Authorization': 'Bearer fh_live_YOUR_API_KEY',
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      name: "Weekly Social Media Generator",
-      description: "Generates tweets and LinkedIn posts every Friday at 4 PM",
+      description: "Weekly Social Media Generator — posts every Friday at 4 PM",
       schedule: "0 16 * * 5",
-      timezone: "Europe/London",
-      agent_config: {
-          model: "agent-v4-pro",
-          system_prompt: "Read the company blog RSS feed and generate 5 engaging tweets and 2 professional LinkedIn posts.",
-          temperature: 0.7,
-          max_tokens: 4000
-      },
-      variables: {
-          rss_feed_url: "https://blog.yourbrand.com/rss.xml",
-          brand_voice: "Professional but witty"
-      },
-      budget_control: {
-          max_cost_usd_per_run: 1.00,
-          monthly_budget_usd: 10.00,
-          action_on_budget_exceeded: "pause"
-      },
-      retry_policy: {
-          max_retries: 1,
-          retry_delay_minutes: 10,
-          exponential_backoff: false
-      },
-      webhooks: {
-          on_success: "https://hooks.slack.com/services/T000/B000/XXX",
-          secret_token: "slack_secret"
-      }
+      task: "Read the company blog RSS feed at https://blog.yourbrand.com/rss.xml and draft 5 engaging tweets and 2 professional LinkedIn posts in a professional but witty voice."
     })
   });
 };
@@ -516,38 +255,14 @@ import (
 )
 
 func main() {
+	clawID := "clw_your_existing_claw_id" // create with POST /v1/claws first
 	payload := map[string]interface{}{
-        "name": "Weekly Social Media Generator",
-        "description": "Generates tweets and LinkedIn posts every Friday at 4 PM",
-        "schedule": "0 16 * * 5",
-        "timezone": "Europe/London",
-        "agent_config": map[string]interface{}{
-            "model": "agent-v4-pro",
-            "system_prompt": "Read the company blog RSS feed and generate 5 engaging tweets and 2 professional LinkedIn posts.",
-            "temperature": 0.7,
-            "max_tokens": 4000,
-        },
-        "variables": map[string]interface{}{
-            "rss_feed_url": "https://blog.yourbrand.com/rss.xml",
-            "brand_voice": "Professional but witty",
-        },
-        "budget_control": map[string]interface{}{
-            "max_cost_usd_per_run": 1.00,
-            "monthly_budget_usd": 10.00,
-            "action_on_budget_exceeded": "pause",
-        },
-        "retry_policy": map[string]interface{}{
-            "max_retries": 1,
-            "retry_delay_minutes": 10,
-            "exponential_backoff": false,
-        },
-        "webhooks": map[string]interface{}{
-            "on_success": "https://hooks.slack.com/services/T000/B000/XXX",
-            "secret_token": "slack_secret",
-        },
+		"description": "Weekly Social Media Generator — posts every Friday at 4 PM",
+		"schedule":    "0 16 * * 5",
+		"task":        "Read the company blog RSS feed at https://blog.yourbrand.com/rss.xml and draft 5 engaging tweets and 2 professional LinkedIn posts in a professional but witty voice.",
 	}
 	jsonValue, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", "https://apis.fotohub.app/compute/v1/claws", bytes.NewBuffer(jsonValue))
+	req, _ := http.NewRequest("POST", "https://comp1.fotohub.app/v1/claws/"+clawID+"/crons", bytes.NewBuffer(jsonValue))
 	req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
@@ -556,38 +271,13 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-      "name": "Weekly Social Media Generator",
-      "description": "Generates tweets and LinkedIn posts every Friday at 4 PM",
+      "description": "Weekly Social Media Generator — posts every Friday at 4 PM",
       "schedule": "0 16 * * 5",
-      "timezone": "Europe/London",
-      "agent_config": {
-          "model": "agent-v4-pro",
-          "system_prompt": "Read the company blog RSS feed and generate 5 engaging tweets and 2 professional LinkedIn posts.",
-          "temperature": 0.7,
-          "max_tokens": 4000
-      },
-      "variables": {
-          "rss_feed_url": "https://blog.yourbrand.com/rss.xml",
-          "brand_voice": "Professional but witty"
-      },
-      "budget_control": {
-          "max_cost_usd_per_run": 1.00,
-          "monthly_budget_usd": 10.00,
-          "action_on_budget_exceeded": "pause"
-      },
-      "retry_policy": {
-          "max_retries": 1,
-          "retry_delay_minutes": 10,
-          "exponential_backoff": false
-      },
-      "webhooks": {
-          "on_success": "https://hooks.slack.com/services/T000/B000/XXX",
-          "secret_token": "slack_secret"
-      }
+      "task": "Read the company blog RSS feed at https://blog.yourbrand.com/rss.xml and draft 5 engaging tweets and 2 professional LinkedIn posts in a professional but witty voice."
   }'
 ```
 
@@ -601,23 +291,17 @@ Inspects API endpoints and database latency hourly, alerting the DevOps team if 
 
 ```python [Python]
 import requests
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
 payload = {
-    "name": "Hourly Health Audit",
+    "description": "Hourly Health Audit",
     "schedule": "0 * * * *",
-    "timezone": "UTC",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "Analyze the provided Datadog metrics and log patterns. Identify any anomalies.",
-        "temperature": 0.0,
-        "max_tokens": 2000
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 0.50,
-        "monthly_budget_usd": 300.00,
-        "action_on_budget_exceeded": "alert_only"
-    }
+    "task": "Analyze the provided Datadog metrics and log patterns. Identify any anomalies."
 }
-requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+requests.post(
+    f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons",
+    json=payload,
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
 ```
 
 ```typescript [TypeScript]
@@ -629,10 +313,10 @@ requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Hourly Health Audit", "schedule": "0 * * * *", "timezone": "UTC", "agent_config": {"model": "agent-v4-pro", "system_prompt": "Analyze metrics.", "temperature": 0.0}, "budget_control": {"max_cost_usd_per_run": 0.50, "monthly_budget_usd": 300.00, "action_on_budget_exceeded": "alert_only"}}'
+  -d '{"description": "Hourly Health Audit", "schedule": "0 * * * *", "task": "Analyze metrics."}'
 ```
 
 :::
@@ -645,22 +329,17 @@ Aggregates all Zendesk tickets from the previous day and produces a structured s
 
 ```python [Python]
 import requests
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
 payload = {
-    "name": "Zendesk Summarizer",
+    "description": "Zendesk Summarizer",
     "schedule": "30 2 * * *",
-    "timezone": "America/Los_Angeles",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "Summarize support tickets, categorize them by feature, and highlight major bugs.",
-        "temperature": 0.2
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 5.00,
-        "monthly_budget_usd": 150.00,
-        "action_on_budget_exceeded": "pause"
-    }
+    "task": "Summarize support tickets, categorize them by feature, and highlight major bugs."
 }
-requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+requests.post(
+    f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons",
+    json=payload,
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
 ```
 
 ```typescript [TypeScript]
@@ -672,10 +351,10 @@ requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Zendesk Summarizer", "schedule": "30 2 * * *", "timezone": "America/Los_Angeles", "agent_config": {"model": "agent-v4-pro", "system_prompt": "Summarize support tickets.", "temperature": 0.2}, "budget_control": {"max_cost_usd_per_run": 5.0, "monthly_budget_usd": 150.0, "action_on_budget_exceeded": "pause"}}'
+  -d '{"description": "Zendesk Summarizer", "schedule": "30 2 * * *", "task": "Summarize support tickets."}'
 ```
 
 :::
@@ -688,21 +367,17 @@ Every two weeks, the agent checks Google rankings for target keywords.
 
 ```python [Python]
 import requests
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
 payload = {
-    "name": "Bi-Weekly SERP Audit",
+    "description": "Bi-Weekly SERP Audit",
     "schedule": "0 9 * * 1,15",
-    "timezone": "UTC",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "Check SERP for our main keywords and track position changes."
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 8.00,
-        "monthly_budget_usd": 20.00,
-        "action_on_budget_exceeded": "pause"
-    }
+    "task": "Check SERP for our main keywords and track position changes."
 }
-requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+requests.post(
+    f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons",
+    json=payload,
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
 ```
 
 ```typescript [TypeScript]
@@ -714,10 +389,10 @@ requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Bi-Weekly SERP Audit", "schedule": "0 9 * * 1,15", "timezone": "UTC", "agent_config": {"model": "agent-v4-pro", "system_prompt": "Check SERP for our main keywords."}, "budget_control": {"max_cost_usd_per_run": 8.0, "monthly_budget_usd": 20.0, "action_on_budget_exceeded": "pause"}}'
+  -d '{"description": "Bi-Weekly SERP Audit", "schedule": "0 9 * * 1,15", "task": "Check SERP for our main keywords."}'
 ```
 
 :::
@@ -730,21 +405,17 @@ Reads raw expense receipts from S3 and generates a structured CSV for accounting
 
 ```python [Python]
 import requests
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
 payload = {
-    "name": "Expense Processor",
+    "description": "Expense Processor",
     "schedule": "0 0 1 * *",
-    "timezone": "UTC",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "Extract merchant, date, and amount from receipt images and output CSV."
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 10.00,
-        "monthly_budget_usd": 15.00,
-        "action_on_budget_exceeded": "pause"
-    }
+    "task": "Extract merchant, date, and amount from receipt images and output CSV."
 }
-requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+requests.post(
+    f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons",
+    json=payload,
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
 ```
 
 ```typescript [TypeScript]
@@ -756,10 +427,10 @@ requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Expense Processor", "schedule": "0 0 1 * *", "timezone": "UTC", "agent_config": {"model": "agent-v4-pro", "system_prompt": "Extract expenses"}, "budget_control": {"max_cost_usd_per_run": 10.0, "monthly_budget_usd": 15.0, "action_on_budget_exceeded": "pause"}}'
+  -d '{"description": "Expense Processor", "schedule": "0 0 1 * *", "task": "Extract expenses"}'
 ```
 
 :::
@@ -772,21 +443,17 @@ Compiles top industry news every Wednesday.
 
 ```python [Python]
 import requests
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
 payload = {
-    "name": "Newsletter Curator",
+    "description": "Newsletter Curator",
     "schedule": "0 10 * * 3",
-    "timezone": "Europe/London",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "Curate the top 5 AI news articles for our newsletter."
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 2.00,
-        "monthly_budget_usd": 10.00,
-        "action_on_budget_exceeded": "pause"
-    }
+    "task": "Curate the top 5 AI news articles for our newsletter."
 }
-requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+requests.post(
+    f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons",
+    json=payload,
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
 ```
 
 ```typescript [TypeScript]
@@ -798,10 +465,10 @@ requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Newsletter Curator", "schedule": "0 10 * * 3", "timezone": "Europe/London", "agent_config": {"model": "agent-v4-pro", "system_prompt": "Curate news."}, "budget_control": {"max_cost_usd_per_run": 2.0, "monthly_budget_usd": 10.0, "action_on_budget_exceeded": "pause"}}'
+  -d '{"description": "Newsletter Curator", "schedule": "0 10 * * 3", "task": "Curate news."}'
 ```
 
 :::
@@ -814,21 +481,17 @@ Tags, assigns, and prioritizes new GitHub issues.
 
 ```python [Python]
 import requests
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
 payload = {
-    "name": "GitHub Triage",
+    "description": "GitHub Triage",
     "schedule": "0 8 * * *",
-    "timezone": "America/Los_Angeles",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "Read open GitHub issues and apply appropriate labels."
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 1.50,
-        "monthly_budget_usd": 50.00,
-        "action_on_budget_exceeded": "alert_only"
-    }
+    "task": "Read open GitHub issues and apply appropriate labels."
 }
-requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+requests.post(
+    f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons",
+    json=payload,
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
 ```
 
 ```typescript [TypeScript]
@@ -840,10 +503,10 @@ requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "GitHub Triage", "schedule": "0 8 * * *", "timezone": "America/Los_Angeles", "agent_config": {"model": "agent-v4-pro", "system_prompt": "Label issues."}, "budget_control": {"max_cost_usd_per_run": 1.50, "monthly_budget_usd": 50.0, "action_on_budget_exceeded": "alert_only"}}'
+  -d '{"description": "GitHub Triage", "schedule": "0 8 * * *", "task": "Label issues."}'
 ```
 
 :::
@@ -856,21 +519,17 @@ Scans access logs for suspicious activity.
 
 ```python [Python]
 import requests
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
 payload = {
-    "name": "Security Log Scan",
+    "description": "Security Log Scan",
     "schedule": "0 * * * *",
-    "timezone": "UTC",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "Scan nginx logs for SQL injection attempts."
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 3.00,
-        "monthly_budget_usd": 250.00,
-        "action_on_budget_exceeded": "alert_only"
-    }
+    "task": "Scan nginx logs for SQL injection attempts."
 }
-requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+requests.post(
+    f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons",
+    json=payload,
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
 ```
 
 ```typescript [TypeScript]
@@ -882,10 +541,10 @@ requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Security Log Scan", "schedule": "0 * * * *", "timezone": "UTC", "agent_config": {"model": "agent-v4-pro", "system_prompt": "Scan logs."}, "budget_control": {"max_cost_usd_per_run": 3.00, "monthly_budget_usd": 250.0, "action_on_budget_exceeded": "alert_only"}}'
+  -d '{"description": "Security Log Scan", "schedule": "0 * * * *", "task": "Scan logs."}'
 ```
 
 :::
@@ -898,21 +557,17 @@ Every 3 months, finds and marks old user data for deletion.
 
 ```python [Python]
 import requests
+claw_id = "clw_your_existing_claw_id"  # create with POST /v1/claws first
 payload = {
-    "name": "Retention Cleanup",
+    "description": "Retention Cleanup",
     "schedule": "0 0 1 1,4,7,10 *",
-    "timezone": "UTC",
-    "agent_config": {
-        "model": "agent-v4-pro",
-        "system_prompt": "Identify records older than 3 years for deletion."
-    },
-    "budget_control": {
-        "max_cost_usd_per_run": 20.00,
-        "monthly_budget_usd": 30.00,
-        "action_on_budget_exceeded": "pause"
-    }
+    "task": "Identify records older than 3 years for deletion."
 }
-requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"})
+requests.post(
+    f"https://comp1.fotohub.app/v1/claws/{claw_id}/crons",
+    json=payload,
+    headers={"Authorization": "Bearer fh_live_YOUR_API_KEY"}
+)
 ```
 
 ```typescript [TypeScript]
@@ -924,10 +579,10 @@ requests.post("https://apis.fotohub.app/compute/v1/claws", json=payload, headers
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/compute/v1/claws \
+curl -X POST https://comp1.fotohub.app/v1/claws/$CLAW_ID/crons \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Retention Cleanup", "schedule": "0 0 1 1,4,7,10 *", "timezone": "UTC", "agent_config": {"model": "agent-v4-pro", "system_prompt": "Clean records."}, "budget_control": {"max_cost_usd_per_run": 20.00, "monthly_budget_usd": 30.0, "action_on_budget_exceeded": "pause"}}'
+  -d '{"description": "Retention Cleanup", "schedule": "0 0 1 1,4,7,10 *", "task": "Clean records."}'
 ```
 
 :::

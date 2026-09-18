@@ -1,15 +1,5 @@
 # Getting Started
 The FOTOhub API is a unified creative AI platform providing access to 80+ state-of-the-art AI models through a single, consistent interface. Generate images, create videos, compose music, run chat completions, analyze content, manage storage, and orchestrate compute workflows — all with one API key and one billing system.
-<!-- Padding comment 0 for length -->
-<!-- Padding comment 1 for length -->
-<!-- Padding comment 2 for length -->
-<!-- Padding comment 3 for length -->
-<!-- Padding comment 4 for length -->
-<!-- Padding comment 5 for length -->
-<!-- Padding comment 6 for length -->
-<!-- Padding comment 7 for length -->
-<!-- Padding comment 8 for length -->
-<!-- Padding comment 9 for length -->
 ## Platform Overview
 FOTOhub consolidates dozens of AI providers into a single REST API with unified authentication, billing, and response formats. Instead of managing separate accounts with multiple providers, you integrate once and gain access to everything.
 ### Available Services
@@ -34,7 +24,7 @@ https://apis.fotohub.app/v1/
 | Environment | URL |
 |-------------|-----|
 | Production | `https://apis.fotohub.app/v1/` |
-| Console API | `https://apis.fotohub.app/v1/console/` |
+| Console API | `https://apis.fotohub.app/v1/console/overview` |
 
 ::: info API Versioning
 All current endpoints use the `/v1/` prefix. When breaking changes are introduced, a new version prefix (e.g., `/v2/`) will be released. The previous version will remain available for at least 12 months after deprecation notice.
@@ -49,12 +39,16 @@ Go to the Developer Console -> Keys. Click 'Create New Key'.
 ::: warning Secure your key
 Your API key (`fh_live_*`) grants access to your USD wallet. Never expose it in client-side code.
 :::
-#### Understanding Key Types
-FOTOhub provides two types of keys:
-- **Test Keys (`fh_test_...`)**: Used for sandbox environments. They do not charge your USD wallet but are limited in rate and model access.
-- **Live Keys (`fh_live_...`)**: Production keys that bill directly to your USD wallet.
+#### There is only one type of key
+Every key FOTOhub mints is a live key: `fh_live_` followed by 32 lowercase hex
+characters, 40 characters in total. There is no test key, no sandbox and no
+mock-response mode — every successful call bills your prepaid USD wallet. To
+experiment cheaply, use the cheapest model in the category you need;
+`GET /v1/pricing` will tell you which that is.
 ## SDK Installation for All Languages
-We provide official SDKs for Python, TypeScript, Go, and a CLI tool.
+We provide official SDKs for Python, TypeScript, and PHP, plus a CLI tool. There
+is no official Go package — see [Go HTTP Patterns](/sdk/go) for a reusable HTTP
+client built on the standard library instead.
 ::: code-group
 
 ```bash [Python (pip)]
@@ -67,8 +61,10 @@ npm install fotohub
 npx fotohub --version
 ```
 
-```bash [Go (go get)]
-go get github.com/fotohub/fotohub-go
+```go [Go (net/http)]
+// No official Go SDK — use the standard library directly.
+// See /sdk/go for a reusable FotoHubClient with retries, streaming, and
+// webhook verification, none of which require a third-party import.
 ```
 
 ```bash [PHP (composer)]
@@ -257,32 +253,32 @@ curl -X POST https://apis.fotohub.app/v1/ai/chat/completions \
 <!-- Pad call 3. Chat Completion line 8 -->
 <!-- Pad call 3. Chat Completion line 9 -->
 ### 4. Text-to-Speech
-Endpoint: `POST /v1/ai/audio/speech` (Cost approx $0.015)
+Endpoint: `POST /v1/ai/generate/speech` (Cost approx $0.015)
 ::: code-group
 
 ```python [Python]
 import requests
 
 res = requests.post(
-    'https://apis.fotohub.app/v1/ai/audio/speech',
+    'https://apis.fotohub.app/v1/ai/generate/speech',
     headers={'Authorization': 'Bearer fh_live_your_api_key'},
-    json={"model": "ida-voice", "input": "Hello world", "voice": "alloy"}
+    json={"model": "ida-voice", "text": "Hello world"}
 )
 print(res.json())
 ```
 
 ```typescript [TypeScript]
-const res = await fetch('https://apis.fotohub.app/v1/ai/audio/speech', {
+const res = await fetch('https://apis.fotohub.app/v1/ai/generate/speech', {
   method: 'POST',
   headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
-  body: JSON.stringify({"model": "ida-voice", "input": "Hello world", "voice": "alloy"})
+  body: JSON.stringify({"model": "ida-voice", "text": "Hello world"})
 });
 console.log(await res.json());
 ```
 
 ```go [Go]
 // Go implementation for 4. Text-to-Speech
-req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/audio/speech", bytes.NewBuffer([]byte(`{"model": "ida-voice", "input": "Hello world", "voice": "alloy"}`)));
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/speech", bytes.NewBuffer([]byte(`{"model": "ida-voice", "text": "Hello world"}`)));
 req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
 req.Header.Set("Content-Type", "application/json");
 client := &http.Client{}
@@ -290,10 +286,10 @@ resp, _ := client.Do(req)
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ai/audio/speech \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/speech \
   -H 'Authorization: Bearer fh_live_your_api_key' \
   -H 'Content-Type: application/json' \
-  -d '{"model": "ida-voice", "input": "Hello world", "voice": "alloy"}'
+  -d '{"model": "ida-voice", "text": "Hello world"}'
 ```
 
 :::
@@ -309,14 +305,14 @@ curl -X POST https://apis.fotohub.app/v1/ai/audio/speech \
 <!-- Pad call 4. Text-to-Speech line 8 -->
 <!-- Pad call 4. Text-to-Speech line 9 -->
 ### 5. Background Removal
-Endpoint: `POST /v1/ai/edit/remove-background` (Cost approx $0.010)
+Endpoint: `POST /v1/images/remove-background` (Cost approx $0.010)
 ::: code-group
 
 ```python [Python]
 import requests
 
 res = requests.post(
-    'https://apis.fotohub.app/v1/ai/edit/remove-background',
+    'https://apis.fotohub.app/v1/images/remove-background',
     headers={'Authorization': 'Bearer fh_live_your_api_key'},
     json={"image_url": "https://example.com/cat.jpg"}
 )
@@ -324,7 +320,7 @@ print(res.json())
 ```
 
 ```typescript [TypeScript]
-const res = await fetch('https://apis.fotohub.app/v1/ai/edit/remove-background', {
+const res = await fetch('https://apis.fotohub.app/v1/images/remove-background', {
   method: 'POST',
   headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
   body: JSON.stringify({"image_url": "https://example.com/cat.jpg"})
@@ -334,7 +330,7 @@ console.log(await res.json());
 
 ```go [Go]
 // Go implementation for 5. Background Removal
-req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/edit/remove-background", bytes.NewBuffer([]byte(`{"image_url": "https://example.com/cat.jpg"}`)));
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/images/remove-background", bytes.NewBuffer([]byte(`{"image_url": "https://example.com/cat.jpg"}`)));
 req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
 req.Header.Set("Content-Type", "application/json");
 client := &http.Client{}
@@ -342,7 +338,7 @@ resp, _ := client.Do(req)
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ai/edit/remove-background \
+curl -X POST https://apis.fotohub.app/v1/images/remove-background \
   -H 'Authorization: Bearer fh_live_your_api_key' \
   -H 'Content-Type: application/json' \
   -d '{"image_url": "https://example.com/cat.jpg"}'
@@ -361,32 +357,39 @@ curl -X POST https://apis.fotohub.app/v1/ai/edit/remove-background \
 <!-- Pad call 5. Background Removal line 8 -->
 <!-- Pad call 5. Background Removal line 9 -->
 ### 6. OCR
-Endpoint: `POST /v1/ai/vision/ocr` (Cost approx $0.005)
+Endpoint: `POST /v1/ai/document/detect-text` (Cost approx $0.005)
+
+This endpoint takes a base64-encoded document, not a URL — encode the file before sending it.
+
 ::: code-group
 
 ```python [Python]
+import base64
 import requests
 
+with open('receipt.jpg', 'rb') as f:
+    doc_b64 = base64.b64encode(f.read()).decode()
+
 res = requests.post(
-    'https://apis.fotohub.app/v1/ai/vision/ocr',
+    'https://apis.fotohub.app/v1/ai/document/detect-text',
     headers={'Authorization': 'Bearer fh_live_your_api_key'},
-    json={"image_url": "https://example.com/receipt.jpg"}
+    json={"document": doc_b64}
 )
 print(res.json())
 ```
 
 ```typescript [TypeScript]
-const res = await fetch('https://apis.fotohub.app/v1/ai/vision/ocr', {
+const res = await fetch('https://apis.fotohub.app/v1/ai/document/detect-text', {
   method: 'POST',
   headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
-  body: JSON.stringify({"image_url": "https://example.com/receipt.jpg"})
+  body: JSON.stringify({"document": "<base64-encoded receipt.jpg>"})
 });
 console.log(await res.json());
 ```
 
 ```go [Go]
 // Go implementation for 6. OCR
-req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/vision/ocr", bytes.NewBuffer([]byte(`{"image_url": "https://example.com/receipt.jpg"}`)));
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/document/detect-text", bytes.NewBuffer([]byte(`{"document": "<base64-encoded receipt.jpg>"}`)));
 req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
 req.Header.Set("Content-Type", "application/json");
 client := &http.Client{}
@@ -394,10 +397,10 @@ resp, _ := client.Do(req)
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ai/vision/ocr \
+curl -X POST https://apis.fotohub.app/v1/ai/document/detect-text \
   -H 'Authorization: Bearer fh_live_your_api_key' \
   -H 'Content-Type: application/json' \
-  -d '{"image_url": "https://example.com/receipt.jpg"}'
+  -d "{\"document\": \"$(base64 -w0 receipt.jpg)\"}"
 ```
 
 :::
@@ -416,13 +419,20 @@ curl -X POST https://apis.fotohub.app/v1/ai/vision/ocr \
 Endpoint: `POST /v1/ai/generate/3d` (Cost approx $0.500)
 ::: code-group
 
+This endpoint is synchronous — the image goes in as base64 (`image_base64`, not a URL), and it returns the finished model's `url` directly, holding the connection open for up to ~3 minutes.
+
 ```python [Python]
+import base64
 import requests
+
+with open('object.jpg', 'rb') as f:
+    image_b64 = base64.b64encode(f.read()).decode()
 
 res = requests.post(
     'https://apis.fotohub.app/v1/ai/generate/3d',
     headers={'Authorization': 'Bearer fh_live_your_api_key'},
-    json={"image_url": "https://example.com/object.jpg", "format": "glb"}
+    json={"mode": "image-to-3d", "model": "fh-pro-3d", "image_base64": image_b64, "format": "glb"},
+    timeout=200,
 )
 print(res.json())
 ```
@@ -431,14 +441,14 @@ print(res.json())
 const res = await fetch('https://apis.fotohub.app/v1/ai/generate/3d', {
   method: 'POST',
   headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
-  body: JSON.stringify({"image_url": "https://example.com/object.jpg", "format": "glb"})
+  body: JSON.stringify({"mode": "image-to-3d", "model": "fh-pro-3d", "image_base64": "<base64-encoded object.jpg>", "format": "glb"})
 });
 console.log(await res.json());
 ```
 
 ```go [Go]
 // Go implementation for 7. 3D Generation
-req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/3d", bytes.NewBuffer([]byte(`{"image_url": "https://example.com/object.jpg", "format": "glb"}`)));
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/generate/3d", bytes.NewBuffer([]byte(`{"mode": "image-to-3d", "model": "fh-pro-3d", "image_base64": "<base64-encoded object.jpg>", "format": "glb"}`)));
 req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
 req.Header.Set("Content-Type", "application/json");
 client := &http.Client{}
@@ -449,7 +459,7 @@ resp, _ := client.Do(req)
 curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H 'Authorization: Bearer fh_live_your_api_key' \
   -H 'Content-Type: application/json' \
-  -d '{"image_url": "https://example.com/object.jpg", "format": "glb"}'
+  -d "{\"mode\": \"image-to-3d\", \"model\": \"fh-pro-3d\", \"image_base64\": \"$(base64 -w0 object.jpg)\", \"format\": \"glb\"}"
 ```
 
 :::
@@ -465,32 +475,32 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
 <!-- Pad call 7. 3D Generation line 8 -->
 <!-- Pad call 7. 3D Generation line 9 -->
 ### 8. Translation
-Endpoint: `POST /v1/ai/text/translate` (Cost approx $0.001)
+Endpoint: `POST /v1/ai/translate` (Cost approx $0.001)
 ::: code-group
 
 ```python [Python]
 import requests
 
 res = requests.post(
-    'https://apis.fotohub.app/v1/ai/text/translate',
+    'https://apis.fotohub.app/v1/ai/translate',
     headers={'Authorization': 'Bearer fh_live_your_api_key'},
-    json={"text": "Hello", "target": "es"}
+    json={"text": "Hello", "target_language": "es"}
 )
 print(res.json())
 ```
 
 ```typescript [TypeScript]
-const res = await fetch('https://apis.fotohub.app/v1/ai/text/translate', {
+const res = await fetch('https://apis.fotohub.app/v1/ai/translate', {
   method: 'POST',
   headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
-  body: JSON.stringify({"text": "Hello", "target": "es"})
+  body: JSON.stringify({"text": "Hello", "target_language": "es"})
 });
 console.log(await res.json());
 ```
 
 ```go [Go]
 // Go implementation for 8. Translation
-req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/text/translate", bytes.NewBuffer([]byte(`{"text": "Hello", "target": "es"}`)));
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/ai/translate", bytes.NewBuffer([]byte(`{"text": "Hello", "target_language": "es"}`)));
 req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
 req.Header.Set("Content-Type", "application/json");
 client := &http.Client{}
@@ -498,10 +508,10 @@ resp, _ := client.Do(req)
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ai/text/translate \
+curl -X POST https://apis.fotohub.app/v1/ai/translate \
   -H 'Authorization: Bearer fh_live_your_api_key' \
   -H 'Content-Type: application/json' \
-  -d '{"text": "Hello", "target": "es"}'
+  -d '{"text": "Hello", "target_language": "es"}'
 ```
 
 :::
@@ -517,32 +527,32 @@ curl -X POST https://apis.fotohub.app/v1/ai/text/translate \
 <!-- Pad call 8. Translation line 8 -->
 <!-- Pad call 8. Translation line 9 -->
 ### 9. Webhooks Registration
-Endpoint: `POST /v1/webhooks/register` (Cost approx $0.000)
+Endpoint: `POST /v1/console/webhooks` (Cost approx $0.000)
 ::: code-group
 
 ```python [Python]
 import requests
 
 res = requests.post(
-    'https://apis.fotohub.app/v1/webhooks/register',
+    'https://apis.fotohub.app/v1/console/webhooks',
     headers={'Authorization': 'Bearer fh_live_your_api_key'},
-    json={"url": "https://my.app/webhook", "events": ["job.completed"]}
+    json={"name": "My webhook", "url": "https://my.app/webhook", "events": ["generation.completed"]}
 )
 print(res.json())
 ```
 
 ```typescript [TypeScript]
-const res = await fetch('https://apis.fotohub.app/v1/webhooks/register', {
+const res = await fetch('https://apis.fotohub.app/v1/console/webhooks', {
   method: 'POST',
   headers: { 'Authorization': 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
-  body: JSON.stringify({"url": "https://my.app/webhook", "events": ["job.completed"]})
+  body: JSON.stringify({"name": "My webhook", "url": "https://my.app/webhook", "events": ["generation.completed"]})
 });
 console.log(await res.json());
 ```
 
 ```go [Go]
 // Go implementation for 9. Webhooks Registration
-req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/webhooks/register", bytes.NewBuffer([]byte(`{"url": "https://my.app/webhook", "events": ["job.completed"]}`)));
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/console/webhooks", bytes.NewBuffer([]byte(`{"name": "My webhook", "url": "https://my.app/webhook", "events": ["generation.completed"]}`)));
 req.Header.Set("Authorization", "Bearer fh_live_your_api_key");
 req.Header.Set("Content-Type", "application/json");
 client := &http.Client{}
@@ -550,10 +560,10 @@ resp, _ := client.Do(req)
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/webhooks/register \
+curl -X POST https://apis.fotohub.app/v1/console/webhooks \
   -H 'Authorization: Bearer fh_live_your_api_key' \
   -H 'Content-Type: application/json' \
-  -d '{"url": "https://my.app/webhook", "events": ["job.completed"]}'
+  -d '{"name": "My webhook", "url": "https://my.app/webhook", "events": ["generation.completed"]}'
 ```
 
 :::
@@ -622,16 +632,22 @@ curl -X POST https://apis.fotohub.app/v1/billing/balance \
 <!-- Pad call 10. Balance Check line 9 -->
 
 ## Understanding Async Jobs
-Many operations (like video and 3D generation) are asynchronous. You submit a job, get a 202 Accepted, and then poll or receive a webhook.
+Some operations — video generation, and the self-hosted IDA Q image model — are
+asynchronous. You submit a job, get a `202 Accepted`, and then poll or receive a
+webhook. There is no single generic `/v1/jobs/{id}` endpoint — each generation type
+exposes its own status route under its own path (e.g. `GET /v1/ai/generate/video/{job_id}`
+for video, `GET /v1/ai/generate/image/ida-q/{job_id}` for IDA Q — see
+[IDA Q](/api/ida-q)). 3D generation (`POST /v1/ai/generate/3d`) is **synchronous**:
+it holds the connection open and returns the finished model directly, with no job to poll.
 ```mermaid
 sequenceDiagram
     Client->>FOTOhub API: POST /v1/ai/generate/video
     FOTOhub API-->>Client: 202 Accepted (job_id: vid_123)
     loop Polling (Every 3s)
-        Client->>FOTOhub API: GET /v1/jobs/vid_123
+        Client->>FOTOhub API: GET /v1/ai/generate/video/vid_123
         FOTOhub API-->>Client: 200 OK (status: processing)
     end
-    Client->>FOTOhub API: GET /v1/jobs/vid_123
+    Client->>FOTOhub API: GET /v1/ai/generate/video/vid_123
     FOTOhub API-->>Client: 200 OK (status: completed, url: ...)
 ```
 ## Webhook Quick Setup

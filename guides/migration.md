@@ -185,6 +185,6 @@ request shape.
 - [ ] Generate an API key in Console → Keys
 - [ ] Install SDK: `pip install fotohub` or `npm install fotohub`
 - [ ] Replace provider-specific API calls with FOTOhub equivalents
-- [ ] Set up webhooks for async operations (video, 3D)
+- [ ] Set up webhooks for the async operations — video and try-on. Image, 3D, chat, speech and music all return their result on the same request.
 - [ ] Configure spending limits in Console → Billing
-- [ ] Test with sandbox key (`fh_test_...`) before going live
+- [ ] Rehearse on the cheapest model in each category — there is no sandbox or mock mode, every call spends real wallet balance

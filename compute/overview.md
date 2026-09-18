@@ -2,13 +2,13 @@
 
 High-performance GPU instances, elastic CPU clusters, and sub-second Firecracker microVM sandboxes engineered for AI model inference, agent execution, and large-scale data processing.
 
-FOTOhub Compute bridges direct AWS EC2 cloud infrastructure managed by the **Compute Engine** (`server/compute-engine/` on port 8801) with lightweight multi-tenant virtualization managed by the **Agent Compute Engine** (`server/agent-compute/` on port 8795).
+FOTOhub Compute bridges direct AWS EC2 cloud infrastructure managed by the **Compute Engine** with lightweight multi-tenant virtualization managed by the **Agent Compute Engine**.
 
 ---
 
 ## 1. Introduction: What is FOTOhub Compute and Who is it For?
 
-FOTOhub Compute is a comprehensive, API-first infrastructure platform designed specifically for modern AI builders, data scientists, and backend engineers. It provides a seamless, programmatically-driven experience for provisioning and managing computational resources, ranging from lightweight CPU microVMs to massive multi-GPU training clusters. 
+FOTOhub Compute is a comprehensive, API-first infrastructure platform designed specifically for modern AI builders, data scientists, and backend engineers. It provides a seamless, programmatically-driven experience for provisioning and managing computational resources, ranging from lightweight Firecracker microVM sandboxes to single-GPU instances (one A10G or T4 per instance) that you scale horizontally behind a load balancer when one GPU isn't enough.
 
 ### 1.1 The FOTOhub Compute Philosophy
 
@@ -57,8 +57,8 @@ flowchart TD
 
     subgraph Compute Control Plane ["FOTOhub Control Plane (Orchestration & Billing)"]
         direction TB
-        D["Compute Engine API (Port 8801) - EC2 Management"]
-        E["Agent Compute Orchestrator (Port 8795) - microVMs"]
+        D["Compute Engine API - EC2 Management"]
+        E["Agent Compute Orchestrator - microVMs"]
         F["Prepaid USD Wallet Billing Engine (Real-time)"]
         DNS["Route53 DNS Manager & Domain Engine"]
         SEC["Security, IAM & Firewall Policy Manager"]
@@ -112,10 +112,10 @@ flowchart TD
 ```
 
 ### 2.1 The Compute Engine (EC2 Abstraction)
-Operating on Port 8801, the Compute Engine handles the heavy lifting of EC2 provisioning. It interfaces directly with AWS APIs to launch instances, attach EBS volumes, allocate Elastic IPs, and configure Route53 DNS records.
+The Compute Engine handles the heavy lifting of EC2 provisioning. It interfaces directly with AWS APIs to launch instances, attach EBS volumes, allocate Elastic IPs, and configure Route53 DNS records.
 
 ### 2.2 The Agent Compute Orchestrator (MicroVMs)
-Operating on Port 8795, this orchestrator manages our pool of Firecracker microVMs. It maintains warm pools of stripped-down Linux kernels to guarantee sub-200ms cold starts for ephemeral task execution, making it perfect for rapid AI agent tool calls.
+This orchestrator manages our pool of Firecracker microVMs. It maintains warm pools of stripped-down Linux kernels to guarantee sub-200ms cold starts for ephemeral task execution, making it perfect for rapid AI agent tool calls.
 
 ---
 ## 3. Comprehensive Hardware Specifications & 22-Instance Catalog
@@ -128,23 +128,19 @@ Spot prices fluctuate based on real-time AWS market demand. FOTOhub passes spot 
 
 ### 3.1 GPU Accelerated Instances (NVIDIA)
 
-Optimized for generative AI, PyTorch model training, vLLM inference, ComfyUI pipelines, 3D rendering, and massively parallel workloads.
+Optimized for generative AI inference, PyTorch/LoRA fine-tuning, vLLM inference, ComfyUI pipelines, and 3D rendering. **There are exactly 5 GPU SKUs, and every one carries a single GPU** — `g4dn.2xlarge` is the same one T4 as `g4dn.xlarge` with more vCPU/RAM, and the three `g5` sizes likewise differ only in CPU/RAM around one A10G. There is no multi-GPU instance; a model that doesn't fit in 24 GB needs to be quantized, not sharded.
 
 | Catalog ID | GPU Model | GPUs | VRAM | vCPU | RAM | Bandwidth | On-Demand ($/hr) | Spot ($/hr)* | Best Use Case / Savings |
 |:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|
-| `g4dn.xlarge` | NVIDIA T4 | 1 | 16 GB | 4 | 16 GB | Up to 25 Gbps | **$0.53** | **$0.20** | Lightweight Inference, SD1.5, Audio Processing (62% savings) |
-| `g4dn.2xlarge` | NVIDIA T4 | 1 | 16 GB | 8 | 32 GB | Up to 25 Gbps | **$0.75** | **$0.27** | Mid-tier Inference, Data Prep, Whisper Speech-to-Text (64% savings) |
-| `g4dn.4xlarge` | NVIDIA T4 | 1 | 16 GB | 16 | 64 GB | Up to 25 Gbps | **$1.20** | **$0.48** | Heavy CPU Pre-processing + GPU Inference (60% savings) |
-| `g4dn.8xlarge` | NVIDIA T4 | 1 | 16 GB | 32 | 128 GB | 50 Gbps | **$2.18** | **$0.85** | Massive Data Pipelines with GPU acceleration (61% savings) |
-| `g4dn.12xlarge`| NVIDIA T4 | 4 | 64 GB | 48 | 192 GB | 50 Gbps | **$3.91** | **$1.52** | Multi-GPU Distributed Inference (vLLM) (61% savings) |
-| `g4dn.16xlarge`| NVIDIA T4 | 1 | 16 GB | 64 | 256 GB | 50 Gbps | **$4.35** | **$1.70** | Extreme CPU + Light GPU workloads (60% savings) |
-| `g5.xlarge` | NVIDIA A10G | 1 | 24 GB | 4 | 16 GB | Up to 25 Gbps | **$1.01** | **$0.38** | **SDXL, ComfyUI, 7B-14B LLM Inference (62% savings)** |
-| `g5.2xlarge` | NVIDIA A10G | 1 | 24 GB | 8 | 32 GB | Up to 25 Gbps | **$1.20** | **$0.45** | LoRA Training, 14B LLM Fine-tuning (63% savings) |
-| `g5.4xlarge` | NVIDIA A10G | 1 | 24 GB | 16 | 64 GB | Up to 25 Gbps | **$1.61** | **$0.60** | 3D Rendering, Heavy Video Transcoding (63% savings) |
-| `g5.8xlarge` | NVIDIA A10G | 1 | 24 GB | 32 | 128 GB | Up to 25 Gbps | **$2.28** | **$0.85** | Massive Batch Inference, Data Augmentation (62% savings) |
-| `g5.12xlarge` | NVIDIA A10G | 4 | 96 GB | 48 | 192 GB | 50 Gbps | **$5.67** | **$2.15** | Multi-GPU LLM Training (30B+ params) (62% savings) |
-| `g5.24xlarge` | NVIDIA A10G | 4 | 96 GB | 96 | 384 GB | 100 Gbps | **$8.14** | **$3.10** | High-Throughput Enterprise Inference (61% savings) |
-| `g5.48xlarge` | NVIDIA A10G | 8 | 192 GB | 192| 768 GB | 100 Gbps | **$16.29**| **$6.20** | Foundation Model Training (61% savings) |
+| `g4dn.xlarge` | NVIDIA T4 | 1 | 16 GB | 4 | 16 GB | Up to 25 Gbps | **$0.5284** | **$0.1975** | Lightweight Inference, SD1.5, Audio Processing (63% savings) |
+| `g4dn.2xlarge` | NVIDIA T4 | 1 | 16 GB | 8 | 32 GB | Up to 25 Gbps | **$0.7531** | **$0.2716** | Mid-tier Inference, Data Prep, Whisper Speech-to-Text (64% savings) |
+| `g5.xlarge` | NVIDIA A10G | 1 | 24 GB | 4 | 16 GB | Up to 25 Gbps | **$1.0123** | **$0.3827** | **SDXL, ComfyUI, 7B-14B LLM Inference (62% savings)** |
+| `g5.2xlarge` | NVIDIA A10G | 1 | 24 GB | 8 | 32 GB | Up to 25 Gbps | **$1.2025** | **$0.4494** | LoRA Training, 14B LLM Fine-tuning (quantized) (63% savings) |
+| `g5.4xlarge` | NVIDIA A10G | 1 | 24 GB | 16 | 64 GB | Up to 25 Gbps | **$1.6123** | **$0.6025** | 3D Rendering, Heavy Video Transcoding (63% savings) |
+
+Need more throughput than one GPU can give you? Scale **horizontally** — run several of these
+behind a [Load Balancer](/compute/load-balancing-autoscaling) — rather than looking for a bigger
+single instance, since none exists.
 
 ### 3.2 General Purpose CPU Instances (T3 & M5 Families)
 
@@ -152,16 +148,16 @@ Ideal for backend services, web servers, microservices, development environments
 
 | Catalog ID | Family Focus | vCPU | RAM | Bandwidth | On-Demand ($/hr) | Spot ($/hr) | Best Use Case |
 |:---|:---|:---|:---|:---|:---|:---|:---|
-| `t3.micro` | Burstable | 2 | 1 GB | Up to 5 Gbps | $0.010 | $0.003 | Bastion Hosts, Cron Job Runners |
-| `t3.small` | Burstable | 2 | 2 GB | Up to 5 Gbps | $0.021 | $0.006 | Light Web Servers, API Gateways |
-| `t3.medium`| Burstable | 2 | 4 GB | Up to 5 Gbps | $0.042 | $0.013 | Dev Environments, Discord Bots |
-| `t3.large` | Burstable | 2 | 8 GB | Up to 5 Gbps | $0.084 | $0.025 | CI/CD Runners, Testing Servers |
-| `t3.xlarge` | Burstable | 4 | 16 GB | Up to 5 Gbps | $0.168 | $0.050 | Mid-size CI/CD, General purpose workers |
-| `t3.2xlarge`| Burstable | 8 | 32 GB | Up to 5 Gbps | $0.336 | $0.114 | Large compile jobs, heavy build servers |
-| `m5.large` | Consistent | 2 | 8 GB | Up to 10 Gbps | $0.096 | $0.037 | Production Microservices, Small web nodes |
-| `m5.xlarge` | Consistent | 4 | 16 GB | Up to 10 Gbps | $0.192 | $0.075 | Small Databases, Message Queues (RabbitMQ) |
-| `m5.2xlarge`| Consistent | 8 | 32 GB | Up to 10 Gbps | $0.384 | $0.150 | High-Traffic Web Applications, Kafka nodes |
-| `m5.4xlarge`| Consistent | 16 | 64 GB | Up to 10 Gbps | $0.768 | $0.300 | Distributed Data Processing, Cache clusters |
+| `t3.micro` | Burstable | 2 | 1 GB | Up to 5 Gbps | $0.0099 | $0.0025 | Bastion Hosts, Cron Job Runners |
+| `t3.small` | Burstable | 2 | 2 GB | Up to 5 Gbps | $0.0198 | $0.0074 | Light Web Servers, API Gateways |
+| `t3.medium`| Burstable | 2 | 4 GB | Up to 5 Gbps | $0.0420 | $0.0148 | Dev Environments, Discord Bots |
+| `t3.large` | Burstable | 2 | 8 GB | Up to 5 Gbps | $0.0840 | $0.0296 | CI/CD Runners, Testing Servers |
+| `t3.xlarge` | Burstable | 4 | 16 GB | Up to 5 Gbps | $0.1679 | $0.0568 | Mid-size CI/CD, General purpose workers |
+| `t3.2xlarge`| Burstable | 8 | 32 GB | Up to 5 Gbps | $0.3358 | $0.1136 | Large compile jobs, heavy build servers |
+| `m5.large` | Consistent | 2 | 8 GB | Up to 10 Gbps | $0.0963 | $0.0370 | Production Microservices, Small web nodes |
+| `m5.xlarge` | Consistent | 4 | 16 GB | Up to 10 Gbps | $0.1926 | $0.0741 | Small Databases, Message Queues (RabbitMQ) |
+| `m5.2xlarge`| Consistent | 8 | 32 GB | Up to 10 Gbps | $0.3852 | $0.1432 | High-Traffic Web Applications, Kafka nodes |
+| `m5.4xlarge`| Consistent | 16 | 64 GB | Up to 10 Gbps | $0.7704 | $0.2840 | Distributed Data Processing, Cache clusters |
 
 ### 3.3 Compute & Memory Optimized Instances (C5 & R5 Families)
 
@@ -169,14 +165,13 @@ Designed for specialized workloads requiring high CPU throughput (C5) or massive
 
 | Catalog ID | Family Focus | vCPU | RAM | Bandwidth | On-Demand ($/hr) | Spot ($/hr) | Best Use Case |
 |:---|:---|:---|:---|:---|:---|:---|:---|
-| `c5.large` | Compute | 2 | 4 GB | Up to 10 Gbps | $0.085 | $0.032 | Batch Processing, Log Parsing, Web Scrapers |
-| `c5.xlarge` | Compute | 4 | 8 GB | Up to 10 Gbps | $0.170 | $0.064 | Video Encoding (FFmpeg), CPU Inference |
-| `c5.2xlarge` | Compute | 8 | 16 GB | Up to 10 Gbps | $0.340 | $0.128 | High-Performance Web Servers, Load Balancers |
-| `c5.4xlarge` | Compute | 16 | 32 GB | Up to 10 Gbps | $0.680 | $0.256 | Scientific Modeling, Massive Compiling |
-| `r5.large` | Memory | 2 | 16 GB | Up to 10 Gbps | $0.126 | $0.047 | Redis/Memcached Clusters, Light databases |
-| `r5.xlarge` | Memory | 4 | 32 GB | Up to 10 Gbps | $0.252 | $0.095 | In-Memory Databases, Search Indices |
-| `r5.2xlarge` | Memory | 8 | 64 GB | Up to 10 Gbps | $0.504 | $0.190 | Vector Databases (Pinecone/Milvus hosting) |
-| `r5.4xlarge` | Memory | 16 | 128 GB| Up to 10 Gbps | $1.008 | $0.380 | Real-Time Big Data Analytics, Spark Clusters |
+| `c5.large` | Compute | 2 | 4 GB | Up to 10 Gbps | $0.0864 | $0.0321 | Batch Processing, Log Parsing, Web Scrapers |
+| `c5.xlarge` | Compute | 4 | 8 GB | Up to 10 Gbps | $0.1704 | $0.0642 | Video Encoding (FFmpeg), CPU Inference |
+| `c5.2xlarge` | Compute | 8 | 16 GB | Up to 10 Gbps | $0.3407 | $0.1284 | High-Performance Web Servers, Load Balancers |
+| `c5.4xlarge` | Compute | 16 | 32 GB | Up to 10 Gbps | $0.6815 | $0.2543 | Scientific Modeling, Massive Compiling |
+| `r5.large` | Memory | 2 | 16 GB | Up to 10 Gbps | $0.1259 | $0.0469 | Redis/Memcached Clusters, Light databases |
+| `r5.xlarge` | Memory | 4 | 32 GB | Up to 10 Gbps | $0.2519 | $0.0938 | In-Memory Databases, Search Indices |
+| `r5.2xlarge` | Memory | 8 | 64 GB | Up to 10 Gbps | $0.5037 | $0.1901 | Vector Databases (Pinecone/Milvus hosting) |
 
 ---
 ## 4. Querying the Live Catalog API
@@ -190,72 +185,77 @@ Authorization: Bearer fh_live_YOUR_API_KEY
 
 ### Response Example
 
+Real, trimmed response for one catalog entry (the full response includes 22 of these, and more
+fields than shown here — `boot_image`, `disk_options`, `available_os_images`, `min_tier`, etc.):
+
 ```json
 {
   "catalog": [
     {
-      "id": "g5.xlarge",
-      "family": "g5",
-      "gpu": {
-        "model": "NVIDIA A10G",
-        "count": 1,
-        "vram_gb": 24,
-        "cuda_cores": 9216,
-        "tensor_cores": 288
-      },
-      "cpu": {
-        "cores": 4,
-        "arch": "x86_64",
-        "model": "AMD EPYC 7R32"
-      },
-      "memory_gb": 16,
-      "network_bandwidth_gbps": 25,
-      "pricing": {
-        "currency": "USD",
-        "on_demand_hourly": 1.012,
-        "spot_hourly": 0.383,
-        "spot_savings_percent": 62.1
-      },
-      "available_zones": ["eu-central-1a", "eu-central-1b"]
+      "id": "755b1e20-ed74-492b-88c3-a84b7a3fa24f",
+      "name": "g5.xlarge (A10G)",
+      "instance_type": "g5.xlarge",
+      "instance_family": "gpu",
+      "machine_category": "gpu",
+      "vram": "24 GB GDDR6X",
+      "cpu_count": 4,
+      "ram_gb": 16,
+      "network_bandwidth": "Up to 25 Gbps",
+      "base_region": "eu-central-1",
+      "hourly_rate_usd": 1.0123,
+      "spot_price_usd": 0.3827,
+      "currency": "USD",
+      "availability": "available"
     }
   ]
 }
 ```
 
+::: info Compute is not in the SDKs
+The `fotohub` Python and TypeScript packages cover generation, storage and
+billing — they have **no Compute namespace and no generic `get()`/`post()`**.
+Call `/compute/v1/*` with an ordinary HTTP client, as below.
+:::
+
 ::: code-group
 
 ```python [Python]
-from fotohub import FotoHub
+import os, requests
 
-client = FotoHub()
-catalog = client.get("/compute/v1/catalog")
+BASE = "https://apis.fotohub.app"
+HEADERS = {"Authorization": f"Bearer {os.environ['FOTOHUB_API_KEY']}"}
+
+catalog = requests.get(f"{BASE}/compute/v1/catalog", headers=HEADERS, timeout=30).json()
 
 print("Available GPU Instances:")
 for item in catalog["catalog"]:
-    if item.get("gpu"):
-        print(f"[{item['id']}] {item['gpu']['model']} ({item['gpu']['vram_gb']}GB VRAM)")
-        print(f"  Spot Rate: ${item['pricing']['spot_hourly']}/hr")
-        print(f"  Savings vs On-Demand: {item['pricing']['spot_savings_percent']}%\n")
+    if item.get("machine_category") == "gpu":
+        print(f"[{item['instance_type']}] {item['name']} ({item['vram']})")
+        print(f"  Spot Rate: ${item['spot_price_usd']}/hr")
+        savings = 100 * (1 - item['spot_price_usd'] / item['hourly_rate_usd'])
+        print(f"  Savings vs On-Demand: {savings:.1f}%\n")
 ```
 
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
+const BASE = "https://apis.fotohub.app";
+const HEADERS = { Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}` };
 
-const client = new FotoHub();
-const { data } = await client.get("/compute/v1/catalog");
+const data = await fetch(`${BASE}/compute/v1/catalog`, { headers: HEADERS })
+  .then((r) => r.json());
 
 console.log("Available GPU Instances:");
 data.catalog.forEach((item: any) => {
-  if (item.gpu) {
-    console.log(`[${item.id}] ${item.gpu.model} (${item.gpu.vram_gb}GB VRAM)`);
-    console.log(`  Spot Rate: $${item.pricing.spot_hourly}/hr`);
-    console.log(`  Savings vs On-Demand: ${item.pricing.spot_savings_percent}%\n`);
+  if (item.machine_category === "gpu") {
+    console.log(`[${item.instance_type}] ${item.name} (${item.vram})`);
+    console.log(`  Spot Rate: $${item.spot_price_usd}/hr`);
+    const savings = 100 * (1 - item.spot_price_usd / item.hourly_rate_usd);
+    console.log(`  Savings vs On-Demand: ${savings.toFixed(1)}%\n`);
   }
 });
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/compute/v1/catalog   -H "Authorization: Bearer $FOTOHUB_API_KEY"   | jq '.catalog[] | select(.gpu != null) | {id, model: .gpu.model, spot: .pricing.spot_hourly}'
+curl -X GET https://apis.fotohub.app/compute/v1/catalog   -H "Authorization: Bearer $FOTOHUB_API_KEY"   | jq '.catalog[] | select(.machine_category == "gpu") | {instance_type, name, spot: .spot_price_usd}'
 ```
 
 :::
@@ -681,8 +681,11 @@ Authorization: Bearer fh_live_YOUR_API_KEY
 ## 11. Common Use Cases and Reference Patterns
 
 ### 11.1 Large Language Model (LLM) Inference (vLLM / TGI)
-Deploy models like Llama-3 (8B or 70B), Mistral, Qwen, or deepseek.
-- **Hardware Profile:** `g5.xlarge` (A10G) for 7B-14B models. `g5.12xlarge` (4x A10G) or `g4dn.12xlarge` (4x T4) for larger models or higher concurrency throughput.
+Deploy models like Llama-3 8B, Mistral, or Qwen that fit in 24 GB.
+- **Hardware Profile:** `g5.xlarge` (A10G) for 7B-14B models, quantized as needed. For higher
+  concurrency throughput, run several `g5.xlarge` instances behind a
+  [Load Balancer](/compute/load-balancing-autoscaling) rather than a bigger instance — there is
+  no multi-GPU tier, so a 70B-class model is not a fit for this platform.
 - **Architectural Pattern:** 
   1. Boot instance via API.
   2. Attach a persistent EBS volume containing pre-downloaded weights mounted at `/data/models`.
@@ -745,8 +748,11 @@ Currently, FOTOhub Compute offers On-Demand and Spot pricing. Long-term reservat
 ### 8. What operating systems are supported?
 We currently support highly optimized AMIs based on Ubuntu 22.04 LTS, Ubuntu 20.04 LTS, and Amazon Linux 2023. These AMIs come pre-installed with the necessary NVIDIA drivers and CUDA toolkits. Custom AMIs and Windows Server are not supported at this time.
 
-### 9. Why can't I provision a `g5.48xlarge`?
-Very large instance types have strict account-level limits to protect against accidental spending and capacity hoarding. If you require massive multi-GPU instances, please submit a quota increase request through the Console UI providing details of your workload.
+### 9. Do you offer multi-GPU instances (e.g. `g5.12xlarge`, `g5.48xlarge`)?
+No. The catalog has exactly 5 GPU SKUs and every one is single-GPU (one A10G or one T4). If your
+model doesn't fit in 24 GB, quantize it; if you need more aggregate throughput, run several
+single-GPU instances behind a [Load Balancer](/compute/load-balancing-autoscaling) instead of
+looking for a bigger box.
 
 ### 10. How is network egress billed?
 Data transferred out of FOTOhub to the public internet costs $0.09/GB. Data transferred internally to other FOTOhub instances or directly to FOTOhub S3 (`s1.fotohub.app`) within the Frankfurt region is entirely free ($0.00/GB).
@@ -817,5 +823,9 @@ FOTOhub Compute operates out of the **AWS eu-central-1 (Frankfurt)** region. Thi
 
 By default, all data written to attached EBS volumes or FOTOhub S3 remains physically within the Frankfurt region. We do not replicate your data across regions without your explicit API request. 
 
-For enterprise customers requiring BAA (Business Associate Agreements) for HIPAA compliance, or specific SOC2 Type II reporting, please contact our enterprise sales team. Note that standard self-serve accounts do not include customized compliance reporting.
+FOTOhub does not hold a SOC 2 attestation and does not sign BAAs for HIPAA today, so if your
+compliance programme requires either, this is not yet the right platform for that workload.
+What we can evidence is the concrete part: the region data is processed in, the append-only
+audit trail, and per-key scoping. Talk to us about those rather than about a certificate we
+do not have.
 

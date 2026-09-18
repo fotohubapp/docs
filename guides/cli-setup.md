@@ -1,6 +1,6 @@
 # Guide: CLI Setup & Usage
 
-Install and use the FOTOhub CLI to generate AI content, chat with LLMs, manage storage, and automate workflows — all from your terminal.
+Install and use the FOTOhub CLI to generate and edit images, post-produce video, run Shorts/Story/UGC pipelines, chat with LLMs, manage storage and webhooks, and check live USD pricing before you spend — all from your terminal.
 
 ## Installation
 
@@ -23,7 +23,67 @@ fotohub --version
 pip install fotohub
 ```
 
-Requires **Python 3.9+**. Provides programmatic access to all CLI operations via the `FotoHub` class. See [SDK Setup](/guides/sdk-setup) for details.
+Requires **Python 3.9+**. Provides programmatic access to the same operations via the `FotoHub` class. See [SDK Setup](/guides/sdk-setup) for details.
+
+---
+
+## What it costs
+
+The API bills a **prepaid USD wallet**, not credits — every operation has a price you can look up before you spend anything.
+
+```bash
+fotohub pricing                         # every priced model, grouped (267 as of writing)
+fotohub pricing --category image        # image | video | audio | chat | 3d | tools | other
+fotohub pricing --search seedream       # substring match on the model id
+fotohub pricing gpt-image-2.5-flare     # every leg, resolution tier, and note for one model
+```
+
+`fotohub pricing` reads the public `GET /v1/pricing` endpoint — the same table the wallet is charged against — and needs **no API key**.
+
+Every `gen` command — `image`, `video`, `3d`, `music`, and `speech` — takes `--estimate`, which quotes the price and exits without generating or charging anything:
+
+```bash
+fotohub gen image "x" -m gpt-image-1 --size 4K -n 2 --estimate
+```
+```
+Estimated cost · nothing has been generated or charged
+
+  Model: gpt-image-1
+  output: $0.167 per image → $0.334 (4K tier)
+
+  Total: $0.334
+```
+
+`gen 3d --estimate` prices a request-priced leg (no duration or size to plug in), keyed as `3d_<model>`:
+
+```bash
+fotohub gen 3d --estimate                    # fh-lite-3d → $0.160772 per request
+fotohub gen 3d --mode text-to-3d --model fh-text-3d --estimate   # $0.267953 per request
+```
+
+`gen speech --estimate` prices per 1000 characters, using the actual length of the text (or `--file`) you pass:
+
+```bash
+fotohub gen speech "Welcome to FOTOhub, the AI creative platform." --estimate
+#   output: $0.015 per 1K characters → $0.000675 (google)
+```
+
+Only three speech engines have a published price row — `google` (`tts-google`), `elevenlabs` (`tts-elevenlabs`), and `grok` (`grok-tts`). For the others (`mars-pro`, `mars-flash`, `chatterbox-tts`, `ida-voice`, `ida-voice-pro`) the command deliberately refuses to guess:
+
+```
+Error: No published price for the 'mars-pro' engine — it has no row in /v1/pricing.
+Engines with a published rate: google, elevenlabs, grok.
+```
+
+That refusal is intentional — not a bug — since those engines currently have no priced leg to quote from.
+
+After a real, billable call, the command prints what it just cost and what is left in the wallet:
+
+```
+  $0.0315 · wallet $6.76 left · 1K tier
+```
+
+Prices under a dollar are shown to several significant digits on purpose — a Seedream image costs $0.0315, and rounding that to "$0.03" understates the bill by 10%.
 
 ---
 
@@ -67,12 +127,13 @@ The CLI resolves credentials in this order:
 
 ```bash
 fotohub auth whoami
-# FOTOhub Account
-# Email:    you@example.com
-# Plan:     Developer
-# Credits:  420 remaining
-# Wallet:   $15.00 USD
-# Key:      fh_live_abcd...xyz9
+```
+```
+FOTOhub Account
+Email:    you@example.com
+Plan:     Developer
+Wallet:   $6.76
+Key:      fh_live_abcd...xyz9
 ```
 
 ### Logout
@@ -80,6 +141,18 @@ fotohub auth whoami
 ```bash
 fotohub auth logout
 ```
+
+### API Key Management
+
+```bash
+fotohub auth keys list
+fotohub auth keys create --name "Production Server Key" [--scopes images,storage] [--expires-in-days 90] [--rate-limit 120]
+fotohub auth keys update <key-id> [--name ...] [--description ...] [--scopes ...] [--rate-limit <n>]
+fotohub auth keys rotate <key-id>          # issues a new secret, revokes the old one
+fotohub auth keys delete <key-id> --yes    # -y is required for non-interactive use
+```
+
+Available scopes: `images`, `video`, `chat`, `audio`, `storage`, `compute`, `billing`, `keys`. Rate limit is capped at 600 requests/minute.
 
 ---
 
@@ -91,13 +164,13 @@ Running `fotohub` with no arguments (in a terminal, without `--json`) launches t
 fotohub
 ```
 
-Type your request in natural language and the agent decides which tools to run — e.g. *"generate a watercolor cat and tell me my credit balance"* will call `generate_image` and `billing_balance`, showing each tool call inline as it runs.
+Type your request in natural language and the agent decides which tools to run — e.g. *"generate a watercolor cat and tell me my wallet balance"* will call `generate_image` and `billing_balance`, showing each tool call inline as it runs.
 
 Anything that is not a slash command is sent to the model as a message.
 
 ### Approval before spending
 
-Image, video, music, speech and 3D generation cost credits, so the agent asks before running them:
+Image, video, music, speech and 3D generation spend the wallet, so the agent asks before running them:
 
 ```
 Approve paid action?
@@ -155,22 +228,21 @@ Type `/` to open an autocomplete menu, then `Tab` to complete.
 | Command | Description |
 |---------|-------------|
 | `/help` | Show available commands |
-| `/model` | Open the model picker (arrow keys to choose) |
-| `/models` | List every image and video generation model |
+| `/model` | Switch the chat model |
+| `/models` | List image & video generation models |
 | `/mode [plan\|auto\|yolo]` | Show or set the approval policy |
 | `/tools` | Show every tool the agent can call |
 | `/mcp` | View connected MCP servers & their tools |
-| `/usage` | Requests, tokens and spend |
+| `/usage` | Requests, tokens and spend this month |
 | `/status` | Platform health per service |
-| `/whoami` | Show account, plan, and credits |
-| `/system <prompt>` | Set a system prompt (no argument shows the current one) |
+| `/whoami` | Show account, plan, wallet |
+| `/system <prompt>` | Set a system prompt |
+| `/copy` | Print the last reply on its own, for copying |
 | `/export [file\|md]` | Write the conversation to a file (json or markdown) |
 | `/resume` | List saved sessions |
 | `/clear` | Reset the conversation |
 | `/login` / `/logout` | Authenticate / clear credentials |
 | `/quit` | Exit |
-
-> **Note:** `/model` lists the models the agent endpoint accepts, which differ from the plain-chat model IDs in `fotohub models list`. Use arrow keys and Enter to select.
 
 ### Appearance
 
@@ -187,7 +259,7 @@ Run a single agent turn non-interactively — for scripts, CI, or piping into ot
 fotohub -p "list my image models"
 
 # A JSON summary
-fotohub -p "how many credits do I have?" --output-format json
+fotohub -p "how much is left in my wallet?" --output-format json
 
 # NDJSON event stream, one object per line
 fotohub -p "generate a logo" --output-format stream-json --yolo | jq -c 'select(.type=="tool_call")'
@@ -224,178 +296,239 @@ Because a headless run cannot ask for approval, **paid tools are refused by defa
 | `result` | `text`, `inputTokens`, `outputTokens` |
 | `error` | `message` |
 
-Exit codes: `0` success, `2` invalid usage, non-zero otherwise.
-
 ---
 
-## Generate Images
+## Generate
+
+### Images
 
 ```bash
-# Basic generation
-fotohub generate image "a futuristic city at sunset"
-
-# Short alias
-fotohub gen image "portrait of a cat in watercolor style"
-
-# Full options
-fotohub gen image "product photo of headphones on marble surface" \
-  --model seedream-5-0-260128 \
-  --width 1024 --height 1024 \
-  --num 4 \
-  --negative-prompt "blurry, low quality" \
-  --seed 42 \
-  --output headphones.png
+fotohub gen image "a futuristic city at sunset"
+fotohub gen image "portrait of a cat in watercolor style" -m seedream-5-0-260128 -n 4 -o cat.png
 ```
-
-### Image Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-m, --model <id>` | Model ID | `seedream-5-0-260128` |
-| `-W, --width <px>` | Width in pixels | 1024 |
-| `-H, --height <px>` | Height in pixels | 1024 |
-| `-n, --num <count>` | Number of images (1-4) | 1 |
-| `--aspect-ratio <ratio>` | Aspect ratio (16:9, 1:1, 9:16) | -- |
-| `--negative-prompt <text>` | What to avoid in the image | -- |
+| `-W, --width <px>` / `-H, --height <px>` | Pixel dimensions | 1024 / 1024 |
+| `--size <tier>` | Resolution tier the price is quoted at: `1K`, `2K`, `4K` | derived from width/height |
+| `-n, --num <count>` | Number of images | 1 |
+| `--aspect-ratio <ratio>` | `1:1`, `16:9`, `9:16`, `4:3`, `3:4` | -- |
+| `--style <style>` | Style hint passed to the model | -- |
+| `--negative-prompt <text>` | What to avoid | -- |
 | `--seed <number>` | Reproducibility seed | random |
-| `-o, --output <path>` | Save first image to local file | -- |
+| `-o, --output <path>` | Save to file — `-n 4 -o out.png` writes `out-1.png … out-4.png`, and this works under `--json` too | -- |
+| `--estimate` | Quote the price and exit without generating | -- |
+| `--list-models` | Print every supported model id and exit | -- |
 
-### Example Output
+There are **43 image models** across ByteDance, OpenAI, Google, Black Forest Labs, Stability AI, xAI, Microsoft, Luma AI, Alibaba and Zhipu — run `fotohub gen image --list-models` for the current list (it changes as models are added), or `fotohub pricing --category image` for the priced ones. An unknown `--model` id is caught locally, with a suggestion, before a request is sent.
 
 ```
-Image generated successfully!
+Image generated
 
   #1 https://s3point.fotohub.app/generations/abc123/0.png
       seed: 42
-  #2 https://s3point.fotohub.app/generations/abc123/1.png
-      seed: 43
 
-  Credits used: 2
+  $0.0315 · wallet $6.76 left · 1K tier
+
+  Links expire in about an hour — use -o <path> to keep a copy.
 ```
 
----
-
-## Generate Video
+### Video
 
 ```bash
-# Text-to-video
-fotohub gen video "a drone shot flying over snow-capped mountains at golden hour" \
-  --model veo-3.1-generate-001 \
-  --duration 10
-
-# Image-to-video (animate a photo)
-fotohub gen video "camera slowly zooms in, subtle movement" \
-  --image https://example.com/photo.jpg \
-  --model kling-v3 \
-  --duration 5
-
-# Asynchronous models return a job ID immediately
-fotohub gen video "waves at sunset"
-
-# Save output locally
-fotohub gen video "waves crashing on a rocky shore" \
-  --output waves.mp4
+fotohub gen video "a drone shot flying over snow-capped mountains at golden hour" --duration 10
+fotohub gen video "camera slowly zooms in" --image https://example.com/photo.jpg -m kling-v3
+fotohub gen video --job <job-id>            # attach to a render already running
 ```
-
-### Video Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-m, --model <id>` | Model ID (see `fotohub models list --category video`) | `veo-3.1-generate-001` |
-| `-d, --duration <seconds>` | Duration in seconds | 5 |
-| `--aspect-ratio <ratio>` | Aspect ratio (16:9, 9:16, 1:1) | 16:9 |
+| `-m, --model <id>` | Model ID | `veo-3.1-generate-001` |
+| `-d, --duration <seconds>` | Duration | 5 |
+| `--aspect-ratio <ratio>` | `16:9`, `9:16`, `1:1` | `16:9` |
+| `--resolution <res>` | `720p`, `1080p`, `4k` | -- |
 | `--image <url>` | Input image for image-to-video | -- |
-| `-o, --output <path>` | Save video to local file | -- |
-| `--no-wait` | Deprecated, accepted but inert (async jobs always return immediately) | -- |
+| `-o, --output <path>` | Save the finished video | -- |
+| `--job <id>` | Attach to an existing job instead of generating | -- |
+| `--no-wait` | Submit and return the job id without waiting | -- |
+| `--poll-interval <seconds>` | Seconds between status polls | 5 |
+| `--timeout <seconds>` | Stop polling after this long | 900 |
+| `--estimate` | Quote the price and exit without generating | -- |
+| `--list-models` | Print every supported model id and exit | -- |
 
-Some video models answer synchronously and the CLI prints the URL (and honors `-o`). The rest are asynchronous: they return a job ID immediately, and the finished video is delivered to your [FOTOhub library](https://fotohub.app/generate/videoai). There is no status endpoint for those jobs yet, so the CLI does not poll.
+There are **49 video models** — Veo, Sora, Kling, Seedance, Wan, Hailuo, Grok Imagine and Gemini Omni Flash. Run `fotohub gen video --list-models` for the current list.
 
----
-
-## Generate 3D Models
-
-Turn an image (or a text prompt) into a downloadable 3D model.
+Video is asynchronous. By default the CLI submits the job and **polls it to completion**, printing progress as it goes. If a synchronous model answers immediately, the URL prints straight away. If `--timeout` is hit first, the command prints the job id rather than losing the render — pick it back up any time with:
 
 ```bash
-# Image-to-3D (default mode)
-fotohub gen 3d --file product-photo.png --output model.glb
-
-# Text-to-3D
-fotohub gen 3d --mode text-to-3d --model fh-text-3d --prompt "a low-poly wooden chair" \
-  --output chair.glb
-
-# Choose format and quality
-fotohub gen 3d --file sculpture.jpg --format obj --quality high --output sculpture.obj
+fotohub gen video --job <job-id>
 ```
 
-### 3D Options
+### 3D Models
+
+```bash
+fotohub gen 3d --file product-photo.png --output model.glb
+fotohub gen 3d --mode text-to-3d --model fh-text-3d --prompt "a low-poly wooden chair" -o chair.glb
+fotohub gen 3d --list-models
+```
 
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--mode <mode>` | `image-to-3d` or `text-to-3d` | `image-to-3d` |
-| `-m, --model <id>` | Model ID (currently available: `fh-lite-3d` for image-to-3d, `fh-text-3d` for text-to-3d) | `fh-lite-3d` |
-| `-f, --file <path>` | Input image file (required for `image-to-3d`) | -- |
-| `-p, --prompt <text>` | Text prompt (required for `text-to-3d`) | -- |
-| `--format <fmt>` | Output format (`glb`, `obj`, `stl`, `usdz`) | `glb` |
-| `--quality <q>` | Quality (`draft`, `standard`, `high`) | `standard` |
-| `-o, --output <path>` | Save 3D model to local file | -- |
-| `--no-wait` | Submit and return the job ID immediately | -- |
+| `-m, --model <id>` | `fh-lite-3d` (image) or `fh-text-3d` (text) | `fh-lite-3d` |
+| `-f, --file <path>` | Input image file (image-to-3d) | -- |
+| `-p, --prompt <text>` | Text prompt, max 500 chars (text-to-3d) | -- |
+| `--format <fmt>` | `glb`, `obj`, `stl`, `usdz` | `glb` |
+| `--quality <q>` | `draft`, `standard`, `high`, `ultra` | `standard` |
+| `-o, --output <path>` | Save the model | -- |
+| `--refresh <file-id>` | Re-sign the link for an asset already generated (free) | -- |
+| `--estimate` | Quote the price (keyed as `3d_<model>`) and exit without generating | -- |
+| `--list-models` | List 3D models with live prices and availability | -- |
 
-The CLI reads the input image locally and uploads it, then polls until the model is ready.
+This endpoint is **synchronous** — the finished model comes back in the same response, so there is no job to poll. A third model, `fh-pro-3d`, exists in the catalogue but is currently switched off in production; `--list-models` marks it `unavailable` rather than pretending it doesn't exist.
 
-> **Note:** `fh-lite-3d`, `fh-pro-3d`, and `fh-pro-3d` are recognized by the API but not yet enabled. Use `fh-lite-3d` (image-to-3d) or `fh-text-3d` (text-to-3d) today.
-
----
-
-## Generate Music
+### Music
 
 ```bash
-# Text-to-music
-fotohub gen music "upbeat electronic track with heavy synths and driving bass" \
-  --duration 60 \
-  --output track.mp3
-
-# Instrumental only
-fotohub gen music "gentle ambient piano with rain sounds" \
-  --instrumental \
-  --duration 120
+fotohub gen music "upbeat electronic track with heavy synths and driving bass" -d 60 -o track.mp3
+fotohub gen music "warm jazz café loop" -m elevenlabs --genre jazz --loop
 ```
-
-### Music Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-m, --model <id>` | Model ID (`minimax`, `elevenlabs`) | `minimax` |
-| `-d, --duration <seconds>` | Duration in seconds (the backend accepts up to 300; clips over 60s are billed at a higher tier) | 30 |
-| `--instrumental` | Generate instrumental only (no vocals) | -- |
-| `-o, --output <path>` | Save audio to local file | -- |
+| `-m, --model <id>` | `minimax` or `elevenlabs` | `minimax` |
+| `-d, --duration <seconds>` | 1–300 | 30 |
+| `--genre <genre>` | **Required** for `elevenlabs`, optional for `minimax` | -- |
+| `--mood <mood>` | Mood hint | -- |
+| `--bpm <bpm>` | Target tempo | -- |
+| `--loop` | Compose as a seamless loop | -- |
+| `--instrumental` | No vocals | -- |
+| `-o, --output <path>` | Save audio | -- |
+| `--estimate` | Quote the price and exit without generating | -- |
+| `--list-models` | Print supported models and exit | -- |
 
----
-
-## Generate Speech (TTS)
+### Speech (TTS)
 
 ```bash
-# Basic text-to-speech
-fotohub gen speech "Welcome to FOTOhub, the AI creative platform." \
-  --language en \
-  --output welcome.mp3
-
-# Short alias
-fotohub gen tts "Witamy w FOTOhub" --language pl
-
-# Custom voice
-fotohub gen speech "Breaking news report" \
-  --voice news-anchor-1 \
-  --output news.mp3
+fotohub gen speech "Welcome to FOTOhub, the AI creative platform." -l en -o welcome.mp3
+fotohub gen tts "Witamy w FOTOhub" -l pl
+fotohub gen speech "Breaking news report" --voice-id news-anchor-1 -o news.mp3
 ```
-
-### Speech Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-v, --voice <id>` | Voice ID or name | platform default |
-| `-l, --language <code>` | Language code (en, pl, de, fr, es) | en |
-| `-o, --output <path>` | Save audio to local file | -- |
+| `-m, --model <id>` | `google`, `ida-voice`, `ida-voice-pro`, `elevenlabs`, `mars-pro`, `mars-flash`, `chatterbox-tts`, `grok` | `google` |
+| `--voice-id <id>` | Voice id for the chosen engine — **not** `--voice`, which the API does not read | -- |
+| `-l, --language <lang>` | `en`, `pl`, `de` | `en` |
+| `--speed <rate>` | Speaking rate, e.g. `0.8`, `1.2` | -- |
+| `--pitch <semitones>` | Pitch shift | -- |
+| `-f, --file <path>` | Read the text from a file instead of an argument | -- |
+| `-o, --output <path>` | Save audio | -- |
+| `--estimate` | Quote the price for the given text length and exit without generating | -- |
+| `--list-models` | List supported engines and exit | -- |
+
+Text caps at **3000 characters**. `ida-voice` and `chatterbox-tts` run on FOTOhub's own GPU3; `google` is an alias that currently maps to `mars-flash`, and `elevenlabs` is a legacy alias for `mars-pro`.
+
+`--estimate` prices per 1000 characters of the text you actually passed (or `--file`). Only `google`, `elevenlabs` and `grok` have a published price row (`tts-google`, `tts-elevenlabs`, `grok-tts`); estimating any other engine (`mars-pro`, `mars-flash`, `chatterbox-tts`, `ida-voice`, `ida-voice-pro`) is refused with `No published price for the '<engine>' engine`, by design, rather than guessed.
+
+---
+
+## Edit and process images
+
+A second command group, separate from `gen image`, for operating on an existing image (post-processing, not text-to-image):
+
+```bash
+fotohub image edit <image-url> "<prompt>" --mode inpaint|outpaint|bgswap|remove [--mask-url <url>]
+fotohub image remove-bg <image-url> [--advanced --point 0.5,0.5 --feather 2 --smooth 0]
+fotohub image replace-bg <image-url> <background> [--type color|gradient|image|auto]
+fotohub image blur-bg <image-url> [--blur-radius 15]
+fotohub image shadow <image-url> [--type natural|drop|contact] [--opacity 0.5]
+fotohub image enhance <image-url> [--mode auto|portrait|landscape|product|food]
+fotohub image denoise <image-url> [--strength 0.5] [--no-preserve-detail]
+fotohub image colorize <image-url> [--style natural|vivid|vintage|artistic]
+fotohub image restore-face <image-url> [--model codeformer|gfpgan] [--fidelity 0.7] [--upscale 1-4]
+fotohub image depth <image-url> [--model midas|zoedepth] [--output-type grayscale|colored|raw]
+fotohub image color-grade <image-url> [--preset cinematic|warm|cool|vintage|noir|teal-orange|pastel]
+```
+
+Every one of these takes an `-o, --output <path>` and, except `edit`, an `--output-format` (`png`/`jpeg`/`webp`, defaults vary by command). Notes worth knowing before you script against them:
+
+- `image edit` always runs the same provider (Imagen 3 Capability) — there is no `--model` flag because the API accepts one but ignores it.
+- `image replace-bg` does not support AI-generated (prompt) backgrounds yet; pass a hex color, a CSS gradient, or an image URL.
+- Inputs are URLs. Upload a local file first with `fotohub storage upload`, then pass the returned URL.
+
+Docs: [/api/image-editing](/api/image-editing)
+
+---
+
+## Post-produce video
+
+A separate command group from `gen video` — for transforming footage you already have, rather than generating new footage:
+
+```bash
+fotohub video upscale <video-url> --scale 2|3|4
+fotohub video lip-sync <video-url> <audio-url> [-m musetalk|latentsync|facefusion] [--duration 5]
+fotohub video transcode <video-url> [--format mp4|webm|mov|gif|prores] [--codec h264|h265|vp9|prores] [--resolution 480p..4K]
+fotohub video merge <video-url-1> <video-url-2> ... [--transition none|dissolve|fade|crossfade|wipeleft|wiperight|slidedown|slideup]
+fotohub video speed <video-url> <0.1-10.0> [--interpolation none|blend|mci]
+fotohub video stabilize <video-url> [--preset smooth|very_smooth|cinematic|action]
+fotohub video subtitles <video-url> --srt-file captions.srt [--position top|bottom|center]
+fotohub video effects <video-url> [--preset vintage|noir|warm|cool|cinematic|hdr] [--brightness -1..1] [--contrast 0..3] ...
+fotohub video watermark <video-url> [--text "FOTOhub"] [--position bottom_right] [--opacity 0.3]
+```
+
+Each takes `-o, --output <path>`. A few behaviours that are easy to assume wrong:
+
+- `video subtitles` does **not** transcribe speech — it burns in an SRT you already have, via `--srt` (inline) or `--srt-file`.
+- `video watermark` only burns **text**; image watermarks are not supported.
+- `video lip-sync` is billed per second (default 5.0s) and each model has a duration ceiling: `musetalk` (fast, ≤60s), `latentsync` (HD, ≤30s), `facefusion` (ultra, ≤120s). Pass `--no-wait` to get the job id back immediately instead of waiting.
+- `video merge` takes 2–20 source URLs.
+
+Docs: [/api/video-editing](/api/video-editing)
+
+---
+
+## Shorts, Story and UGC
+
+### AI Shorts & Clips
+
+Turns a long video into short, captioned clips in one call:
+
+```bash
+fotohub shorts create <source-url> \
+  --max-clips 5 --caption-style hormozi --aspect-ratio 9:16 \
+  --output clip.mp4
+
+fotohub shorts status <job-id>
+fotohub shorts list [--status completed] [--limit 20]
+fotohub shorts cancel <job-id>
+```
+
+Key options: `--source-type` (`url`, `youtube`, `tiktok`, `instagram`, `vimeo`, `upload`, `fh_library` — auto-detected if omitted), `--min-duration`/`--max-duration`, `--caption-style` (`hormozi`, `beasty`, `clean`, `karaoke`, `minimal`, `neon`, `typewriter`, `bold`, `none`), `--no-captions`/`--no-reframe`/`--no-hooks`/`--no-covers`/`--no-enhance-audio`/`--no-remove-filler`/`--no-retention-model` to skip individual pipeline steps, `--broll` to opt in, and `--webhook-url`/`--webhook-secret`/`--reference` for async notification. By default the command polls to completion (`--no-wait` to return the job id immediately, `--timeout` to bound the wait).
+
+### Story Studio
+
+```bash
+fotohub story generate "<prompt>" --num-scenes 4 --duration-per-scene 5 --aspect-ratio 9:16 -o story.mp4
+```
+
+`prompt` must be 3–2000 characters; `--num-scenes` is 2–6, `--duration-per-scene` is 3–15s each, `--video-model` defaults to `seedance`, `--voice <id>` sets narration (a default narrator is used if omitted), `--language` is `en`/`pl`/`de`. This call streams the whole multi-scene pipeline over one connection and can take several minutes — there is no separate job id or status endpoint, so the command blocks until it finishes.
+
+### UGC Studio
+
+```bash
+fotohub ugc create "My Campaign" [--brief '{"...": "..."}']    # free — nothing generated yet
+fotohub ugc get <project-id>
+fotohub ugc blueprint <project-id> --file blueprint.json       # required before render
+fotohub ugc estimate --file blueprint.json                     # price it first
+fotohub ugc render <project-id> [--variant v1] [--product hero=https://...]
+fotohub ugc job <job-id> [--no-wait] [-o out.mp4]
+```
+
+A project starts free; you save a blueprint document onto it, price the blueprint with `ugc estimate`, then `ugc render` to spend. `--idempotency-key` on `render` makes a retry hand back the same render instead of creating a second one. `ugc job` accepts either a job id or a render id (useful when the job record itself has aged out but the render link is still valid), and polls to completion unless `--no-wait` is given.
+
+Docs: [/api/shorts-clips](/api/shorts-clips), [/api/story-studio](/api/story-studio), [/api/ugc-studio](/api/ugc-studio)
 
 ---
 
@@ -403,57 +536,43 @@ fotohub gen speech "Breaking news report" \
 
 ### One-Shot Mode
 
-Send a single message and get a streaming response:
-
 ```bash
-# Quick question
 fotohub chat send "Explain REST APIs in 3 sentences"
-
-# With specific model and system prompt
-fotohub chat send "Review this code for security issues" \
-  --model claude-sonnet \
-  --system "You are a senior security engineer" \
-  --temperature 0.3
-
-# Non-streaming (full response at once)
+fotohub chat send "Review this code for security issues" -m claude-sonnet -s "You are a senior security engineer" -t 0.3
 fotohub chat send "Generate 5 product names for a coffee brand" --no-stream
 ```
 
-### Chat Send Options
-
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-m, --model <id>` | Model ID (`claude-sonnet`, `gpt-4o`, `gemini-pro`, `gemini-flash`) | `claude-sonnet` |
+| `-m, --model <id>` | Model id — see the table below | `claude-sonnet` |
 | `-s, --system <prompt>` | System prompt | -- |
-| `-t, --temperature <temp>` | Temperature (0-2) | 1 |
-| `--no-stream` | Disable streaming | -- |
+| `-t, --temperature <temp>` | 0–2 | 1 |
+| `--no-stream` | Get the full response at once instead of streaming | -- |
+
+The public chat API accepts exactly these four model ids (each aliases to the underlying model shown):
+
+| id | Aliases to | Provider |
+|----|------------|----------|
+| `claude-sonnet` | `claude-sonnet-4-6` | Anthropic |
+| `gpt-4o` | `gpt-5.1` | OpenAI |
+| `gemini-pro` | `gemini-2.5-pro` | Google |
+| `gemini-flash` | `gemini-2.5-flash` | Google |
+
+Any other id is rejected locally before a request is sent. (A broader catalogue is prepared server-side but not yet live — only the four ids above currently work.)
 
 ### Interactive Chat Mode
 
 ```bash
-fotohub chat
+fotohub chat interactive
 ```
 
-Launches a dedicated, plain-streaming chat session with persistent context (this is the lightweight readline REPL, distinct from the full [interactive agent](#interactive-mode)):
-
-```
-FOTOhub Chat — claude-sonnet
-Commands: /quit /clear /model /system /tokens /export
-
-You > What is quantum computing?
-AI  Quantum computing leverages quantum mechanics...
-
-You > How does it compare to classical computing?
-AI  Classical computers use bits (0 or 1), while quantum...
-```
-
-### Chat Session Commands
+A dedicated, plain-streaming REPL with persistent context — distinct from the full [interactive agent](#interactive-mode) that runs when you type bare `fotohub`.
 
 | Command | Description |
 |---------|-------------|
-| `/quit` | Exit chat session |
+| `/quit` (or `/exit`, `/q`) | Exit |
 | `/clear` | Reset conversation context |
-| `/model <id>` | Switch model mid-conversation (e.g. `/model gpt-4o`) |
+| `/model <id>` | Switch model mid-conversation |
 | `/system <prompt>` | Set the system prompt |
 | `/tokens` | Show approximate token count |
 | `/export` | Print the conversation as JSON |
@@ -462,164 +581,65 @@ AI  Classical computers use bits (0 or 1), while quantum...
 
 ## Models
 
-### List All Models
-
 ```bash
-# List all available models
-fotohub models list
-
-# Filter by category
-fotohub models list --category image
-fotohub models list --category video
-fotohub models list --category chat
-fotohub models list --category audio
-
-# Filter by provider
+fotohub models list                              # all models
+fotohub models list --category image             # image | video | chat | audio | analysis
 fotohub models list --provider google
-fotohub models list --provider anthropic
+fotohub models info seedream-5-0-260128
 ```
 
-### Example Output
-
 ```
-52 models available
+106 models available
 
-Model ID              Provider    Category  Cost   Status
-seedream-5-0-260128   bytedance   image     2 cr   active
-veo-3.1-generate-001  google      video     12 cr  active
-claude-sonnet         anthropic   chat      2 cr   active
-minimax               minimax     audio     3 cr   active
+Model ID                        Provider           Category  Cost                Status
+------------------------------  -----------------  --------  ------------------  ------
+audio-mastering                 fotoHUB Engine     audio     $0.0398 / minute    active
+tts-elevenlabs                  ElevenLabs         audio     $0.0478 / 1k_characters  active
 ...
 ```
 
-> The header shows the exact number of models returned, and the `Cost` column is a flat credit figure (`N cr`) — per-second video pricing is applied at billing time, not shown in this table.
-
-### Model Details
-
-```bash
-fotohub models info seedream-5-0-260128
-```
+Cost is the live USD rate, not a flat credit figure — this listing and `fotohub pricing` read the same table. `models info` resolves across the browsable catalogue, the price list, and the generation catalogue, and says which one answered: a generation-only id like `gpt-image-2` is not in `/v1/models`, so it is looked up in the pricing/generation catalogues instead of being reported as "not found".
 
 ---
 
 ## Cloud Storage
 
-The CLI provides S3-compatible cloud storage management.
-
-### List Buckets
-
 ```bash
 fotohub storage list
-```
-
-```
-2 bucket(s)
-
-Name         Region        Size    Created       Status
-my-renders   eu-central-1  1.2 GB  2026-06-14    active
-project-xyz  eu-central-1  340 MB  2026-07-02    active
-```
-
-### Create a Bucket
-
-```bash
 fotohub storage create my-renders --region eu-central-1 --size 50
-```
-
-### List Objects
-
-```bash
 fotohub storage ls my-renders --prefix videos/
-```
-
-### Upload a File
-
-```bash
-# Upload with auto-detected content type
-fotohub storage upload ./render.mp4 -b my-renders
-
-# Custom object key
-fotohub storage upload ./photo.jpg -b my-renders --key assets/hero.jpg
-
-# Explicit content type
-fotohub storage upload ./data.json -b my-renders --content-type application/json
-```
-
-### Download a File
-
-```bash
+fotohub storage upload ./render.mp4 -b my-renders [-k assets/hero.mp4] [--content-type video/mp4]
 fotohub storage download videos/output.mp4 -b my-renders -o local-copy.mp4
 ```
+
+Buckets can be passed by **name or id** everywhere — the name is what `storage list` prints, so that is what you'd naturally reach for.
 
 ---
 
 ## Billing & Usage
 
-### Check Balance
-
 ```bash
-fotohub billing balance
+fotohub billing balance      # wallet, this month's spend, and any spend cap
+fotohub billing usage        # requests, tokens, top endpoints and models
+fotohub billing history      # wallet ledger, per operation and model — supports -l/--limit, -t/--type
+fotohub billing estimate --file batch.json      # price a batch of operations before running them
+fotohub billing topup --list-packages           # then --package <slug> or --amount <usd>
+fotohub billing limit --amount 50               # or --disable to remove the cap
+fotohub billing invoices
+fotohub billing plans        # legacy subscription plans; the API itself is prepaid USD
 ```
 
 ```
 FOTOhub Billing
 
   Plan:       Developer
-  Credits:    420 / 500 remaining (84%)
-  Used:       80 credits this period
-  Wallet:     $15.00 USD
-  Resets:     2026-08-01
-  Overage:    $15.00 limit
+  Wallet:     $6.76  (prepaid — API usage is billed from this)
+  Spent:      $12.40 this month
 ```
 
-### Usage Breakdown
+`billing estimate` takes `-f/--file` (a JSON array of operations, or `{"operations": [...]}`) or `-o/--operations` inline; each operation looks like `{"type":"generate_image","model":"seedream-5-0-260128","count":5}` (types: `generate_image`, `generate_video`, `tts`, each with its own count/duration/characters field).
 
-```bash
-fotohub billing usage --period month
-```
-
-### Transaction History
-
-```bash
-fotohub billing history --limit 50
-```
-
----
-
-## API Key Management
-
-### List Keys
-
-```bash
-fotohub auth keys list
-```
-
-```
-Name            Key             Created     Last Used   Scopes
---------------  --------------  ----------  ----------  ---------------
-Production Key  fh_live_abc...  2026-06-01  2026-07-24  All
-Image Worker    fh_live_def...  2026-07-10  Never       images, storage
-```
-
-### Create a New Key
-
-```bash
-fotohub auth keys create --name "Production Server Key"
-
-# Optionally scope the key (comma-separated)
-fotohub auth keys create --name "Image Worker" --scopes images,storage
-```
-
-```
-API key created successfully!
-
-Key:  fh_live_new_key_here_full_value
-ID:   key_9f2c1a8e
-
-Save this key now — it will not be shown again.
-```
-
-Available scopes: `images`, `video`, `chat`, `audio`, `storage`, `compute`, `billing`, `keys`.
+`billing topup` returns a **checkout URL** — it does not fund the wallet directly. Complete payment there, then re-check `fotohub billing balance`. Both `billing topup` and `billing invoices` currently require a dashboard login (JWT); they may answer 401 even with a valid `FOTOHUB_API_KEY`. Use `fotohub billing history` for API-key-visible spend in the meantime.
 
 ---
 
@@ -627,29 +647,40 @@ Available scopes: `images`, `video`, `chat`, `audio`, `storage`, `compute`, `bil
 
 Execute DAG-based automation workflows from the terminal.
 
-### List Workflows
-
 ```bash
 fotohub workflow list
-```
-
-### Run a Workflow
-
-```bash
-fotohub workflow run abc123def --input '{"prompt": "generate 5 product images"}'
-```
-
-### Check Execution Status
-
-```bash
+fotohub workflow run abc123def --input '{"prompt": "generate 5 product images"}' [--credits-max 100] [--no-wait]
 fotohub workflow status exec_456
 ```
+
+`run` polls to completion by default (`--timeout`, default 300s); `--no-wait` returns as soon as the run starts.
+
+---
+
+## Webhooks
+
+Notify your own endpoint as generation and billing events happen, instead of polling.
+
+```bash
+fotohub webhooks list
+fotohub webhooks create "prod" https://example.com/hook -e generation.completed,credits.low
+fotohub webhooks update <id> [--url ...] [--events ...] [--activate|--deactivate]
+fotohub webhooks test <id>
+fotohub webhooks logs <id>
+fotohub webhooks delete <id> --yes   # -y is required for non-interactive use
+```
+
+`-H/--headers` on `create`/`update` accepts a JSON object of up to 10 extra headers to send with each delivery. Target URLs must be HTTPS and cannot point at a private/reserved IP.
+
+Event names (`-e/--events`, comma-separated):
+
+`generation.completed`, `generation.failed`, `generation.refunded`, `generation.started`, `credits.low`, `credits.depleted`, `key.used`, `billing.charged`, `billing.insufficient_funds`, `billing.refunded`, `billing.unfunded`, `images.batch.completed`, `background.removed`, `background.replaced`, `background.blurred`, `shadow.added`, `commerce.job.completed`, `commerce.job.failed`, `commerce.item.completed`, `commerce.job.awaiting_credits`, `shorts.job.started`, `shorts.job.completed`, `shorts.job.failed`, `shorts.clip.rendered`.
+
+Docs: [/api/webhooks](/api/webhooks)
 
 ---
 
 ## System Status
-
-Check platform health from the terminal:
 
 ```bash
 fotohub status
@@ -658,18 +689,20 @@ fotohub status
 ```
 FOTOhub System Status  operational
 
-  API Version: 3.2.1
-  Uptime:      99.98%
+  Region:      eu-central-1
 
   Services:
 
-    OK  Image Generation (82ms)
-    OK  Video Generation (140ms)
-    OK  Chat / LLM (61ms)
-    OK  Storage (48ms)
+    OK  api
+    OK  billing
+    OK  brand
+    OK  s3
+    OK  chat
+    OK  social
+    OK  agent
 ```
 
-The service list is returned by the API, so it reflects whatever FOTOhub is currently monitoring.
+The service list is returned by the API, so it reflects whatever FOTOhub is currently monitoring. Status page: <https://fotohub.app/status>.
 
 ---
 
@@ -677,7 +710,7 @@ The service list is returned by the API, so it reflects whatever FOTOhub is curr
 
 ### Config File Location
 
-Non-secret preferences are stored in `~/.fotohub/config.json` with restricted permissions (0600). Your API key is **not** kept here — it lives in the OS keychain or the encrypted fallback file (see [Credential Storage](#credential-storage)).
+Non-secret preferences are stored in `~/.fotohub/config.json` with restricted permissions (0600). Your API key is **not** kept here as plaintext — even `fotohub config set apiKey ...` routes it into secure storage rather than the file (see [Credential Storage](#credential-storage)).
 
 ```json
 {
@@ -686,34 +719,21 @@ Non-secret preferences are stored in `~/.fotohub/config.json` with restricted pe
 }
 ```
 
-### View Configuration
-
 ```bash
 fotohub config list
-```
-
-### Set Defaults
-
-```bash
-# Set default image model
-fotohub config set defaultModel seedream-5-0-260128
-
-# Set custom API endpoint (self-hosted, staging, etc.)
-fotohub config set baseUrl https://apis.staging.fotohub.app
-```
-
-### Get a Specific Value
-
-```bash
 fotohub config get defaultModel
+fotohub config set defaultModel seedream-5-0-260128
+fotohub config set baseUrl https://apis.staging.fotohub.app
+fotohub config unset defaultModel      # restores the built-in default
 ```
-
-### Available Config Keys
 
 | Key | Description | Default |
 |-----|-------------|---------|
-| `defaultModel` | Default model for image generation | `seedream-5-0-260128` |
+| `defaultModel` | Default model for `gen image` | `seedream-5-0-260128` |
 | `baseUrl` | API base URL | `https://apis.fotohub.app` |
+| `apiKey` | Accepted by `config set` only; stored in the keychain/encrypted file, never in `config.json` | -- |
+
+`config unset` only accepts `defaultModel`/`baseUrl` — remove the API key with `fotohub auth logout` instead.
 
 > For machine-readable output, pass `--json` to any command (see [JSON Output](#json-output-scripting)) rather than setting a persistent format.
 
@@ -747,23 +767,25 @@ Legacy installs that kept a plaintext `apiKey` in `~/.fotohub/config.json` are m
 
 ## JSON Output (Scripting)
 
-All commands support `--json` for machine-readable output, making it easy to integrate with scripts and pipelines:
+Every subcommand supports `--json` for machine-readable output. The JSON is the API's own payload, unwrapped but not reshaped:
 
 ```bash
-# Get image URLs as JSON
-fotohub gen image "a cat" --json | jq '.images[0].url'
+# Image URLs come back as {images:[{url, seed}]}
+fotohub gen image "a cat" --json | jq -r '.images[0].url'
 
-# List models and filter
+# Models list is a plain array
 fotohub models list --json | jq '.[] | select(.category == "image") | .id'
 
-# Check balance programmatically
+# Wallet balance is under .wallet.balance_usd
 BALANCE=$(fotohub billing balance --json | jq '.wallet.balance_usd')
 echo "Wallet Balance: \$$BALANCE"
 
-# Generate and immediately open
+# Generate and immediately download
 URL=$(fotohub gen image "sunset" --json | jq -r '.images[0].url')
-curl -o image.png "$URL" && open image.png
+curl -o image.png "$URL"
 ```
+
+`-o/--output` also works together with `--json` — the file is saved and the JSON is still printed, so a script gets both the payload and a local copy.
 
 ---
 
@@ -822,6 +844,7 @@ cat prompts.txt | xargs -P 4 -I {} fotohub gen image "{}" --json >> outputs.json
 | `FOTOHUB_API_KEY` | API key (alternative to `fotohub auth login`) |
 | `FOTOHUB_BASE_URL` | Custom API base URL (default: `https://apis.fotohub.app`) |
 | `FOTOHUB_CRED_PASSPHRASE` | Passphrase for the encrypted credential fallback (see [Credential Storage](#credential-storage)) |
+| `FOTOHUB_THEME` | Interactive-mode palette: `dark`, `light`, `high-contrast`, `mono` |
 | `NO_COLOR` | Disable colored output ([no-color.org](https://no-color.org)) |
 
 ---
@@ -843,36 +866,20 @@ These flags work with any command:
 
 ## Shell Completions
 
-### Bash
-
-Add to your `~/.bashrc`:
-
 ```bash
-eval "$(fotohub --completion bash)"
-```
-
-### Zsh
-
-Add to your `~/.zshrc`:
-
-```bash
-eval "$(fotohub --completion zsh)"
-```
-
-### Fish
-
-```bash
+eval "$(fotohub --completion bash)"   # ~/.bashrc
+eval "$(fotohub --completion zsh)"    # ~/.zshrc
 fotohub --completion fish | source
 ```
 
-After adding completions, restart your shell or run `source ~/.bashrc` (or equivalent).
-
-You can also use the `completion` subcommand (equivalent to the `--completion` flag), which auto-detects your shell from `$SHELL` when the argument is omitted:
+Or use the `completion` subcommand (equivalent, and auto-detects your shell from `$SHELL` when the argument is omitted):
 
 ```bash
 fotohub completion bash
 fotohub completion        # auto-detect from $SHELL
 ```
+
+Restart your shell (or `source ~/.bashrc`) after adding it.
 
 ---
 
@@ -888,6 +895,8 @@ fotohub mcp connect
 
 Registers FOTOhub's hosted MCP server using your existing API key and discovers its tools. Once connected, the interactive agent can call them directly.
 
+> The public MCP endpoint URL is intentionally not pinned here — it is being re-verified separately after a transport issue, so `fotohub mcp connect` (which resolves it for you) is the reliable path rather than a hardcoded address.
+
 ### Add an External MCP Server
 
 ```bash
@@ -898,9 +907,7 @@ fotohub mcp add search --url https://mcp.example.com/
 fotohub mcp add search --url https://mcp.example.com/ --token "$MY_TOKEN"
 
 # Local server over stdio (spawns a command)
-fotohub mcp add local-fs \
-  --command npx \
-  --args "-y @modelcontextprotocol/server-filesystem /tmp"
+fotohub mcp add local-fs --command npx --args "-y @modelcontextprotocol/server-filesystem /tmp"
 ```
 
 > **Security:** adding a `--command` server lets the CLI spawn a local process, so it prompts for confirmation. Pass `-y`/`--yes` to skip the prompt in non-interactive use. Remote URLs are validated against SSRF (private/loopback/link-local addresses are rejected).
@@ -909,13 +916,11 @@ fotohub mcp add local-fs \
 
 ```bash
 fotohub mcp list                # List registered servers
-fotohub mcp tools <name>        # List tools discovered on a server
+fotohub mcp tools <name>        # List tools discovered on a server (--refresh to bypass the cache)
 fotohub mcp remove <name>       # Remove a registered server
 ```
 
 ### Expose the CLI as an MCP Server
-
-Run the CLI as a local stdio MCP server so tools like Claude Desktop or Cursor can call FOTOhub actions (image, storage, models, billing) directly:
 
 ```bash
 fotohub mcp serve
@@ -935,17 +940,6 @@ Example Claude Desktop configuration (`claude_desktop_config.json`):
 ```
 
 Server registrations are stored in `~/.fotohub/mcp.json` (0600). Any bearer tokens are kept in secure credential storage, never in that file.
-
-### MCP Command Reference
-
-| Command | Description |
-|---------|-------------|
-| `fotohub mcp connect` | One-command connect to the FOTOhub MCP server |
-| `fotohub mcp add <name>` | Register a server (`--url` or `--command`) |
-| `fotohub mcp list` | List registered servers |
-| `fotohub mcp tools <name>` | List tools on a registered server |
-| `fotohub mcp remove <name>` | Remove a registered server |
-| `fotohub mcp serve` | Expose this CLI as a local stdio MCP server |
 
 ---
 
@@ -1010,32 +1004,25 @@ source ~/.bashrc
 npm install -g fotohubapp-cli
 ```
 
-### Slow video/music generation
+### A video render is taking a while
 
-3D jobs are polled until completion. Asynchronous video models instead return a job ID right away — the finished file lands in your FOTOhub library, since there is no per-job status endpoint yet.
+`gen video` polls by default and prints progress. If you don't want to wait in the foreground, pass `--no-wait` to get the job id back immediately, then check on it later with `fotohub gen video --job <id>` — the render is never abandoned, just detached from your terminal. `gen 3d` has no job to poll: it's synchronous and returns the finished model in one response.
 
-### Rate limit errors (429)
+### Rate limited (exit code 5)
 
-Your plan has a per-minute request limit. The CLI automatically retries with exponential backoff. Check which plan you are on:
+Your key has a per-minute request limit. Check `fotohub auth keys list` for the configured rate limit, or raise it with `fotohub auth keys update <key-id> --rate-limit <n>`.
 
-```bash
-fotohub billing balance
-```
-
-### Insufficient credits (402)
-
-Check your balance and consider upgrading or purchasing a top-up:
+### Wallet cannot cover this call (exit code 4)
 
 ```bash
 fotohub billing balance
+fotohub billing topup --list-packages
 ```
 
 ### Connection timeout
 
-If you are behind a proxy or firewall:
-
 ```bash
-# Set custom endpoint
+# Set custom endpoint for one call
 fotohub --base-url https://apis.fotohub.app gen image "test"
 
 # Or permanently
@@ -1050,6 +1037,18 @@ Add `--verbose` to any command to see full request/response details:
 fotohub gen image "test" --verbose
 ```
 
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | success |
+| `1` | server error, timeout, or anything unclassified |
+| `2` | bad request — invalid arguments, validation, not found |
+| `3` | authentication or permission |
+| `4` | the prepaid wallet cannot cover this call |
+| `5` | rate limited — the same call may succeed later |
+| `6` | the API could not be reached at all |
+
 ---
 
 ## Command Reference (Quick)
@@ -1060,48 +1059,43 @@ fotohub auth login                Authenticate (browser OAuth)
 fotohub auth login --manual       Authenticate (paste key)
 fotohub auth logout               Clear credentials
 fotohub auth whoami               Show account info
-fotohub auth keys list            List API keys
-fotohub auth keys create -n NAME  Create new API key
+fotohub auth keys list|create|update|rotate|delete
 
-fotohub generate image <prompt>   Generate image
-fotohub generate video <prompt>   Generate video
-fotohub generate 3d --file <img>  Generate a 3D model
-fotohub generate music <prompt>   Generate music
-fotohub generate speech <text>    Text-to-speech (alias: tts)
+fotohub pricing [model-id]        Live USD pricing (public, no key needed)
 
-fotohub chat                      Interactive chat session
+fotohub generate|gen image <prompt>    Generate image  (--estimate, --list-models)
+fotohub generate|gen video <prompt>    Generate video  (--estimate, --list-models, --job)
+fotohub generate|gen 3d --file <img>   Generate a 3D model (synchronous, --estimate, --list-models)
+fotohub generate|gen music <prompt>    Generate music  (--estimate, --list-models)
+fotohub generate|gen speech <text>     Text-to-speech, alias tts (--estimate, --list-models)
+
+fotohub image edit|remove-bg|replace-bg|blur-bg|shadow|enhance|denoise|colorize|restore-face|depth|color-grade <url>
+fotohub video upscale|lip-sync|transcode|merge|speed|stabilize|subtitles|effects|watermark <url>
+
+fotohub shorts create|status|list|cancel
+fotohub story generate <prompt>
+fotohub ugc create|get|blueprint|estimate|render|job
+
 fotohub chat send <message>       One-shot chat message
+fotohub chat interactive          Interactive chat session
 
 fotohub models list               List all models
 fotohub models info <id>          Model details
 
-fotohub storage list              List buckets
-fotohub storage create <name>     Create bucket
-fotohub storage ls <bucket>       List objects
-fotohub storage upload <file>     Upload file
-fotohub storage download <key>    Download file
+fotohub storage list|create|ls|upload|download
 
-fotohub billing balance           Show credit balance
-fotohub billing usage            Usage breakdown
-fotohub billing history          Transaction history
+fotohub billing balance|usage|history|estimate|topup|limit|invoices|plans
 
-fotohub workflow list            List workflows
-fotohub workflow run <id>        Execute workflow
-fotohub workflow status <id>     Check execution status
+fotohub workflow list|run|status
 
-fotohub config list              Show configuration
-fotohub config set <key> <val>   Set config value
-fotohub config get <key>         Get config value
+fotohub webhooks list|create|update|delete|test|logs
 
-fotohub mcp connect              Connect to the FOTOhub MCP server
-fotohub mcp add <name>           Register an MCP server (--url or --command)
-fotohub mcp list                 List registered MCP servers
-fotohub mcp tools <name>         List a server's tools
-fotohub mcp remove <name>        Remove a registered server
-fotohub mcp serve                Expose this CLI as an MCP server
+fotohub config list|set|get|unset
 
-fotohub completion [shell]       Print a shell-completion script
-fotohub status                   Platform health check
+fotohub mcp connect|add|list|tools|remove|serve
+
+fotohub completion [shell]        Print a shell-completion script
+fotohub status                    Platform health check
 ```
 
 ---

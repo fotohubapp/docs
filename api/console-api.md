@@ -30,8 +30,11 @@ all. If a call returns `{"detail":"Invalid or expired token"}` with an
 
 ## Base URL
 
+All endpoints on this page hang off this prefix — there is no handler at the bare
+path itself, only at the routes below (e.g. `/v1/console/overview`).
+
 ```
-https://apis.fotohub.app/v1/console
+https://apis.fotohub.app/v1/console/
 ```
 
 ---

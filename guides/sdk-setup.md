@@ -142,7 +142,7 @@ console.log(`USD charged: ${result.usdCharged}`);
 
 1. Go to [fotohub.app/settings/api](https://fotohub.app/settings/api)
 2. Click **Create API Key**
-3. Copy the key (starts with `fh_live_` or `fh_test_`)
+3. Copy the key — it starts with `fh_live_` and is shown only once
 4. Store it securely — never commit to git
 
 ### Environment Variables

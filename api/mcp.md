@@ -2,6 +2,17 @@
 
 FOTOhub exposes a fully-compliant MCP (Model Context Protocol) server that lets AI assistants and agents call creative AI tools directly. This page documents the server endpoint, authentication, protocol details, and available capabilities.
 
+::: warning Three tools on this page are not registered in production
+The registry defines 60 tools; production serves **57**. `generate_shorts`,
+`create_training_job` and `get_training_status` are gated on services that are
+not deployed (`SHORTS_ENGINE_URL` and `TRAINING_ENGINE_URL`), so they do not
+appear in `tools/list` and cannot be called today. They are documented below
+because the gate is configuration, not removal — but do not build against them.
+
+`GET https://apis.fotohub.app/mcp/health` returns the live count and is
+authoritative over any number written on this page.
+:::
+
 ---
 
 ## Endpoint
@@ -125,7 +136,7 @@ The FOTOhub MCP server advertises the following capabilities:
 | `image_to_video` | Animate a still image into video | `image_url`, `prompt`, `duration` |
 | `extend_video` | Extend an existing video | `video_url`, `prompt`, `seconds` |
 | `generate_story` | Create multi-scene film with voiceover | `scenes`, `voice`, `music` |
-| `generate_shorts` | Auto-cut long video into social shorts | `video_url`, `count`, `style` |
+| `generate_shorts` ⚠️ | Auto-cut long video into social shorts — **not registered in production** | `video_url`, `count`, `style` |
 | `get_job_status` | Check status of async jobs | `job_id` |
 | `add_subtitles` | Add subtitles to a video | `video_url`, `language`, `style` |
 
@@ -161,8 +172,8 @@ The FOTOhub MCP server advertises the following capabilities:
 
 | Tool Name | Description | Parameters |
 |-----------|-------------|------------|
-| `create_training_job` | Start a LoRA or voice training job | `type`, `dataset_url`, `config` |
-| `get_training_status` | Check training job progress | `job_id` |
+| `create_training_job` ⚠️ | Start a LoRA or voice training job — **not registered in production** | `type`, `dataset_url`, `config` |
+| `get_training_status` ⚠️ | Check training job progress — **not registered in production** | `job_id` |
 
 ---
 
@@ -556,7 +567,11 @@ Generate a multi-scene AI film with voiceover — full creative pipeline. **Asyn
 
 ---
 
-#### `generate_shorts`
+#### `generate_shorts` {#generate-shorts}
+
+::: danger Not registered in production
+Gated on `SHORTS_ENGINE_URL`, which is unset. This tool is absent from `tools/list`.
+:::
 
 Auto-cut a long video into short-form clips for TikTok/Reels/Shorts. **Async**. AI analyzes the video, finds the best moments, cuts, and adds captions.
 
@@ -964,7 +979,12 @@ Semantic search through your photo library using AI embeddings. Finds images mat
 
 ---
 
-### Training Tools (2)
+### Training tools (2 — not registered in production)
+
+::: danger Not registered in production
+Both training tools are gated on `TRAINING_ENGINE_URL`, which is unset because
+training-engine is not deployed. They are absent from `tools/list`.
+:::
 
 #### `create_training_job`
 

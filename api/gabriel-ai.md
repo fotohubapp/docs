@@ -4,7 +4,7 @@ Gabriel is FOTOhub's intelligent platform orchestrator — a proprietary AI laye
 
 Gabriel AI is free to use for authenticated users and provides real-time suggestions, streaming responses, and proactive recommendations.
 
-All authenticated Gabriel endpoints accept your standard API key (`fh_live_*` / `fh_test_*`) via the `Authorization: Bearer` header — the same key you use for every other endpoint. A Supabase session JWT is also accepted (used by the web dashboard), but no separate credential is required for API integrations.
+All authenticated Gabriel endpoints accept your standard API key (`fh_live_*`) via the `Authorization: Bearer` header — the same key you use for every other endpoint. A Supabase session JWT is also accepted (used by the web dashboard), but no separate credential is required for API integrations.
 
 ## Endpoints
 
@@ -24,7 +24,7 @@ Classify user intent and return a routing decision with optimal model selection,
 
 **Rate limit:** 30 requests/minute per user
 
-**Authentication:** API key (`fh_live_*` / `fh_test_*`) or Supabase session JWT
+**Authentication:** API key (`fh_live_*`) or Supabase session JWT
 
 ### Request Body
 
@@ -143,7 +143,7 @@ Streaming orchestration via Server-Sent Events (SSE). Provides progressive feedb
 
 **Rate limit:** 30 requests/minute per user
 
-**Authentication:** API key (`fh_live_*` / `fh_test_*`) or Supabase session JWT
+**Authentication:** API key (`fh_live_*`) or Supabase session JWT
 
 ### Request Body
 
@@ -367,7 +367,7 @@ Translate text between languages using FOTOhub's built-in translation engine.
 
 **Rate limit:** 30 requests/minute per user
 
-**Authentication:** API key (`fh_live_*` / `fh_test_*`) or Supabase session JWT
+**Authentication:** API key (`fh_live_*`) or Supabase session JWT
 
 ### Request Body
 

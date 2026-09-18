@@ -174,35 +174,41 @@ In `stack` split-screen layouts, viewers can become confused when both speakers 
 
 ---
 
-## Real-Time SSE Streaming Progress (`/v1/shorts/clips/{id}/events`)
+## Progress Monitoring: Polling, Not SSE
 
-Rather than polling endpoints in a loop, enterprise integrations can subscribe to real-time Server-Sent Events (SSE) to receive micro-step progress updates, virality scores, and immediate clip ready notifications.
+::: warning Corrected 2026-09
+This page previously documented a per-job `GET /v1/shorts/clips/{job_id}/events`
+Server-Sent Events stream with `step_started`/`clip_ready`/`job_completed` event
+types. **That endpoint does not exist.** There is no per-job SSE stream anywhere
+in the Shorts API. The only real `.../events` route is
+`GET /v1/shorts/clips/events` (no job id) — a static catalogue of the webhook
+event names and payload shapes you can subscribe to, not a live stream.
 
-### SSE Stream Endpoint
+For real-time-feeling progress, poll the job status endpoint instead — it
+already returns live `progress` and, once clips finish, the clips themselves:
+:::
+
+### Status Polling Endpoint
 ```http
-GET https://apis.fotohub.app/v1/shorts/clips/{job_id}/events
+GET https://apis.fotohub.app/v1/shorts/clips/{job_id}
 Authorization: Bearer fh_live_your_api_key
-Accept: text/event-stream
 ```
 
-### SSE Event Stream Protocol
+Poll every 2-5 seconds. A typical response while running:
 
+```json
+{"job_id":"job_908f0a21","status":"processing","progress":22}
 ```
-event: step_started
-data: {"job_id":"job_908f0a21","step":"transcribe","label":"Transcribing audio (WhisperX)","progress_pct":12,"timestamp":1788712010}
 
-event: step_progress
-data: {"job_id":"job_908f0a21","step":"transcribe","progress_pct":22,"words_processed":3840,"timestamp":1788712025}
+And once complete:
 
-event: step_completed
-data: {"job_id":"job_908f0a21","step":"transcribe","duration_ms":32100,"timestamp":1788712042}
-
-event: clip_ready
-data: {"job_id":"job_908f0a21","clip_id":"clip_3821a9ef","clip_number":1,"total_clips":3,"virality_score":94.2,"video_url":"https://storage.fotohub.app/shorts/job_908f0a21/clip_01.mp4","cover_url":"https://storage.fotohub.app/shorts/job_908f0a21/cover_01.jpg","duration_s":42.6,"title":"Why MicroVMs Beat Containers","timestamp":1788712095}
-
-event: job_completed
-data: {"job_id":"job_908f0a21","status":"completed","total_clips":3,"total_runtime_s":135.2,"processing_time_s":84.7,"usd_charged":0.7500,"balance_usd":48.2500,"timestamp":1788712125}
+```json
+{"job_id":"job_908f0a21","status":"completed","progress":100,"clips":[{"clip_id":"clip_3821a9ef","clip_number":1,"total_clips":3,"video_url":"https://storage.fotohub.app/shorts/job_908f0a21/clip_01.mp4","cover_url":"https://storage.fotohub.app/shorts/job_908f0a21/cover_01.jpg","duration_s":42.6,"title":"Why MicroVMs Beat Containers"}],"usd_charged":0.7500}
 ```
+
+If you would rather not poll at all, register a webhook for
+`shorts.job.completed` / `shorts.clip.rendered` via `POST /v1/console/webhooks`
+(see [Webhooks guide](/guides/webhooks)) and be notified when the job finishes.
 
 ---
 
@@ -474,171 +480,100 @@ curl -X POST https://apis.fotohub.app/v1/shorts/clips \
 
 ---
 
-## Real-Time SSE Progress Consumer Implementation
+## Progress Consumer Implementation (Polling)
 
-Consume real-time SSE stream events from `/v1/shorts/clips/{id}/events` to render live progress bars and receive individual clips as they finish rendering.
+Poll `GET /v1/shorts/clips/{job_id}` to render a live progress bar and pick up clips as they appear in the response.
 
 ::: code-group
 
 ```python [Python]
 """
-FOTOhub SSE Progress Consumer using httpx.
-Streams real-time clipping milestones and clip_ready events.
+FOTOhub job progress poller using httpx.
 """
 
 import os
-import json
+import time
 import httpx
 
 API_KEY = os.environ.get("FOTOHUB_API_KEY", "fh_live_sample_key_9021")
 JOB_ID = "job_908f0a21"
-SSE_URL = f"https://apis.fotohub.app/v1/shorts/clips/{JOB_ID}/events"
+STATUS_URL = f"https://apis.fotohub.app/v1/shorts/clips/{JOB_ID}"
 
-def stream_job_events():
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Accept": "text/event-stream"
-    }
+def poll_job():
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    seen_clip_ids = set()
 
-    with httpx.stream("GET", SSE_URL, headers=headers, timeout=900) as response:
-        print(f"Connected to SSE stream for job: {JOB_ID}\n")
-        current_event = None
+    with httpx.Client(timeout=30) as client:
+        while True:
+            data = client.get(STATUS_URL, headers=headers).json()
+            print(f"  ... Progress: {data.get('progress', 0)}%")
 
-        for line in response.iter_lines():
-            line = line.strip()
-            if not line:
-                continue
+            for clip in data.get("clips", []):
+                if clip["clip_id"] not in seen_clip_ids:
+                    seen_clip_ids.add(clip["clip_id"])
+                    print(f"\n★ [Clip Ready!] Clip #{clip['clip_number']}: '{clip['title']}'")
+                    print(f"   Video URL: {clip['video_url']}")
+                    print(f"   Cover URL: {clip['cover_url']}\n")
 
-            if line.startswith("event:"):
-                current_event = line.replace("event:", "").strip()
-            elif line.startswith("data:"):
-                data_str = line.replace("data:", "").strip()
-                payload = json.loads(data_str)
+            if data.get("status") == "completed":
+                print(f"✔ [Job Complete] Billed: ${data.get('usd_charged', 0):.2f} USD")
+                break
+            if data.get("status") == "failed":
+                print(f"✘ [Job Failed] {data.get('error')}")
+                break
 
-                if current_event == "step_started":
-                    print(f"▶ [Stage Started] {payload['step']}: {payload['label']} ({payload['progress_pct']}%)")
-                elif current_event == "step_progress":
-                    print(f"  ... [{payload['step']}] Progress: {payload['progress_pct']}%")
-                elif current_event == "clip_ready":
-                    print(f"\n★ [Clip Ready!] Clip #{payload['clip_number']}: '{payload['title']}'")
-                    print(f"   Virality Score: {payload['virality_score']}/100")
-                    print(f"   Video URL: {payload['video_url']}")
-                    print(f"   Cover URL: {payload['cover_url']}\n")
-                elif current_event == "job_completed":
-                    print(f"✔ [Job Complete] Billed: ${payload['usd_charged']:.2f} USD | Remaining Balance: ${payload['balance_usd']:.2f} USD")
-                    break
+            time.sleep(3)
 
 if __name__ == "__main__":
-    stream_job_events()
+    poll_job()
 ```
 
 ```typescript [TypeScript]
 /**
- * FOTOhub SSE Progress Consumer in TypeScript / Node.js.
- * Uses eventsource or fetch streaming to handle real-time pipeline events.
+ * FOTOhub job progress poller.
  */
-
-import EventSource from "eventsource";
 
 const API_KEY = process.env.FOTOHUB_API_KEY || "fh_live_sample_key_9021";
 const JOB_ID = "job_908f0a21";
-const SSE_URL = `https://apis.fotohub.app/v1/shorts/clips/${JOB_ID}/events`;
+const STATUS_URL = `https://apis.fotohub.app/v1/shorts/clips/${JOB_ID}`;
 
-const es = new EventSource(SSE_URL, {
-  headers: {
-    Authorization: `Bearer ${API_KEY}`,
-    Accept: "text/event-stream",
-  },
-});
+async function pollJob() {
+  const seenClipIds = new Set<string>();
 
-es.addEventListener("step_started", (e: any) => {
-  const data = JSON.parse(e.data);
-  console.log(`▶ Step Started: ${data.step} (${data.progress_pct}%) - ${data.label}`);
-});
+  while (true) {
+    const res = await fetch(STATUS_URL, {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+    });
+    const data = await res.json();
+    console.log(`  ... Progress: ${data.progress ?? 0}%`);
 
-es.addEventListener("clip_ready", (e: any) => {
-  const clip = JSON.parse(e.data);
-  console.log(`★ Clip ${clip.clip_number} Ready! Score: ${clip.virality_score}`);
-  console.log(`  URL: ${clip.video_url}`);
-});
+    for (const clip of data.clips ?? []) {
+      if (!seenClipIds.has(clip.clip_id)) {
+        seenClipIds.add(clip.clip_id);
+        console.log(`★ Clip ${clip.clip_number} Ready! URL: ${clip.video_url}`);
+      }
+    }
 
-es.addEventListener("job_completed", (e: any) => {
-  const summary = JSON.parse(e.data);
-  console.log(`✔ All Clips Rendered! Charged: $${summary.usd_charged} USD`);
-  es.close();
-});
+    if (data.status === "completed") {
+      console.log(`✔ All Clips Rendered! Charged: $${data.usd_charged} USD`);
+      break;
+    }
+    if (data.status === "failed") {
+      console.error(`✘ Job Failed: ${data.error}`);
+      break;
+    }
 
-es.onerror = (err) => {
-  console.error("SSE connection error:", err);
-  es.close();
-};
-```
-
-```go [Go]
-package main
-
-import (
-	"bufio"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"os"
-	"strings"
-)
-
-func main() {
-	jobID := "job_908f0a21"
-	url := fmt.Sprintf("https://apis.fotohub.app/v1/shorts/clips/%s/events", jobID)
-
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
-	req.Header.Set("Accept", "text/event-stream")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	reader := bufio.NewReader(resp.Body)
-	var currentEvent string
-
-	fmt.Printf("Streaming SSE progress for job %s...\n", jobID)
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			break
-		}
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		if strings.HasPrefix(line, "event:") {
-			currentEvent = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
-		} else if strings.HasPrefix(line, "data:") {
-			dataStr := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			var payload map[string]interface{}
-			json.Unmarshal([]byte(dataStr), &payload)
-
-			switch currentEvent {
-			case "step_started":
-				fmt.Printf("▶ Step Started: %s (Progress: %.0f%%)\n", payload["step"], payload["progress_pct"])
-			case "clip_ready":
-				fmt.Printf("★ Clip Ready! Score: %.1f | URL: %s\n", payload["virality_score"], payload["video_url"])
-			case "job_completed":
-				fmt.Printf("✔ Job Completed! Charged: $%.2f USD\n", payload["usd_charged"])
-				return
-			}
-		}
-	}
+    await new Promise((r) => setTimeout(r, 3000));
+  }
 }
+
+pollJob();
 ```
 
 ```bash [cURL]
-curl -N -H "Authorization: Bearer $FOTOHUB_API_KEY" \
-     -H "Accept: text/event-stream" \
-     https://apis.fotohub.app/v1/shorts/clips/job_908f0a21/events
+# Poll every few seconds — no streaming endpoint exists
+watch -n 3 curl -s -H "Authorization: Bearer \$FOTOHUB_API_KEY" \
+     https://apis.fotohub.app/v1/shorts/clips/job_908f0a21
 ```
 
 :::

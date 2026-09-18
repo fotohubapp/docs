@@ -473,3 +473,82 @@ html {
     display: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Reading column width
+   ───────────────────────────────────────────────────────────
+   VitePress ships a 688px content column, which is tuned for prose. These are
+   API docs: the majority of the content is parameter tables of four to six
+   columns and code samples with long URLs, and at 688px both were wrapping or
+   scrolling sideways on a 1440px screen that had 400px of unused margin to
+   spare.
+
+   688 -> 820 on the doc column, and a wider page shell so the "On this page"
+   rail is not pushed into the gutter. Prose line length stays sane because the
+   `.vp-doc p` measure is capped separately below — the extra width is spent on
+   tables and code, which is where it was needed.
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --vp-layout-max-width: 1536px;
+}
+
+@media (min-width: 1280px) {
+  .VPDoc:not(.has-sidebar) .content-container,
+  .VPDoc.has-aside .content-container,
+  .VPDoc .content-container {
+    max-width: 820px;
+  }
+
+  /* Paragraphs and list items keep a comfortable measure; tables, code blocks
+     and admonitions take the full 820. A 820px-wide paragraph of 17px type is
+     roughly 105 characters, which is past the point where the eye loses the
+     start of the next line. */
+  .vp-doc > div > p,
+  .vp-doc > div > ul,
+  .vp-doc > div > ol {
+    max-width: 68ch;
+  }
+}
+
+/* VitePress lays tables out as `display: block` so wide ones scroll. Combined
+   with the rounded border this file puts on every table, that left a table
+   narrower than the column sitting inside a full-width bordered box with a
+   dead strip of background down its right-hand side — very visible now that
+   the column is 820px. Tables here are parameter lists whose cells wrap
+   perfectly well, so they lay out as real tables and fill the column instead. */
+.vp-doc table {
+  display: table;
+  width: 100%;
+  table-layout: auto;
+}
+
+/* Below the desktop breakpoint there is no spare width to wrap into, so give
+   wide tables their scroll back rather than crushing six columns into 360px. */
+@media (max-width: 767px) {
+  .vp-doc table {
+    display: block;
+    overflow-x: auto;
+    width: auto;
+  }
+}
+
+/* ─── Sidebar: let long entries wrap ───
+   Several nav labels in this set are long enough to be cut off mid-word at the
+   272px default ("Load Balancers & Auto Scaling", "Delivery to Your Bucket
+   Guide", "Self-Hosting LLMs (vLLM & TGI)"). A nav item you cannot read is a
+   nav item you cannot choose, so they wrap onto a second line and the rail
+   gains a little width to reduce how often that happens. */
+:root {
+  --vp-sidebar-width: 300px;
+}
+
+.VPSidebarItem .text {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.45;
+}
+
+.VPSidebarItem .item {
+  align-items: flex-start;
+}

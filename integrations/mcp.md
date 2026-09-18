@@ -66,67 +66,129 @@ Authorization: Bearer fh_live_YOUR_API_KEY
 
 Get your API key at [fotohub.app/console](https://fotohub.app/console) → API Keys.
 
-## Available Tools (30)
+## Available tools (57)
 
-### Image (8 tools)
+The live count is served by `GET https://apis.fotohub.app/mcp/health`, which reads
+the registry rather than a constant — treat it as authoritative over this page.
+
+The tool registry defines 60 tools. Three are **gated off in production** because
+the service behind them is not deployed, and a registered tool that 403s is worse
+than an absent one: `generate_shorts` (needs `SHORTS_ENGINE_URL`) and the two
+training tools `create_training_job` / `get_training_status` (need
+`TRAINING_ENGINE_URL`). That leaves the 57 below.
+
+Two of those 57 are registered but **inert**: `voice_clone` and `separate_stems`
+appear in `tools/list` and answer successfully, but their implementations return
+a short "not yet available via MCP" message and never call a backend. They are
+marked ⚠️ in the tables. So 55 tools actually do work. Both capabilities exist in
+the FOTOhub dashboard; neither has a billed public endpoint behind it yet.
+
+### Image (8)
 
 | Tool | Description |
 |------|-------------|
-| `generate_image` | Generate an image from text prompt. Models: seedream, flux-2-pro, imagen-4, grok-imagine |
+| `generate_image` | Generate an image from a text prompt |
 | `edit_image` | Edit an image (inpaint, background swap, outpaint) |
-| `upscale_image` | AI super-resolution (2x/4x) |
-| `remove_background` | Remove background from image |
-| `enhance_prompt` | AI-enhance your image prompt for better results |
-| `analyze_image` | Analyze image (tags, colors, NSFW detection, OCR) |
-| `style_transfer` | Apply artistic style to an image |
+| `upscale_image` | AI super-resolution |
+| `remove_background` | Remove the background from an image |
+| `enhance_prompt` | Rewrite an image prompt for better results |
+| `analyze_image` | Tags, colours, NSFW detection, OCR |
+| `style_transfer` | Apply an artistic style to an image |
 | `inpaint_image` | Remove or replace objects in an image |
 
-### Video (7 tools)
+### Editing — image and video post-production (11)
 
 | Tool | Description |
 |------|-------------|
-| `generate_video` | Generate video from text (async — returns job_id) |
-| `image_to_video` | Animate a still image into video |
+| `replace_background` | Swap an image background |
+| `blur_background` | Depth-aware background blur |
+| `add_shadow` | Composite a natural shadow |
+| `enhance_image` | General quality enhancement |
+| `denoise_image` | Noise reduction |
+| `restore_faces` | Face restoration |
+| `depth_map` | Produce a depth map |
+| `upscale_video` | Video super-resolution |
+| `transcode_video` | Re-encode to another format or codec |
+| `add_watermark` | Overlay a watermark |
+| `change_video_speed` | Retime a video |
+
+### Video (6)
+
+| Tool | Description |
+|------|-------------|
+| `generate_video` | Generate video from text (async — returns `job_id`) |
+| `image_to_video` | Animate a still image |
 | `extend_video` | Extend an existing video |
-| `generate_story` | Create multi-scene film with voiceover |
-| `generate_shorts` | Auto-cut long video into social shorts |
-| `get_job_status` | Check status of async video/music jobs |
-| `add_subtitles` | Add subtitles to a video |
+| `generate_story` | Multi-scene film with voiceover |
+| `get_job_status` | Poll any async job |
+| `add_subtitles` | Burn subtitles into a video |
 
-### Audio (6 tools)
-
-| Tool | Description |
-|------|-------------|
-| `text_to_speech` | Convert text to speech (multiple voices/languages) |
-| `generate_music` | Generate music from description (async) |
-| `generate_sfx` | Generate sound effects |
-| `transcribe_audio` | Speech-to-text transcription |
-| `voice_clone` | Clone a voice from audio sample |
-| `separate_stems` | Separate audio into vocal/drum/bass/other tracks |
-
-### Chat (3 tools)
+### Audio (6)
 
 | Tool | Description |
 |------|-------------|
-| `chat_completion` | LLM chat (Claude, GPT, Gemini) |
-| `translate_text` | Translate text between languages |
-| `gabriel_route` | Smart intent classifier — analyzes prompt and suggests best action |
+| `text_to_speech` | Speech synthesis, multiple voices and languages |
+| `generate_music` | Music from a description (async) |
+| `generate_sfx` | Sound effects |
+| `transcribe_audio` | Speech to text |
+| `voice_clone` ⚠️ | Registered but **disabled** — returns a message pointing at the dashboard. It calls no backend. |
+| `separate_stems` ⚠️ | Registered but **disabled** — returns a message pointing at the dashboard. It calls no backend. |
 
-### Utility (4 tools)
-
-| Tool | Description |
-|------|-------------|
-| `check_balance` | Check your prepaid USD wallet balance |
-| `list_models` | List all available AI models with pricing |
-| `list_generations` | View generation history |
-| `search_photos` | Semantic photo search in your library |
-
-### Training (2 tools)
+### 3D (4)
 
 | Tool | Description |
 |------|-------------|
-| `create_training_job` | Start a LoRA/voice training job |
-| `get_training_status` | Check training job progress |
+| `generate_3d_from_text` | Text to 3D mesh |
+| `generate_3d_from_image` | Image to 3D mesh |
+| `list_3d_models` | Available 3D engines, with prices and availability |
+| `get_3d_result` | Fetch a finished 3D job |
+
+### Studio — UGC ads (6)
+
+| Tool | Description |
+|------|-------------|
+| `create_ugc_project` | Start a UGC ad project |
+| `list_ugc_projects` | List your projects |
+| `estimate_ugc_cost` | Price a render before running it |
+| `set_ugc_blueprint` | Set the project blueprint |
+| `render_ugc_video` | Render the ad |
+| `get_ugc_job` | Poll a render |
+
+### Chat (3)
+
+| Tool | Description |
+|------|-------------|
+| `chat_completion` | LLM chat |
+| `translate_text` | Translate between languages |
+| `gabriel_route` | Intent classification — suggests the best action for a prompt |
+
+### Pricing (3)
+
+| Tool | Description |
+|------|-------------|
+| `get_price` | The rate for one model |
+| `estimate_cost` | Cost of a specific run before you make it |
+| `compare_prices` | Compare models for the same job |
+
+### Storage (4)
+
+| Tool | Description |
+|------|-------------|
+| `list_buckets` | Your buckets |
+| `list_files` | Files in a bucket |
+| `save_to_storage` | Copy a generated file into your own bucket before its link expires |
+| `get_download_link` | Fresh signed link for a stored file |
+
+### Account (6)
+
+| Tool | Description |
+|------|-------------|
+| `check_balance` | Prepaid USD wallet balance |
+| `list_models` | Full model catalogue with pricing |
+| `list_generations` | Generation history |
+| `get_usage_summary` | Usage roll-up |
+| `get_transactions` | Wallet transactions |
+| `search_photos` | Semantic search over your library |
 
 ## Async Operations
 

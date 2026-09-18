@@ -332,9 +332,9 @@ FOTOhub delivers webhooks with automatic exponential backoff:
 
 ### Querying Dead-Letter Logs
 
-If an endpoint is unreachable during a generation, you can query delivery logs via the API to inspect response codes and payload contents:
+If an endpoint is unreachable during a generation, you can query delivery logs via the API to inspect response codes and payload contents. This returns the last 50 attempts (no server-side filtering — filter on the `success` field client-side):
 
 ```bash
-curl -X GET "https://apis.fotohub.app/v1/webhooks/wh_98a12bc/deliveries?status=failed&limit=10" \
+curl -X GET "https://apis.fotohub.app/v1/console/webhooks/wh_98a12bc/logs" \
   -H "Authorization: Bearer $FOTOHUB_API_KEY"
 ```

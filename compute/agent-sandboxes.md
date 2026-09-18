@@ -1,234 +1,167 @@
-# Firecracker microVM Sandboxes & Virtual Workspaces
+# Firecracker microVM Sandboxes
 
-Execute untrusted agent-generated code, statistical algorithms, and data processing tasks in high-isolation microVMs booted in under **200 milliseconds**.
+FOTOhub runs untrusted, agent-generated Python in high-isolation microVMs booted in
+under **200 milliseconds**.
 
-Managed by the **Agent Compute Engine** (`server/agent-compute/` on port 8795), sandboxes isolate tenant code using hardware-assisted Linux KVM virtualization backed by AWS Firecracker, with automatic fallback to Docker cgroups v2.
+Managed by the **Agent Compute Engine**, sandboxes isolate tenant code using hardware-assisted
+Linux KVM virtualization via Firecracker, with an automatic fallback to Docker cgroups v2 when
+Firecracker/KVM isn't available on the host.
+
+:::warning Not a standalone public API
+`POST /sandbox/exec-python` is an **internal** route on the Agent Compute service, gated by
+a proxy secret (`X-Proxy-Secret`) that only other FOTOhub backend services hold — it does not
+accept an `fh_live_*` API key and is not reachable as a customer-facing REST endpoint. You run
+code in a sandbox by adding a `code.python` node to an **Agent Engine workflow**
+(`POST /engine/v1/workflows`); the workflow runtime calls the sandbox on your behalf and bills
+the wall-clock time as part of the workflow run. Earlier drafts of this page described
+`exec-python` (and a nonexistent `exec-bash`) as something you could curl directly — that was
+wrong and has been removed below.
+:::
 
 ---
 
-## Architecture Deep Dive: Firecracker KVM Isolation
+## Architecture: Firecracker KVM Isolation
 
-Traditional container sandboxes (Docker, LXC) share the host Linux kernel and rely purely on namespaces and cgroups, leaving them vulnerable to kernel privilege escalation and escape exploits.
+Traditional container sandboxes (Docker, LXC) share the host Linux kernel and rely on
+namespaces and cgroups, which leaves them exposed to kernel privilege-escalation and escape
+exploits.
 
-FOTOhub Sandboxes run inside genuine hardware microVMs created by the Linux KVM hypervisor. Each microVM gets its own lightweight Linux kernel.
-
-### The vsock Host-Guest Channel
-
-Communication between the host API server and the guest VM is strictly over `virtio-vsock`.
-This is a zero-network interface communication channel that avoids the need for virtual ethernet devices. 
-It uses a Context ID (CID) and Port (9999) to pass JSON payloads back and forth.
+FOTOhub sandboxes run inside genuine hardware microVMs created by the Linux KVM hypervisor.
+Each microVM boots its own lightweight Linux kernel, is provisioned with **2 vCPU / 2048 MiB
+RAM**, and talks to the host exclusively over `virtio-vsock` on guest port **9999** — there is
+no virtual ethernet device inside the guest.
 
 ```mermaid
 flowchart TD
-    subgraph Host OS (Bare-Metal KVM Compute Node)
-        A["API Request (POST /sandbox/exec-python)"] --> B["SandboxManager"]
-        B --> C{"Pre-Warmed Pool Ready?"}
-        C -->|"Yes (p50: 142ms)"| D["Acquire Warm Firecracker VM"]
-        C -->|"No (p50: 210ms)"| E["Spawn New Firecracker Jailer"]
-        
-        D & E --> F["Host virtio-vsock Channel (Port 9999)"]
+    subgraph Host["Host OS (Agent Compute Engine)"]
+        A["code.python node call (internal, proxy-secret auth)"] --> B["FirecrackerSandbox"]
+        B --> C{"Firecracker/KVM available?"}
+        C -->|"Yes"| D["Boot microVM (2 vCPU / 2048 MiB)"]
+        C -->|"No"| E["Fall back to Docker cgroups v2"]
+        D --> F["Host vsock UDS proxy (guest port 9999)"]
     end
 
-    subgraph Firecracker MicroVM Jail (Hardware KVM Guest)
-        F --> G["Guest Execution Daemon (exec_daemon.py)"]
-        G --> H["Isolated vCPU & Memory (Max 2GB RAM / 1 vCPU)"]
-        G --> I["Seccomp BPF Syscall Filter (Blocks raw sockets)"]
-        G --> J["Workspace Directory Mount (/sandbox/workspace)"]
+    subgraph Guest["Firecracker MicroVM (Hardware KVM Guest)"]
+        F --> G["Guest exec_daemon"]
+        G --> H["Wrapped Python: input injected, result captured"]
     end
 
-    subgraph Persistent Storage
-        J <--> K["User Persistent Workspace (/data/workspaces/{user_id})"]
-    end
-
-    G --> L["Result Envelope ({ok, output, error, execution_ms, memory_mb})"]
+    G --> I["Response: {ok, value, stdout, stderr, error, duration_ms}"]
 ```
 
 ### Process Lifecycle
 
-1. **Pre-warming:** The host maintains a pool of paused, booted microVMs.
-2. **Assignment:** When a request arrives, a VM is resumed and bound to the request context.
-3. **Execution:** The Python payload is injected via vsock. The execution daemon runs it in an isolated environment, parsing inputs and assigning `result = ...`.
-4. **Scavenging:** After execution, the VM is immediately destroyed to prevent any cross-tenant state leakage.
-5. **Replenishment:** A new VM is booted in the background.
+1. **Boot:** A microVM is booted (or an already-booted one from the warm pool is reused).
+2. **Vsock handshake:** The host waits for the guest's `exec_daemon` to answer a ping over the
+   vsock UDS proxy before sending real work.
+3. **Execution:** The user's code is wrapped (input is JSON-decoded into a module-level `input`
+   global, and the code's `result = ...` assignment is captured via a `__FOTOHUB_RESULT__`
+   stdout sentinel so `print()` output never corrupts the return value).
+4. **Teardown:** The VM is destroyed after the call to prevent any cross-tenant state leakage.
 
 ---
 
 ## Security Boundary Guarantees
 
 :::danger Security Restrictions
-The sandbox intentionally restricts common system capabilities to ensure safety and isolation.
+The sandbox intentionally restricts common system capabilities to ensure isolation.
 :::
 
-1. **Zero TCP/IP Attack Surface**: Host-to-guest communications flow strictly across Linux `virtio-vsock`. The guest kernel contains **no virtual ethernet devices (`eth0`)**, preventing SSRF and intranet probing.
-2. **No Environment Variables**: Host environment variables are completely isolated. Do not rely on `os.environ` inside the sandbox.
-3. **No Filesystem Persistence Outside Workspace**: The root filesystem is read-only. Writable state must be stored in `/sandbox/workspace`.
-4. **KVM Jailer Sandboxing**: Firecracker processes are locked inside an unprivileged jail using `chroot`, `unshare`, custom cgroups, and strict Seccomp filters that deny over 200 system calls.
+1. **No virtual ethernet device.** Host-to-guest communication is exclusively `virtio-vsock`;
+   the guest has no `eth0`, which rules out SSRF and intranet probing from inside sandboxed code.
+2. **No inherited environment.** Host environment variables are not exposed to the guest; don't
+   rely on `os.environ` inside sandboxed code.
+3. **Ephemeral by design.** Each execution gets a fresh microVM; nothing persists across calls
+   unless your workflow explicitly passes state back in via `input`.
 
 ---
 
-## Sandbox REST API Reference
+## Running Code: the `code.python` Workflow Node
 
-### `POST /sandbox/exec-python`
+There is no public `POST /sandbox/exec-python` endpoint. To execute Python, add a
+`code.python` node to an Agent Engine workflow:
 
-Run arbitrary Python scripts with typed inputs and structured return values.
-
-**Sub-200ms cold start** is guaranteed by the Firecracker pre-warmed pool.
-
-#### Authentication
-
-You must authenticate with your FOTOhub API Key using the Authorization header:
-
-```http
-Authorization: Bearer fh_live_YOUR_API_KEY
+```json
+{
+  "type": "code.python",
+  "params": {
+    "code": "import numpy as np\ndata = np.array(input['values'])\nresult = {'mean': float(np.mean(data))}",
+    "timeout_s": 30,
+    "memory_mb": 512
+  }
+}
 ```
 
-#### Request Schema
+| Parameter | Type | Default | Notes |
+|:---|:---|:---:|:---|
+| `code` | string | — | Python source. Assign the return value to `result = ...`. |
+| `input` | object | `{}` | The node's incoming data, injected as the global `input` dict. |
+| `timeout_s` | integer | `30` | Server-side hard cap of **120s** regardless of what you request. |
+| `memory_mb` | integer | `512` | Soft ceiling passed to the sandbox; not independently verified per-recipe below. |
 
-| Parameter | Type | Required | Default | Description |
-|:---|:---|:---:|:---:|:---|
-| `code` | string | **Yes** | — | Python code snippet. Assign final output to `result = ...`. |
-| `input` | object | No | `{}` | Key-value dictionary injected as the predefined global `input`. |
-| `timeout_s` | integer | No | `10` | Maximum execution time in seconds (hard limit of 10s). |
-| `memory_mb` | integer | No | `128` | Memory ceiling in megabytes (~128MB recommended). |
+Create/manage the workflow via the real Agent Engine routes:
 
-#### The `input` Dictionary
-
-To pass typed data into sandbox code, use the `input` dictionary in your JSON payload. 
-The execution daemon automatically unpacks this into the global scope as `input`.
-
-Example usage in code:
-```python
-user_id = input['user_id']
-metadata = input.get('meta', {})
+```bash
+curl -X POST https://apis.fotohub.app/engine/v1/workflows \
+  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "sandbox-demo", "nodes": [{"type": "code.python", "params": {"code": "result = 1 + 1"}}]}'
 ```
 
-#### Response Schema
+### Response shape
 
-| Field | Type | Description |
-|:---|:---|:---|
-| `ok` | boolean | True if execution succeeded and returned a valid result, False if it crashed or timed out. |
-| `output` | any | The JSON-serialized value assigned to the `result` variable in your code. |
-| `error` | string \| null | A detailed error message including traceback, if execution failed. |
-| `execution_ms` | integer | Wall-clock time spent inside the sandbox in milliseconds. |
-| `memory_mb` | float | Peak memory usage observed during execution. |
-
-The daemon uses the `__FOTOHUB_RESULT__` sentinel to safely extract the output without being corrupted by `print()` statements.
-
-#### Example Response
+The sandbox call itself (internal) returns:
 
 ```json
 {
   "ok": true,
-  "output": {
-    "count": 6,
-    "mean": 16.483333333333334,
-    "p95": 25.325
-  },
+  "value": { "mean": 3.0 },
+  "stdout": "",
+  "stderr": "",
   "error": null,
-  "execution_ms": 142,
-  "memory_mb": 45.2
+  "duration_ms": 142
 }
 ```
 
----
-
-## Handling Large Inputs (S3 URLs)
-
-:::info Passing Large Data
-If your input exceeds 1MB, passing it inline in the JSON payload may cause API limits to trigger. 
-Instead, pass a signed FOTOhub S3 URL inside the `input` dictionary and download it within the sandbox using `httpx`.
-:::
-
-```python
-import httpx
-# Download directly to memory or workspace
-response = httpx.get(input['data_url'])
-with open('/sandbox/workspace/dataset.json', 'wb') as f:
-    f.write(response.content)
-result = {"bytes_downloaded": len(response.content)}
-```
+`value` carries whatever you assigned to `result`; there is no separate `memory_mb` field in
+the response — memory pressure shows up as an `ok: false` / OOM error instead.
 
 ---
 
-## Pricing and Billing Breakdown
+## Resource Limits
 
-FOTOhub sandboxes offer highly predictable per-execution billing directly from your USD wallet.
-
-### Sandbox Billing vs EC2 Comparison
-
-| Metric | FOTOhub Sandbox | AWS EC2 (t3.micro) |
-|:---|:---|:---|
-| **Pricing Model** | Per Execution | Per Second (minimum 60s) |
-| **Cost** | ~$0.00008 per run | ~$0.0104 per hour |
-| **Cold Start** | < 200ms | 30s - 2min |
-| **Maintenance** | None (Fully Managed) | OS updates, security patching |
-| **Isolation** | Firecracker MicroVM per run | Shared OS instance |
-
-At **~$0.00008** per run, you can execute 12,500 scripts for $1.00.
-
----
-
-## Resource Limitations & Error Propagation
-
-### Timeout Handling (10s Hard Limit)
-
-The sandbox enforces a hard execution limit of `timeout_s` (maximum 10s). If exceeded, you receive:
+- **Timeout:** requests may ask for any `timeout_s`, but the route clamps it to a **120-second
+  hard maximum**; the default if you omit it is 30s.
+- **Memory:** the microVM itself is provisioned with 2048 MiB; the `memory_mb` request
+  parameter (default 512) is a soft ceiling for your own accounting, not a guaranteed hard cap
+  independently verified for every workload shape.
+- **Timeout error example:**
 
 ```json
-{
-  "ok": false,
-  "output": null,
-  "error": "TimeoutError: Execution exceeded 10.0 seconds limit",
-  "execution_ms": 10005,
-  "memory_mb": 51.0
-}
-```
-
-### Memory Ceiling (~128MB per microVM)
-
-Each VM is capped by a cgroup memory ceiling, defaulting to 128MB.
-Memory-intensive operations (like large Pandas joins) will crash the daemon:
-
-```json
-{
-  "ok": false,
-  "output": null,
-  "error": "MemoryError: Process killed by OOM killer (exceeded 128 MB)",
-  "execution_ms": 1240,
-  "memory_mb": 128.0
-}
-```
-
-### Syntax and Runtime Errors
-
-```json
-{
-  "ok": false,
-  "output": null,
-  "error": "SyntaxError: invalid syntax (line 4)",
-  "execution_ms": 12,
-  "memory_mb": 15.0
-}
+{ "ok": false, "value": null, "error": "TimeoutError: execution exceeded the configured timeout", "duration_ms": 30004 }
 ```
 
 ---
 
-## Extensive Sandbox Recipes (15+ Use Cases)
+## Billing
 
-:::tip Pre-installed Libraries
-The execution environment includes numpy, pandas, scipy, pillow, httpx, scikit-learn, beautifulsoup4, regex, and many more out-of-the-box.
-:::
+Sandbox wall-clock time bills at **$0.0002 per second**, added on
+top of the model-token cost for the workflow step that triggered it — there is no separate,
+standalone "per sandbox call" product or invoice line. A 400ms execution therefore adds about
+**$0.00008** to that step's cost. Billing happens only after the node completes successfully;
+a failed or timed-out execution is not charged.
+
+---
+
+## Example Recipes
+
+These are `code` payloads you can drop straight into a `code.python` node's `params.code`.
+The execution environment includes numpy, pandas, scipy, pillow, httpx, scikit-learn, and
+beautifulsoup4.
 
 ### 1. Basic Math/Stats with NumPy
 
-::: code-group
-
-```python [Python]
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-res = client.post("/sandbox/exec-python", {
-    "code": """
+```python
 import numpy as np
 data = np.array(input['values'])
 result = {
@@ -236,86 +169,41 @@ result = {
     "std": float(np.std(data)),
     "max": float(np.max(data))
 }
-""",
-    "input": {"values": [1, 2, 3, 4, 5]},
-    "timeout_s": 5
-})
 ```
-
-```typescript [TypeScript]
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-const res = await client.post("/sandbox/exec-python", {
-    code: `
-import numpy as np
-data = np.array(input['values'])
-result = {"mean": float(np.mean(data)), "std": float(np.std(data))}
-    `,
-    input: { values: [1, 2, 3, 4, 5] },
-    timeout_s: 5
-});
-```
-
-```go [Go]
-// Go implementation
-payload := map[string]interface{}{
-    "code": "import numpy as np
-result={'mean': float(np.mean(input['v']))}",
-    "input": map[string]interface{}{"v": []float64{1, 2, 3, 4}},
-}
-```
-
-```bash [cURL]
-curl -X POST https://apis.fotohub.app/sandbox/exec-python   -H "Authorization: Bearer fh_live_YOUR_API_KEY"   -H "Content-Type: application/json"   -d '{"code": "import numpy as np
-result=float(np.mean(input["v"]))", "input": {"v": [1,2,3]}}'
-```
-:::
 
 ### 2. Pandas Data Transformation
 
 ```python
 import pandas as pd
 df = pd.DataFrame(input['records'])
-# Group by category and sum values
 summary = df.groupby('category')['amount'].sum().to_dict()
 result = summary
 ```
 
 ### 3. Image Processing with PIL/Pillow
 
-:::warning No Network Uploads
-In production, pass base64 encoded images in the `input` dictionary or download via signed URL.
+:::warning
+Pass images as base64 in `input`, or a signed FOTOhub S3 URL to fetch with `httpx` — the guest
+has no inbound network access to fetch anything else.
 :::
 
 ```python
-import base64
-import io
+import base64, io
 from PIL import Image, ImageFilter
 
 image_data = base64.b64decode(input['image_b64'])
-img = Image.open(io.BytesIO(image_data))
+img = Image.open(io.BytesIO(image_data)).filter(ImageFilter.BLUR)
 
-# Apply blur
-img = img.filter(ImageFilter.BLUR)
-
-# Convert back to base64
 buffered = io.BytesIO()
 img.save(buffered, format="PNG")
-img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-
-result = {"blurred_image": img_str}
+result = {"blurred_image": base64.b64encode(buffered.getvalue()).decode('utf-8')}
 ```
 
 ### 4. JSON Parsing and Transformation
 
 ```python
 import json
-
-raw_string = input['json_string']
-data = json.loads(raw_string)
-
-# Flatten nested dict
+data = json.loads(input['json_string'])
 flat = {}
 for key, value in data.items():
     if isinstance(value, dict):
@@ -323,25 +211,18 @@ for key, value in data.items():
             flat[f"{key}_{k}"] = v
     else:
         flat[key] = value
-
 result = {"flattened": flat}
 ```
 
-### 5. HTTP Requests with httpx Inside Sandbox
+### 5. HTTP Requests with httpx Inside the Sandbox
 
 ```python
 import httpx
-
-# The sandbox allows outbound HTTP requests via httpx.
 res = httpx.get("https://api.github.com/repos/facebook/react")
-if res.status_code == 200:
-    data = res.json()
-    result = {"stars": data["stargazers_count"]}
-else:
-    result = {"error": "Failed to fetch"}
+result = {"stars": res.json()["stargazers_count"]} if res.status_code == 200 else {"error": "fetch failed"}
 ```
 
-### 6. Machine Learning Inference with scikit-learn
+### 6. Scikit-learn Inference
 
 ```python
 from sklearn.linear_model import LinearRegression
@@ -349,23 +230,15 @@ import numpy as np
 
 X = np.array(input['X']).reshape(-1, 1)
 y = np.array(input['y'])
-test = np.array(input['test_X']).reshape(-1, 1)
-
 model = LinearRegression().fit(X, y)
-predictions = model.predict(test).tolist()
-
-result = {"predictions": predictions, "coef": model.coef_.tolist()}
+result = {"predictions": model.predict(np.array(input['test_X']).reshape(-1, 1)).tolist()}
 ```
 
-### 7. Regex Extraction Patterns
+### 7. Regex Extraction
 
 ```python
 import re
-
-text = input['text']
-# Extract all email addresses
-emails = re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)
-
+emails = re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', input['text'])
 result = {"emails": emails, "count": len(emails)}
 ```
 
@@ -373,1675 +246,35 @@ result = {"emails": emails, "count": len(emails)}
 
 ```python
 import ast
-
-code = input['code_to_check']
 try:
-    tree = ast.parse(code)
-    # Count function definitions
-    func_count = sum(isinstance(node, ast.FunctionDef) for node in ast.walk(tree))
-    result = {"valid_syntax": True, "functions": func_count}
+    tree = ast.parse(input['code_to_check'])
+    result = {"valid_syntax": True, "functions": sum(isinstance(n, ast.FunctionDef) for n in ast.walk(tree))}
 except SyntaxError as e:
     result = {"valid_syntax": False, "error": str(e)}
 ```
 
-### 9. CSV to JSON Conversion
+### 9. CSV to JSON
 
 ```python
-import csv
-import io
-
-csv_string = input['csv_data']
-f = io.StringIO(csv_string)
-reader = csv.DictReader(f)
-rows = [row for row in reader]
-
-result = {"data": rows}
+import csv, io
+reader = csv.DictReader(io.StringIO(input['csv_data']))
+result = {"data": [row for row in reader]}
 ```
 
 ### 10. Mathematical Optimization with SciPy
 
 ```python
 from scipy.optimize import minimize
-
-def objective(x):
-    # simple quadratic function centered at 5
-    return (x[0] - 5)**2
-
-res = minimize(objective, [0])
+res = minimize(lambda x: (x[0] - 5) ** 2, [0])
 result = {"optimized_x": res.x.tolist()[0], "success": res.success}
 ```
 
-### 11. Markdown to HTML Rendering
-
-```python
-# requires markdown to be pre-installed in the sandbox image
-import markdown
-
-md_text = input['markdown']
-html = markdown.markdown(md_text)
-
-result = {"html": html}
-```
-
-### 12. JSON Schema Validation
-
-```python
-import jsonschema
-from jsonschema import validate
-
-schema = input['schema']
-instance = input['data']
-
-try:
-    validate(instance=instance, schema=schema)
-    result = {"valid": True}
-except jsonschema.exceptions.ValidationError as e:
-    result = {"valid": False, "error": e.message}
-```
-
-### 13. Time Series Analysis
-
-```python
-import pandas as pd
-
-dates = pd.date_range(start='1/1/2026', periods=len(input['series']))
-ts = pd.Series(input['series'], index=dates)
-
-# Calculate 3-day rolling mean
-rolling_mean = ts.rolling(window=3).mean().dropna().tolist()
-
-result = {"rolling_mean": rolling_mean}
-```
-
-### 14. Text Similarity Scoring
-
-```python
-from difflib import SequenceMatcher
-
-text1 = input['str1']
-text2 = input['str2']
-
-ratio = SequenceMatcher(None, text1, text2).ratio()
-result = {"similarity_ratio": ratio}
-```
-
-### 15. Base64 Encode/Decode Workflows
+### 11. Base64 Encode/Decode
 
 ```python
 import base64
-
 if input['action'] == 'encode':
-    encoded = base64.b64encode(input['text'].encode()).decode()
-    result = {"output": encoded}
+    result = {"output": base64.b64encode(input['text'].encode()).decode()}
 elif input['action'] == 'decode':
-    decoded = base64.b64decode(input['text'].encode()).decode()
-    result = {"output": decoded}
+    result = {"output": base64.b64decode(input['text'].encode()).decode()}
 ```
-
----
-
-## Executing Shell Commands (`POST /sandbox/exec-bash`)
-
-While Python is the primary execution target, the sandbox also supports arbitrary bash commands.
-
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-bash   -H "Authorization: Bearer fh_live_YOUR_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "command": "python3 -m unittest discover -s /sandbox/workspace/tests",
-    "timeout_s": 10
-  }'
-```
-
-Returns:
-```json
-{
-  "ok": true,
-  "exit_code": 0,
-  "output": "Ran 12 tests in 0.045s
-
-OK
-",
-  "error": "",
-  "execution_ms": 185
-}
-```
-
----
-
-## Workspace File Management
-
-Files placed in `/sandbox/workspace` automatically persist between executions for the authenticated user.
-This is highly useful for chaining multiple executions together without needing to re-upload large datasets.
-
-### Workspace API Reference
-
-| Endpoint | Method | Description |
-|:---|:---|:---|
-| `/sandbox/workspace/files` | `GET` | List all files in the virtual workspace. |
-| `/sandbox/workspace/upload` | `POST` | Multipart upload a file into `/sandbox/workspace/{path}`. |
-| `/sandbox/workspace/download/{path}` | `GET` | Download a file generated by the sandbox. |
-| `/sandbox/workspace/reset` | `DELETE` | Purge all workspace files and reset to empty state. |
-
-
-### 16. Additional Recipe 16
-```python
-# More logic here
-result = {'idx': 16}
-```
-
-### 17. Additional Recipe 17
-```python
-# More logic here
-result = {'idx': 17}
-```
-
-### 18. Additional Recipe 18
-```python
-# More logic here
-result = {'idx': 18}
-```
-
-### 19. Additional Recipe 19
-```python
-# More logic here
-result = {'idx': 19}
-```
-
-### 20. Additional Recipe 20
-```python
-# More logic here
-result = {'idx': 20}
-```
-
-### 21. Additional Recipe 21
-```python
-# More logic here
-result = {'idx': 21}
-```
-
-### 22. Additional Recipe 22
-```python
-# More logic here
-result = {'idx': 22}
-```
-
-### 23. Additional Recipe 23
-```python
-# More logic here
-result = {'idx': 23}
-```
-
-### 24. Additional Recipe 24
-```python
-# More logic here
-result = {'idx': 24}
-```
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-
-
-
----
-
-## Multi-Language SDK Examples for Exec-Python
-
-### Python Example
-```python
-from fotohub import FotoHub
-client = FotoHub(api_key="fh_live_YOUR_API_KEY")
-
-def execute_remote():
-    res = client.post("/sandbox/exec-python", {
-        "code": "result = {'hello': input['name']}",
-        "input": {"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128
-    })
-    return res.data
-```
-
-### TypeScript Example
-```typescript
-import { FotoHub } from "fotohub";
-const client = new FotoHub({ apiKey: "fh_live_YOUR_API_KEY" });
-
-async function executeRemote() {
-    const res = await client.post("/sandbox/exec-python", {
-        code: "result = {'hello': input['name']}",
-        input: { name: "World" },
-        timeout_s: 5,
-        memory_mb: 128
-    });
-    console.log(res.data);
-}
-```
-
-### Go Example
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-func main() {
-    payload := map[string]interface{}{
-        "code":      "result = {'hello': input['name']}",
-        "input":     map[string]string{"name": "World"},
-        "timeout_s": 5,
-        "memory_mb": 128,
-    }
-    jsonData, _ := json.Marshal(payload)
-    
-    req, _ := http.NewRequest("POST", "https://apis.fotohub.app/sandbox/exec-python", bytes.NewBuffer(jsonData))
-    req.Header.Set("Authorization", "Bearer fh_live_YOUR_API_KEY")
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, _ := client.Do(req)
-    defer resp.Body.Close()
-    
-    fmt.Println(resp.Status)
-}
-```
-
-### cURL Example
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "result = {"hello": input["name"]}",
-    "input": {"name": "World"},
-    "timeout_s": 5,
-    "memory_mb": 128
-  }'
-```
-
----
-
-## Detailed Sandbox Lifecycle Flow
-
-When a request arrives at the API server, several components collaborate to return a response efficiently.
-
-1. **API Gateway Layer**: The request is authenticated. Rate limits are checked.
-2. **SandboxManager**: The payload is routed to the sandbox orchestrator.
-3. **Pool Checkout**: A ready, booted Firecracker VM is taken from the pool.
-4. **Vsock Injection**: The Python payload is injected.
-5. **Daemon Parsing**: `exec_daemon.py` uses `ast.parse` and custom logic to execute the code.
-6. **Execution Phase**: The sandbox enforces time and memory constraints.
-7. **Scraping phase**: Outputs are fetched, looking for `__FOTOHUB_RESULT__`.
-8. **Teardown**: The KVM instance is killed. A new one is asynchronously queued.
-9. **Response Delivery**: JSON is sent back to the API client.
-

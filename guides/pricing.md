@@ -47,6 +47,12 @@ provider's own price list or invoice; `false` means it is our recorded copy of
 their published rate and has not been reconciled against an invoice.
 `GET /v1/pricing/audit` lists which models are in which bucket.
 
+::: warning `/v1/pricing` is the authoritative source
+`GET /v1/models` also returns a `request_price` field per model, but that figure
+can lag behind what you are actually billed — treat `GET /v1/pricing` as the source
+of truth and `/v1/models` as a catalog listing only, not a price quote.
+:::
+
 ## Image Generation Costs
 
 Charged per delivered image. Models marked with a range charge per resolution —
@@ -219,7 +225,7 @@ Read `shortfall_usd` to size the top-up.
 
 **Provider failure after the charge** — the wallet is refunded and the error says
 so explicitly (`"No charge was made for this request."`). If you do not see that
-sentence, reconcile against `GET /v1/billing/usage` rather than assuming.
+sentence, reconcile against `GET /v1/tiers/usage` rather than assuming.
 
 ## Cost Optimization Tips
 

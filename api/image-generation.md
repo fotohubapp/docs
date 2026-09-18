@@ -1,6 +1,6 @@
 # Image Generation
 
-FOTOhub provides access to **30+ image generation models** from 8 providers: Google (Vertex AI Imagen + Gemini), OpenAI, Microsoft, BytePlus, xAI, Black Forest Labs, MiniMax, and Kling. Generate photorealistic images, illustrations, concept art, and more via a single unified endpoint.
+FOTOhub provides access to **35 image generation models** from 10 providers: Google (Vertex AI Imagen, Gemini, and Vision), OpenAI, BytePlus, xAI, Black Forest Labs, MiniMax, Kuaishou, and FOTOhub's own proprietary models. Generate photorealistic images, illustrations, concept art, and more via a single unified endpoint.
 
 ::: info One billing mode: prepaid USD
 Every image is charged in **USD from your prepaid wallet**, at the provider's own
@@ -2079,7 +2079,7 @@ than a 2K `gpt-image-2` draft.
 ::: tip Verify, don't estimate
 Every response carries the settled `cost_usd`, and BytePlus models carry a per-leg
 `cost_breakdown`. Reconcile against those, not against this page — and read your running
-total from [`GET /v1/billing/usage`](/api/billing).
+total from [`GET /v1/tiers/usage`](/api/billing).
 :::
 
 ### Prompt Engineering Best Practices
@@ -2171,7 +2171,7 @@ $0.126 above is 4 SeedDream images.
 The charge happens before the provider on every model, so any failure after it is reversed.
 When the reversal commits, the sentence **`Your wallet was not charged for this request.`**
 is appended to the error message — and it is appended *only* then, so its absence means
-check [`GET /v1/billing/usage`](/api/billing) rather than assume.
+check [`GET /v1/tiers/usage`](/api/billing) rather than assume.
 
 ```json
 {

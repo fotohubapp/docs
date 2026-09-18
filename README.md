@@ -14,7 +14,7 @@
 
 ## About
 
-Source for the [FOTOhub developer documentation](https://docs.fotohub.app) — covering 50+ AI models, cloud computing, storage, agent workflows, and the full platform API.
+Source for the [FOTOhub developer documentation](https://docs.fotohub.app) — covering 100+ AI models, cloud computing, storage, agent workflows, and the full platform API.
 
 Built with [VitePress](https://vitepress.dev), deployed on nginx at `docs.fotohub.app`.
 
@@ -53,8 +53,8 @@ docs-site/
 ├── api/                     # API Reference (32 pages)
 │   ├── getting-started.md   #   Introduction & setup
 │   ├── authentication.md    #   Auth & API keys
-│   ├── image-generation.md  #   Image generation (27 models)
-│   ├── video-generation.md  #   Video generation (7 models)
+│   ├── image-generation.md  #   Image generation (35 models)
+│   ├── video-generation.md  #   Video generation (56 models)
 │   ├── music-audio.md       #   Music, TTS, speech-to-text
 │   ├── chat-llm.md          #   Chat completions (credit & token billing)
 │   ├── gabriel-ai.md        #   Gabriel AI orchestrator
@@ -103,7 +103,7 @@ docs-site/
 ### Style Guidelines
 
 - Use standard Markdown with VitePress extensions (containers, code groups, badges).
-- API endpoints: use `## POST /v1/endpoint` headings.
+- API endpoints: use `## POST /v1/{resource}` headings (a real path, not a literal placeholder).
 - Include request/response examples with syntax-highlighted code blocks.
 - Add `:::tip`, `:::warning`, or `:::danger` containers for callouts.
 

@@ -13,7 +13,7 @@ FOTOhub provides three tiers of object storage — from simple managed buckets t
 | Tier | Prefix | Backend | Best For |
 |------|--------|---------|----------|
 | Simple Buckets | `/v1/buckets` | Supabase Storage | Quick file storage, small projects |
-| S3 Enterprise | `/v1/storage/s3` | Real AWS S3 | Production apps, large-scale storage |
+| S3 Enterprise | `/v1/storage/s3/*` (e.g. `/v1/storage/s3/buckets`) | Real AWS S3 | Production apps, large-scale storage |
 | Rental Packages | `/v1/storage` | Managed S3 | Teams, shared workspaces |
 
 ---

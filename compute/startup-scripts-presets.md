@@ -45,56 +45,49 @@ The scripts execute in a non-interactive shell environment. Environment variable
 
 ## Comprehensive Built-In Installation Presets Reference
 
-FOTOhub provides heavily optimized, pre-tested installation scripts that execute automatically during initial instance boot. Specifying these presets offloads the burden of writing robust bash installation logic for common dependencies.
+FOTOhub provides pre-written installation scripts (`install_presets`) that run automatically
+during initial instance boot, concatenated together and executed as `UserData`. **There are 8
+real presets** — earlier drafts of this page invented `cuda`, `jupyter`, `comfyui`, `vllm`, and
+`ollama` presets that don't exist, and described the real `docker`/`python-ml` presets
+inaccurately. What's actually in `STARTUP_SCRIPTS` (`server/compute-engine`):
 
 ### 1. `docker`
-The `docker` preset installs the latest stable version of Docker CE and Docker Compose V2.
+Installs Docker CE from the official Docker apt repo.
 - **Components Installed**: `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`.
-- **Post-Boot State**: The Docker daemon is running and enabled via systemd. The default `ubuntu` user is added to the `docker` group, allowing passwordless execution of Docker commands.
-- **Log Rotation**: Automatically configures Docker daemon with `json-file` log driver, capping logs at 50MB and 3 files max to prevent disk exhaustion.
-- **Boot Time Impact**: ~18s
+- **Post-Boot State**: Docker daemon enabled and started via systemd; the `ubuntu` user is added to the `docker` group.
 
-### 2. `python-ml`
-The ultimate preset for Python-based machine learning workloads.
-- **Components Installed**: Python 3.10+, pip, virtualenv. Pre-installs massive binaries to save bandwidth: PyTorch 2.4 (CUDA 12.x compatible), TorchVision, NumPy, Pandas, Scikit-Learn, FastAPI, Uvicorn, and Hugging Face `transformers`.
-- **Post-Boot State**: A global virtual environment is instantiated in `/opt/ml-env`. The `.bashrc` for the `ubuntu` user is modified to activate this environment automatically upon SSH login.
-- **Boot Time Impact**: ~45s (due to large package extraction)
+### 2. `nodejs`
+Installs Node.js 20.x from NodeSource.
+- **Components Installed**: `nodejs`, plus `pm2`, `yarn`, and `pnpm` globally via npm.
 
-### 3. `cuda`
-The foundational layer for any GPU-accelerated computing.
-- **Components Installed**: NVIDIA Proprietary Drivers (v535 or latest stable), CUDA Toolkit 12.2, cuDNN 8.x, and the NVIDIA Container Toolkit.
-- **Post-Boot State**: The `nvidia-smi` command is immediately available. Docker is configured with the `nvidia` runtime as the default, allowing `docker run --gpus all` out of the box without manual daemon configuration.
-- **Boot Time Impact**: ~90s (Requires DKMS module compilation)
+### 3. `python-ml`
+- **Components Installed**: `python3-pip`, `python3-venv`, `git`, and (via pip, system-wide, no
+  venv) **CPU-only** PyTorch/TorchVision/TorchAudio (`--index-url .../whl/cpu`), plus numpy,
+  pandas, scikit-learn, matplotlib, jupyter, fastapi, uvicorn. If you need CUDA-enabled PyTorch on
+  a GPU instance, reinstall it yourself in your `startup_script` — this preset does not do it for
+  you, and there is no separate `cuda` preset (GPU instances ship with NVIDIA drivers in the base
+  AMI, not via a preset).
 
-### 4. `monitoring`
-Essential for production observability and fleet management.
-- **Components Installed**: Prometheus Node Exporter, NVIDIA DCGM Exporter (if GPUs are present).
-- **Post-Boot State**: Systemd services are active. Node exporter listens on `0.0.0.0:9100`. DCGM exporter listens on `0.0.0.0:9400`. UFW firewall rules are automatically adjusted to allow access from FOTOhub internal monitoring subnets.
-- **Boot Time Impact**: ~8s
+### 4. `nginx-certbot`
+Installs and starts `nginx` and `certbot` (with the nginx plugin), and opens the `Nginx Full` UFW
+profile.
 
-### 5. `jupyter`
-Instantly deploy an interactive data science environment.
-- **Components Installed**: JupyterLab, Jupyter Notebook, IPython, and common data visualization libraries (Matplotlib, Seaborn).
-- **Post-Boot State**: JupyterLab runs as a systemd service (`jupyter.service`) under the `ubuntu` user. It binds to port `8888` and is accessible via a secure token automatically generated and logged to `/var/log/jupyter_token.txt`.
-- **Boot Time Impact**: ~30s
+### 5. `fotohub-worker`
+Installs Docker plus the `fotohub`, `celery`, and `redis` pip packages, and drops a minimal
+`worker.py` stub at `/opt/fotohub-worker/worker.py` that just instantiates a `FotoHub` client and
+prints a ready message — a starting point, not a functioning worker.
 
-### 6. `comfyui`
-The preferred backend for Stable Diffusion and generative image workflows.
-- **Components Installed**: ComfyUI core, ComfyUI-Manager, xformers, and standard nodes.
-- **Post-Boot State**: Cloned into `/home/ubuntu/ComfyUI`. A systemd service `comfyui.service` is created to ensure it starts on boot and restarts on failure, bound to port `8188`.
-- **Boot Time Impact**: ~50s
+### 6. `postgres`
+Installs `postgresql`/`postgresql-contrib`, starts it, and creates a superuser/database both
+named `ubuntu`.
 
-### 7. `vllm`
-High-throughput and memory-efficient LLM inference engine.
-- **Components Installed**: `vllm`, `ray`, `xformers`.
-- **Post-Boot State**: The vLLM OpenAI-compatible API server is pre-configured as a systemd service (`vllm.service`), ready to serve models.
-- **Boot Time Impact**: ~40s
+### 7. `redis`
+Installs `redis-server`, binds it to `0.0.0.0` (not just localhost — pair this with a Security
+Group rule, not open to the internet), and restarts the service.
 
-### 8. `ollama`
-Local LLM execution made incredibly simple.
-- **Components Installed**: Official Ollama binary and service definitions.
-- **Post-Boot State**: Ollama daemon runs on port `11434`. Models like `llama3` or `mistral` can be pulled immediately in your `startup_script`.
-- **Boot Time Impact**: ~12s
+### 8. `monitoring`
+Downloads and installs Prometheus **Node Exporter** (not a GPU/DCGM exporter — there is no DCGM
+exporter preset) as a systemd service listening on `0.0.0.0:9100`.
 
 ---
 
@@ -119,8 +112,8 @@ curl -X POST "https://apis.fotohub.app/compute/v1/instances" \
     "catalog_id": "g5.xlarge",
     "spot_instance": true,
     "root_volume_size_gb": 150,
-    "install_presets": ["cuda", "docker", "comfyui", "monitoring"],
-    "startup_script": "#!/bin/bash\necho \"Initialization complete\" > /var/log/custom_boot.log"
+    "install_presets": ["docker", "monitoring"],
+    "startup_script": "#!/bin/bash\ngit clone https://github.com/comfyanonymous/ComfyUI /home/ubuntu/ComfyUI\necho \"Initialization complete\" > /var/log/custom_boot.log"
   }'
 ```
 
@@ -135,11 +128,13 @@ payload = {
     "catalog_id": "g4dn.xlarge",
     "spot_instance": True,
     "root_volume_size_gb": 100,
-    "install_presets": ["cuda", "python-ml", "jupyter", "monitoring"],
+    "install_presets": ["python-ml", "monitoring"],
     "startup_script": """#!/bin/bash
     echo "Starting custom initialization..."
-    # Custom pip packages
-    sudo -u ubuntu /opt/ml-env/bin/pip install wandb accelerate bitsandbytes
+    # python-ml installs CPU-only torch system-wide (no venv) — reinstall the CUDA build,
+    # then add JupyterLab and training extras yourself, since there is no jupyter/cuda preset.
+    pip3 install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu121
+    pip3 install jupyterlab wandb accelerate bitsandbytes
     """
 }
 
@@ -168,8 +163,8 @@ async function launchInstance() {
     catalog_id: 'g5.xlarge',
     spot_instance: true,
     root_volume_size_gb: 250,
-    install_presets: ['cuda', 'docker', 'vllm', 'monitoring'],
-    startup_script: '#!/bin/bash\ncurl -X POST http://localhost:8000/v1/models'
+    install_presets: ['docker', 'monitoring'],
+    startup_script: '#!/bin/bash\npip3 install vllm\nnohup python3 -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-7B-Instruct --port 8000 &'
   }, {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -705,18 +700,29 @@ curl -X POST https://apis.fotohub.app/compute/v1/instances/inst_90f23b/run-scrip
   }'
 ```
 
-#### Response Example
+#### This is asynchronous, not blocking
 
-The API blocks until the script completes and returns the exact exit code, standard output, and standard error.
+`run-script` dispatches the script over AWS SSM and returns immediately with a `command_id` — it
+does **not** wait for the script to finish or return its output in the same call:
+
+```json
+{ "command_id": "c0ffee12-3456-7890-abcd-ef1234567890", "status": "pending" }
+```
+
+Poll `GET /compute/v1/instances/{id}/script-result/{command_id}` until `status` is no longer
+`"InProgress"`/`"Pending"` (final SSM states are `"Success"`, `"Failed"`, `"Cancelled"`,
+`"TimedOut"`):
 
 ```json
 {
-  "success": true,
-  "exit_code": 0,
+  "status": "Success",
   "stdout": "4%, 1824 MiB, 24576 MiB\n",
   "stderr": "",
-  "duration_ms": 320
+  "exit_code": 0
 }
 ```
 
-This endpoint shares the same execution context as `startup_script`: it runs as `root` in a non-interactive shell. For long-running background tasks, wrap your commands in `nohup` or create temporary systemd units.
+This endpoint runs the script on the instance as `root` via SSM (`AWS-RunShellScript`), and
+**requires the SSM agent to be running on the instance** — if it isn't, the call fails with a 500.
+For long-running background tasks, wrap your commands in `nohup` or create temporary systemd
+units rather than relying on a single script invocation.

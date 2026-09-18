@@ -379,9 +379,10 @@ curl -X PUT "https://apis.fotohub.app/v1/billing/overage-limit" \
 
 ::: warning This endpoint needs a session JWT, not an API key
 Unlike the rest of the billing endpoints, `PUT /v1/billing/overage-limit`
-authenticates with your dashboard session token. An `fh_live_*` / `fh_test_*`
-key is rejected with `401` — changing your own spending cap is an
-account-level action, not delegated to API keys.
+authenticates with your dashboard session token. An `fh_live_*` API key
+is rejected with `401` — changing your own spending cap is an
+account-level action, not delegated to API keys. (There is no `fh_test_*`
+prefix — every FOTOhub API key is `fh_live_*`; see [Authentication](/api/authentication).)
 :::
 
 A project-level limit takes precedence over the account-level one when the

@@ -163,15 +163,21 @@ The worker executes a sequential 2-pass garment transfer (`top -> bottom`) in a 
 
 ---
 
-## 4. Pre-Registered Garment Catalog System
+## 4. There is no garment catalog / registration endpoint
 
-For high-volume merchants, repeatedly uploading and segmenting the same garment across 10 different models is inefficient. You can pre-register garments to obtain a `garment_id`.
+::: warning Corrected 2026-09
+This page previously documented a `POST /v1/catalog/garments` endpoint for
+pre-registering a garment image to obtain a `garment_id`. **No such endpoint
+exists** — there is no public API call that writes to the garment catalogue.
 
-1. **Upload & Register**: `POST /v1/catalog/garments` with your image.
-2. **Receive ID**: The API returns a UUID, e.g., `garment_12345678-abcd...`.
-3. **Reuse**: Pass `garment_id` in your try-on requests instead of `garment_image_url`.
-
-This saves the $0.0030 segmentation cost on subsequent generations and speeds up the pipeline by skipping the segmentation phase.
+The `garment_id` field itself is real: the try-on endpoint does accept it and
+will resolve it against a stored garment record, skipping re-segmentation. But
+nothing in the public API can create that record — it is populated elsewhere
+(the fotohub.app dashboard), not through `apis.fotohub.app`. If you only have
+API access, pass `garment_image_url` on every call and accept the repeated
+segmentation cost; host the image yourself (e.g. a FOTOhub S3 bucket via
+`GET,POST /v1/storage/s3/buckets`) so you at least avoid re-uploading it.
+:::
 
 ---
 
@@ -229,21 +235,20 @@ The `fidelity` parameter (0.0 to 1.0) controls how strictly the AI preserves the
 | `upscale` | integer | No | `4` | Resolution scaling factor: `1` (denoise only), `2` (2x), or `4` (4K UHD). |
 | `output_format` | string | No | `"png"` | Target format. |
 
-### `POST /v1/images/upscale` 
+### No general-purpose image upscaler exists separately
 
-If no faces are present (e.g., flat lays), use general upscaling.
-
-| Field | Type | Required | Default | Description |
-|:---|:---|:---|:---|:---|
-| `image_url` | string | **Yes** | — | Image requiring upscaling. |
-| `scale` | integer | No | `4` | 2 or 4. |
+There is no standalone `POST /v1/images/upscale` endpoint — the only resolution
+upscaling on the image side is the `upscale` parameter on `POST /v1/images/face-restore`
+above (works on flat-lays too, just set `model: "gfpgan"` for a faster, less
+face-biased pass). `POST /v1/video/upscale` is a different, video-only endpoint
+and does not accept a still image.
 
 ---
 
 ## 8. Virtual Ambassador Outfit Variants
 
 Want to generate the model smiling, looking away, or walking? 
-Use `POST /v1/brands/{id}/faces/{face_id}/expressions` to generate variants of your ambassador before applying the outfit, multiplying your catalog angles.
+Use `POST /brand/v1/brands/{brand_id}/faces/{face_id}/expressions` to generate variants of your ambassador before applying the outfit, multiplying your catalog angles.
 
 | Field | Type | Required | Default | Description |
 |:---|:---|:---|:---|:---|

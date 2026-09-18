@@ -241,8 +241,13 @@ def check_queue():
 
 if check_queue() == 0:
     print("Queue empty, terminating self...")
-    requests.delete(
-        "https://apis.fotohub.app/compute/v1/instances/self",
+    # Read your own instance ID from the instance metadata service (there is
+    # no "self" alias on the terminate endpoint — you need the real ID).
+    instance_id = requests.get(
+        "http://169.254.169.254/latest/meta-data/instance-id"
+    ).text
+    requests.post(
+        f"https://apis.fotohub.app/compute/v1/instances/{instance_id}/terminate",
         headers={"Authorization": "Bearer fh_live_secret"}
     )
     sys.exit(0)
@@ -342,17 +347,21 @@ Monitor your spend via the FOTOhub console and API.
 ### `/console` Billing Breakdown
 The web console provides a day-by-day breakdown of spend by instance family and project tag.
 
-### CSV Export
-You can programmatically export your usage logs for internal chargeback:
+### Cost Breakdown & Forecast API
+There is no CSV export or emailed PDF report today. What's real is a JSON cost breakdown and
+forecast, both windowed to 1–90 days:
 
 :::code-group
 ```bash [cURL]
-curl "https://apis.fotohub.app/compute/v1/billing/export?format=csv&month=2026-09"   -H "Authorization: Bearer fh_live_secret" > billing.csv
+curl "https://apis.fotohub.app/compute/v1/costs/breakdown?days=30" \
+  -H "Authorization: Bearer fh_live_secret"
+
+curl "https://apis.fotohub.app/compute/v1/costs/forecast?days=30" \
+  -H "Authorization: Bearer fh_live_secret"
 ```
 :::
 
-### Monthly Reports
-Enable monthly PDF reports to be emailed to your finance team, summarizing spot savings and idle waste.
+For chargeback today, pull `/costs/breakdown` on a schedule and store the JSON yourself.
 
 ---
 
@@ -453,15 +462,17 @@ When requesting large spot fleets during high-demand European business hours, di
 
 :::code-group
 ```python [Python]
-from fotohub import FotoHub
+import os, requests
 
-client = FotoHub(api_key="fh_live_...")
+# Compute is not covered by the fotohub SDK -- plain HTTP.
+BASE = "https://apis.fotohub.app"
+HEADERS = {"Authorization": f"Bearer {os.environ['FOTOHUB_API_KEY']}"}
 
 def launch_resilient_spot_node(name: str):
     zones = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
     for az in zones:
         try:
-            instance = client.post("/compute/v1/instances", {
+            instance = requests.post(f"{BASE}/compute/v1/instances", headers=HEADERS, timeout=60, json={
                 "name": f"{name}-{az}",
                 "catalog_id": "g5.xlarge",
                 "spot_instance": True,
@@ -666,185 +677,3 @@ A: No, FOTOhub does not offer zero-upfront reservations. The recommended approac
 ---
 
 *Last Updated: 2026-09-06*
-
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->
-<!-- Padding comment for file length requirement. This ensures we safely exceed the 800 line count. -->

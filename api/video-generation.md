@@ -1,10 +1,10 @@
 # Video Generation
 
-Generate high-quality AI videos from text prompts or source images. FOTOhub provides access to 30+ video models across 6 providers, supporting text-to-video, image-to-video, reference-to-video, and video editing workflows. Generate clips up to 60 seconds, with configurable aspect ratios and resolutions up to 4K.
+Generate high-quality AI videos from text prompts or source images. FOTOhub provides access to 56 video models across 11 providers, supporting text-to-video, image-to-video, reference-to-video, and video editing workflows. Generate clips up to 60 seconds, with configurable aspect ratios and resolutions up to 4K.
 
 | | |
 |---|---|
-| **Models** | 30+ models from 6 providers |
+| **Models** | 56 models from 11 providers |
 | **Duration** | 2-60 seconds, model-dependent (longest single clip: 30s on `seedance-2-5`) |
 | **Resolution** | 480p, 720p, 1080p, 4K (model-dependent) |
 | **Modes** | Text-to-video, image-to-video, reference-to-video, video-to-video editing, native audio, lip-sync |
@@ -60,7 +60,7 @@ POST /v1/ai/generate/video
 it — read the balance to decide whether to dispatch the next job. There is no
 credit field: `veo-3.1-generate-001` bills $0.20 per second, and the 4 seconds
 here (Veo snaps 5 → 4, see [below](#duration-is-snapped-before-it-is-billed))
-cost $0.80. `GET /v1/billing/usage` has the same figure per request if you need to
+cost $0.80. `GET /v1/tiers/usage` has the same figure per request if you need to
 reconcile later.
 
 ### Processing Response (202)
@@ -200,7 +200,7 @@ The wallet is charged when the job is submitted and refunded automatically if th
 - **Failed after submit** — the failure appears on the next poll with `"refunded": true`. Typically within seconds of the provider giving up.
 - **Never finished** — a job still `processing` 20 minutes after submit is declared failed on your next poll and refunded then.
 
-The refund happens once per job. Polling a failed job repeatedly returns `"refunded": false` on every call after the first; that means "already refunded", not "not refunded" — check `GET /v1/billing/usage` if you need the ledger entry.
+The refund happens once per job. Polling a failed job repeatedly returns `"refunded": false` on every call after the first; that means "already refunded", not "not refunded" — check `GET /v1/tiers/usage` if you need the ledger entry.
 
 ::: warning Read the sentence, not the status code
 `No charge was made for this request.` is only appended when the reversal actually
@@ -1487,12 +1487,12 @@ string instead of `video_url`.
 
 ::: warning Branch on `status`, not on an event name
 There is no `event` key to switch on. `video.ready` and `video.progress` are
-**not** real events — `POST /v1/webhooks` rejects both with
+**not** real events — `POST /v1/console/webhooks` rejects both with
 `400 Invalid events`. See [Webhook Events](#webhook-events) for the events you
 can actually subscribe to.
 
 Billing figures are not delivered by the callback either. Read them from the
-generation response at submit time, or from `GET /v1/billing/usage`.
+generation response at submit time, or from `GET /v1/tiers/usage`.
 :::
 
 ::: tip Only `https` callbacks to public hosts
@@ -1683,7 +1683,7 @@ deliveries.
 - Always verify the `X-FotoHub-Signature` header using HMAC-SHA256 with your webhook secret
 - The secret is returned **once**, in the `201` response to `POST /v1/console/webhooks`. It is deliberately absent from every later read, including `PATCH`, so store it when you create the webhook — if you lose it, delete the webhook and create a new one
 - Respond with a 2xx or the delivery is retried, up to 3 attempts total
-- Retries back off exponentially and quickly: roughly 0.5s, then 1s, then 2s. This is not a queue that will keep trying for hours — an endpoint that is down for a minute misses the event, so treat webhooks as a fast path and reconcile against `GET /v1/billing/usage` for anything you must not lose
+- Retries back off exponentially and quickly: roughly 0.5s, then 1s, then 2s. This is not a queue that will keep trying for hours — an endpoint that is down for a minute misses the event, so treat webhooks as a fast path and reconcile against `GET /v1/tiers/usage` for anything you must not lose
 :::
 
 ## Error Responses

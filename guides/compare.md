@@ -19,7 +19,7 @@ Side-by-side comparison of FOTOhub with common AI API providers.
 | Self-hosted option | Yes | No | No | No | No |
 | Webhooks | Yes | Yes | No | No | Yes |
 | SDK languages | 3 | 2 | 2 | 4 | 2 |
-| Free sandbox testing | Yes (fh_test_*) | No | No | $5 once | No |
+| Free sandbox testing | No | No | No | $5 once | No |
 
 ## Price Comparison
 

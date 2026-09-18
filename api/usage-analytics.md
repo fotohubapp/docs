@@ -303,25 +303,31 @@ Sort your `top_models` response by `usd_charged` to identify where most of your 
 
 ### Low Balance Webhook Alert
 
-Register a webhook for `wallet.balance_low` events to get notified before your balance runs out:
+There is no proactive "balance dropped below $X" event on the API wallet — the
+closest real signal is `billing.insufficient_funds`, which fires reactively, the
+moment a request is actually rejected for lack of funds. Register a webhook for it:
 
 ```python
 import httpx
 import os
 
-# Register webhook for low balance events
+# Register a webhook that fires when a request is rejected for insufficient funds
 httpx.post(
-    "https://apis.fotohub.app/v1/webhooks",
+    "https://apis.fotohub.app/v1/console/webhooks",
     headers={"Authorization": f"Bearer {os.environ['FOTOHUB_API_KEY']}"},
     json={
+        "name": "Low balance alert",
         "url": "https://api.yourapp.com/webhooks/fotohub",
-        "events": ["wallet.balance_low", "wallet.balance_depleted"],
-        "secret": "whsec_your_secret_here"
+        "events": ["billing.insufficient_funds"],
     }
 )
 ```
 
-The `wallet.balance_low` event fires when your balance drops below $10.00 USD. The `wallet.balance_depleted` event fires when balance reaches $0.00 and API calls will start failing.
+The webhook secret used to verify deliveries (`X-FotoHub-Signature`) is returned
+**once**, in the response body of this `POST` call — store it immediately. `billing.insufficient_funds`
+fires when a request is rejected because the wallet cannot cover it (a `402`); for
+an early warning before you hit $0, poll `GET /v1/usage` on a schedule instead
+(see Programmatic Balance Guard below).
 
 ### Programmatic Balance Guard
 

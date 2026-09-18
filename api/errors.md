@@ -558,10 +558,13 @@ try:
 except FotohubAPIError as e:
     if e.error == "insufficient_funds":
         print(f"{e} — top up at {e.details.get('topup_url')}")
-    elif e.error == "invalid_parameters":
-        print(f"Bad request: {e} — fields: {e.details.get('fields', [])}")
-    elif e.error == "model_unavailable":
-        print(f"Model offline: {e} — try a fallback model")
+    elif e.status in (400, 422):
+        # No error code for validation failures — 400 is a plain string,
+        # 422 is FastAPI's per-field array. See Validation Errors below.
+        print(f"Bad request: {e}")
+    elif e.status in (502, 503, 504):
+        # No error code for a provider failure either — branch on status.
+        print(f"Provider error [{e.status}]: {e} — try a fallback model")
     else:
         print(f"API error [{e.error}]: {e} (request_id: {e.request_id})")
 ```
@@ -688,20 +691,18 @@ try {
   console.log(`Generated: ${result.url}`);
 } catch (e) {
   if (e instanceof FotohubAPIError) {
-    switch (e.code) {
-      case "insufficient_funds":
-        console.error(`${e.message} — top up at ${e.details.topup_url}`);
-        break;
-      case "invalid_parameters":
-        console.error(`Bad request: ${e.message}`, e.details);
-        break;
-      case "model_unavailable":
-        console.error(`Model offline: ${e.message} — try a fallback model`);
-        break;
-      default:
-        console.error(
-          `API error [${e.code}]: ${e.message} (request_id: ${e.requestId})`
-        );
+    if (e.code === "insufficient_funds") {
+      console.error(`${e.message} — top up at ${e.details.topup_url}`);
+    } else if (e.status === 400 || e.status === 422) {
+      // No error code for validation failures — branch on status instead.
+      console.error(`Bad request: ${e.message}`, e.details);
+    } else if ([502, 503, 504].includes(e.status)) {
+      // No error code for a provider failure either.
+      console.error(`Provider error [${e.status}]: ${e.message} — try a fallback model`);
+    } else {
+      console.error(
+        `API error [${e.code}]: ${e.message} (request_id: ${e.requestId})`
+      );
     }
   }
 }
@@ -946,7 +947,7 @@ fotohub_request() {
     local request_id
     request_id=$(echo "$body" | jq -r '.request_id // "unknown"')
     local error_code
-    error_code=$(echo "$body" | jq -r '.error // "unknown"')
+    error_code=$(echo "$body" | jq -r '.detail.error // .error // "unknown"')
 
     echo "[$error_code] Retry $((attempt+1))/$MAX_RETRIES in ${total_wait}s (request_id: $request_id)" >&2
     sleep "$total_wait"
@@ -2241,8 +2242,8 @@ request_id=$(grep -i "X-Request-Id:" /tmp/fh_headers.txt \
 if [ "$http_code" -lt 400 ] 2>/dev/null; then
   echo "[OK] /ai/generate/image -> HTTP $http_code (request_id: $request_id)"
 else
-  error_code=$(echo "$body" | jq -r '.error // "unknown"')
-  message=$(echo "$body" | jq -r '.message // "unknown"')
+  error_code=$(echo "$body" | jq -r '.detail.error // .error // "unknown"')
+  message=$(echo "$body" | jq -r '.detail.message // .detail // .message // "unknown"')
   echo "[ERROR] [$error_code] $message (HTTP $http_code, request_id: $request_id)" >&2
 
   # For server errors, save full context for support ticket
@@ -2264,25 +2265,27 @@ Complete error handling patterns for each category of error. Use the `error` fie
 
 ### Authentication Errors (401)
 
+There is no `error` code on a 401 — `detail` is a plain string, so branch on the HTTP
+status and, if you need to tell the causes apart, match on the string content
+(`"revoked"`, `"expired"`, `"Missing Authorization"`). All FOTOhub API keys share the
+single `fh_live_*` prefix — there is no `fh_test_*` sandbox prefix.
+
 ::: code-group
 
 ```python [Python]
 from fotohub import FotoHub
+from fotohub.exceptions import AuthError
 
-def handle_auth_error(error_code: str, request_id: str):
+def handle_auth_error(message: str):
     """Handle authentication failures with appropriate recovery."""
-    if error_code == "invalid_api_key":
-        # Key format wrong — check environment variable
-        print("Invalid API key format. Keys must start with fh_live_ or fh_test_.")
-        print("Check your FOTOHUB_API_KEY environment variable.")
-    elif error_code == "expired_api_key":
-        # Key expired — generate a new one
-        print("API key has expired. Generate a new key at fotohub.app/console/keys")
-    elif error_code == "revoked_api_key":
-        # Key was manually revoked — cannot be restored
+    if "revoked" in message.lower():
         print("API key was revoked. Create a new key — revoked keys cannot be restored.")
+    elif "expired" in message.lower():
+        print("API key has expired. Generate a new key at fotohub.app/console/keys")
+    elif "missing authorization" in message.lower():
+        print("No Authorization header sent. Check your FOTOHUB_API_KEY environment variable.")
     else:
-        print(f"Authentication failed [{error_code}] (request_id: {request_id})")
+        print(f"Authentication failed: {message}")
 
 
 # Usage pattern with SDK
@@ -2292,32 +2295,21 @@ try:
         model="seedream-5-0-260128",
         prompt="A landscape",
     )
-except Exception as e:
-    if hasattr(e, "status") and e.status == 401:
-        handle_auth_error(e.error, e.request_id)
+except AuthError as e:
+    handle_auth_error(e.message)
 ```
 
 ```typescript [TypeScript]
-function handleAuthError(errorCode: string, requestId: string): void {
-  switch (errorCode) {
-    case "invalid_api_key":
-      console.error(
-        "Invalid API key format. Keys must start with fh_live_ or fh_test_."
-      );
-      console.error("Check your FOTOHUB_API_KEY environment variable.");
-      break;
-    case "expired_api_key":
-      console.error(
-        "API key has expired. Generate a new key at fotohub.app/console/keys"
-      );
-      break;
-    case "revoked_api_key":
-      console.error(
-        "API key was revoked. Create a new key - revoked keys cannot be restored."
-      );
-      break;
-    default:
-      console.error(`Authentication failed [${errorCode}] (request_id: ${requestId})`);
+function handleAuthError(message: string): void {
+  const m = message.toLowerCase();
+  if (m.includes("revoked")) {
+    console.error("API key was revoked. Create a new key - revoked keys cannot be restored.");
+  } else if (m.includes("expired")) {
+    console.error("API key has expired. Generate a new key at fotohub.app/console/keys");
+  } else if (m.includes("missing authorization")) {
+    console.error("No Authorization header sent. Check your FOTOHUB_API_KEY environment variable.");
+  } else {
+    console.error(`Authentication failed: ${message}`);
   }
 }
 
@@ -2329,7 +2321,7 @@ try {
   });
 } catch (e) {
   if (e instanceof FotohubAPIError && e.status === 401) {
-    handleAuthError(e.code, e.requestId);
+    handleAuthError(e.message);
   }
 }
 ```
@@ -2337,26 +2329,29 @@ try {
 ```go [Go]
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
-func handleAuthError(errorCode, requestID string) {
-	switch errorCode {
-	case "invalid_api_key":
-		fmt.Println("Invalid API key format. Keys must start with fh_live_ or fh_test_.")
-		fmt.Println("Check your FOTOHUB_API_KEY environment variable.")
-	case "expired_api_key":
-		fmt.Println("API key has expired. Generate a new key at fotohub.app/console/keys")
-	case "revoked_api_key":
+func handleAuthError(message string) {
+	m := strings.ToLower(message)
+	switch {
+	case strings.Contains(m, "revoked"):
 		fmt.Println("API key was revoked. Create a new key — revoked keys cannot be restored.")
+	case strings.Contains(m, "expired"):
+		fmt.Println("API key has expired. Generate a new key at fotohub.app/console/keys")
+	case strings.Contains(m, "missing authorization"):
+		fmt.Println("No Authorization header sent. Check your FOTOHUB_API_KEY environment variable.")
 	default:
-		fmt.Printf("Authentication failed [%s] (request_id: %s)\n", errorCode, requestID)
+		fmt.Printf("Authentication failed: %s\n", message)
 	}
 }
 ```
 
 ```bash [cURL]
 #!/bin/bash
-# Handle 401 authentication errors
+# Handle 401 authentication errors — `detail` is a plain string, no `error` code
 
 response=$(curl -s -w "\n%{http_code}" \
   -X POST "https://apis.fotohub.app/v1/ai/generate/image" \
@@ -2368,18 +2363,19 @@ http_code=$(echo "$response" | tail -n1)
 body=$(echo "$response" | sed '$d')
 
 if [ "$http_code" = "401" ]; then
-  error_code=$(echo "$body" | jq -r '.error')
-
-  case "$error_code" in
-    invalid_api_key)
-      echo "Invalid API key. Check FOTOHUB_API_KEY env var." >&2
-      echo "Keys must start with fh_live_ or fh_test_." >&2
+  detail=$(echo "$body" | jq -r '.detail')
+  case "$(echo "$detail" | tr '[:upper:]' '[:lower:]')" in
+    *revoked*)
+      echo "API key revoked. Create a new key." >&2
       ;;
-    expired_api_key)
+    *expired*)
       echo "API key expired. Generate a new key at fotohub.app/console/keys" >&2
       ;;
-    revoked_api_key)
-      echo "API key revoked. Create a new key." >&2
+    *"missing authorization"*)
+      echo "No Authorization header. Check FOTOHUB_API_KEY env var." >&2
+      ;;
+    *)
+      echo "Authentication failed: $detail" >&2
       ;;
   esac
   exit 1
@@ -2585,7 +2581,14 @@ fi
 
 :::
 
-### Model and Generation Errors (500/502/503)
+### Model and Generation Errors (500/502/503/504)
+
+There is **no** machine-readable `error` code on a provider failure — `detail` is a
+plain string (`"Provider request failed"` or similar), the same shape for a timeout,
+an overloaded model, or a malformed upstream response. Branch on the **HTTP status**,
+not on parsed error text: `502`/`503`/`504` all mean "the provider side failed",
+so it is safe to treat them alike and try a fallback model rather than trying to
+tell the three apart from the body.
 
 ::: code-group
 
@@ -2630,14 +2633,13 @@ def generate_with_fallback(
 
         except FotohubAPIError as e:
             last_error = e
-            if e.error in ("model_unavailable", "model_overloaded", "provider_error"):
-                print(f"Model {current_model} unavailable [{e.error}], trying fallback...")
-                continue
-            elif e.error == "timeout":
-                print(f"Model {current_model} timed out, trying fallback...")
+            # No error code to branch on for a provider failure — any 502/503/504
+            # is worth trying a fallback for. A 4xx (auth, billing, validation)
+            # is not: falling back would just fail the same way again.
+            if e.status in (502, 503, 504):
+                print(f"Model {current_model} unavailable [HTTP {e.status}], trying fallback...")
                 continue
             else:
-                # Non-model error (auth, billing, validation) — do not fallback
                 raise
 
     # All models failed
@@ -2692,14 +2694,12 @@ async function generateWithFallback(
       return result;
     } catch (e) {
       lastError = e as Error;
-      if (e instanceof FotohubAPIError) {
-        const modelErrors = ["model_unavailable", "model_overloaded", "provider_error", "timeout"];
-        if (modelErrors.includes(e.code)) {
-          console.warn(`Model ${currentModel} unavailable [${e.code}], trying fallback...`);
-          continue;
-        }
+      // No error code on a provider failure — branch on status. Any 502/503/504
+      // is worth a fallback; other statuses (auth, billing, validation) are not.
+      if (e instanceof FotohubAPIError && [502, 503, 504].includes(e.status)) {
+        console.warn(`Model ${currentModel} unavailable [HTTP ${e.status}], trying fallback...`);
+        continue;
       }
-      // Non-model error — do not fallback
       throw e;
     }
   }
@@ -2718,21 +2718,15 @@ console.log(`URL: ${result.url}`);
 ```go [Go]
 package main
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
 var fallbackModels = map[string]string{
 	"seedream-5-0-260128": "flux-2-klein-4b",
-	"kling-v3":               "veo-3.1-generate-001",
+	"kling-v3":             "veo-3.1-generate-001",
 }
 
-var modelErrorCodes = map[string]bool{
-	"model_unavailable": true,
-	"model_overloaded":  true,
-	"provider_error":    true,
-	"timeout":           true,
+func isProviderFailure(statusCode int) bool {
+	return statusCode == 502 || statusCode == 503 || statusCode == 504
 }
 
 func generateWithFallback(model, prompt string, opts map[string]interface{}) (map[string]interface{}, error) {
@@ -2751,7 +2745,7 @@ func generateWithFallback(model, prompt string, opts map[string]interface{}) (ma
 			payload[k] = v
 		}
 
-		result, err := requestWithRetry("POST", "/ai/generate/image", payload)
+		result, statusCode, err := requestWithRetryStatus("POST", "/ai/generate/image", payload)
 		if err == nil {
 			if currentModel != model {
 				fmt.Printf("Used fallback model: %s (primary: %s)\n", currentModel, model)
@@ -2760,22 +2754,12 @@ func generateWithFallback(model, prompt string, opts map[string]interface{}) (ma
 		}
 
 		lastErr = err
-		// Check if it's a model-related error worth falling back from
-		errStr := err.Error()
-		isModelError := false
-		for code := range modelErrorCodes {
-			if strings.Contains(errStr, code) {
-				isModelError = true
-				break
-			}
-		}
-
-		if isModelError {
-			fmt.Printf("Model %s unavailable, trying fallback...\n", currentModel)
+		if isProviderFailure(statusCode) {
+			fmt.Printf("Model %s unavailable [HTTP %d], trying fallback...\n", currentModel, statusCode)
 			continue
 		}
 
-		// Non-model error — do not fallback
+		// A 4xx (auth, billing, validation) — do not fall back
 		return nil, err
 	}
 
@@ -2795,7 +2779,8 @@ func main() {
 
 ```bash [cURL]
 #!/bin/bash
-# Generate with model fallback on provider errors
+# Generate with model fallback on provider errors — no `error` code to branch on,
+# so retry any 502/503/504 with an alternate model.
 
 API_BASE="https://apis.fotohub.app/v1"
 API_KEY="fh_live_your_api_key"
@@ -2805,7 +2790,6 @@ generate_with_fallback() {
   local fallback_model="$2"
   local prompt="$3"
 
-  # Try primary model
   local response http_code body
   response=$(curl -s -w "\n%{http_code}" \
     -X POST "$API_BASE/ai/generate/image" \
@@ -2821,14 +2805,10 @@ generate_with_fallback() {
     return 0
   fi
 
-  # Check if error is model-related (worth trying fallback)
-  local error_code
-  error_code=$(echo "$body" | jq -r '.error // ""')
-
-  case "$error_code" in
-    model_unavailable|model_overloaded|provider_error|timeout)
+  case "$http_code" in
+    502|503|504)
       if [ -n "$fallback_model" ]; then
-        echo "Primary model $primary_model unavailable, trying $fallback_model..." >&2
+        echo "Primary model $primary_model unavailable (HTTP $http_code), trying $fallback_model..." >&2
 
         response=$(curl -s -w "\n%{http_code}" \
           -X POST "$API_BASE/ai/generate/image" \
@@ -2860,89 +2840,98 @@ generate_with_fallback "seedream-5-0-260128" "flux-2-klein-4b" "A mountain at su
 
 ### Validation Errors (400/422)
 
-Validation errors indicate a problem with the request parameters. The `details.fields` array tells you exactly which parameters are invalid and why.
+The two statuses carry genuinely different shapes, and neither is the invented
+`{field, reason}` array some older docs described:
+
+- **400** — a hand-checked parameter. `detail` is a **plain string**, e.g.
+  `{"detail": "prompt is required"}`. There is no field name or reason code to
+  parse out; the string is the whole of it.
+- **422** — FastAPI's own request-model validation. `detail` is an **array**,
+  one entry per offending field, each shaped `{"type", "loc", "msg", "input"}`
+  (see [Error Codes Reference](#error-codes-reference)). `loc` is a path like
+  `["body", "width"]` — drop the leading `"body"` to get the field name.
 
 ::: code-group
 
 ```python [Python]
-def handle_validation_error(error: FotohubAPIError) -> dict:
+def handle_validation_error(status_code: int, body: dict) -> dict:
     """
-    Parse validation errors and return structured feedback.
+    Parse a 400 or 422 body into a field -> message map.
     Useful for building user-facing form validation.
     """
-    fields = error.details.get("fields", [])
-    field_errors = {}
+    detail = body.get("detail")
 
-    for field_info in fields:
-        field_name = field_info.get("field", "unknown")
-        reason = field_info.get("reason", "Invalid value")
-        field_errors[field_name] = reason
+    if status_code == 422 and isinstance(detail, list):
+        # FastAPI validation errors: [{"type", "loc", "msg", "input"}, ...]
+        field_errors = {}
+        for entry in detail:
+            loc = entry.get("loc", [])
+            field = loc[-1] if loc else "unknown"
+            field_errors[str(field)] = entry.get("msg", "Invalid value")
+        return field_errors
 
-    return field_errors
+    # 400 — a plain string with no field to attribute it to.
+    return {"_": str(detail) if detail else "Invalid request"}
 
 
 # Usage — building a generation form
-try:
-    result = request_with_retry("POST", "/ai/generate/image", {
+import requests
+
+resp = requests.post(
+    "https://apis.fotohub.app/v1/ai/generate/image",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={
         "model": "seedream-5-0-260128",
-        "prompt": "",  # Empty — will trigger validation error
-        "width": 5000,  # Too large — will trigger validation error
-    })
-except FotohubAPIError as e:
-    if e.error == "invalid_parameters":
-        field_errors = handle_validation_error(e)
-        for field, reason in field_errors.items():
-            print(f"  {field}: {reason}")
-        # Output:
-        #   prompt: Prompt must not be empty
-        #   width: Value 5000 exceeds maximum of 2048
-    elif e.error == "missing_required_field":
-        missing = e.details.get("field", "unknown")
-        print(f"Missing required field: {missing}")
+        "prompt": "",   # Empty — 400, plain string
+        "width": 5000,  # Out of range — 422, FastAPI array
+    },
+)
+if resp.status_code in (400, 422):
+    field_errors = handle_validation_error(resp.status_code, resp.json())
+    for field, reason in field_errors.items():
+        print(f"  {field}: {reason}")
 ```
 
 ```typescript [TypeScript]
-interface FieldError {
-  field: string;
-  reason: string;
+interface FastAPIFieldError {
+  type: string;
+  loc: (string | number)[];
+  msg: string;
+  input?: unknown;
 }
 
 function handleValidationError(
-  error: FotohubAPIError
+  statusCode: number,
+  body: { detail?: unknown }
 ): Record<string, string> {
-  /**
-   * Parse validation errors into a field -> message map.
-   * Useful for form validation UI.
-   */
-  const fields = (error.details?.fields as FieldError[]) ?? [];
-  const fieldErrors: Record<string, string> = {};
+  const { detail } = body;
 
-  for (const { field, reason } of fields) {
-    fieldErrors[field] = reason;
+  if (statusCode === 422 && Array.isArray(detail)) {
+    const fieldErrors: Record<string, string> = {};
+    for (const entry of detail as FastAPIFieldError[]) {
+      const field = entry.loc?.[entry.loc.length - 1] ?? "unknown";
+      fieldErrors[String(field)] = entry.msg;
+    }
+    return fieldErrors;
   }
 
-  return fieldErrors;
+  // 400 — a plain string with no field to attribute it to.
+  return { _: typeof detail === "string" ? detail : "Invalid request" };
 }
 
 // Usage — building a generation form
-try {
-  const result = await requestWithRetry("POST", "/ai/generate/image", {
-    model: "seedream-5-0-260128",
-    prompt: "", // Empty
-    width: 5000, // Too large
-  });
-} catch (e) {
-  if (e instanceof FotohubAPIError) {
-    if (e.code === "invalid_parameters") {
-      const fieldErrors = handleValidationError(e);
-      for (const [field, reason] of Object.entries(fieldErrors)) {
-        console.error(`  ${field}: ${reason}`);
-      }
-      // Show errors next to form fields in UI
-    } else if (e.code === "missing_required_field") {
-      const missing = (e.details?.field as string) ?? "unknown";
-      console.error(`Missing required field: ${missing}`);
-    }
+const res = await fetch("https://apis.fotohub.app/v1/ai/generate/image", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ model: "seedream-5-0-260128", prompt: "", width: 5000 }),
+});
+if (res.status === 400 || res.status === 422) {
+  const fieldErrors = handleValidationError(res.status, await res.json());
+  for (const [field, reason] of Object.entries(fieldErrors)) {
+    console.error(`  ${field}: ${reason}`);
   }
 }
 ```
@@ -2955,48 +2944,44 @@ import (
 	"fmt"
 )
 
-type FieldError struct {
-	Field  string `json:"field"`
-	Reason string `json:"reason"`
+type fastAPIFieldError struct {
+	Loc []interface{} `json:"loc"`
+	Msg string        `json:"msg"`
 }
 
-func handleValidationError(details map[string]interface{}) map[string]string {
+// handleValidationError parses a 400 (plain string) or 422 (FastAPI array).
+func handleValidationError(statusCode int, body []byte) map[string]string {
 	fieldErrors := make(map[string]string)
 
-	fieldsRaw, ok := details["fields"]
-	if !ok {
-		return fieldErrors
+	if statusCode == 422 {
+		var envelope struct {
+			Detail []fastAPIFieldError `json:"detail"`
+		}
+		if err := json.Unmarshal(body, &envelope); err == nil {
+			for _, e := range envelope.Detail {
+				field := "unknown"
+				if len(e.Loc) > 0 {
+					field = fmt.Sprintf("%v", e.Loc[len(e.Loc)-1])
+				}
+				fieldErrors[field] = e.Msg
+			}
+			return fieldErrors
+		}
 	}
 
-	// Re-marshal and unmarshal to parse the nested structure
-	fieldsJSON, _ := json.Marshal(fieldsRaw)
-	var fields []FieldError
-	json.Unmarshal(fieldsJSON, &fields)
-
-	for _, f := range fields {
-		fieldErrors[f.Field] = f.Reason
+	// 400 — a plain string with no field to attribute it to.
+	var envelope struct {
+		Detail string `json:"detail"`
 	}
+	json.Unmarshal(body, &envelope)
+	fieldErrors["_"] = envelope.Detail
 	return fieldErrors
-}
-
-// Usage
-func example() {
-	_, err := requestWithRetry("POST", "/ai/generate/image", map[string]interface{}{
-		"model":  "seedream-5-0-260128",
-		"prompt": "",   // Empty
-		"width":  5000, // Too large
-	})
-	if err != nil {
-		// Parse error details (simplified for example)
-		fmt.Printf("Validation error: %v\n", err)
-		// In production, parse the error body for field-level details
-	}
 }
 ```
 
 ```bash [cURL]
 #!/bin/bash
-# Handle 400/422 validation errors
+# Handle 400/422 validation errors — 400 is a plain string, 422 is FastAPI's array
 
 response=$(curl -s -w "\n%{http_code}" \
   -X POST "https://apis.fotohub.app/v1/ai/generate/image" \
@@ -3007,18 +2992,12 @@ response=$(curl -s -w "\n%{http_code}" \
 http_code=$(echo "$response" | tail -n1)
 body=$(echo "$response" | sed '$d')
 
-if [ "$http_code" = "400" ] || [ "$http_code" = "422" ]; then
-  error_code=$(echo "$body" | jq -r '.error')
-
-  if [ "$error_code" = "invalid_parameters" ]; then
-    echo "Validation errors:" >&2
-    echo "$body" | jq -r '.details.fields[] | "  \(.field): \(.reason)"' 2>/dev/null
-  elif [ "$error_code" = "missing_required_field" ]; then
-    field=$(echo "$body" | jq -r '.details.field')
-    echo "Missing required field: $field" >&2
-  elif [ "$error_code" = "unsupported_format" ]; then
-    echo "Unsupported file format. Use JPEG, PNG, WebP, MP4, or MP3." >&2
-  fi
+if [ "$http_code" = "400" ]; then
+  echo "Validation error: $(echo "$body" | jq -r '.detail')" >&2
+  exit 1
+elif [ "$http_code" = "422" ]; then
+  echo "Validation errors:" >&2
+  echo "$body" | jq -r '.detail[] | "  \(.loc[-1]): \(.msg)"' 2>/dev/null
   exit 1
 fi
 ```
@@ -3027,9 +3006,15 @@ fi
 
 ## Error Handling Best Practices
 
-### Always check error codes programmatically
+### Branch on the HTTP status first, the `error` field second
 
-Use the `error` field (not `message`) for control flow. Messages may change between versions; error codes are stable and part of the API contract.
+Most failures — 400, 401, and every 5xx — carry no `error` code at all; `detail`
+is a plain string. Only a handful of 4xx responses (`402`, `429`, `key_limit_reached`,
+the output-routing errors, and a few others — see the
+[Error Codes Reference](#error-codes-reference)) carry a structured `detail.error`.
+Always branch on the HTTP status code first, and use `error` for control flow only
+where it is documented to exist; fall back to displaying `message`/`detail` for
+everything else.
 
 ### Log request_id with every call
 

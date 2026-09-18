@@ -77,7 +77,7 @@ FOTOHUB_API_KEY=fh_live_your_key_here
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `apiKey` | `string` | — (**required**) | Your API key (starts with `fh_live_` or `fh_test_`) |
+| `apiKey` | `string` | — (**required**) | Your API key (starts with `fh_live_`) |
 | `baseUrl` | `string` | `https://apis.fotohub.app` | API base URL |
 | `timeout` | `number` | `60000` | Request timeout in milliseconds |
 | `maxRetries` | `number` | `3` | Max retries for transient errors (429, 5xx) |
@@ -1047,18 +1047,50 @@ for tool in client.stability_tools():
 package main
 
 import (
+    "context"
+    "encoding/json"
     "fmt"
+    "io"
+    "log"
+    "net/http"
     "os"
-    "github.com/fotohubapp/sdk-go"
 )
+
+// See https://docs.fotohub.app/sdk/go for the FotoHubClient pattern.
+// /stability/* is not under the /v1 prefix FotoHubClient.BaseURL uses, so this
+// builds the request directly instead of going through client.Post.
+
+type StabilityTool struct {
+    ID             string  `json:"id"`
+    PriceUSD       float64 `json:"price_usd"`
+    Unit           string  `json:"unit"`
+    RequiresMask   bool    `json:"requires_mask"`
+    RequiresPrompt bool    `json:"requires_prompt"`
+}
 
 func main() {
     // Pass your Supabase session access_token, not an fh_live_* API key.
-    client := fotohub.NewClient(os.Getenv("SUPABASE_ACCESS_TOKEN"))
+    token := os.Getenv("SUPABASE_ACCESS_TOKEN")
 
-    tools, _ := client.ListStabilityTools()
+    req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://apis.fotohub.app/stability/tools", nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+    req.Header.Set("Authorization", "Bearer "+token)
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        log.Fatalf("request failed: %v", err)
+    }
+    defer resp.Body.Close()
+
+    raw, _ := io.ReadAll(resp.Body)
+    var tools []StabilityTool
+    if err := json.Unmarshal(raw, &tools); err != nil {
+        log.Fatalf("decode failed: %v", err)
+    }
     for _, tool := range tools {
-        fmt.Printf("%s: $%.2f\n", tool.ID, tool.PriceUSD)
+        fmt.Printf("$%.2f per %s — %s (mask=%v, prompt=%v)\n", tool.PriceUSD, tool.Unit, tool.ID, tool.RequiresMask, tool.RequiresPrompt)
     }
 }
 ```
@@ -1119,20 +1151,60 @@ print(f"Cost: ${result['cost_usd']}")
 package main
 
 import (
+    "bytes"
+    "context"
     "encoding/base64"
+    "encoding/json"
     "fmt"
+    "io"
+    "log"
+    "net/http"
     "os"
-    "github.com/fotohubapp/sdk-go"
 )
 
+// See https://docs.fotohub.app/sdk/go for the FotoHubClient pattern.
+// /stability/* is not under the /v1 prefix FotoHubClient.BaseURL uses, so this
+// builds the request directly. tool_id = fast-upscale | conservative-upscale | creative-upscale.
+
+type stabilityResult struct {
+    Image   string  `json:"image"`
+    Tool    string  `json:"tool"`
+    CostUSD float64 `json:"cost_usd"`
+}
+
 func main() {
-    client := fotohub.NewClient(os.Getenv("SUPABASE_ACCESS_TOKEN"))
+    token := os.Getenv("SUPABASE_ACCESS_TOKEN")
 
     // Input images are base64 strings, not URLs.
-    data, _ := os.ReadFile("photo.jpg")
+    data, err := os.ReadFile("photo.jpg")
+    if err != nil {
+        log.Fatal(err)
+    }
     imageB64 := base64.StdEncoding.EncodeToString(data)
 
-    result, _ := client.StabilityUpscale(imageB64, "creative")
+    payload, _ := json.Marshal(map[string]any{
+        "image":         imageB64,
+        "output_format": "png",
+    })
+
+    req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://apis.fotohub.app/stability/creative-upscale", bytes.NewReader(payload))
+    if err != nil {
+        log.Fatal(err)
+    }
+    req.Header.Set("Authorization", "Bearer "+token)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        log.Fatalf("request failed: %v", err)
+    }
+    defer resp.Body.Close()
+
+    raw, _ := io.ReadAll(resp.Body)
+    var result stabilityResult
+    if err := json.Unmarshal(raw, &result); err != nil {
+        log.Fatalf("decode failed: %v", err)
+    }
 
     // Output is base64 too — decode it to save the file.
     out, _ := base64.StdEncoding.DecodeString(result.Image)
@@ -1518,7 +1590,9 @@ Generate 3D models from images or text prompts. Supports GLB, OBJ, STL, and USDZ
 generate3D(opts: Generate3DOptions): Promise<Job>
 ```
 
-Starts a 3D model generation job. Returns immediately with a job ID for polling.
+Generates a 3D model. `generate3D()` is synchronous — the model is already finished when it
+returns, with a signed download URL good for 2 hours. The `job_id`/`status` framing below reflects
+the response shape, not an in-progress job; there is nothing to poll.
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1563,31 +1637,54 @@ print(f"Job ID: {job.id}, Status: {job.status}")
 package main
 
 import (
+    "context"
     "encoding/base64"
+    "encoding/json"
     "fmt"
+    "log"
     "os"
-    "github.com/fotohubapp/sdk-go"
 )
 
-func main() {
-    client := fotohub.NewClient("fh_live_your_api_key")
+// See https://docs.fotohub.app/sdk/go for FotoHubClient / NewFotoHubClient / Post.
 
-    data, _ := os.ReadFile("product.jpg")
+type generate3DJob struct {
+    ID     string `json:"id"`
+    Status string `json:"status"`
+}
+
+func main() {
+    client := NewFotoHubClient(os.Getenv("FOTOHUB_API_KEY"))
+    ctx := context.Background()
+
+    data, err := os.ReadFile("product.jpg")
+    if err != nil {
+        log.Fatal(err)
+    }
     imageB64 := base64.StdEncoding.EncodeToString(data)
 
-    job, _ := client.Generate3D(fotohub.Generate3DOptions{
-        Mode:    "image-to-3d",
-        Model:   "fh-lite-3d",
-        Image:   imageB64,
-        Format:  "glb",
-        Quality: "standard",
-    })
+    body := map[string]any{
+        "mode":    "image-to-3d",
+        "model":   "fh-lite-3d",
+        "image":   imageB64,
+        "format":  "glb",
+        "quality": "standard",
+    }
+
+    raw, err := client.Post(ctx, "/ai/generate/3d", body)
+    if err != nil {
+        log.Fatalf("request failed: %v", err)
+    }
+
+    var job generate3DJob
+    if err := json.Unmarshal(raw, &job); err != nil {
+        log.Fatalf("decode failed: %v", err)
+    }
     fmt.Printf("Job ID: %s, Status: %s\n", job.ID, job.Status)
 }
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/3d/generate \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1636,7 +1733,7 @@ if status.Status == "completed" {
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/3d/status/job_abc123 \
+curl -X GET https://apis.fotohub.app/v1/ai/generate/3d/job_abc123 \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
@@ -1647,7 +1744,11 @@ curl -X GET https://apis.fotohub.app/v1/3d/status/job_abc123 \
 waitFor3D(jobId: string, options?: { pollInterval?: number; timeout?: number; onProgress?: (status: Status) => void }): Promise<Result>
 ```
 
-Polls a 3D generation job until completion or timeout. Returns the final result with download URL.
+::: warning Deprecated
+There is nothing to wait for: `generate3D()` is already synchronous. `waitFor3D()` is kept only for
+existing callers; new code should use the `generate3D()` result directly, or `get3DStatus(job_id)`
+when it just needs a fresh signed URL.
+:::
 
 ::: code-group
 ```typescript [TypeScript]
@@ -1689,7 +1790,7 @@ fmt.Printf("Cost: $%.6f\n", result.Billing.CostUSD)
 ```bash [cURL]
 # Poll manually until status is "completed"
 while true; do
-  STATUS=$(curl -s https://apis.fotohub.app/v1/3d/status/job_abc123 \
+  STATUS=$(curl -s https://apis.fotohub.app/v1/ai/generate/3d/job_abc123 \
     -H "Authorization: Bearer fh_live_your_api_key")
   echo "$STATUS" | jq '.status'
   echo "$STATUS" | jq -e '.status == "completed"' && break
@@ -2624,7 +2725,7 @@ for _, wh := range webhooks {
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/webhooks \
+curl -X GET https://apis.fotohub.app/v1/console/webhooks \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
@@ -2685,7 +2786,7 @@ fmt.Printf("Secret: %s\n", webhook.Secret)  // Store securely
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/webhooks \
+curl -X POST https://apis.fotohub.app/v1/console/webhooks \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -2730,7 +2831,7 @@ fmt.Printf("Updated: %s, events: %d\n", updated.ID, len(updated.Events))
 ```
 
 ```bash [cURL]
-curl -X PATCH https://apis.fotohub.app/v1/webhooks/wh_abc123 \
+curl -X PATCH https://apis.fotohub.app/v1/console/webhooks/wh_abc123 \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -2765,7 +2866,7 @@ fmt.Println("Webhook deleted")
 ```
 
 ```bash [cURL]
-curl -X DELETE https://apis.fotohub.app/v1/webhooks/wh_abc123 \
+curl -X DELETE https://apis.fotohub.app/v1/console/webhooks/wh_abc123 \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
@@ -2795,7 +2896,7 @@ fmt.Printf("Success: %t, Response time: %dms\n", test.Success, test.ResponseTime
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/webhooks/wh_abc123/test \
+curl -X POST https://apis.fotohub.app/v1/console/webhooks/wh_abc123/test \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
@@ -2835,7 +2936,7 @@ for _, log := range logs {
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/webhooks/wh_abc123/logs \
+curl -X GET https://apis.fotohub.app/v1/console/webhooks/wh_abc123/logs \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 :::
@@ -2847,51 +2948,43 @@ Gabriel is FOTOhub's intelligent routing assistant. It classifies prompts, sugge
 ### Classify Prompt
 
 ```typescript
-gabrielClassify(prompt: string, opts?: { context?: string }): Promise<Classification>
+gabrielClassify(options: {
+  prompt: string;
+  language?: string;
+  context?: { user_tier?: string; credits_remaining?: number; recent_tools?: string[]; brand_id?: string };
+  enhance_prompt?: boolean;
+}): Promise<GabrielResult>
 ```
 
-Classifies a user prompt into a category and suggests the best model and parameters.
+Routes a natural-language request to the right FOTOhub feature. Calls `POST /v1/ai/gabriel` under
+the hood (not `/v1/gabriel/classify`, which does not exist). The result carries an `action`
+(`"route" | "answer" | "workflow" | "error"`), not a free-form category.
 
 ::: code-group
 ```typescript [TypeScript]
-const classification = await client.gabrielClassify(
-  'Generate a 3D model of a sneaker from this photo',
-  { context: 'e-commerce product pipeline' }
-);
+const result = await client.gabrielClassify({
+  prompt: 'Generate a 3D model of a sneaker from this photo',
+});
 
-console.log(`Category: ${classification.category}`);      // 'image_to_3d'
-console.log(`Model: ${classification.recommended_model}`); // 'fh-lite-3d'
-console.log(`Confidence: ${classification.confidence}`);   // 0.95
-console.log(`Parameters:`, classification.suggested_params);
+console.log(`Action: ${result.action}`);               // 'route'
+console.log(`Target: ${result.target}`);                // e.g. '/generate/3d'
+console.log(`Model: ${result.model_selected}`);          // e.g. 'fh-lite-3d'
+console.log(`Confidence: ${result.confidence}`);
 ```
 
 ```python [Python]
-classification = client.gabriel_classify(
-    "Generate a 3D model of a sneaker from this photo",
-    context="e-commerce product pipeline"
-)
-print(f"Category: {classification.category}")
-print(f"Model: {classification.recommended_model}")
-print(f"Confidence: {classification.confidence}")
-print(f"Parameters: {classification.suggested_params}")
-```
-
-```go [Go]
-classification, _ := client.GabrielClassify("Generate a 3D model of a sneaker from this photo", fotohub.ClassifyOptions{
-    Context: "e-commerce product pipeline",
-})
-fmt.Printf("Category: %s\n", classification.Category)
-fmt.Printf("Model: %s\n", classification.RecommendedModel)
-fmt.Printf("Confidence: %.2f\n", classification.Confidence)
+result = client.gabriel_classify(prompt="Generate a 3D model of a sneaker from this photo")
+print(f"Action: {result['action']}")
+print(f"Target: {result.get('target')}")
+print(f"Model: {result.get('model_selected')}")
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/gabriel/classify \
+curl -X POST https://apis.fotohub.app/v1/ai/gabriel \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "Generate a 3D model of a sneaker from this photo",
-    "context": "e-commerce product pipeline"
+    "prompt": "Generate a 3D model of a sneaker from this photo"
   }'
 ```
 :::
@@ -2899,51 +2992,35 @@ curl -X POST https://apis.fotohub.app/v1/gabriel/classify \
 ### Suggest Completions
 
 ```typescript
-gabrielSuggest(partial: string, opts?: { limit?: number; category?: string }): Promise<Suggestion[]>
+gabrielSuggest(options: { partial: string; tab?: 'all' | 'image' | 'video' | 'audio' | 'chat'; page?: string }): Promise<GabrielSuggestion[]>
 ```
 
-Returns prompt completions and suggestions based on a partial input.
+Returns lightweight autocomplete suggestions as the user types. No authentication required.
 
 ::: code-group
 ```typescript [TypeScript]
-const suggestions = await client.gabrielSuggest('A cinematic drone shot of', {
-  limit: 5,
-  category: 'video',
+const suggestions = await client.gabrielSuggest({
+  partial: 'A cinematic drone shot of',
+  tab: 'video',
 });
 
 for (const s of suggestions) {
-  console.log(`${s.text} (score: ${s.score})`);
+  console.log(`${s.text} (${s.category})`);
 }
 ```
 
 ```python [Python]
-suggestions = client.gabriel_suggest(
-    "A cinematic drone shot of",
-    limit=5,
-    category="video"
-)
+suggestions = client.gabriel_suggest(partial="A cinematic drone shot of", tab="video")
 for s in suggestions:
-    print(f"{s.text} (score: {s.score})")
-```
-
-```go [Go]
-suggestions, _ := client.GabrielSuggest("A cinematic drone shot of", fotohub.SuggestOptions{
-    Limit:    5,
-    Category: "video",
-})
-for _, s := range suggestions {
-    fmt.Printf("%s (score: %.2f)\n", s.Text, s.Score)
-}
+    print(f"{s['text']} ({s['category']})")
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/gabriel/suggest \
-  -H "Authorization: Bearer fh_live_your_api_key" \
+curl -X POST https://apis.fotohub.app/v1/ai/gabriel/suggest \
   -H "Content-Type: application/json" \
   -d '{
     "partial": "A cinematic drone shot of",
-    "limit": 5,
-    "category": "video"
+    "tab": "video"
   }'
 ```
 :::
@@ -3200,40 +3277,80 @@ except FotoHubError as e:
 package main
 
 import (
-    "errors"
+    "bytes"
+    "context"
+    "encoding/json"
     "fmt"
-    "github.com/fotohubapp/sdk-go"
+    "io"
+    "log"
+    "net/http"
+    "os"
 )
 
+// See https://docs.fotohub.app/sdk/go for the FotoHubClient pattern.
+// Post() only returns a generic error, so this example makes the request
+// directly to inspect the HTTP status code and the JSON error body below.
+
+type apiErrorBody struct {
+    Error struct {
+        Code        string          `json:"code"`
+        Message     string          `json:"message"`
+        RetryAfter  int             `json:"retry_after"`
+        FieldErrors json.RawMessage `json:"fieldErrors"`
+    } `json:"error"`
+    Detail struct {
+        RequiredUSD float64 `json:"required_usd"`
+        BalanceUSD  float64 `json:"balance_usd"`
+    } `json:"detail"`
+}
+
 func main() {
-    client := fotohub.NewClient("fh_live_your_api_key")
+    apiKey := os.Getenv("FOTOHUB_API_KEY")
 
-    result, err := client.GenerateImage(fotohub.GenerateImageOptions{
-        Prompt: "A landscape",
-        Model:  "seedream-5-0-260128",
+    payload, _ := json.Marshal(map[string]any{
+        "prompt": "A landscape",
+        "model":  "seedream-5-0-260128",
     })
-    if err != nil {
-        var authErr *fotohub.AuthenticationError
-        var fundsErr *fotohub.InsufficientFundsError
-        var rateErr *fotohub.RateLimitError
-        var valErr *fotohub.ValidationError
-        var apiErr *fotohub.FotoHubError
 
-        switch {
-        case errors.As(err, &authErr):
+    req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://apis.fotohub.app/v1/ai/generate/image", bytes.NewReader(payload))
+    if err != nil {
+        log.Fatal(err)
+    }
+    req.Header.Set("Authorization", "Bearer "+apiKey)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        fmt.Printf("Network error: %v\n", err)
+        return
+    }
+    defer resp.Body.Close()
+    raw, _ := io.ReadAll(resp.Body)
+
+    if resp.StatusCode >= 400 {
+        var errBody apiErrorBody
+        _ = json.Unmarshal(raw, &errBody)
+
+        switch resp.StatusCode {
+        case 401:
             fmt.Println("Invalid API key.")
-        case errors.As(err, &fundsErr):
-            fmt.Printf("Need $%.2f, balance $%.2f\n", fundsErr.RequiredUsd, fundsErr.BalanceUsd)
-        case errors.As(err, &rateErr):
-            fmt.Printf("Rate limited. Retry after %ds\n", rateErr.RetryAfter)
-        case errors.As(err, &valErr):
-            fmt.Printf("Validation failed: %v\n", valErr.FieldErrors)
-        case errors.As(err, &apiErr):
-            fmt.Printf("[%d] %s: %s\n", apiErr.StatusCode, apiErr.Code, apiErr.Message)
+        case 402:
+            fmt.Printf("Need $%.2f, balance $%.2f\n", errBody.Detail.RequiredUSD, errBody.Detail.BalanceUSD)
+        case 429:
+            fmt.Printf("Rate limited. Retry after %ds\n", errBody.Error.RetryAfter)
+        case 422:
+            fmt.Printf("Validation failed: %s\n", errBody.Error.FieldErrors)
         default:
-            fmt.Printf("Network error: %v\n", err)
+            fmt.Printf("[%d] %s: %s\n", resp.StatusCode, errBody.Error.Code, errBody.Error.Message)
         }
         return
+    }
+
+    var result struct {
+        Images []string `json:"images"`
+    }
+    if err := json.Unmarshal(raw, &result); err != nil {
+        log.Fatalf("decode failed: %v", err)
     }
     fmt.Printf("Image: %s\n", result.Images[0])
 }
@@ -3246,7 +3363,7 @@ func main() {
 # 429: {"error": {"code": "rate_limit_exceeded", "message": "...", "retry_after": 30}}
 # 422: {"error": {"code": "validation_error", "message": "...", "fieldErrors": {"model": ["required"]}}}
 
-curl -X POST https://apis.fotohub.app/v1/image/generate \
+curl -X POST https://apis.fotohub.app/v1/ai/generate/image \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "A landscape", "model": "seedream-5-0-260128"}'
@@ -3445,128 +3562,74 @@ const client = new FotoHub({
 
 ## Advanced Feature Integrations
 
-### Brand Engine (`client.brand`)
+### Brand Engine
 
-The Brand Engine allows you to create consistent brand assets across all generations. This module helps you define your brand DNA and apply it consistently.
+::: warning No `client.brand` namespace
+The brand-engine capability is real (`/brand/v1/brands/...`, behind the `/brand/` gateway prefix),
+but the TypeScript, Python and PHP SDKs do not ship a `client.brand` wrapper for it. Call the
+endpoints directly, as shown below.
+:::
 
 ::: code-group
 
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
-import { z } from 'zod';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
-
-// Define strong types for Brand Engine
-export interface Brand {
-  id: string;
-  name: string;
-  dnaId: string;
-  createdAt: string;
-}
-
-export interface BrandFace {
-  id: string;
-  brandId: string;
-  features: Record<string, any>;
-}
-
-export interface BrandExpression {
-  id: string;
-  type: 'smile' | 'serious' | 'laughing';
-  assetUrl: string;
-}
+const base = 'https://apis.fotohub.app';
+const headers = { Authorization: `Bearer ${process.env.FOTOHUB_API_KEY}`, 'Content-Type': 'application/json' };
 
 async function createBrandWorkflow() {
   // 1. Create a brand profile
-  const brand = await client.brand.createBrand({
-    name: "Acme Corp Summer Campaign",
-    description: "Bright, energetic, and professional",
-    brandColors: ["#FF5733", "#33FF57"],
-    guidelinesUrl: "https://acme.com/brand.pdf"
-  });
-  console.log(`Brand created: ${brand.id} (Cost: $0.05)`);
+  const brand = await fetch(`${base}/brand/v1/brands`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name: 'Acme Corp Summer Campaign', description: 'Bright, energetic, and professional' }),
+  }).then((r) => r.json());
 
   // 2. Extract DNA from reference images
-  const dna = await client.brand.extractDNA({
-    brandId: brand.id,
-    imageUrls: [
-      "https://example.com/ref1.jpg",
-      "https://example.com/ref2.jpg"
-    ]
-  });
-  console.log(`DNA Extracted: ${dna.dnaId} (Cost: $0.15)`);
+  const dna = await fetch(`${base}/brand/v1/brands/${brand.id}/extract-dna`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ image_urls: ['https://example.com/ref1.jpg', 'https://example.com/ref2.jpg'] }),
+  }).then((r) => r.json());
 
-  // 3. Generate a Brand Face
-  const face = await client.brand.generateFace({
-    brandId: brand.id,
-    dnaId: dna.dnaId,
-    demographics: {
-      age: 25,
-      gender: "female",
-      ethnicity: "asian"
-    }
-  });
-  console.log(`Face Generated: ${face.id} (Cost: $0.10)`);
+  // 3. Generate a brand face
+  const face = await fetch(`${base}/brand/v1/brands/${brand.id}/faces/generate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ demographics: { age: 25, gender: 'female', ethnicity: 'asian' } }),
+  }).then((r) => r.json());
 
-  // 4. Get expressions
-  const expressions = await client.brand.getExpressions({
-    faceId: face.id,
-    types: ["smile", "laughing"]
-  });
-  
-  return { brand, dna, face, expressions };
+  return { brand, dna, face };
 }
 ```
 
 ```python [Python]
 import os
-from fotohub import FotoHub
+import httpx
 
-client = FotoHub(api_key=os.environ.get("FOTOHUB_API_KEY"))
+api_key = os.environ.get("FOTOHUB_API_KEY")
+headers = {"Authorization": f"Bearer {api_key}"}
+base = "https://apis.fotohub.app"
 
 def create_brand_workflow():
-    brand = client.brand.create_brand(
-        name="Acme Corp Summer Campaign",
-        description="Bright, energetic, and professional",
-        brand_colors=["#FF5733", "#33FF57"],
-        guidelines_url="https://acme.com/brand.pdf"
-    )
-    print(f"Brand created: {brand.id} (Cost: $0.05)")
+    brand = httpx.post(f"{base}/brand/v1/brands", headers=headers, json={
+        "name": "Acme Corp Summer Campaign",
+        "description": "Bright, energetic, and professional",
+    }).json()
 
-    dna = client.brand.extract_dna(
-        brand_id=brand.id,
-        image_urls=["https://example.com/ref1.jpg", "https://example.com/ref2.jpg"]
-    )
-    print(f"DNA Extracted: {dna.dna_id} (Cost: $0.15)")
-    return brand
-```
-
-```go [Go]
-package main
-
-import (
-	"context"
-	"fmt"
-	"os"
-
-	"github.com/fotohub/fotohub-go/sdk"
-)
-
-func main() {
-	client := sdk.NewClient(os.Getenv("FOTOHUB_API_KEY"))
-	
-	brand, _ := client.Brand.CreateBrand(context.Background(), sdk.CreateBrandRequest{
-		Name: "Acme Corp Summer Campaign",
-		Description: "Bright, energetic, and professional",
-	})
-	fmt.Printf("Brand created: %s (Cost: $0.05)
-", brand.ID)
-}
+    dna = httpx.post(f"{base}/brand/v1/brands/{brand['id']}/extract-dna", headers=headers, json={
+        "image_urls": ["https://example.com/ref1.jpg", "https://example.com/ref2.jpg"],
+    }).json()
+    return brand, dna
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/brand/create   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+curl -X POST https://apis.fotohub.app/brand/v1/brands \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
     "name": "Acme Corp Summer Campaign",
     "description": "Bright, energetic, and professional"
   }'
@@ -3578,210 +3641,116 @@ curl -X POST https://apis.fotohub.app/v1/brand/create   -H "Authorization: Beare
 Brand DNA extraction costs exactly $0.15. Keep this in mind when batch processing multiple brands.
 :::
 
-### UGC Studio (`client.ugc`)
+### UGC Studio
 
-Generate user-generated content style videos automatically with full pipeline automation.
+::: warning No `client.ugc` — and two different hosts underneath
+There is no `client.ugc` in any SDK; call these with raw HTTP. `POST /v1/ugc/briefs` does not
+exist anywhere. What does exist:
 
-::: code-group
-```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
-
-export interface CreateBrief {
-  productName: string;
-  targetAudience: string;
-  keyBenefits: string[];
-}
-
-export interface RenderVideo {
-  scriptId: string;
-  avatarId: string;
-  resolution: "1080p" | "4k";
-}
-
-async function generateUGCCampaign() {
-  // 1. Create Brief
-  const brief = await client.ugc.createBrief({
-    productName: "GlowSerum",
-    targetAudience: "Gen Z Skincare Enthusiasts",
-    keyBenefits: ["Hydrating", "Vegan", "Cruelty-free"]
-  });
-
-  // 2. Write Script
-  const script = await client.ugc.writeScript({
-    briefId: brief.id,
-    durationSeconds: 30,
-    tone: "enthusiastic"
-  });
-
-  // 3. Generate Angles
-  const angles = await client.ugc.generateAngles({
-    scriptId: script.id,
-    count: 3
-  });
-
-  // 4. Render final video
-  const job = await client.ugc.renderVideo({
-    scriptId: script.id,
-    avatarId: "av_12345",
-    resolution: "1080p"
-  });
-  
-  console.log(`UGC Render Job started: ${job.id} (Cost: $1.50)`);
-  return job;
-}
-```
-
-```python [Python]
-def generate_ugc_campaign():
-    brief = client.ugc.create_brief(
-        product_name="GlowSerum",
-        target_audience="Gen Z Skincare Enthusiasts",
-        key_benefits=["Hydrating", "Vegan", "Cruelty-free"]
-    )
-    script = client.ugc.write_script(
-        brief_id=brief.id,
-        duration_seconds=30,
-        tone="enthusiastic"
-    )
-    job = client.ugc.render_video(
-        script_id=script.id,
-        avatar_id="av_12345",
-        resolution="1080p"
-    )
-    print(f"UGC Render Job started: {job.id} (Cost: $1.50)")
-    return job
-```
-
-```go [Go]
-// UGC Studio Go Example
-```
-
-```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ugc/briefs   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
-    "productName": "GlowSerum",
-    "targetAudience": "Gen Z Skincare Enthusiasts",
-    "keyBenefits": ["Hydrating", "Vegan", "Cruelty-free"]
-  }'
-```
-
+- `POST /ugc/creative/brief`, `/ugc/creative/angles`, `/ugc/creative/script` — first-party
+  session auth (a Supabase user JWT), **not** an `fh_live_*` API key.
+- `POST /v1/ugc/projects`, `PUT /v1/ugc/projects/{id}/blueprint`,
+  `POST /v1/ugc/projects/{id}/render`, `GET /v1/ugc/jobs/{id}`, `POST /v1/ugc/estimate` —
+  the real `fh_live_*` API-key surface. A public SDK integration can call this half today with
+  an API key; it needs another way to produce the brief/angle/script content (its own LLM call)
+  to reach it without a first-party session.
 :::
 
-### Document Intelligence (`client.documents`)
+### Document Intelligence
 
-Process documents securely using our vision models.
+::: warning No `client.documents` namespace
+No SDK ships a `documents` wrapper. Call `POST /v1/ai/document/analyze-expense` directly.
+:::
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+const apiKey = process.env.FOTOHUB_API_KEY!;
 
 async function processExpenseReports(urls: string[]) {
-  // Batch processing with Promise.allSettled
   const results = await Promise.allSettled(
-    urls.map(url => client.documents.analyzeExpense({
-      documentUrl: url,
-      extractLineItems: true
-    }))
+    urls.map((url) =>
+      fetch('https://apis.fotohub.app/v1/ai/document/analyze-expense', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_url: url }),
+      }).then((r) => r.json())
+    )
   );
 
   const successful = results
     .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-    .map(r => r.value);
-    
-  const failed = results
-    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-    .map(r => r.reason);
+    .map((r) => r.value);
 
-  console.log(`Processed ${successful.length} documents. Total cost: $${(successful.length * 0.02).toFixed(2)}`);
-  
-  return { successful, failed };
+  return successful;
 }
 ```
 
 ```python [Python]
-def process_expense_reports(urls):
+import httpx
+
+def process_expense_reports(urls, api_key):
+    headers = {"Authorization": f"Bearer {api_key}"}
     successful = []
     for url in urls:
-        res = client.documents.analyze_expense(document_url=url, extract_line_items=True)
+        res = httpx.post(
+            "https://apis.fotohub.app/v1/ai/document/analyze-expense",
+            headers=headers,
+            json={"document_url": url},
+        ).json()
         successful.append(res)
-    print(f"Processed {len(successful)} documents. Total cost: ${len(successful) * 0.02:.2f}")
-```
-
-```go [Go]
-// Document Intelligence Go Example
+    return successful
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/documents/analyze-expense   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
-    "documentUrl": "https://example.com/receipt.jpg",
-    "extractLineItems": true
+curl -X POST https://apis.fotohub.app/v1/ai/document/analyze-expense \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_url": "https://example.com/receipt.jpg"
   }'
 ```
 :::
 
-### Virtual Try-On (`client.tryon`)
+### Virtual Try-On
+
+The real method is the flat `client.tryOn()` / `client.getTryOnStatus()` — there is no `client.tryon`
+namespace. `tryOn()` posts to `POST /v1/ai/tryon` (not `/v1/tryon/submit`) and returns the job
+synchronously; polling is only for a fresh signed URL.
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
-export interface TryonRequest {
-  personImageUrl: string;
-  garmentImageUrl: string;
-  category: 'tops' | 'bottoms' | 'dresses';
-}
+async function runTryOn() {
+  const job = await client.tryOn({
+    personImageUrl: 'https://example.com/person.jpg',
+    garmentImageUrl: 'https://example.com/shirt.jpg',
+    category: 'tops',
+  });
 
-export interface TryonJob {
-  id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  resultUrl?: string;
-}
-
-async function runTryOnWithTimeout(req: TryonRequest): Promise<string> {
-  const job = await client.tryon.submit(req);
-  
-  const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), 60000); // 1 minute timeout
-
-  try {
-    // Polling logic
-    while (true) {
-      if (abortController.signal.aborted) {
-        throw new Error("Try-on polling timed out");
-      }
-      
-      const status = await client.tryon.getJob(job.id);
-      if (status.status === 'completed') {
-        clearTimeout(timeout);
-        return status.resultUrl!;
-      }
-      if (status.status === 'failed') {
-        throw new Error("Try-on job failed");
-      }
-      
-      // Wait 2 seconds before next poll
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-  } finally {
-    clearTimeout(timeout);
-  }
+  const status = await client.getTryOnStatus(job.job_id);
+  return status;
 }
 ```
 ```python [Python]
-# Try-on Python example
-```
-```go [Go]
-// Try-on Go example
+job = client.tryon(
+    person_image_url="https://example.com/person.jpg",
+    garment_image_url="https://example.com/shirt.jpg",
+    category="tops",
+)
+status = client.get_tryon_status(job["job_id"])
 ```
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/tryon/submit   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
-    "personImageUrl": "https://example.com/person.jpg",
-    "garmentImageUrl": "https://example.com/shirt.jpg",
+curl -X POST https://apis.fotohub.app/v1/ai/tryon \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "person_image_url": "https://example.com/person.jpg",
+    "garment_image_url": "https://example.com/shirt.jpg",
     "category": "tops"
   }'
 ```
@@ -3791,7 +3760,7 @@ curl -X POST https://apis.fotohub.app/v1/tryon/submit   -H "Authorization: Beare
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -3828,7 +3797,7 @@ async function createProductModel() {
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -3858,7 +3827,7 @@ async function scheduleCampaign() {
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -3896,7 +3865,7 @@ async function extractViralClips(videoUrl: string) {
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -3931,7 +3900,7 @@ We recommend creating custom hooks to encapsulate FotoHub logic in your React ap
 ::: code-group
 ```tsx [hooks/useFotoHub.ts]
 import { useState, useCallback } from 'react';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 // Initialize client outside component to avoid recreation
 const client = new FotoHub({ apiKey: process.env.NEXT_PUBLIC_FOTOHUB_API_KEY });
@@ -3969,7 +3938,7 @@ export function useImageGeneration() {
 
 ::: code-group
 ```tsx [app/page.tsx]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 import Image from 'next/image';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
@@ -4011,7 +3980,7 @@ export default async function Page() {
 ::: code-group
 ```typescript [app/api/generate/route.ts]
 import { NextResponse } from 'next/server';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -4046,7 +4015,7 @@ export async function POST(request: Request) {
 ::: code-group
 ```typescript [app/api/edge/route.ts]
 import { NextResponse } from 'next/server';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 export const runtime = 'edge';
 
@@ -4104,7 +4073,7 @@ export const useFotoHubImage = () => {
 ```typescript [app/routes/_index.tsx]
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
@@ -4133,7 +4102,7 @@ export default function Index() {
 
 ::: code-group
 ```typescript [src/routes/+page.server.ts]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 import { FOTOHUB_API_KEY } from '$env/static/private';
 import type { PageServerLoad } from './$types';
 
@@ -4156,7 +4125,7 @@ export const load: PageServerLoad = async () => {
 
 ::: code-group
 ```typescript [server.ts]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -4185,7 +4154,7 @@ Bun.serve({
 ```typescript [server/trpc/router.ts]
 import { initTRPC } from '@trpc/server';
 import { z } from 'zod';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const t = initTRPC.create();
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
@@ -4359,7 +4328,7 @@ export function handleWebhook(payloadStr: string, headers: Record<string, string
 
 ::: code-group
 ```typescript [builders/ImageRequestBuilder.ts]
-import { ImageGenerationRequest } from '@fotohub/sdk';
+import { ImageGenerationRequest } from 'fotohub';
 
 export class ImageRequestBuilder {
   private request: Partial<ImageGenerationRequest> = {
@@ -4408,7 +4377,7 @@ export class ImageRequestBuilder {
 
 ::: code-group
 ```typescript [middleware/client.ts]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 // A wrapper around the standard client to add cross-cutting concerns
 export class InstrumentedFotoHub {
@@ -4442,7 +4411,7 @@ Always display costs in USD natively in your UI.
 
 ::: code-group
 ```typescript [utils/pricing.ts]
-import { ImageGenerationRequest } from '@fotohub/sdk';
+import { ImageGenerationRequest } from 'fotohub';
 
 export function estimateCost(request: ImageGenerationRequest): number {
   let basePrice = 0.025; // Standard 1024x1024
@@ -4505,7 +4474,7 @@ export async function* parseSSEStream<T>(response: Response): AsyncGenerator<T, 
 ::: code-group
 ```typescript [tests/api.test.ts]
 import { describe, it, expect, vi } from 'vitest';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 // Mock the global fetch
 global.fetch = vi.fn();
@@ -4513,7 +4482,7 @@ global.fetch = vi.fn();
 describe('FotoHub Client', () => {
   it('generates an image successfully', async () => {
     const mockResponse = {
-      data: [{ url: 'https://example.com/image.png' }]
+      images: ['https://example.com/image.png']
     };
     
     vi.mocked(global.fetch).mockResolvedValueOnce({
@@ -4522,11 +4491,11 @@ describe('FotoHub Client', () => {
     } as Response);
     
     const client = new FotoHub({ apiKey: 'test_key' });
-    const result = await client.image.generate({ prompt: 'test' });
+    const result = await client.generateImage({ prompt: 'test' });
     
-    expect(result.data[0].url).toBe('https://example.com/image.png');
+    expect(result.images[0]).toBe('https://example.com/image.png');
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://apis.fotohub.app/v1/images/generations',
+      'https://apis.fotohub.app/v1/ai/generate/image',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
@@ -4762,128 +4731,60 @@ When utilizing `client.ugc` and `client.lipSync`, requests are dynamically route
 
 ## Advanced System Patterns
 
-### Brand Engine (`client.brand_v2`)
+### Brand Engine
 
-The Brand Engine allows you to create consistent brand assets across all generations. This module helps you define your brand DNA and apply it consistently.
+::: warning No `client.brand` namespace
+The brand-engine capability is real (`/brand/v1/brands/...`, behind the `/brand/` gateway prefix),
+but no SDK ships a wrapper for it. Call the endpoints directly, as shown below.
+:::
 
 ::: code-group
 
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
-import { z } from 'zod';
+import { FotoHub } from 'fotohub';
 
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
-
-// Define strong types for Brand Engine
-export interface Brand {
-  id: string;
-  name: string;
-  dnaId: string;
-  createdAt: string;
-}
-
-export interface BrandFace {
-  id: string;
-  brandId: string;
-  features: Record<string, any>;
-}
-
-export interface BrandExpression {
-  id: string;
-  type: 'smile' | 'serious' | 'laughing';
-  assetUrl: string;
-}
+const apiKey = process.env.FOTOHUB_API_KEY!;
+const base = 'https://apis.fotohub.app';
+const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
 
 async function createBrandWorkflow() {
-  // 1. Create a brand profile
-  const brand = await client.brand_v2.createBrand({
-    name: "Acme Corp Summer Campaign",
-    description: "Bright, energetic, and professional",
-    brandColors: ["#FF5733", "#33FF57"],
-    guidelinesUrl: "https://acme.com/brand.pdf"
-  });
-  console.log(`Brand created: ${brand.id} (Cost: $0.05)`);
+  const brand = await fetch(`${base}/brand/v1/brands`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name: 'Acme Corp Summer Campaign', description: 'Bright, energetic, and professional' }),
+  }).then((r) => r.json());
 
-  // 2. Extract DNA from reference images
-  const dna = await client.brand_v2.extractDNA({
-    brandId: brand.id,
-    imageUrls: [
-      "https://example.com/ref1.jpg",
-      "https://example.com/ref2.jpg"
-    ]
-  });
-  console.log(`DNA Extracted: ${dna.dnaId} (Cost: $0.15)`);
+  const dna = await fetch(`${base}/brand/v1/brands/${brand.id}/extract-dna`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ image_urls: ['https://example.com/ref1.jpg', 'https://example.com/ref2.jpg'] }),
+  }).then((r) => r.json());
 
-  // 3. Generate a Brand Face
-  const face = await client.brand_v2.generateFace({
-    brandId: brand.id,
-    dnaId: dna.dnaId,
-    demographics: {
-      age: 25,
-      gender: "female",
-      ethnicity: "asian"
-    }
-  });
-  console.log(`Face Generated: ${face.id} (Cost: $0.10)`);
-
-  // 4. Get expressions
-  const expressions = await client.brand_v2.getExpressions({
-    faceId: face.id,
-    types: ["smile", "laughing"]
-  });
-  
-  return { brand, dna, face, expressions };
+  return { brand, dna };
 }
 ```
 
 ```python [Python]
 import os
-from fotohub import FotoHub
+import httpx
 
-client = FotoHub(api_key=os.environ.get("FOTOHUB_API_KEY"))
+api_key = os.environ.get("FOTOHUB_API_KEY")
+headers = {"Authorization": f"Bearer {api_key}"}
+base = "https://apis.fotohub.app"
 
 def create_brand_workflow():
-    brand = client.brand_v2.create_brand(
-        name="Acme Corp Summer Campaign",
-        description="Bright, energetic, and professional",
-        brand_colors=["#FF5733", "#33FF57"],
-        guidelines_url="https://acme.com/brand.pdf"
-    )
-    print(f"Brand created: {brand.id} (Cost: $0.05)")
-
-    dna = client.brand_v2.extract_dna(
-        brand_id=brand.id,
-        image_urls=["https://example.com/ref1.jpg", "https://example.com/ref2.jpg"]
-    )
-    print(f"DNA Extracted: {dna.dna_id} (Cost: $0.15)")
+    brand = httpx.post(f"{base}/brand/v1/brands", headers=headers, json={
+        "name": "Acme Corp Summer Campaign",
+        "description": "Bright, energetic, and professional",
+    }).json()
     return brand
 ```
 
-```go [Go]
-package main
-
-import (
-	"context"
-	"fmt"
-	"os"
-
-	"github.com/fotohub/fotohub-go/sdk"
-)
-
-func main() {
-	client := sdk.NewClient(os.Getenv("FOTOHUB_API_KEY"))
-	
-	brand, _ := client.Brand.CreateBrand(context.Background(), sdk.CreateBrandRequest{
-		Name: "Acme Corp Summer Campaign",
-		Description: "Bright, energetic, and professional",
-	})
-	fmt.Printf("Brand created: %s (Cost: $0.05)
-", brand.ID)
-}
-```
-
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/brand/create   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+curl -X POST https://apis.fotohub.app/brand/v1/brands \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
     "name": "Acme Corp Summer Campaign",
     "description": "Bright, energetic, and professional"
   }'
@@ -4895,210 +4796,116 @@ curl -X POST https://apis.fotohub.app/v1/brand/create   -H "Authorization: Beare
 Brand DNA extraction costs exactly $0.15. Keep this in mind when batch processing multiple brands.
 :::
 
-### UGC Studio (`client.ugc`)
+### UGC Studio
 
-Generate user-generated content style videos automatically with full pipeline automation.
+::: warning No `client.ugc` — and two different hosts underneath
+There is no `client.ugc` in any SDK; call these with raw HTTP. `POST /v1/ugc/briefs` does not
+exist anywhere. What does exist:
 
-::: code-group
-```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
-
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
-
-export interface CreateBrief {
-  productName: string;
-  targetAudience: string;
-  keyBenefits: string[];
-}
-
-export interface RenderVideo {
-  scriptId: string;
-  avatarId: string;
-  resolution: "1080p" | "4k";
-}
-
-async function generateUGCCampaign() {
-  // 1. Create Brief
-  const brief = await client.ugc.createBrief({
-    productName: "GlowSerum",
-    targetAudience: "Gen Z Skincare Enthusiasts",
-    keyBenefits: ["Hydrating", "Vegan", "Cruelty-free"]
-  });
-
-  // 2. Write Script
-  const script = await client.ugc.writeScript({
-    briefId: brief.id,
-    durationSeconds: 30,
-    tone: "enthusiastic"
-  });
-
-  // 3. Generate Angles
-  const angles = await client.ugc.generateAngles({
-    scriptId: script.id,
-    count: 3
-  });
-
-  // 4. Render final video
-  const job = await client.ugc.renderVideo({
-    scriptId: script.id,
-    avatarId: "av_12345",
-    resolution: "1080p"
-  });
-  
-  console.log(`UGC Render Job started: ${job.id} (Cost: $1.50)`);
-  return job;
-}
-```
-
-```python [Python]
-def generate_ugc_campaign():
-    brief = client.ugc.create_brief(
-        product_name="GlowSerum",
-        target_audience="Gen Z Skincare Enthusiasts",
-        key_benefits=["Hydrating", "Vegan", "Cruelty-free"]
-    )
-    script = client.ugc.write_script(
-        brief_id=brief.id,
-        duration_seconds=30,
-        tone="enthusiastic"
-    )
-    job = client.ugc.render_video(
-        script_id=script.id,
-        avatar_id="av_12345",
-        resolution="1080p"
-    )
-    print(f"UGC Render Job started: {job.id} (Cost: $1.50)")
-    return job
-```
-
-```go [Go]
-// UGC Studio Go Example
-```
-
-```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ugc/briefs   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
-    "productName": "GlowSerum",
-    "targetAudience": "Gen Z Skincare Enthusiasts",
-    "keyBenefits": ["Hydrating", "Vegan", "Cruelty-free"]
-  }'
-```
-
+- `POST /ugc/creative/brief`, `/ugc/creative/angles`, `/ugc/creative/script` — first-party
+  session auth (a Supabase user JWT), **not** an `fh_live_*` API key.
+- `POST /v1/ugc/projects`, `PUT /v1/ugc/projects/{id}/blueprint`,
+  `POST /v1/ugc/projects/{id}/render`, `GET /v1/ugc/jobs/{id}`, `POST /v1/ugc/estimate` —
+  the real `fh_live_*` API-key surface. A public SDK integration can call this half today with
+  an API key; it needs another way to produce the brief/angle/script content (its own LLM call)
+  to reach it without a first-party session.
 :::
 
-### Document Intelligence (`client.documents`)
+### Document Intelligence
 
-Process documents securely using our vision models.
+::: warning No `client.documents` namespace
+No SDK ships a `documents` wrapper. Call `POST /v1/ai/document/analyze-expense` directly.
+:::
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
+const apiKey = process.env.FOTOHUB_API_KEY!;
 
 async function processExpenseReports(urls: string[]) {
-  // Batch processing with Promise.allSettled
   const results = await Promise.allSettled(
-    urls.map(url => client.documents.analyzeExpense({
-      documentUrl: url,
-      extractLineItems: true
-    }))
+    urls.map((url) =>
+      fetch('https://apis.fotohub.app/v1/ai/document/analyze-expense', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_url: url }),
+      }).then((r) => r.json())
+    )
   );
 
   const successful = results
     .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-    .map(r => r.value);
-    
-  const failed = results
-    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-    .map(r => r.reason);
+    .map((r) => r.value);
 
-  console.log(`Processed ${successful.length} documents. Total cost: $${(successful.length * 0.02).toFixed(2)}`);
-  
-  return { successful, failed };
+  return successful;
 }
 ```
 
 ```python [Python]
-def process_expense_reports(urls):
+import httpx
+
+def process_expense_reports(urls, api_key):
+    headers = {"Authorization": f"Bearer {api_key}"}
     successful = []
     for url in urls:
-        res = client.documents.analyze_expense(document_url=url, extract_line_items=True)
+        res = httpx.post(
+            "https://apis.fotohub.app/v1/ai/document/analyze-expense",
+            headers=headers,
+            json={"document_url": url},
+        ).json()
         successful.append(res)
-    print(f"Processed {len(successful)} documents. Total cost: ${len(successful) * 0.02:.2f}")
-```
-
-```go [Go]
-// Document Intelligence Go Example
+    return successful
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/documents/analyze-expense   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
-    "documentUrl": "https://example.com/receipt.jpg",
-    "extractLineItems": true
+curl -X POST https://apis.fotohub.app/v1/ai/document/analyze-expense \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_url": "https://example.com/receipt.jpg"
   }'
 ```
 :::
 
-### Virtual Try-On (`client.tryon`)
+### Virtual Try-On
+
+The real method is the flat `client.tryOn()` / `client.getTryOnStatus()` — there is no `client.tryon`
+namespace. `tryOn()` posts to `POST /v1/ai/tryon` (not `/v1/tryon/submit`) and returns the job
+synchronously; polling is only for a fresh signed URL.
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
-export interface TryonRequest {
-  personImageUrl: string;
-  garmentImageUrl: string;
-  category: 'tops' | 'bottoms' | 'dresses';
-}
+async function runTryOn() {
+  const job = await client.tryOn({
+    personImageUrl: 'https://example.com/person.jpg',
+    garmentImageUrl: 'https://example.com/shirt.jpg',
+    category: 'tops',
+  });
 
-export interface TryonJob {
-  id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  resultUrl?: string;
-}
-
-async function runTryOnWithTimeout(req: TryonRequest): Promise<string> {
-  const job = await client.tryon.submit(req);
-  
-  const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), 60000); // 1 minute timeout
-
-  try {
-    // Polling logic
-    while (true) {
-      if (abortController.signal.aborted) {
-        throw new Error("Try-on polling timed out");
-      }
-      
-      const status = await client.tryon.getJob(job.id);
-      if (status.status === 'completed') {
-        clearTimeout(timeout);
-        return status.resultUrl!;
-      }
-      if (status.status === 'failed') {
-        throw new Error("Try-on job failed");
-      }
-      
-      // Wait 2 seconds before next poll
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-  } finally {
-    clearTimeout(timeout);
-  }
+  const status = await client.getTryOnStatus(job.job_id);
+  return status;
 }
 ```
 ```python [Python]
-# Try-on Python example
-```
-```go [Go]
-// Try-on Go example
+job = client.tryon(
+    person_image_url="https://example.com/person.jpg",
+    garment_image_url="https://example.com/shirt.jpg",
+    category="tops",
+)
+status = client.get_tryon_status(job["job_id"])
 ```
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/tryon/submit   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
-    "personImageUrl": "https://example.com/person.jpg",
-    "garmentImageUrl": "https://example.com/shirt.jpg",
+curl -X POST https://apis.fotohub.app/v1/ai/tryon \
+  -H "Authorization: Bearer fh_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "person_image_url": "https://example.com/person.jpg",
+    "garment_image_url": "https://example.com/shirt.jpg",
     "category": "tops"
   }'
 ```
@@ -5108,7 +4915,7 @@ curl -X POST https://apis.fotohub.app/v1/tryon/submit   -H "Authorization: Beare
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -5145,7 +4952,7 @@ async function createProductModel() {
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -5175,7 +4982,7 @@ async function scheduleCampaign() {
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -5213,7 +5020,7 @@ async function extractViralClips(videoUrl: string) {
 
 ::: code-group
 ```typescript [TypeScript]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -5248,7 +5055,7 @@ We recommend creating custom hooks to encapsulate FotoHub logic in your React ap
 ::: code-group
 ```tsx [hooks/useFotoHub.ts]
 import { useState, useCallback } from 'react';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 // Initialize client outside component to avoid recreation
 const client = new FotoHub({ apiKey: process.env.NEXT_PUBLIC_FOTOHUB_API_KEY });
@@ -5286,7 +5093,7 @@ export function useImageGeneration() {
 
 ::: code-group
 ```tsx [app/page.tsx]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 import Image from 'next/image';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
@@ -5328,7 +5135,7 @@ export default async function Page() {
 ::: code-group
 ```typescript [app/api/generate/route.ts]
 import { NextResponse } from 'next/server';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -5363,7 +5170,7 @@ export async function POST(request: Request) {
 ::: code-group
 ```typescript [app/api/edge/route.ts]
 import { NextResponse } from 'next/server';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 export const runtime = 'edge';
 
@@ -5421,7 +5228,7 @@ export const useFotoHubImage = () => {
 ```typescript [app/routes/_index.tsx]
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
@@ -5450,7 +5257,7 @@ export default function Index() {
 
 ::: code-group
 ```typescript [src/routes/+page.server.ts]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 import { FOTOHUB_API_KEY } from '$env/static/private';
 import type { PageServerLoad } from './$types';
 
@@ -5473,7 +5280,7 @@ export const load: PageServerLoad = async () => {
 
 ::: code-group
 ```typescript [server.ts]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
 
@@ -5502,7 +5309,7 @@ Bun.serve({
 ```typescript [server/trpc/router.ts]
 import { initTRPC } from '@trpc/server';
 import { z } from 'zod';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 const t = initTRPC.create();
 const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY });
@@ -5676,7 +5483,7 @@ export function handleWebhook(payloadStr: string, headers: Record<string, string
 
 ::: code-group
 ```typescript [builders/ImageRequestBuilder.ts]
-import { ImageGenerationRequest } from '@fotohub/sdk';
+import { ImageGenerationRequest } from 'fotohub';
 
 export class ImageRequestBuilder {
   private request: Partial<ImageGenerationRequest> = {
@@ -5725,7 +5532,7 @@ export class ImageRequestBuilder {
 
 ::: code-group
 ```typescript [middleware/client.ts]
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 // A wrapper around the standard client to add cross-cutting concerns
 export class InstrumentedFotoHub {
@@ -5759,7 +5566,7 @@ Always display costs in USD natively in your UI.
 
 ::: code-group
 ```typescript [utils/pricing.ts]
-import { ImageGenerationRequest } from '@fotohub/sdk';
+import { ImageGenerationRequest } from 'fotohub';
 
 export function estimateCost(request: ImageGenerationRequest): number {
   let basePrice = 0.025; // Standard 1024x1024
@@ -5822,7 +5629,7 @@ export async function* parseSSEStream<T>(response: Response): AsyncGenerator<T, 
 ::: code-group
 ```typescript [tests/api.test.ts]
 import { describe, it, expect, vi } from 'vitest';
-import { FotoHub } from '@fotohub/sdk';
+import { FotoHub } from 'fotohub';
 
 // Mock the global fetch
 global.fetch = vi.fn();
@@ -5830,7 +5637,7 @@ global.fetch = vi.fn();
 describe('FotoHub Client', () => {
   it('generates an image successfully', async () => {
     const mockResponse = {
-      data: [{ url: 'https://example.com/image.png' }]
+      images: ['https://example.com/image.png']
     };
     
     vi.mocked(global.fetch).mockResolvedValueOnce({
@@ -5839,11 +5646,11 @@ describe('FotoHub Client', () => {
     } as Response);
     
     const client = new FotoHub({ apiKey: 'test_key' });
-    const result = await client.image.generate({ prompt: 'test' });
+    const result = await client.generateImage({ prompt: 'test' });
     
-    expect(result.data[0].url).toBe('https://example.com/image.png');
+    expect(result.images[0]).toBe('https://example.com/image.png');
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://apis.fotohub.app/v1/images/generations',
+      'https://apis.fotohub.app/v1/ai/generate/image',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({

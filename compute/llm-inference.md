@@ -65,8 +65,12 @@ FOTOhub offers a diverse set of instance families situated in `eu-central-1` to 
 |:---|:---|:---|:---|:---|:---|
 | `g4dn.xlarge` | 1x NVIDIA T4 | 16 GB | **$0.20/hr** | **$0.53/hr** | 7B-8B models, low-cost inference, Whisper |
 | `g5.xlarge` | 1x NVIDIA A10G | 24 GB | **$0.38/hr** | **$1.01/hr** | 7B-14B models, high-throughput |
-| `g5.2xlarge` | 1x NVIDIA A10G | 24 GB | **$0.45/hr** | **$1.21/hr** | 14B-32B models (Quantized), mixed workloads |
-| `g5.12xlarge` | 4x NVIDIA A10G | 96 GB | **$1.85/hr** | **$5.67/hr** | 70B+ models, multi-GPU Tensor Parallelism |
+| `g5.2xlarge` | 1x NVIDIA A10G | 24 GB | **$0.4494/hr** | **$1.2025/hr** | 14B-32B models (quantized), mixed workloads |
+| `g5.4xlarge` | 1x NVIDIA A10G | 24 GB | **$0.6025/hr** | **$1.6123/hr** | Same single A10G as `g5.xlarge`/`g5.2xlarge` with more vCPU/RAM |
+
+FOTOhub does not offer a multi-GPU instance — every GPU catalog entry, `g4dn` or `g5`, carries
+exactly one GPU. A model that doesn't fit in 24 GB on a single A10G needs to be quantized; it
+cannot be sharded across GPUs on this platform.
 
 ### CPU Instance Families
 
@@ -101,8 +105,10 @@ Choosing the right model and GPU combination is crucial for balancing cost, thro
    - **Notes:** Requires 4-bit or 8-bit quantization to fit within 24GB VRAM. Expect moderate throughput (~30-40 tokens/sec). Mixtral (MoE) is very efficient for its size.
 
 4. **70B+ Parameters (e.g., Llama 3.3 70B, Qwen 2.5 72B)**
-   - **Recommended:** `g5.12xlarge` (4x A10G 96GB)
-   - **Notes:** Must be split across multiple GPUs using Tensor Parallelism (`--tensor-parallel-size 4`). Can fit quantized weights with massive context, or FP16 with moderate context.
+   - **Not a fit for this platform today.** FOTOhub has no multi-GPU instance to shard a 70B+
+     model across, and even 4-bit quantization of a 70B model (roughly 35-40 GB) does not fit
+     in a single A10G's 24 GB. Use a smaller or more aggressively quantized model, or run this
+     workload elsewhere.
 
 ### Memory & Throughput Matrix (A10G 24GB)
 
@@ -577,18 +583,6 @@ python3 benchmark_throughput.py     --backend vllm     --dataset ShareGPT_V3_unf
 
 ---
 
-## Multi-GPU Tensor Parallelism (g5.12xlarge)
-
-For massive models exceeding a single GPU's 24GB capacity (e.g. Llama 3.3 70B AWQ), launch a multi-GPU instance (`g5.12xlarge` with 4x A10G = 96 GB VRAM) and configure tensor parallelism.
-
-vLLM handles the communication and sharding across GPUs via Ray or PyTorch distributed automatically. The `--tensor-parallel-size` argument must equal the number of GPUs.
-
-```bash
-python3 -m vllm.entrypoints.openai.api_server     --model casperhansen/llama-3.3-70b-instruct-awq     --tensor-parallel-size 4     --gpu-memory-utilization 0.94     --max-model-len 32768
-```
-
----
-
 ## Horizontal Scaling & Production Patterns
 
 For true high-availability and scale, a single GPU instance is insufficient. You need an array of workers hidden behind a load balancer.
@@ -688,20 +682,13 @@ You can configure Prometheus to scrape this endpoint and build a Grafana dashboa
 
 If your LLM generates code that needs to be executed securely (e.g. a code interpreter agent), do NOT run it directly on your GPU instance or a standard VM. Doing so exposes your infrastructure to malicious behavior.
 
-Instead, use the FOTOhub serverless Python sandbox.
-
-### Executing Code Safely
-
-```bash
-curl -X POST https://apis.fotohub.app/sandbox/exec-python   -H "Authorization: Bearer fh_live_YOUR_API_KEY"   -H "Content-Type: application/json"   -d '{
-    "code": "print(sum([i for i in range(100)]))",
-    "timeout_ms": 5000,
-    "memory_mb": 256
-  }'
-```
+Instead, run it through a `code.python` node in an Agent Engine workflow — see
+[Firecracker Sandboxes](/compute/agent-sandboxes) for the full mechanism. There is no direct
+`POST /sandbox/exec-python` endpoint reachable with your API key; it's an internal, proxy-secret
+authenticated route the Agent Engine workflow runtime calls on your behalf.
 
 :::warning Security Isolation
-The sandbox environment is completely isolated via microVMs (Firecracker). Each execution runs in a pristine environment that is destroyed immediately after completion. It does not have network access by default, strictly protecting your infrastructure and internal VPC from malicious generated code.
+The sandbox environment is completely isolated via microVMs (Firecracker). Each execution runs in a pristine environment that is destroyed immediately after completion. There is no inherited network route into your infrastructure or internal VPC from generated code.
 :::
 
 ---

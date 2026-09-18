@@ -177,12 +177,12 @@ checked first, before authentication.
 | `POST /v1/billing/topup`, `/v1/storage/s3/buy` | 3 / min |
 | `POST /v1/images/batch`, `/v1/video/merge`, `/v1/video/stabilize`, `/v1/video/subtitles` | 10 / min |
 | `POST /v1/ai/generate/music`, `/v1/shorts/*`, `/v1/story/step`, `/v1/ai/document` | 10 / min |
-| `POST /v1/images/*` (background, shadow, colorize, face-restore, depth-map) | 15-30 / min |
-| `POST /v1/video/*` (transcode, speed, effects, watermark) | 15 / min |
+| `POST /v1/images/remove-background`, `/add-shadow`, `/colorize`, `/face-restore`, `/depth-map` | 15-30 / min |
+| `POST /v1/video/transcode`, `/speed`, `/effects`, `/watermark` | 15 / min |
 | `POST /v1/photos/upload` | 20 / min |
-| `POST /v1/ai/tts/polly`, `/v1/ai/tts/azure` | 20 / min |
+| `POST /v1/ai/tts/polly/synthesize`, `/v1/ai/tts/azure/synthesize` | 20 / min |
 | `POST /v1/ai/generate/image` | 30 / min |
-| `POST /v1/ai/chat`, `/v1/ai/gabriel` | 30 / min |
+| `POST /v1/ai/chat/completions`, `/v1/ai/gabriel` | 30 / min |
 | `/v1/auth/keys` | 30 / min |
 | Everything else | 60 / min |
 

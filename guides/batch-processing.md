@@ -573,7 +573,7 @@ func submitVideoJob(prompt string) (string, error) {
 
 func pollVideoStatus(jobID string) (string, string, error) {
     req, _ := http.NewRequest("GET",
-        "https://apis.fotohub.app/v1/ai/video/status/"+jobID, nil)
+        "https://apis.fotohub.app/v1/ai/generate/video/"+jobID, nil)
     req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
@@ -657,7 +657,7 @@ PENDING=("${JOB_IDS[@]}")
 while [ ${#PENDING[@]} -gt 0 ]; do
   NEW_PENDING=()
   for JOB_ID in "${PENDING[@]}"; do
-    STATUS=$(curl -s "https://apis.fotohub.app/v1/ai/video/status/$JOB_ID" \
+    STATUS=$(curl -s "https://apis.fotohub.app/v1/ai/generate/video/$JOB_ID" \
       -H "Authorization: Bearer $FOTOHUB_API_KEY" | jq -r '.status')
     if [ "$STATUS" != "completed" ] && [ "$STATUS" != "failed" ]; then
       NEW_PENDING+=("$JOB_ID")

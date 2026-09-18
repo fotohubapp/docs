@@ -22,7 +22,7 @@ sequenceDiagram
     actor Client as Automation Pipeline / Video Studio
     participant API as FotoHUB API (/v1/ai)
     participant Vision as Vision Perception Engine
-    participant MMAudio as MMAudio Foley Engine (GPU2 :8799)
+    participant MMAudio as MMAudio Foley Engine (GPU2)
     participant Music as Music Engine (MiniMax / ElevenLabs)
     participant Mixer as FFmpeg NVENC Remuxer
 
@@ -190,19 +190,23 @@ Generates background scores via MiniMax.
 | `instrumental` | boolean | No | `true` | True guarantees no vocal hallucinations. |
 | `loop` | boolean | No | `false` | Renders seamless looping boundaries. |
 
-### Video/Audio Composition (`POST /v1/ai/compose/video-audio`)
+### There is no server-side "compose" endpoint
 
-The master orchestrator endpoint that handles the full pipeline in a single async job.
+::: warning Corrected 2026-09
+Earlier revisions of this page documented a `POST /v1/ai/compose/video-audio`
+"master orchestrator" that took a silent video plus a cue sheet and returned a
+fully mixed, ducked, loudness-mastered video in one async job — with webhook
+notification and a BYOB stem export. **That endpoint does not exist.** There is
+no server-side mixing, sidechain ducking, or loudness mastering capability on
+the public API.
 
-| Parameter | Type | Required | Default | Description |
-|:---|:---|:---:|:---|:---|
-| `video_url` | string | **Yes** | — | The source silent video. |
-| `cue_sheet` | object | **Yes** | — | The JSON cue sheet from the perception pass. |
-| `music_track_url` | string | No | — | Pre-generated music track, or omitted to auto-generate. |
-| `ducking_db` | float | No | -16.0 | Amount of sidechain ducking applied to music. |
-| `target_lufs` | float | No | -14.0 | Master EBU R128 loudness target. |
-| `export_s3` | object | No | — | BYOB S3/R2 export configuration. |
-| `webhook_url` | string | No | — | URL to notify upon completion (HMAC-SHA256 secured). |
+What is real: **`POST /v1/ai/generate/sfx`** and **`POST /v1/ai/generate/music`**
+(documented above) each return a finished audio file — synchronously, no
+`job_id`, no polling. Assembling those stems onto the silent video — timeline
+placement, sidechain ducking, and EBU R128 mastering — is your own FFmpeg step,
+same as the "DSP & Assembly Engine" box in the architecture diagram above
+describes; it is not something you can hand to the API in a single call.
+:::
 
 ---
 
@@ -260,18 +264,19 @@ FFmpeg uses the `adelay` filter to offset stems to their correct timestamp. For 
 
 ---
 
-## 8. 4-Way Production Code Examples
+## 8. Production Code Examples
 
-Here is how to automate the full pipeline using the FOTOhub API.
+Here is how to automate the real, synchronous part of the pipeline using the FOTOhub API.
 
 ::: code-group
+
+Each real call below is synchronous — there is no `job_id` to poll and no
+webhook for these two endpoints. Mixing the returned stems onto the video is a
+local FFmpeg step, not an API call.
 
 ```python [Python]
 import os
 import requests
-import hmac
-import hashlib
-import time
 
 API_KEY = os.environ.get("FOTOHUB_API_KEY", "fh_live_your_api_key")
 BASE_URL = "https://apis.fotohub.app/v1"
@@ -284,34 +289,31 @@ def run_automated_sound_design(video_url: str):
         headers=HEADERS,
         json={"image_url": video_url, "features": ["actions"]}
     ).json()
-    
+
     cue_sheet = analyze_res.get("cues", [])
-    
-    print("2. Submitting Async Composition Job...")
-    compose_res = requests.post(
-        f"{BASE_URL}/ai/compose/video-audio",
+
+    print("2. Synthesizing an SFX stem per cue (synchronous)...")
+    sfx_urls = []
+    for cue in cue_sheet:
+        sfx_res = requests.post(
+            f"{BASE_URL}/ai/generate/sfx",
+            headers=HEADERS,
+            json={"prompt": cue["sfx_prompt"], "duration": cue.get("duration", 3)}
+        ).json()
+        sfx_urls.append({"start_s": cue["timestamp"], "url": sfx_res["audio_url"]})
+
+    print("3. Generating the music bed (synchronous)...")
+    music_res = requests.post(
+        f"{BASE_URL}/ai/generate/music",
         headers=HEADERS,
-        json={
-            "video_url": video_url,
-            "cue_sheet": {"duration_s": 15.0, "cues": cue_sheet},
-            "music_prompt": "Cinematic dark synthwave, 110 bpm",
-            "webhook_url": "https://your-server.com/webhooks/fotohub"
-        }
+        json={"prompt": "Cinematic dark synthwave, 110 bpm", "duration": 15, "instrumental": True}
     ).json()
-    
-    job_id = compose_res.get("job_id")
-    print(f"Job {job_id} submitted. Polling for completion...")
-    
-    # 3. Async Job Polling Pattern
-    while True:
-        status_res = requests.get(f"{BASE_URL}/jobs/{job_id}", headers=HEADERS).json()
-        if status_res["status"] == "completed":
-            print(f"Success! Final Video: {status_res['result']['video_url']}")
-            break
-        elif status_res["status"] in ["failed", "dlq"]:
-            print(f"Job failed: {status_res['error']}")
-            break
-        time.sleep(5)
+    music_url = music_res["audio_url"]
+
+    print("4. Mixing stems onto the video (local FFmpeg — not an API call)...")
+    # Build an `adelay`+`amix`+sidechain `ffmpeg` filtergraph from `sfx_urls`
+    # and `music_url` here; see "Timeline Assembly" above for the filter shape.
+    return {"sfx": sfx_urls, "music": music_url}
 ```
 
 ```typescript [TypeScript]
@@ -332,103 +334,58 @@ async function runSoundDesign(videoUrl: string) {
     body: JSON.stringify({ image_url: videoUrl, features: ["actions"] })
   });
   const analyzeData = await analyzeRes.json();
-  
-  console.log("2. Submitting Async Composition Job...");
-  const composeRes = await fetch(`${BASE_URL}/ai/compose/video-audio`, {
+
+  console.log("2. Synthesizing SFX stems (synchronous, one call per cue)...");
+  const sfxUrls: string[] = [];
+  for (const cue of analyzeData.cues ?? []) {
+    const sfxRes = await fetch(`${BASE_URL}/ai/generate/sfx`, {
+      method: "POST",
+      headers: HEADERS,
+      body: JSON.stringify({ prompt: cue.sfx_prompt, duration: cue.duration ?? 3 })
+    });
+    const sfxData = await sfxRes.json();
+    sfxUrls.push(sfxData.audio_url);
+  }
+
+  console.log("3. Generating the music bed (synchronous)...");
+  const musicRes = await fetch(`${BASE_URL}/ai/generate/music`, {
     method: "POST",
     headers: HEADERS,
-    body: JSON.stringify({
-      video_url: videoUrl,
-      cue_sheet: { duration_s: 15.0, cues: analyzeData.cues },
-      music_prompt: "Cinematic dark synthwave, 110 bpm",
-      export_s3: {
-        bucket: "my-studio-bucket",
-        endpoint: "s3.amazonaws.com",
-        access_key: "AKIA...",
-        secret_key: "..."
-      }
-    })
+    body: JSON.stringify({ prompt: "Cinematic dark synthwave, 110 bpm", duration: 15, instrumental: true })
   });
-  
-  const composeData = await composeRes.json();
-  const jobId = composeData.job_id;
-  
-  console.log(`Job ${jobId} submitted. Awaiting Webhook or Polling...`);
-  // Note: For production, rely on webhooks rather than active polling.
+  const musicData = await musicRes.json();
+
+  console.log("4. Mix sfxUrls + musicData.audio_url onto the video locally with FFmpeg.");
+  return { sfxUrls, music: musicData.audio_url };
 }
 
 runSoundDesign("https://storage.fotohub.app/raw/silent_cyberpunk.mp4");
 ```
 
-```go [Go]
-package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"time"
-)
-
-const apiKey = "fh_live_your_api_key"
-const baseURL = "https://apis.fotohub.app/v1"
-
-func main() {
-	client := &http.Client{Timeout: 30 * time.Second}
-
-	// Submit Job
-	reqBody, _ := json.Marshal(map[string]interface{}{
-		"video_url": "https://storage.fotohub.app/raw/silent.mp4",
-		"music_prompt": "Cinematic ambient score",
-	})
-	
-	req, _ := http.NewRequest("POST", baseURL+"/ai/compose/video-audio", bytes.NewBuffer(reqBody))
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Content-Type", "application/json")
-	
-	resp, _ := client.Do(req)
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-	jobID := result["job_id"].(string)
-	
-	fmt.Printf("Job ID: %s. Polling...
-", jobID)
-	
-	for {
-		statusReq, _ := http.NewRequest("GET", baseURL+"/jobs/"+jobID, nil)
-		statusReq.Header.Set("Authorization", "Bearer "+apiKey)
-		statusResp, _ := client.Do(statusReq)
-		
-		var status map[string]interface{}
-		json.NewDecoder(statusResp.Body).Decode(&status)
-		
-		if status["status"] == "completed" {
-			fmt.Printf("Done! URL: %v
-", status["result"].(map[string]interface{})["video_url"])
-			break
-		}
-		time.Sleep(5 * time.Second)
-	}
-}
-```
-
 ```bash [cURL]
 # 1. Analyze Video for Cues
-curl -X POST https://apis.fotohub.app/v1/ai/analyze/image   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
+curl -X POST https://apis.fotohub.app/v1/ai/analyze/image \
+  -H "Authorization: Bearer fh_live_your_api_key" -H "Content-Type: application/json" -d '{
     "image_url": "https://storage.fotohub.app/raw/silent.mp4",
     "features": ["actions"]
   }'
 
-# 2. Submit Compose Job
-curl -X POST https://apis.fotohub.app/v1/ai/compose/video-audio   -H "Authorization: Bearer fh_live_your_api_key"   -H "Content-Type: application/json"   -d '{
-    "video_url": "https://storage.fotohub.app/raw/silent.mp4",
-    "music_prompt": "Cinematic orchestral",
-    "webhook_url": "https://api.yourdomain.com/webhook"
+# 2. Generate one SFX stem (synchronous — the audio URL comes back in this response)
+curl -X POST https://apis.fotohub.app/v1/ai/generate/sfx \
+  -H "Authorization: Bearer fh_live_your_api_key" -H "Content-Type: application/json" -d '{
+    "prompt": "Heavy footstep on wet concrete",
+    "duration": 3
   }'
 
-# 3. Poll Job Status (202 Accepted -> 200 OK)
-curl -X GET https://apis.fotohub.app/v1/jobs/job_12345abc   -H "Authorization: Bearer fh_live_your_api_key"
+# 3. Generate the music bed (also synchronous)
+curl -X POST https://apis.fotohub.app/v1/ai/generate/music \
+  -H "Authorization: Bearer fh_live_your_api_key" -H "Content-Type: application/json" -d '{
+    "prompt": "Cinematic orchestral",
+    "duration": 15,
+    "instrumental": true
+  }'
+
+# 4. Mix the returned stems onto the video with your own FFmpeg pipeline (no API call)
 ```
 
 :::
@@ -437,9 +394,15 @@ curl -X GET https://apis.fotohub.app/v1/jobs/job_12345abc   -H "Authorization: B
 
 ## 9. Webhook Handling & Security
 
-For long-running videos, do not use active polling. Provide a `webhook_url` to receive a POST request when the job completes.
+The SFX and music generation calls used in this recipe are synchronous and do **not**
+fire webhooks — there is no `webhook_url` parameter on either, and no job to notify
+you about. This section is a general reference for webhooks elsewhere on the
+platform (e.g. `generation.completed`, `shorts.job.completed` — register via
+`POST /v1/console/webhooks`, see the [Webhooks guide](/guides/webhooks)); it does not
+apply to the pipeline built above.
 
-FOTOhub signs webhook payloads using HMAC-SHA256. Verify the signature using your API key.
+FOTOhub signs webhook payloads using HMAC-SHA256. Verify the signature using the
+per-webhook secret returned when you create the webhook (not your API key).
 
 ### Python FastAPI Webhook Handler
 
@@ -502,63 +465,29 @@ app.listen(3000);
 
 ---
 
-## 10. Async Job Patterns, DLQ, & Retries
+## 10. There is no async job, DLQ, or batch endpoint for this pipeline
 
-Complex multi-track compositions can take 10-30 seconds depending on video length. The API uses a standard async pattern:
-
-1. **202 Accepted:** The compose endpoint immediately returns a `job_id`.
-2. **Polling:** Make `GET /v1/jobs/{job_id}` requests.
-3. **Dead Letter Queue (DLQ):** If a job fails (e.g., MMAudio GPU OOM, or invalid FFmpeg filter), it is routed to the DLQ. You can query `GET /v1/jobs/failed` to review.
-4. **Auto-Retry:** FOTOhub automatically retries transient network errors (like MiniMax API timeouts) up to 3 times before failing the job.
-
----
-
-## 11. BYOB (Bring Your Own Bucket) S3/R2 Export
-
-By default, FOTOhub stores renders for 24 hours. For production pipelines, configure direct export to your AWS S3 or Cloudflare R2 bucket. FOTOhub will write the master video AND the individual unmixed audio stems to your bucket.
-
-```json
-"export_s3": {
-  "provider": "aws",
-  "bucket": "studio-assets-prod",
-  "endpoint": "s3.us-east-1.amazonaws.com",
-  "prefix": "projects/cyberpunk/",
-  "access_key": "AKIA...",
-  "secret_key": "..."
-}
-```
-
-The resulting bucket will contain:
-- `master_mix.mp4`
-- `stem_music.wav`
-- `stem_foley_01.wav`
-- `stem_ambient.wav`
+`POST /v1/ai/generate/sfx` and `POST /v1/ai/generate/music` are both synchronous:
+no `202`, no `job_id`, no polling, no Dead Letter Queue, no auto-retry, and no
+`POST /v1/ai/compose/batch` to submit many at once. If a call fails you get a
+`4xx`/`5xx` directly and the wallet is refunded — retry it yourself. For genuinely
+large studio runs, rate-limit your own client to the per-endpoint cap in
+[Rate Limits](/api/rate-limits) rather than relying on a server-side batch queue
+that does not exist.
 
 ---
 
-## 12. Batch Processing for Studios
+## 11. Delivering stems to your own storage
 
-Need to process 50 silent clips overnight? Do not dispatch 50 concurrent API calls as you may hit rate limits (default: 10 concurrent jobs). 
-
-Implement a local queue (RabbitMQ / Redis) or use the FOTOhub Batch API:
-
-```http
-POST https://apis.fotohub.app/v1/ai/compose/batch
-Authorization: Bearer fh_live_your_api_key
-
-{
-  "batch_name": "Nightly Render Pass",
-  "jobs": [
-    {"video_url": "vid1.mp4"},
-    {"video_url": "vid2.mp4"}
-  ],
-  "webhook_url": "https://api.domain.com/batch-complete"
-}
-```
+There is no `export_s3` parameter on these endpoints, and no capability that
+writes an unmixed stem breakdown to your bucket automatically. What is real:
+download each `audio_url` FOTOhub returns and upload it to your own storage, or
+provision a FOTOhub-managed S3 bucket via `GET,POST /v1/storage/s3/buckets` and
+push the files there yourself with the standard object endpoints.
 
 ---
 
-## 13. Manual FFmpeg Filter Chain Examples
+## 12. Manual FFmpeg Filter Chain Examples
 
 If you prefer to download the raw stems and perform the mixing locally on your own infrastructure, here is the raw FFmpeg command used by the pipeline:
 
@@ -572,7 +501,7 @@ The `adelay=2400|2400` filter shifts the audio stem exactly 2.4 seconds (2400 mi
 
 ---
 
-## 14. Common Failure Modes & Troubleshooting
+## 13. Common Failure Modes & Troubleshooting
 
 | Error Code | Meaning | Resolution |
 |:---|:---|:---|
@@ -584,7 +513,7 @@ The `adelay=2400|2400` filter shifts the audio stem exactly 2.4 seconds (2400 mi
 
 ---
 
-## 15. Unit Economics & ROI Table
+## 14. Unit Economics & ROI Table
 
 All operations strictly deduct from your **USD balance** (`wallet.available_usd`). No credits, no synthetic tokens.
 

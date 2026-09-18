@@ -11,13 +11,17 @@ Production-ready patterns for integrating with FOTOhub API.
 
 ## Error Handling
 
-- **Always handle 402** — Credits can run out mid-session
+- **Always handle 402** — The prepaid USD wallet can run dry mid-session. This is
+  about the wallet, not fotohub.app subscription credits -- the two are separate
+  balances and a key never spends the latter.
 - **Implement retries** — Use exponential backoff for 429 and 5xx errors
 - **Use idempotency keys** — Prevent duplicate billing on network retries
-- **Log request IDs** — Include `request_id` from error responses in your logs
+- **Log the request ID** — Present as the `X-Request-Id` response header on every
+  call; only duplicated into the error body on a `500`.
 
 ```python
 import time
+from fotohub.exceptions import RateLimitError, InsufficientFundsError
 
 def generate_safe(client, prompt, max_retries=3):
     for attempt in range(max_retries + 1):
@@ -28,9 +32,9 @@ def generate_safe(client, prompt, max_retries=3):
                 time.sleep(e.retry_after)
             else:
                 raise
-        except InsufficientCreditsError:
-            # Alert ops team, don't retry
-            notify_ops("Credits depleted!")
+        except InsufficientFundsError as e:
+            # Nothing was charged. Alert ops team, don't retry.
+            notify_ops(f"Wallet empty: need ${e.shortfall_usd} more")
             raise
 ```
 
@@ -43,7 +47,7 @@ def generate_safe(client, prompt, max_retries=3):
 
 ## Cost Optimization
 
-- **Monitor with webhooks** — Subscribe to `credits.low` and `billing.charged`
+- **Monitor with webhooks** — Subscribe to `billing.charged` and `billing.insufficient_funds` (confirmed live; `credits.low` is accepted as a subscription but no emitter for it could be found in the codebase -- see [Webhooks](/api/webhooks#available-events))
 - **Set hard limits** — Configure per-project spending caps in Console
 - **Use appropriate models** — Don't use Ultra/4K models when Standard suffices
 - **Check balance before batch** — Verify credits before large job queues

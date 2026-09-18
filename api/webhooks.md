@@ -18,17 +18,55 @@ Webhooks are available on **Startup** tier and above. Free and Developer plans c
 
 Subscribe to specific event types to receive only the notifications relevant to your integration.
 
+This table is the platform's exact `ALLOWED_EVENTS` allow-list -- subscribing to
+anything outside it is rejected at creation time (`400 Invalid events: ...`), and
+nothing outside it can ever be delivered, because delivery matches on
+`events.contains([event])`.
+
 | Event | Description |
 |-------|-------------|
 | `generation.completed` | Image, video, or music generation finished successfully. Includes output URL and billing info. |
 | `generation.failed` | Generation failed with an error. Includes error reason and partial billing info. |
-| `credits.low` | Plan credits are exhausted; the operation fell back to wallet billing. |
-| `credits.depleted` | The wallet could not cover the charge. Operations fail until topped up. |
-| `billing.charged` | Wallet charged for an operation, in USD. Includes `amount_usd`, `operation` and `method`. |
+| `generation.refunded` | A failed generation's charge was reversed. Carries `cost_usd` and `job_id` -- reconciles against the `billing.charged` that preceded it. |
+| `generation.started` | A generation began processing. |
+| `credits.low` | Plan credits are exhausted; the operation fell back to wallet billing. Meant to fire from the fotohub.app web app's own credit paths, not from API-key traffic -- but no emitter for it could be found anywhere in `server/`, `supabase/functions/` or the migrations at the time of writing (see the warning below). An API-only integration should subscribe to the `billing.*` events instead, which are confirmed live. |
+| `credits.depleted` | Same status as `credits.low`: documented intent, no emitter found. |
 | `key.used` | Accepted as a subscription target, but **no code path emits it today** — subscribing to it will never deliver anything. |
+| `billing.charged` | Wallet charged for an operation, in USD. Includes `amount_usd`, `operation` and `method`. |
+| `billing.insufficient_funds` | The `402` case: a request was refused for lack of funds. Carries `required_usd` and `balance_usd`, so you learn the wallet stopped a request without parsing the error of the call that was refused. |
+| `billing.refunded` | A charge was reversed. |
+| `billing.unfunded` | A reserved-then-settled operation's real cost exceeded both the hold and the balance. Rare, and always FOTOhub's error rather than the customer's. |
 | `images.batch.completed` | A batch image job finished. |
 | `background.removed` / `background.replaced` / `background.blurred` / `shadow.added` | Background/shadow operation finished. |
 | `commerce.job.completed` / `commerce.job.failed` / `commerce.item.completed` / `commerce.job.awaiting_credits` | Commerce Bridge batch events. |
+| `shorts.job.started` / `shorts.job.completed` / `shorts.job.failed` / `shorts.clip.rendered` | Shorts clipping job lifecycle, delivered by shorts-engine's own webhook path (account subscriptions only -- a clipping job can also take a per-job `webhook_url`, delivered directly by the engine and independent of this subscription system). |
+
+::: warning Real events that exist but cannot be subscribed to
+A handful of events fire internally (`fire_event(...)` in the codebase) but are
+**not** on `ALLOWED_EVENTS`, so no account webhook can ever receive them --
+subscribing to them is simply rejected as an unknown event name:
+
+- `video.lip_sync.completed`
+- `shorts.agent.completed`, `shorts.clips.generated`, `shorts.render.completed`
+  (a different shorts pipeline from the `shorts.job.*` / `shorts.clip.rendered`
+  events above, which come from shorts-engine and *are* subscribable)
+- `story.generate.started`, `story.completed`
+- `enterprise.application_submitted`
+
+If your integration needs one of these, poll the relevant job/resource status
+endpoint instead -- there is no webhook path for them today.
+:::
+
+::: warning `credits.low` and `credits.depleted` have no emitter found
+Unlike `key.used`, these two are not source-commented as unfired -- a test in
+`api-server` explicitly says they are "emitted outside this service" on the
+fotohub.app subscription side. But a repository-wide search for the literal
+event names, across `server/`, `supabase/functions/` and the SQL migrations,
+turns up no call site that actually fires either one -- the same symptom as
+`key.used`, just without the comment admitting it. Treat both as unverified in
+practice: they are accepted subscriptions, and may be silently delivering
+nothing, until an emitter is found or added.
+:::
 
 ::: warning Money fields are USD
 Every monetary field in a webhook payload (`amount_usd`, `needed_usd`) is USD.
@@ -43,27 +81,34 @@ All webhook deliveries use the same envelope: `{ "event", "timestamp", "data", "
 
 ### generation.completed
 
+`data` is a flat set of billing/identity fields set by the route that fired it --
+not a nested `billing` object, and not the same fields on every route. There is
+**no `job_id` and no `output_url`** on this event; get the result the way you
+normally would (the synchronous API response, or by polling the job). `duration`
+appears on video/music routes, `tokens` on token-billed ones; a plain image
+generation has neither:
+
 ```json
 {
   "event": "generation.completed",
   "timestamp": "2026-07-17T12:00:00Z",
   "attempt": 1,
   "data": {
-    "job_id": "vj_xyz",
-    "generation_type": "video",
+    "type": "video",
     "model": "veo-2.0-generate-001",
-    "output_url": "https://s3point.fotohub.app/generations/vj_xyz.mp4",
     "duration": 5,
-    "billing": {
-      "method": "wallet",
-      "usd_charged": 0.4500,
-      "usd_charged": 0
-    }
+    "cost_usd": 0.45
   }
 }
 ```
 
 ### generation.failed
+
+Also flat, and also with **no `job_id`**. `error` is the failure message itself
+(truncated to 200 characters), not a short machine code -- there is no separate
+`error_message` field. `refunded` is present on routes where a charge could have
+already been taken; it is absent on routes where the failure is caught before
+any charge:
 
 ```json
 {
@@ -71,21 +116,39 @@ All webhook deliveries use the same envelope: `{ "event", "timestamp", "data", "
   "timestamp": "2026-07-17T12:01:00Z",
   "attempt": 1,
   "data": {
-    "job_id": "vj_failed1",
-    "generation_type": "video",
+    "type": "video",
     "model": "veo-2.0-generate-001",
-    "error": "content_policy_violation",
-    "error_message": "The prompt was rejected by the safety filter.",
-    "billing": {
-      "method": "wallet",
-      "usd_charged": 0.0000,
-      "usd_charged": 0
-    }
+    "error": "The prompt was rejected by the safety filter.",
+    "refunded": true
   }
 }
 ```
 
-### credits.low
+### generation.refunded
+
+Unlike the two events above, this one **does** carry `job_id` -- it exists specifically
+to reconcile against the `billing.charged` (or the `cost_usd` on `generation.completed`)
+that preceded it:
+
+```json
+{
+  "event": "generation.refunded",
+  "timestamp": "2026-07-17T12:02:00Z",
+  "attempt": 1,
+  "data": {
+    "type": "video",
+    "model": "veo-2.0-generate-001",
+    "cost_usd": 0.45,
+    "job_id": "vj_xyz"
+  }
+}
+```
+
+### credits.low / credits.depleted
+
+No emitter for either event could be found in the codebase (see the warning
+under [Available Events](#available-events)), so the shape below is the
+documented intent, not something observed live. Treat it as unconfirmed:
 
 ```json
 {
@@ -95,20 +158,6 @@ All webhook deliveries use the same envelope: `{ "event", "timestamp", "data", "
   "data": {
     "operation": "generate_image:seedream-5-0-260128",
     "message": "Credits exhausted, falling back to wallet billing."
-  }
-}
-```
-
-### credits.depleted
-
-```json
-{
-  "event": "credits.depleted",
-  "timestamp": "2026-07-17T16:30:00Z",
-  "attempt": 1,
-  "data": {
-    "operation": "generate_image:seedream-5-0-260128",
-    "needed_usd": 0.0492
   }
 }
 ```
@@ -123,7 +172,57 @@ All webhook deliveries use the same envelope: `{ "event", "timestamp", "data", "
   "data": {
     "operation": "generate_video:kling-v3",
     "amount_usd": 1.47,
-    "method": "wallet"
+    "balance_usd": 8.53,
+    "currency": "USD"
+  }
+}
+```
+
+### billing.insufficient_funds
+
+The `402` case, fired the moment a request is refused for lack of funds:
+
+```json
+{
+  "event": "billing.insufficient_funds",
+  "timestamp": "2026-07-17T10:46:00Z",
+  "attempt": 1,
+  "data": {
+    "operation": "generate_video:kling-v3",
+    "required_usd": 1.47,
+    "balance_usd": 0.02
+  }
+}
+```
+
+### billing.refunded
+
+```json
+{
+  "event": "billing.refunded",
+  "timestamp": "2026-07-17T10:47:00Z",
+  "attempt": 1,
+  "data": {
+    "operation": "generate_video:kling-v3",
+    "amount_usd": 1.47,
+    "reason": "generation_failed"
+  }
+}
+```
+
+### billing.unfunded
+
+A reserved-then-settled operation whose real cost exceeded both the hold and the
+balance -- always FOTOhub's error, not the customer's:
+
+```json
+{
+  "event": "billing.unfunded",
+  "timestamp": "2026-07-17T10:48:00Z",
+  "attempt": 1,
+  "data": {
+    "operation": "generate_video:kling-v3",
+    "unfunded_usd": 0.31
   }
 }
 ```
@@ -1068,13 +1167,14 @@ def handle_webhook():
 
 
 def handle_generation_completed(data):
-    """Download and process completed generation."""
-    print(f"Generation complete: {data['job_id']} -> {data['output_url']}")
+    """Note the completed generation. No job_id or output_url on this event --
+    fetch the result the way you normally would (sync response or job poll)."""
+    print(f"Generation complete: {data['type']}/{data['model']} cost ${data.get('cost_usd', 0)}")
     # Queue for async download/processing
 
 def handle_generation_failed(data):
-    """Log failed generation for review."""
-    print(f"Generation failed: {data['job_id']} - {data['error']}")
+    """Log failed generation for review. No job_id on this event either."""
+    print(f"Generation failed: {data['type']}/{data['model']} - {data['error']}")
 
 def handle_credits_low(data):
     """Plan credits exhausted -- wallet billing takes over."""
@@ -1086,7 +1186,7 @@ def handle_credits_depleted(data):
 
 def handle_billing_charged(data):
     """Sync charge to accounting system."""
-    print(f"Charged: ${data['amount_usd']} for {data['operation']} via {data['method']}")
+    print(f"Charged: ${data['amount_usd']} for {data['operation']}, balance now ${data['balance_usd']}")
 
 def handle_key_used(data):
     """Security: new IP detected.
@@ -1189,11 +1289,13 @@ app.post("/webhook/fotohub", async (req, res) => {
 });
 
 function handleGenerationCompleted(data: any) {
-  console.log(`Generation complete: ${data.job_id} -> ${data.output_url}`);
+  // No job_id or output_url on this event -- fetch the result the way you
+  // normally would (sync response or job poll).
+  console.log(`Generation complete: ${data.type}/${data.model} cost $${data.cost_usd ?? 0}`);
 }
 
 function handleGenerationFailed(data: any) {
-  console.log(`Generation failed: ${data.job_id} - ${data.error}`);
+  console.log(`Generation failed: ${data.type}/${data.model} - ${data.error}`);
 }
 
 function handleCreditsLow(data: any) {
@@ -1297,9 +1399,11 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	// 5. Route by event type
 	switch event.Event {
 	case "generation.completed":
-		log.Printf("Generation complete: %v -> %v", event.Data["job_id"], event.Data["output_url"])
+		// No job_id or output_url on this event -- fetch the result the way
+		// you normally would (sync response or job poll).
+		log.Printf("Generation complete: %v/%v cost $%v", event.Data["type"], event.Data["model"], event.Data["cost_usd"])
 	case "generation.failed":
-		log.Printf("Generation failed: %v - %v", event.Data["job_id"], event.Data["error"])
+		log.Printf("Generation failed: %v/%v - %v", event.Data["type"], event.Data["model"], event.Data["error"])
 	case "credits.low":
 		log.Printf("Credits low on %v: %v", event.Data["operation"], event.Data["message"])
 	case "credits.depleted":
@@ -1327,7 +1431,7 @@ func main() {
 # Test your webhook handler locally with a simulated delivery
 
 # 1. Generate a test signature
-PAYLOAD='{"event":"generation.completed","timestamp":"2026-07-17T12:00:00Z","attempt":1,"data":{"job_id":"vj_xyz","generation_type":"video","model":"veo-2.0-generate-001","output_url":"https://s3point.fotohub.app/generations/vj_xyz.mp4","duration":5,"billing":{"method":"wallet","usd_charged":6.975,"usd_charged":0}}}'
+PAYLOAD='{"event":"generation.completed","timestamp":"2026-07-17T12:00:00Z","attempt":1,"data":{"type":"video","model":"veo-2.0-generate-001","duration":5,"cost_usd":0.45}}'
 SECRET="your_webhook_secret_here"
 SIGNATURE="$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')"
 
@@ -1428,12 +1532,13 @@ curl https://apis.fotohub.app/v1/console/webhooks/wh_abc123/logs \
 
 Each log entry includes:
 
-- **Timestamp** -- When the delivery was attempted
-- **Event type** -- Which event was sent
-- **HTTP status** -- Response code from your endpoint (or `timeout`)
-- **Response time** -- How long your endpoint took to respond
-- **Attempt number** -- Which delivery attempt (1-3)
-- **Response body** -- First 512 bytes of your endpoint's response
+- **Timestamp** (`attempted_at`) -- When the delivery was attempted
+- **Event type** (`event`) -- Which event was sent
+- **HTTP status** (`response_status`) -- Response code from your endpoint
+- **Success** (`success`) -- Whether the response was 2xx
+- **Response body** (`response_body`) -- First 1000 characters of your endpoint's response
+
+There is no response-time field and no attempt-number column on the log row itself -- the `attempt` number lives inside the delivered `payload`, not as a separate log column.
 
 ### Testing Locally
 
@@ -1467,7 +1572,7 @@ curl -X POST https://apis.fotohub.app/v1/console/webhooks/wh_abc123/test \
 
 ```json
 {
-  "events": ["generation.completed", "generation.failed", "images.batch.completed"]
+  "events": ["generation.started", "generation.completed", "generation.failed", "generation.refunded", "images.batch.completed"]
 }
 ```
 
@@ -1475,7 +1580,7 @@ curl -X POST https://apis.fotohub.app/v1/console/webhooks/wh_abc123/test \
 
 ```json
 {
-  "events": ["credits.low", "credits.depleted", "billing.charged"]
+  "events": ["billing.charged", "billing.insufficient_funds", "billing.refunded", "billing.unfunded", "credits.low", "credits.depleted"]
 }
 ```
 
@@ -1487,17 +1592,38 @@ curl -X POST https://apis.fotohub.app/v1/console/webhooks/wh_abc123/test \
 }
 ```
 
+::: tip
+`key.used` is accepted here without error, but nothing in the platform emits it today -- subscribing to it produces no calls. See [Available Events](#available-events).
+:::
+
 ### Subscribe to All Events
 
 ```json
 {
   "events": [
+    "generation.started",
     "generation.completed",
     "generation.failed",
+    "generation.refunded",
     "images.batch.completed",
     "credits.low",
     "credits.depleted",
     "billing.charged",
+    "billing.insufficient_funds",
+    "billing.refunded",
+    "billing.unfunded",
+    "background.removed",
+    "background.replaced",
+    "background.blurred",
+    "shadow.added",
+    "commerce.job.completed",
+    "commerce.job.failed",
+    "commerce.item.completed",
+    "commerce.job.awaiting_credits",
+    "shorts.job.started",
+    "shorts.job.completed",
+    "shorts.job.failed",
+    "shorts.clip.rendered",
     "key.used"
   ]
 }
@@ -1508,14 +1634,14 @@ curl -X POST https://apis.fotohub.app/v1/console/webhooks/wh_abc123/test \
 | Constraint | Value |
 |------------|-------|
 | Maximum webhooks per account | 10 |
-| Request timeout | 5 seconds |
-| Maximum attempts | 3 (initial + 2 retries) |
-| Auto-disable threshold | 10 consecutive failures |
+| Request timeout | Not enforced by the delivery worker -- there is no server-side cutoff on how long it waits for your response. Respond within a few seconds anyway (see [Best Practices](#best-practices-for-reliability) above); a slow endpoint delays the next retry attempt and looks identical to a hung one from the console. |
+| Maximum attempts | 3 (initial + 2 retries, at 1s then 2s) |
+| Auto-disable | None -- see [Failures Never Disable Your Webhook](#failures-never-disable-your-webhook) above. There is no failure counter and no threshold. |
 | Minimum plan | Startup |
 | URL scheme | HTTPS only |
-| Payload size | Up to 64 KB |
+| Payload size | Not enforced by the delivery worker -- a generation's `data` payload is normally well under a few KB. |
 | Custom headers per webhook | 10 |
-| Event types per webhook | Unlimited (select from available events) |
+| Event types per webhook | Unlimited, from the [Available Events](#available-events) allow-list above |
 
 ## Related APIs
 

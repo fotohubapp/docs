@@ -5,7 +5,7 @@ description: Master documentation for the FOTOhub Brand Engine and Identity APIs
 
 # Brand Engine API
 
-The **FOTOhub Brand Engine** (`/v1/brands`) is the centralized repository for brand visual identity kits, virtual brand faces and ambassadors, logos, product catalogs, color palettes, and automated brand compliance checking. 
+The **FOTOhub Brand Engine** (`/brand/v1/brands`) is the centralized repository for brand visual identity kits, virtual brand faces and ambassadors, logos, product catalogs, color palettes, and automated brand compliance checking. 
 
 This powerful engine acts as the unified configuration layer across all FOTOhub generation pipelines, allowing your AI image, video, and audio generation requests to automatically inject consistent brand styling, fonts, colors, and characters.
 
@@ -13,7 +13,7 @@ This powerful engine acts as the unified configuration layer across all FOTOhub 
 By using the Brand Engine, you no longer need to pass complex prompt injections for styles, colors, and LoRA character models in every single API call. Instead, simply pass the `brand_id` parameter to any generation endpoint, and the FOTOhub backend handles the context assembly.
 :::
 
-Base URL: `https://apis.fotohub.app/v1/brands`
+Base URL: `https://apis.fotohub.app/brand/v1/brands`
 
 ---
 
@@ -78,13 +78,13 @@ Ensure your `wallet.available_usd` has sufficient funds before initiating bulk g
 
 Retrieve a paginated list of all brand identity kits associated with your workspace.
 
-`GET /v1/brands`
+`GET /brand/v1/brands`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -96,7 +96,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands"
+url = "https://apis.fotohub.app/brand/v1/brands"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -108,7 +108,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands";
+  const url = "https://apis.fotohub.app/brand/v1/brands";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -128,7 +128,7 @@ import (
 	"net/http"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands"
+	url := "https://apis.fotohub.app/brand/v1/brands"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Add("Content-Type", "application/json")
@@ -140,7 +140,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/brands" \
+curl -X GET "https://apis.fotohub.app/brand/v1/brands" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json"
 ```
@@ -153,13 +153,13 @@ curl -X GET "https://apis.fotohub.app/v1/brands" \
 
 Initialize a new brand identity kit.
 
-`POST /v1/brands`
+`POST /brand/v1/brands`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -171,7 +171,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands"
+url = "https://apis.fotohub.app/brand/v1/brands"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -184,7 +184,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands";
+  const url = "https://apis.fotohub.app/brand/v1/brands";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -206,7 +206,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands"
+	url := "https://apis.fotohub.app/brand/v1/brands"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -219,7 +219,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/brands" \
+curl -X POST "https://apis.fotohub.app/brand/v1/brands" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -233,13 +233,13 @@ curl -X POST "https://apis.fotohub.app/v1/brands" \
 
 Fetch all stored configuration for a specific brand kit.
 
-`GET /v1/brands/{id}`
+`GET /brand/v1/brands/{brand_id}`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -251,7 +251,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -263,7 +263,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -283,7 +283,7 @@ import (
 	"net/http"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Add("Content-Type", "application/json")
@@ -295,7 +295,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/brands/{id}" \
+curl -X GET "https://apis.fotohub.app/brand/v1/brands/{brand_id}" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json"
 ```
@@ -308,13 +308,13 @@ curl -X GET "https://apis.fotohub.app/v1/brands/{id}" \
 
 Modify fields on an existing brand profile.
 
-`PUT /v1/brands/{id}`
+`PUT /brand/v1/brands/{brand_id}`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -326,7 +326,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -339,7 +339,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -361,7 +361,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("PUT", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -374,7 +374,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X PUT "https://apis.fotohub.app/v1/brands/{id}" \
+curl -X PUT "https://apis.fotohub.app/brand/v1/brands/{brand_id}" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -388,13 +388,13 @@ curl -X PUT "https://apis.fotohub.app/v1/brands/{id}" \
 
 Permanently delete a brand and all associated assets, faces, and trained LoRAs.
 
-`DELETE /v1/brands/{id}`
+`DELETE /brand/v1/brands/{brand_id}`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -406,7 +406,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -418,7 +418,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -438,7 +438,7 @@ import (
 	"net/http"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}"
 	req, _ := http.NewRequest("DELETE", url, nil)
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Add("Content-Type", "application/json")
@@ -450,7 +450,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X DELETE "https://apis.fotohub.app/v1/brands/{id}" \
+curl -X DELETE "https://apis.fotohub.app/brand/v1/brands/{brand_id}" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json"
 ```
@@ -463,13 +463,13 @@ curl -X DELETE "https://apis.fotohub.app/v1/brands/{id}" \
 
 Returns a highly compressed, token-optimized text string representing the brand context.
 
-`GET /v1/brands/{id}/summary`
+`GET /brand/v1/brands/{brand_id}/summary`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -481,7 +481,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/summary"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/summary"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -493,7 +493,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/summary";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/summary";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -513,7 +513,7 @@ import (
 	"net/http"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/summary"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/summary"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Add("Content-Type", "application/json")
@@ -525,7 +525,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/brands/{id}/summary" \
+curl -X GET "https://apis.fotohub.app/brand/v1/brands/{brand_id}/summary" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json"
 ```
@@ -538,13 +538,13 @@ curl -X GET "https://apis.fotohub.app/v1/brands/{id}/summary" \
 
 Fetches the complete resolution map for the brand, including references to internal LoRAs, cached face embeddings, style presets, and resolved CDN URLs.
 
-`GET /v1/brands/{id}/context`
+`GET /brand/v1/brands/{brand_id}/context`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -556,7 +556,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/context"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/context"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -568,7 +568,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/context";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/context";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -588,7 +588,7 @@ import (
 	"net/http"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/context"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/context"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Add("Content-Type", "application/json")
@@ -600,7 +600,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/brands/{id}/context" \
+curl -X GET "https://apis.fotohub.app/brand/v1/brands/{brand_id}/context" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json"
 ```
@@ -613,13 +613,13 @@ curl -X GET "https://apis.fotohub.app/v1/brands/{id}/context" \
 
 Exports a static JSON/ZIP bundle of the entire brand kit to an external location (like a BYOB S3 bucket).
 
-`POST /v1/brands/{id}/export`
+`POST /brand/v1/brands/{brand_id}/export`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -631,7 +631,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/export"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/export"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -644,7 +644,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/export";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/export";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -666,7 +666,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/export"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/export"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -679,7 +679,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/brands/{id}/export" \
+curl -X POST "https://apis.fotohub.app/brand/v1/brands/{brand_id}/export" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -693,13 +693,13 @@ curl -X POST "https://apis.fotohub.app/v1/brands/{id}/export" \
 
 Upload a brand image to extract the core palette.
 
-`POST /v1/brands/{id}/extract-colors`
+`POST /brand/v1/brands/{brand_id}/extract-colors`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -711,7 +711,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/extract-colors"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/extract-colors"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -724,7 +724,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/extract-colors";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/extract-colors";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -746,7 +746,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/extract-colors"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/extract-colors"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -759,7 +759,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/brands/{id}/extract-colors" \
+curl -X POST "https://apis.fotohub.app/brand/v1/brands/{brand_id}/extract-colors" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -773,13 +773,13 @@ curl -X POST "https://apis.fotohub.app/v1/brands/{id}/extract-colors" \
 
 Upload marketing collateral, packaging, or screenshots to automatically analyze and extract brand colors, visual style, tone of voice, typography, and keywords.
 
-`POST /v1/brands/{id}/extract-dna`
+`POST /brand/v1/brands/{brand_id}/extract-dna`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -791,7 +791,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/extract-dna"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/extract-dna"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -804,7 +804,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/extract-dna";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/extract-dna";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -826,7 +826,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/extract-dna"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/extract-dna"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -839,7 +839,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/brands/{id}/extract-dna" \
+curl -X POST "https://apis.fotohub.app/brand/v1/brands/{brand_id}/extract-dna" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -853,13 +853,13 @@ curl -X POST "https://apis.fotohub.app/v1/brands/{id}/extract-dna" \
 
 Score how closely a newly generated ad, banner, or photo matches the established brand guidelines on a scale of 0 to 100.
 
-`POST /v1/brands/{id}/check-compliance`
+`POST /brand/v1/brands/{brand_id}/check-compliance`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -871,7 +871,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/check-compliance"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/check-compliance"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -884,7 +884,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/check-compliance";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/check-compliance";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -906,7 +906,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/check-compliance"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/check-compliance"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -919,7 +919,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/brands/{id}/check-compliance" \
+curl -X POST "https://apis.fotohub.app/brand/v1/brands/{brand_id}/check-compliance" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -933,13 +933,13 @@ curl -X POST "https://apis.fotohub.app/v1/brands/{id}/check-compliance" \
 
 Generate copy (taglines, slogans, captions, or email subjects) that strictly adheres to the brand's stored tone of voice and keywords.
 
-`POST /v1/brands/{id}/generate-text`
+`POST /brand/v1/brands/{brand_id}/generate-text`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -951,7 +951,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/generate-text"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/generate-text"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -964,7 +964,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/generate-text";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/generate-text";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -986,7 +986,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/generate-text"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/generate-text"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -999,7 +999,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/brands/{id}/generate-text" \
+curl -X POST "https://apis.fotohub.app/brand/v1/brands/{brand_id}/generate-text" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -1013,13 +1013,13 @@ curl -X POST "https://apis.fotohub.app/v1/brands/{id}/generate-text" \
 
 Retrieves all virtual ambassadors linked to this brand kit.
 
-`GET /v1/brands/{id}/faces`
+`GET /brand/v1/brands/{brand_id}/faces`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -1031,7 +1031,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/faces"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1043,7 +1043,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/faces";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1063,7 +1063,7 @@ import (
 	"net/http"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/faces"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Add("Content-Type", "application/json")
@@ -1075,7 +1075,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/brands/{id}/faces" \
+curl -X GET "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json"
 ```
@@ -1088,13 +1088,13 @@ curl -X GET "https://apis.fotohub.app/v1/brands/{id}/faces" \
 
 Initialize a new digital character from text parameters. This is an async job.
 
-`POST /v1/brands/{id}/faces/generate`
+`POST /brand/v1/brands/{brand_id}/faces/generate`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -1106,7 +1106,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/faces/generate"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/generate"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1119,7 +1119,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/faces/generate";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/generate";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1141,7 +1141,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/faces/generate"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/generate"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -1154,7 +1154,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/brands/{id}/faces/generate" \
+curl -X POST "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/generate" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -1168,13 +1168,13 @@ curl -X POST "https://apis.fotohub.app/v1/brands/{id}/faces/generate" \
 
 Retrieves face settings, parameters used for generation, and all currently generated variant URLs.
 
-`GET /v1/brands/{id}/faces/{face_id}`
+`GET /brand/v1/brands/{brand_id}/faces/{face_id}`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -1186,7 +1186,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1198,7 +1198,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1218,7 +1218,7 @@ import (
 	"net/http"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Add("Content-Type", "application/json")
@@ -1230,7 +1230,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}" \
+curl -X GET "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json"
 ```
@@ -1243,13 +1243,13 @@ curl -X GET "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}" \
 
 Removes the face embedding permanently.
 
-`DELETE /v1/brands/{id}/faces/{face_id}`
+`DELETE /brand/v1/brands/{brand_id}/faces/{face_id}`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -1261,7 +1261,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1273,7 +1273,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1293,7 +1293,7 @@ import (
 	"net/http"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}"
 	req, _ := http.NewRequest("DELETE", url, nil)
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Add("Content-Type", "application/json")
@@ -1305,7 +1305,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X DELETE "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}" \
+curl -X DELETE "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json"
 ```
@@ -1318,13 +1318,13 @@ curl -X DELETE "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}" \
 
 Create consistent alternative angles for a master face embedding.
 
-`POST /v1/brands/{id}/faces/{face_id}/perspectives`
+`POST /brand/v1/brands/{brand_id}/faces/{face_id}/perspectives`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -1336,7 +1336,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/perspectives"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}/perspectives"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1349,7 +1349,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/perspectives";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}/perspectives";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1371,7 +1371,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/perspectives"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}/perspectives"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -1384,7 +1384,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/perspectives" \
+curl -X POST "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}/perspectives" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -1398,13 +1398,13 @@ curl -X POST "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/perspectiv
 
 Create variations in facial expression or pose based on the master identity.
 
-`POST /v1/brands/{id}/faces/{face_id}/expressions`
+`POST /brand/v1/brands/{brand_id}/faces/{face_id}/expressions`
 
 #### Path / Body Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Resource identifier |
+| `brand_id` | string | Yes | - | Resource identifier |
 | `limit` | integer | No | `20` | Pagination limit |
 | `offset` | integer | No | `0` | Pagination offset |
 | `verbose` | boolean | No | `false` | Enable verbose output |
@@ -1416,7 +1416,7 @@ import requests
 import json
 import time
 
-url = "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/expressions"
+url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}/expressions"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1429,7 +1429,7 @@ print(response.json())
 
 ```typescript [TypeScript]
 async function callApi() {
-  const url = "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/expressions";
+  const url = "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}/expressions";
   const headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -1451,7 +1451,7 @@ import (
 	"bytes"
 )
 func main() {
-	url := "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/expressions"
+	url := "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}/expressions"
 	payload := []byte(`{"dummy_field": "dummy_value"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Add("Authorization", "Bearer fh_live_your_api_key")
@@ -1464,7 +1464,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/expressions" \
+curl -X POST "https://apis.fotohub.app/brand/v1/brands/{brand_id}/faces/{face_id}/expressions" \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"dummy_field": "dummy_value"}'
@@ -1477,15 +1477,11 @@ curl -X POST "https://apis.fotohub.app/v1/brands/{id}/faces/{face_id}/expression
 
 ## Webhooks & Async Handling
 
-For long-running tasks like face generation, massive multi-angle perspective rendering, or bulk DNA extraction, it is highly recommended to use FOTOhub Webhooks instead of polling `/v1/jobs/{job_id}`.
+For long-running tasks like face generation, massive multi-angle perspective rendering, or bulk DNA extraction, it is highly recommended to use FOTOhub Webhooks instead of repeatedly polling `GET /brand/v1/brands/{brand_id}/faces/{face_id}` for status.
 
-### DLQ and Retries
-
-If an async job fails (e.g., due to temporary GPU starvation, bad prompts, or insufficient funds), it automatically enters the Dead Letter Queue (DLQ).
-
-- Jobs failing due to `insufficient_funds` will remain in DLQ for 72 hours, allowing you to top up your `wallet.available_usd` and trigger a manual retry via `POST /v1/jobs/{job_id}/retry`.
-- Network or transient errors (e.g. S3 timeout) are automatically attempted up to 3 times with exponential backoff before entering DLQ.
-- You can list all DLQ jobs by calling `GET /v1/jobs/dlq`.
+::: warning No dedicated job queue on Brand Engine
+Brand Engine does not expose a Dead Letter Queue or a generic job-retry endpoint. If a face generation or DNA extraction request fails (e.g. temporary GPU starvation or insufficient funds), re-submit the original request (`POST /brand/v1/brands/{brand_id}/faces/generate` or `POST /brand/v1/brands/{brand_id}/extract-dna`) rather than expecting an automatic retry queue.
+:::
 
 ### Webhook Verification Flow
 

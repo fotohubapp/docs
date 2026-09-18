@@ -1,6 +1,6 @@
 # Guide: Video Generation with the SDK
 
-Generate videos from text or images using 30+ AI models from 6 providers. Video generation is async — you submit a job and poll for completion.
+Generate videos from text or images using 56 AI models from 11 providers. Video generation is async — you submit a job and poll for completion.
 
 ::: info Async by Design
 Video generation takes 30 seconds to 5 minutes depending on the model and duration. The API returns a `job_id` immediately, and you poll for the result. The SDKs provide `wait_for_video` helpers that handle polling automatically.
@@ -83,7 +83,7 @@ func main() {
     // Poll for completion
     for {
         statusReq, _ := http.NewRequest("GET",
-            "https://apis.fotohub.app/v1/ai/video/status/"+job.JobID, nil)
+            "https://apis.fotohub.app/v1/ai/generate/video/"+job.JobID, nil)
         statusReq.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
         statusResp, _ := http.DefaultClient.Do(statusReq)
 
@@ -118,7 +118,7 @@ echo "Job: $JOB_ID"
 
 # Poll until done
 while true; do
-  RESULT=$(curl -s "https://apis.fotohub.app/v1/ai/video/status/$JOB_ID" \
+  RESULT=$(curl -s "https://apis.fotohub.app/v1/ai/generate/video/$JOB_ID" \
     -H "Authorization: Bearer $FOTOHUB_API_KEY")
   STATUS=$(echo "$RESULT" | jq -r '.status')
   echo "Status: $STATUS"
@@ -357,7 +357,7 @@ const poll = setInterval(async () => {
 // Poll loop
 for {
     req, _ := http.NewRequest("GET",
-        "https://apis.fotohub.app/v1/ai/video/status/"+jobID, nil)
+        "https://apis.fotohub.app/v1/ai/generate/video/"+jobID, nil)
     req.Header.Set("Authorization", "Bearer "+os.Getenv("FOTOHUB_API_KEY"))
     resp, _ := http.DefaultClient.Do(req)
     var s struct {
@@ -377,7 +377,7 @@ for {
 ```bash [cURL]
 # Poll with progress display
 while true; do
-  RESULT=$(curl -s "https://apis.fotohub.app/v1/ai/video/status/$JOB_ID" \
+  RESULT=$(curl -s "https://apis.fotohub.app/v1/ai/generate/video/$JOB_ID" \
     -H "Authorization: Bearer $FOTOHUB_API_KEY")
   STATUS=$(echo "$RESULT" | jq -r '.status')
   PROGRESS=$(echo "$RESULT" | jq -r '.progress // 0')

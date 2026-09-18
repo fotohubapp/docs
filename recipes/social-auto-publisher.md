@@ -18,10 +18,9 @@ flowchart TD
         A["Raw Media Asset Ingestion (S3 / Video to Shorts / Virtual Try-On)"] 
     end
     
-    subgraph Pre-Flight & AI Analysis
-        A --> B["Vision & Context Analysis (/v1/ai/analyze-image)"]
-        B --> MOD["Content Moderation Pre-flight (/v1/social/moderate)"]
-        MOD --> C["Platform-Specific Copywriting Engine (/v1/social/captions/generate)"]
+    subgraph AI Analysis
+        A --> B["Vision & Context Analysis (/social/v1/ai/analyze-image)"]
+        B --> C["Platform-Specific Copywriting Engine (/social/v1/ai/generate-caption)"]
     end
     
     subgraph Adaptation
@@ -30,18 +29,11 @@ flowchart TD
         C --> D3["YouTube Shorts Variant (SEO Keywords, CTR Title)"]
         C --> D4["X / Twitter Variant (Punchy 280-char Thread Hook)"]
         C --> D5["LinkedIn Variant (Professional, Case Study Format)"]
-        
-        A --> RESIZE["Multi-platform Format Adaptation (/v1/media/resize)"]
-        RESIZE --> D1
-        RESIZE --> D2
-        RESIZE --> D3
-        RESIZE --> D4
-        RESIZE --> D5
     end
     
     subgraph Scheduling
-        D1 & D2 & D3 & D4 & D5 --> E["Optimal Publishing Window Calculator (/v1/social/optimal-time)"]
-        E --> F["Schedule Unified Multi-Channel Post (POST /v1/social/schedule)"]
+        D1 & D2 & D3 & D4 & D5 --> E["Optimal Publishing Window Calculator (/social/v1/ai/optimal-time)"]
+        E --> F["Create + Schedule Post (POST /social/v1/posts, with scheduled_at)"]
     end
     
     subgraph Execution
@@ -52,10 +44,15 @@ flowchart TD
     subgraph Post-Execution
         H --> I["Signed Webhook Broadcast (social.post.published / X-FotoHub-Signature)"]
         I --> J["Automated First-Comment Engagement Injection"]
-        H --> K["Post Performance & Engagement Sync (/v1/social/analytics/{post_id})"]
-        H --> BYOB["BYOB S3/R2 Export: Auto-archive Metadata + Media"]
+        H --> K["Post Performance Sync (/social/v1/posts/{post_id} results, /social/v1/analytics/posts)"]
     end
 ```
+
+::: info Not modelled above
+There is no pre-flight content-moderation endpoint and no dedicated media-resize
+endpoint on Social Studio — see the notes in sections 5 and 6 below. There is also
+no BYOB S3/R2 auto-archive of published content; see section 15.
+:::
 
 ::: info GPU Affinity
 Under the hood, FOTOhub routes different operations to specialized GPU clusters:
@@ -100,28 +97,28 @@ Social Studio operations are billed directly against your prepaid USD wallet at 
 
 To publish, you must first connect social accounts via OAuth. 
 
-### `POST /v1/social/accounts/connect`
+### `POST /social/v1/accounts/connect/{platform}`
 
-Generates an OAuth connection link to redirect your users to.
+Generates an OAuth connection link to redirect your users to. `platform` is a
+path segment, not a body field.
 
 | Parameter | Type | Required | Default | Description |
 |:---|:---|:---|:---|:---|
-| `platform` | string | **Yes** | — | `"tiktok"`, `"instagram"`, `"youtube"`, `"twitter"`, `"linkedin"` |
-| `redirect_uri` | string | **Yes** | — | The URI FOTOhub will redirect back to after auth |
-| `scopes` | string[] | No | All | Specific permissions required |
+| `platform` (path) | string | **Yes** | — | `"tiktok"`, `"instagram"`, `"youtube"`, `"twitter"`, `"linkedin"` |
+| `redirect_uri` | string | No | account default | The URI FOTOhub will redirect back to after auth |
+| `scopes` | string[] | No | — | Specific permissions required |
 
 ::: code-group
 
 ```python [Python]
 import requests
 
-url = "https://apis.fotohub.app/v1/social/accounts/connect"
+url = "https://apis.fotohub.app/social/v1/accounts/connect/tiktok"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
 }
 data = {
-    "platform": "tiktok",
     "redirect_uri": "https://your-app.com/callback/tiktok"
 }
 response = requests.post(url, headers=headers, json=data)
@@ -132,8 +129,7 @@ print(response.json())
 import axios from 'axios';
 
 async function connectAccount() {
-  const response = await axios.post('https://apis.fotohub.app/v1/social/accounts/connect', {
-    platform: 'tiktok',
+  const response = await axios.post('https://apis.fotohub.app/social/v1/accounts/connect/tiktok', {
     redirect_uri: 'https://your-app.com/callback/tiktok'
   }, {
     headers: {
@@ -155,8 +151,8 @@ import (
 )
 
 func main() {
-	url := "https://apis.fotohub.app/v1/social/accounts/connect"
-	payload := []byte(`{"platform":"tiktok","redirect_uri":"https://your-app.com/callback/tiktok"}`)
+	url := "https://apis.fotohub.app/social/v1/accounts/connect/tiktok"
+	payload := []byte(`{"redirect_uri":"https://your-app.com/callback/tiktok"}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
@@ -169,32 +165,26 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/social/accounts/connect \
+curl -X POST https://apis.fotohub.app/social/v1/accounts/connect/tiktok \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "platform": "tiktok",
     "redirect_uri": "https://your-app.com/callback/tiktok"
   }'
 ```
 
 :::
 
-### `GET /v1/social/accounts`
+### `GET /social/v1/accounts`
 
-List all connected accounts.
-
-| Parameter | Type | Required | Default | Description |
-|:---|:---|:---|:---|:---|
-| `status` | string | No | `active` | Filter by `active`, `expired`, `all` |
-| `platform` | string | No | — | Filter by specific platform |
+List all connected accounts. Takes no filter query parameters.
 
 ::: code-group
 
 ```python [Python]
 import requests
 
-url = "https://apis.fotohub.app/v1/social/accounts"
+url = "https://apis.fotohub.app/social/v1/accounts"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
 }
@@ -206,7 +196,7 @@ print(response.json())
 import axios from 'axios';
 
 async function listAccounts() {
-  const response = await axios.get('https://apis.fotohub.app/v1/social/accounts', {
+  const response = await axios.get('https://apis.fotohub.app/social/v1/accounts', {
     headers: {
       'Authorization': 'Bearer fh_live_your_api_key'
     }
@@ -225,7 +215,7 @@ import (
 )
 
 func main() {
-	url := "https://apis.fotohub.app/v1/social/accounts"
+	url := "https://apis.fotohub.app/social/v1/accounts"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	
@@ -237,7 +227,7 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/social/accounts \
+curl -X GET https://apis.fotohub.app/social/v1/accounts \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 
@@ -247,32 +237,23 @@ curl -X GET https://apis.fotohub.app/v1/social/accounts \
 
 ## 5. Content Moderation Pre-Flight
 
-Before attempting to schedule a post, check for platform compliance.
-
-### `POST /v1/social/moderate`
-
-| Parameter | Type | Required | Default | Description |
-|:---|:---|:---|:---|:---|
-| `media_url` | string | **Yes** | — | Public URL to media |
-| `text` | string | No | — | Associated text |
-
-::: tip Pre-flight Savings
-A rejected post on TikTok can shadowban an account. Running a $0.002 pre-flight check saves hours of debugging.
+::: warning No content-moderation endpoint exists
+There is no `/social/moderate` (or equivalent) call on Social Studio, or
+anywhere else in the public surface. There is no automated pre-flight
+compliance check before scheduling — review content yourself before publishing.
 :::
 
 ---
 
 ## 6. Multi-Platform Format Adaptation
 
-FOTOhub can automatically pad, crop, or resize video assets.
-
-### `POST /v1/media/resize`
-
-| Parameter | Type | Required | Default | Description |
-|:---|:---|:---|:---|:---|
-| `media_url` | string | **Yes** | — | Public URL to media |
-| `target_aspect_ratio` | string | **Yes** | — | e.g. `9:16`, `16:9`, `1:1` |
-| `strategy` | string | No | `smart_crop` | `pad`, `crop`, `smart_crop` |
+::: warning No media-resize endpoint exists
+FOTOhub does not offer a video pad/crop/resize call on the Social Studio (or any
+other public) surface — the only `resize` in the public API is
+`POST /compute/instances/{instance_id}/resize`, which resizes a compute instance
+and has nothing to do with media. Prepare each aspect ratio (9:16 / 1:1 / 16:9)
+of your asset yourself before uploading.
+:::
 
 ---
 
@@ -280,22 +261,24 @@ FOTOhub can automatically pad, crop, or resize video assets.
 
 Generate customized captions per platform based on a single topic.
 
-### `POST /v1/social/captions/generate`
+### `POST /social/v1/ai/generate-caption`
 
 | Parameter | Type | Required | Default | Description |
 |:---|:---|:---|:---|:---|
-| `topic` | string | **Yes** | — | Subject matter |
 | `platform` | string | **Yes** | — | Target platform |
-| `tone` | string | No | `casual` | `professional`, `casual`, `funny`, `luxury` |
-| `include_hashtags` | boolean | No | `true` | Append hashtags |
-| `hashtag_count` | integer | No | `5` | Number of tags |
+| `topic` | string | No | — | Subject matter |
+| `tone` | string | No | `professional` | `professional`, `casual`, `humorous`, `inspirational`, `educational` |
+| `include_emojis` | boolean | No | `true` | Include emojis |
+| `count` | integer | No | `3` | Number of caption variants to generate (1-10) |
+
+Hashtags are a separate call — see `POST /social/v1/ai/suggest-hashtags`.
 
 ::: code-group
 
 ```python [Python]
 import requests
 
-url = "https://apis.fotohub.app/v1/social/captions/generate"
+url = "https://apis.fotohub.app/social/v1/ai/generate-caption"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
@@ -303,9 +286,9 @@ headers = {
 data = {
     "topic": "AI virtual try-on technology demo",
     "platform": "instagram",
-    "tone": "luxury",
-    "include_hashtags": True,
-    "hashtag_count": 15
+    "tone": "inspirational",
+    "include_emojis": True,
+    "count": 3
 }
 response = requests.post(url, headers=headers, json=data)
 print(response.json())
@@ -315,12 +298,12 @@ print(response.json())
 import axios from 'axios';
 
 async function generateCaption() {
-  const response = await axios.post('https://apis.fotohub.app/v1/social/captions/generate', {
+  const response = await axios.post('https://apis.fotohub.app/social/v1/ai/generate-caption', {
     topic: 'AI virtual try-on technology demo',
     platform: 'instagram',
-    tone: 'luxury',
-    include_hashtags: true,
-    hashtag_count: 15
+    tone: 'inspirational',
+    include_emojis: true,
+    count: 3
   }, {
     headers: {
       'Authorization': 'Bearer fh_live_your_api_key'
@@ -341,8 +324,8 @@ import (
 )
 
 func main() {
-	url := "https://apis.fotohub.app/v1/social/captions/generate"
-	payload := []byte(`{"topic":"AI virtual try-on technology demo","platform":"instagram","tone":"luxury","include_hashtags":true,"hashtag_count":15}`)
+	url := "https://apis.fotohub.app/social/v1/ai/generate-caption"
+	payload := []byte(`{"topic":"AI virtual try-on technology demo","platform":"instagram","tone":"inspirational","include_emojis":true,"count":3}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
@@ -355,15 +338,15 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/social/captions/generate \
+curl -X POST https://apis.fotohub.app/social/v1/ai/generate-caption \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
     "topic": "AI virtual try-on technology demo",
     "platform": "instagram",
-    "tone": "luxury",
-    "include_hashtags": true,
-    "hashtag_count": 15
+    "tone": "inspirational",
+    "include_emojis": true,
+    "count": 3
   }'
 ```
 
@@ -375,40 +358,44 @@ curl -X POST https://apis.fotohub.app/v1/social/captions/generate \
 
 Schedule or instantly publish to multiple platforms.
 
-### `POST /v1/social/schedule` (or `/v1/social/publish`)
+### `POST /social/v1/posts`
+
+There is no separate `/schedule` or `/publish` endpoint at this stage — creating
+a post with `scheduled_at` set is what schedules it (status becomes `scheduled`
+and it auto-publishes at that time). To publish immediately instead, create the
+post without `scheduled_at`, then call `POST /social/v1/posts/{post_id}/publish`.
 
 | Parameter | Type | Required | Default | Description |
 |:---|:---|:---|:---|:---|
-| `media_url` | string | **Yes** | — | The video/image URL |
-| `target_accounts` | string[] | **Yes** | — | Array of account UUIDs |
-| `scheduled_at` | string | No | `now` | ISO8601 UTC time for scheduling |
-| `variants` | object[] | **Yes** | — | Overrides per platform |
+| `media_urls` | string[] | No | `[]` | The video/image URL(s) |
+| `account_ids` | string[] | No | `[]` | Array of account IDs |
+| `scheduled_at` | string | No | — | ISO8601 UTC time for scheduling |
+| `variants` | object[] | No | — | Platform-specific overrides |
 
 #### Variant Object
 
 | Field | Type | Description |
 |---|---|---|
 | `platform` | string | `tiktok`, `instagram`, etc. |
-| `text` | string | Caption text |
-| `first_comment` | string | Optional first comment text |
+| `text` | string | Caption text override |
 
 ::: code-group
 
 ```python [Python]
 import requests
 
-url = "https://apis.fotohub.app/v1/social/schedule"
+url = "https://apis.fotohub.app/social/v1/posts"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key",
     "Content-Type": "application/json"
 }
 data = {
-    "media_url": "https://static.fotohub.app/demo/vid.mp4",
-    "target_accounts": ["acc_123", "acc_456"],
+    "media_urls": ["https://static.fotohub.app/demo/vid.mp4"],
+    "account_ids": ["acc_123", "acc_456"],
     "scheduled_at": "2026-10-10T12:00:00Z",
     "variants": [
         {"platform": "tiktok", "text": "Check this out!"},
-        {"platform": "instagram", "text": "Aesthetic vibe.", "first_comment": "#tags #here"}
+        {"platform": "instagram", "text": "Aesthetic vibe."}
     ]
 }
 response = requests.post(url, headers=headers, json=data)
@@ -419,13 +406,13 @@ print(response.json())
 import axios from 'axios';
 
 async function schedulePost() {
-  const response = await axios.post('https://apis.fotohub.app/v1/social/schedule', {
-    media_url: 'https://static.fotohub.app/demo/vid.mp4',
-    target_accounts: ['acc_123', 'acc_456'],
+  const response = await axios.post('https://apis.fotohub.app/social/v1/posts', {
+    media_urls: ['https://static.fotohub.app/demo/vid.mp4'],
+    account_ids: ['acc_123', 'acc_456'],
     scheduled_at: '2026-10-10T12:00:00Z',
     variants: [
       {platform: 'tiktok', text: 'Check this out!'},
-      {platform: 'instagram', text: 'Aesthetic vibe.', first_comment: '#tags #here'}
+      {platform: 'instagram', text: 'Aesthetic vibe.'}
     ]
   }, {
     headers: {
@@ -447,8 +434,8 @@ import (
 )
 
 func main() {
-	url := "https://apis.fotohub.app/v1/social/schedule"
-	payload := []byte(`{"media_url":"https://static.fotohub.app/demo/vid.mp4","target_accounts":["acc_123"],"scheduled_at":"2026-10-10T12:00:00Z","variants":[{"platform":"tiktok","text":"Wow!"}]}`)
+	url := "https://apis.fotohub.app/social/v1/posts"
+	payload := []byte(`{"media_urls":["https://static.fotohub.app/demo/vid.mp4"],"account_ids":["acc_123"],"scheduled_at":"2026-10-10T12:00:00Z","variants":[{"platform":"tiktok","text":"Wow!"}]}`)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	req.Header.Set("Content-Type", "application/json")
@@ -461,12 +448,12 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/social/schedule \
+curl -X POST https://apis.fotohub.app/social/v1/posts \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "media_url": "https://static.fotohub.app/demo/vid.mp4",
-    "target_accounts": ["acc_123"],
+    "media_urls": ["https://static.fotohub.app/demo/vid.mp4"],
+    "account_ids": ["acc_123"],
     "scheduled_at": "2026-10-10T12:00:00Z",
     "variants": [{"platform": "tiktok", "text": "Wow!"}]
   }'
@@ -476,55 +463,54 @@ curl -X POST https://apis.fotohub.app/v1/social/schedule \
 
 ---
 
-## 9. Async Bulk Publish
+## 9. Bulk-Importing a Content Calendar
 
-If you are scheduling massive content calendars (e.g., 20+ posts a week).
+If you are populating a large content calendar (e.g., 20+ posts at once), import
+them all in one call — each entry can carry its own media, targets and
+`scheduled_at`. This is not "publish one payload to many platforms" (a single
+`POST /social/v1/posts` call already does that via `account_ids`); it's for
+importing many *different* posts at once.
 
-### `POST /v1/social/bulk`
+### `POST /social/v1/posts/bulk-import`
 
 | Parameter | Type | Required | Default | Description |
 |:---|:---|:---|:---|:---|
-| `jobs` | object[] | **Yes** | — | Array of schedule objects |
-
-::: tip SSE Streaming
-Bulk endpoints return a `202 Accepted` with a `job_id`. You can connect via Server-Sent Events (SSE) to monitor progress, or wait for the webhook.
-:::
+| `posts` | object[] | **Yes** | — | Array of post data objects (`text`, `target_accounts`, `scheduled_at`, `hashtags`, `media`, ...) |
+| `default_accounts` | string[] | No | — | Fallback target accounts for entries that don't specify their own |
+| `default_status` | string | No | `draft` | `draft` or `scheduled` |
 
 ---
 
 ## 10. Engagement Analytics
 
-Fetch post analytics after publication.
+Fetch post analytics after publication. There is no `/analytics/{post_id}`
+endpoint — per-post results come back inline on the post resource itself.
 
-### `GET /v1/social/analytics/{post_id}`
-
-| Parameter | Type | Required | Default | Description |
-|:---|:---|:---|:---|:---|
-| `post_id` | string | **Yes** | — | ID returned from publish/schedule |
+### `GET /social/v1/posts/{post_id}`
 
 ::: code-group
 
 ```python [Python]
 import requests
 
-url = "https://apis.fotohub.app/v1/social/analytics/post_123"
+url = "https://apis.fotohub.app/social/v1/posts/post_123"
 headers = {
     "Authorization": "Bearer fh_live_your_api_key"
 }
 response = requests.get(url, headers=headers)
-print(response.json())
+print(response.json()["results"])  # per-platform publish/engagement outcomes
 ```
 
 ```typescript [TypeScript]
 import axios from 'axios';
 
 async function getAnalytics() {
-  const response = await axios.get('https://apis.fotohub.app/v1/social/analytics/post_123', {
+  const response = await axios.get('https://apis.fotohub.app/social/v1/posts/post_123', {
     headers: {
       'Authorization': 'Bearer fh_live_your_api_key'
     }
   });
-  console.log(response.data);
+  console.log(response.data.results);
 }
 ```
 
@@ -538,7 +524,7 @@ import (
 )
 
 func main() {
-	url := "https://apis.fotohub.app/v1/social/analytics/post_123"
+	url := "https://apis.fotohub.app/social/v1/posts/post_123"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer fh_live_your_api_key")
 	
@@ -550,11 +536,15 @@ func main() {
 ```
 
 ```bash [cURL]
-curl -X GET https://apis.fotohub.app/v1/social/analytics/post_123 \
+curl -X GET https://apis.fotohub.app/social/v1/posts/post_123 \
   -H "Authorization: Bearer fh_live_your_api_key"
 ```
 
 :::
+
+For cross-post analytics sortable by engagement, use
+`GET /social/v1/analytics/posts` (query params: `account_id`, `date_from`,
+`date_to`, `sort_by`, `limit`, `offset`).
 
 ---
 
@@ -674,16 +664,19 @@ async def schedule_single(session, url, data):
         return await resp.json()
 
 async def batch_schedule(posts):
-    url = "https://apis.fotohub.app/v1/social/schedule"
+    url = "https://apis.fotohub.app/social/v1/posts"
     async with aiohttp.ClientSession(headers=HEADERS) as session:
         tasks = [schedule_single(session, url, post) for post in posts]
         results = await asyncio.gather(*tasks)
         return results
 
 # Usage
-# posts = [{"media_url": "...", "target_accounts": ["..."]}, ...]
+# posts = [{"media_urls": ["..."], "account_ids": ["..."], "scheduled_at": "..."}, ...]
 # results = asyncio.run(batch_schedule(posts))
 ```
+
+For a real bulk import of many *different* posts in one call, prefer
+`POST /social/v1/posts/bulk-import` (section 9) over N concurrent requests.
 
 ---
 
@@ -691,9 +684,9 @@ async def batch_schedule(posts):
 
 Publish the same video with two caption variants sequentially to measure performance.
 1. Post Variant A today at 5 PM.
-2. Archive the post after 24h.
+2. Delete or leave the post after 24h (there is no separate "archive" state — see section 4's post lifecycle).
 3. Post Variant B tomorrow at 5 PM.
-4. Compare `/v1/social/analytics/{post_id}` engagement metrics.
+4. Compare their results via `GET /social/v1/posts/{post_id}` or `GET /social/v1/analytics/posts`.
 
 ---
 
@@ -706,18 +699,22 @@ Platform specific rate limits:
 
 If FOTOhub receives a rate limit, the API returns HTTP 429. Implement exponential backoff or use our background scheduler.
 
-### DLQ (Dead Letter Queue) Pattern
-All failed asynchronous publish jobs are queued into a DLQ. You can poll `/v1/social/dlq` to replay failed messages.
+::: warning No DLQ / replay endpoint
+There is no dead-letter queue and no `/social/dlq` (or equivalent) to poll or
+replay. A failed publish attempt lands in the post's `results`/`status` — inspect
+`GET /social/v1/posts/{post_id}` and re-submit yourself if you want a retry.
+:::
 
 ---
 
 ## 15. BYOB (Bring Your Own Bucket) S3/R2 Export
 
-Automatically archive published content and metadata to your AWS S3 or Cloudflare R2 buckets.
-
-Provide credentials in the Console. FOTOhub will save:
-- `post_123.mp4`
-- `post_123_metadata.json` (contains analytics up to 7 days, caption variants, and hashtags)
+::: warning Not a real capability
+Social Studio does not accept AWS/R2 credentials and does not auto-archive
+published content or metadata to a customer-owned bucket. The closest real thing
+is pulling your own analytics on demand via `GET /social/v1/analytics/export`
+(`format=csv` or `json`), which returns the data directly in the response.
+:::
 
 ---
 
@@ -727,7 +724,7 @@ Provide credentials in the Console. FOTOhub will save:
 |---|---|---|---|
 | `account_suspended` | 400 | Social account is blocked. | Resolve block on platform. |
 | `invalid_token` | 401 | FOTOhub API Key is invalid. | Check API key. |
-| `oauth_expired` | 403 | Platform OAuth token expired. | Re-connect via `/v1/social/accounts/connect`. |
+| `oauth_expired` | 403 | Platform OAuth token expired. | Re-connect via `/social/v1/accounts/connect/{platform}`. |
 | `rate_limit_exceeded` | 429 | Exceeded platform limits. | Wait or reduce volume. |
 | `media_too_large` | 400 | File exceeds platform max. | Compress or trim video. |
 | `insufficient_funds` | 402 | USD wallet empty. | Top up in FOTOhub console. |

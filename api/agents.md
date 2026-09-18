@@ -190,7 +190,7 @@ The agent builds messages, calls the LLM, dispatches any `tool_use` blocks, appe
 
 ## Execution Model
 
-1. **Start** — Client calls `POST /v1/runs`
+1. **Start** — Client calls `POST /engine/v1/runs`
 2. **Compile** — Planner validates DAG, checks for cycles, resolves types
 3. **Queue** — Insert `agent_runs` row with `status='queued'`
 4. **Enqueue** — Submit to Temporal workflow engine
@@ -211,13 +211,13 @@ A background reaper runs every 5 minutes, marking any run stuck in `running` for
 ### List Workflows
 
 ```http
-GET /v1/workflows?limit=50&offset=0&include_legacy=false
+GET /engine/v1/workflows?limit=50&offset=0&include_legacy=false
 ```
 
 ### Create Workflow
 
 ```http
-POST /v1/workflows
+POST /engine/v1/workflows
 ```
 
 ```json
@@ -246,13 +246,13 @@ POST /v1/workflows
 ### Get Workflow
 
 ```http
-GET /v1/workflows/{workflow_id}
+GET /engine/v1/workflows/{workflow_id}
 ```
 
 ### Update Workflow
 
 ```http
-PUT /v1/workflows/{workflow_id}
+PUT /engine/v1/workflows/{workflow_id}
 ```
 
 All fields optional: `name`, `description`, `spec`, `tags`, `active`.
@@ -260,7 +260,7 @@ All fields optional: `name`, `description`, `spec`, `tags`, `active`.
 ### Delete Workflow
 
 ```http
-DELETE /v1/workflows/{workflow_id}
+DELETE /engine/v1/workflows/{workflow_id}
 ```
 
 ::: warning
@@ -270,7 +270,7 @@ Deleting a workflow does not cancel active runs. Cancel them first.
 ### Duplicate Workflow
 
 ```http
-POST /v1/workflows/{workflow_id}/duplicate
+POST /engine/v1/workflows/{workflow_id}/duplicate
 ```
 
 Creates a copy with `"(Copy)"` appended to the name.
@@ -282,7 +282,7 @@ Creates a copy with `"(Copy)"` appended to the name.
 ### Start a Run
 
 ```http
-POST /v1/runs
+POST /engine/v1/runs
 ```
 
 ```json
@@ -317,13 +317,13 @@ POST /v1/runs
 ### List Runs
 
 ```http
-GET /v1/runs?workflow_id=wf_abc123&limit=50
+GET /engine/v1/runs?workflow_id=wf_abc123&limit=50
 ```
 
 ### Get Run Status
 
 ```http
-GET /v1/runs/{run_id}
+GET /engine/v1/runs/{run_id}
 ```
 
 **Response:**
@@ -353,7 +353,7 @@ GET /v1/runs/{run_id}
 ### Cancel a Run
 
 ```http
-POST /v1/runs/{run_id}/cancel
+POST /engine/v1/runs/{run_id}/cancel
 ```
 
 Immediately stops the workflow. Status transitions to `cancelled`.
@@ -361,7 +361,7 @@ Immediately stops the workflow. Status transitions to `cancelled`.
 ### Retry a Run
 
 ```http
-POST /v1/runs/{run_id}/retry
+POST /engine/v1/runs/{run_id}/retry
 ```
 
 Creates a new run from a `failed`, `cancelled`, or `timed_out` run using the same spec and input. Returns a new `run_id`.
@@ -372,7 +372,7 @@ Unlike `/retry` which restarts the entire pipeline from scratch, `/resume` lever
 It queries `agent_run_nodes` for all nodes that already completed with `status = 'succeeded'`, preserves their outputs in memory, skips re-executing them, and seamlessly resumes DAG execution only from pending or failed nodes.
 
 ```http
-POST /v1/runs/{run_id}/resume
+POST /engine/v1/runs/{run_id}/resume
 ```
 
 **Response (200 OK):**
@@ -393,7 +393,7 @@ The Agent Engine includes an autonomous supervisor daemon running 24/7 in the ba
 #### Check Watchdog Status
 
 ```http
-GET /v1/runs/watchdog/status
+GET /engine/v1/runs/watchdog/status
 ```
 
 **Response (200 OK):**
@@ -415,7 +415,7 @@ GET /v1/runs/watchdog/status
 #### Scan & Auto-Heal Stalled Processes
 
 ```http
-POST /v1/runs/watchdog/scan
+POST /engine/v1/runs/watchdog/scan
 ```
 
 Triggers an immediate scan for stalled runs across active workers. Stalled processes are diagnosed and automatically resumed without human intervention.
@@ -423,7 +423,7 @@ Triggers an immediate scan for stalled runs across active workers. Stalled proce
 #### Recover All User Interrupted Processes
 
 ```http
-POST /v1/runs/watchdog/recover-all
+POST /engine/v1/runs/watchdog/recover-all
 ```
 
 Resumes all interrupted, timed-out, or failed runs belonging to the authenticated user from their checkpoints.
@@ -431,7 +431,7 @@ Resumes all interrupted, timed-out, or failed runs belonging to the authenticate
 ### Send Signal
 
 ```http
-POST /v1/runs/{run_id}/signals/{signal_name}
+POST /engine/v1/runs/{run_id}/signals/{signal_name}
 ```
 
 | Signal Name | Purpose |
@@ -449,7 +449,7 @@ POST /v1/runs/{run_id}/signals/{signal_name}
 ### Stream Events (SSE)
 
 ```http
-GET /v1/runs/{run_id}/events?since_seq=0
+GET /engine/v1/runs/{run_id}/events?since_seq=0
 ```
 
 Returns a Server-Sent Events stream. Use `since_seq` for reconnection (each event has a monotonically increasing `seq`).
@@ -502,13 +502,13 @@ Parallel branches execute concurrently. Note both `generate_hero` and `generate_
 ### List Schedules
 
 ```http
-GET /v1/schedules
+GET /engine/v1/schedules
 ```
 
 ### Create Schedule
 
 ```http
-POST /v1/schedules
+POST /engine/v1/schedules
 ```
 
 ```json
@@ -530,7 +530,7 @@ POST /v1/schedules
 ### Update Schedule
 
 ```http
-PATCH /v1/schedules/{schedule_id}
+PATCH /engine/v1/schedules/{schedule_id}
 ```
 
 Fields: `active`, `cron`, `timezone` (all optional).
@@ -538,7 +538,7 @@ Fields: `active`, `cron`, `timezone` (all optional).
 ### Delete Schedule
 
 ```http
-DELETE /v1/schedules/{schedule_id}
+DELETE /engine/v1/schedules/{schedule_id}
 ```
 
 ---
@@ -548,7 +548,7 @@ DELETE /v1/schedules/{schedule_id}
 ### List Templates
 
 ```http
-GET /v1/templates?category=marketing&difficulty=beginner&featured=true&limit=50
+GET /engine/v1/templates?category=marketing&difficulty=beginner&featured=true&limit=50
 ```
 
 | Parameter | Type | Description |
@@ -561,7 +561,7 @@ GET /v1/templates?category=marketing&difficulty=beginner&featured=true&limit=50
 ### Get Template Details
 
 ```http
-GET /v1/templates/{template_id}
+GET /engine/v1/templates/{template_id}
 ```
 
 Returns full template including workflow spec, required connections, and setup instructions.
@@ -569,7 +569,7 @@ Returns full template including workflow spec, required connections, and setup i
 ### Install Template
 
 ```http
-POST /v1/templates/{template_id}/install
+POST /engine/v1/templates/{template_id}/install
 ```
 
 Creates a new workflow from the template. Increments the template's `use_count`.
@@ -583,13 +583,13 @@ Connections store credentials securely. Secrets are never exposed in API respons
 ### List Connections
 
 ```http
-GET /v1/connections
+GET /engine/v1/connections
 ```
 
 ### Create Connection
 
 ```http
-POST /v1/connections
+POST /engine/v1/connections
 ```
 
 ```json
@@ -615,13 +615,13 @@ Secrets are stored encrypted at rest and only decrypted during node execution. T
 ### Delete Connection
 
 ```http
-DELETE /v1/connections/{connection_id}
+DELETE /engine/v1/connections/{connection_id}
 ```
 
 ### Test Connection
 
 ```http
-POST /v1/connections/{connection_id}/test
+POST /engine/v1/connections/{connection_id}/test
 ```
 
 Validates stored credentials by making a test request to the provider.
@@ -637,13 +637,13 @@ Validates stored credentials by making a test request to the provider.
 ### List Node Types
 
 ```http
-GET /v1/nodes?category=fotohub_image&subcategory=generate&tag=pro
+GET /engine/v1/nodes?category=fotohub_image&subcategory=generate&tag=pro
 ```
 
 ### Get Node Definition
 
 ```http
-GET /v1/nodes/{node_type}
+GET /engine/v1/nodes/{node_type}
 ```
 
 Returns full definition including parameter JSON Schema, port definitions, credential slots, and examples.
@@ -675,13 +675,13 @@ Returns full definition including parameter JSON Schema, port definitions, crede
 ### Per-Workflow Tools
 
 ```http
-GET /v1/tools/workflow/{workflow_id}
+GET /engine/v1/tools/workflow/{workflow_id}
 ```
 
 List active tools for a workflow.
 
 ```http
-POST /v1/tools/workflow/{workflow_id}
+POST /engine/v1/tools/workflow/{workflow_id}
 ```
 
 Upsert a tool (creates or updates):
@@ -691,19 +691,19 @@ Upsert a tool (creates or updates):
 ```
 
 ```http
-DELETE /v1/tools/workflow/{workflow_id}/{tool_id}
+DELETE /engine/v1/tools/workflow/{workflow_id}/{tool_id}
 ```
 
 ### MCP Servers
 
 ```http
-GET /v1/tools/mcp
+GET /engine/v1/tools/mcp
 ```
 
 List registered MCP servers.
 
 ```http
-POST /v1/tools/mcp
+POST /engine/v1/tools/mcp
 ```
 
 Register a new MCP server:
@@ -720,13 +720,13 @@ Register a new MCP server:
 | `auth_token` | string | no | Authentication token |
 
 ```http
-POST /v1/tools/mcp/{server_id}/discover
+POST /engine/v1/tools/mcp/{server_id}/discover
 ```
 
 Re-discover tools from the MCP server. Returns updated tool list.
 
 ```http
-DELETE /v1/tools/mcp/{server_id}
+DELETE /engine/v1/tools/mcp/{server_id}
 ```
 
 ---
@@ -736,11 +736,11 @@ DELETE /v1/tools/mcp/{server_id}
 Knowledge documents provide RAG context to AI agent nodes.
 
 ```http
-GET /v1/knowledge?workflow_id=wf_abc123
+GET /engine/v1/knowledge?workflow_id=wf_abc123
 ```
 
 ```http
-POST /v1/knowledge
+POST /engine/v1/knowledge
 ```
 
 ```json
@@ -772,7 +772,7 @@ Or with inline text:
 | `text` | string | conditional | Inline content (when `"text"`) |
 
 ```http
-DELETE /v1/knowledge/{doc_id}
+DELETE /engine/v1/knowledge/{doc_id}
 ```
 
 ---
@@ -784,11 +784,11 @@ Define evaluation criteria and data points for automated run analysis.
 ### Criteria
 
 ```http
-GET /v1/analytics/criteria/{workflow_id}
+GET /engine/v1/analytics/criteria/{workflow_id}
 ```
 
 ```http
-POST /v1/analytics/criteria
+POST /engine/v1/analytics/criteria
 ```
 
 ```json
@@ -810,17 +810,17 @@ POST /v1/analytics/criteria
 | `llm_prompt` | string | yes | Prompt sent to evaluator LLM |
 
 ```http
-DELETE /v1/analytics/criteria/{id}
+DELETE /engine/v1/analytics/criteria/{id}
 ```
 
 ### Data Points
 
 ```http
-GET /v1/analytics/data-points/{workflow_id}
+GET /engine/v1/analytics/data-points/{workflow_id}
 ```
 
 ```http
-POST /v1/analytics/data-points
+POST /engine/v1/analytics/data-points
 ```
 
 ```json
@@ -842,13 +842,13 @@ POST /v1/analytics/data-points
 | `enum_values` | string[] | conditional | Valid values (when `"enum"`) |
 
 ```http
-DELETE /v1/analytics/data-points/{id}
+DELETE /engine/v1/analytics/data-points/{id}
 ```
 
 ### Run Analyses
 
 ```http
-GET /v1/analytics/run-analyses/{workflow_id}?limit=50
+GET /engine/v1/analytics/run-analyses/{workflow_id}?limit=50
 ```
 
 Returns evaluated results for past runs:
@@ -875,13 +875,13 @@ Workflow tests define assertions that validate run outputs.
 ### List Tests
 
 ```http
-GET /v1/tests/workflow/{workflow_id}
+GET /engine/v1/tests/workflow/{workflow_id}
 ```
 
 ### Create Test
 
 ```http
-POST /v1/tests
+POST /engine/v1/tests
 ```
 
 ```json
@@ -903,13 +903,13 @@ POST /v1/tests
 ### Delete Test
 
 ```http
-DELETE /v1/tests/{test_id}
+DELETE /engine/v1/tests/{test_id}
 ```
 
 ### Run Test
 
 ```http
-POST /v1/tests/{test_id}/run
+POST /engine/v1/tests/{test_id}/run
 ```
 
 Creates a run with `trigger_type="test"` and evaluates assertions against output:
@@ -934,7 +934,7 @@ Creates a run with `trigger_type="test"` and evaluates assertions against output
 Public webhook endpoint for triggering workflows (no Bearer token required).
 
 ```http
-POST /v1/hooks/{webhook_id}/{path}
+POST /engine/v1/hooks/{webhook_id}/{path}
 ```
 
 The `webhook_id` is assigned to a workflow's webhook trigger. The `path` allows routing different events.
@@ -954,13 +954,13 @@ Widgets embed workflow interactions in external applications.
 ### Get Widget Config
 
 ```http
-GET /v1/widget/{workflow_id}
+GET /engine/v1/widget/{workflow_id}
 ```
 
 ### Upsert Widget Config
 
 ```http
-PUT /v1/widget/{workflow_id}
+PUT /engine/v1/widget/{workflow_id}
 ```
 
 ```json
@@ -995,7 +995,7 @@ Canary deployments allow safe progressive rollouts of new workflow versions with
 ### Get Canary Configuration & Metrics
 
 ```http
-GET /v1/workflows/{workflow_id}/canary
+GET /engine/v1/workflows/{workflow_id}/canary
 ```
 
 **Response:**
@@ -1022,7 +1022,7 @@ GET /v1/workflows/{workflow_id}/canary
 ### Configure or Update Canary Rule
 
 ```http
-POST /v1/workflows/{workflow_id}/canary
+POST /engine/v1/workflows/{workflow_id}/canary
 ```
 
 ```json
@@ -1039,13 +1039,13 @@ POST /v1/workflows/{workflow_id}/canary
 ### Delete / Reset Canary Rule
 
 ```http
-DELETE /v1/workflows/{workflow_id}/canary
+DELETE /engine/v1/workflows/{workflow_id}/canary
 ```
 
 ### Resolve Target Version for Incoming Request
 
 ```http
-POST /v1/workflows/{workflow_id}/canary/resolve
+POST /engine/v1/workflows/{workflow_id}/canary/resolve
 ```
 
 ```json
@@ -1073,13 +1073,13 @@ The Dead-Letter Queue intercepts failed executions and node exceptions, preservi
 ### List Incidents
 
 ```http
-GET /v1/incidents?workflow_id=wf_12345&status=unresolved&limit=50
+GET /engine/v1/incidents?workflow_id=wf_12345&status=unresolved&limit=50
 ```
 
 ### Replay Failed Incident
 
 ```http
-POST /v1/incidents/{incident_id}/replay
+POST /engine/v1/incidents/{incident_id}/replay
 ```
 
 ```json
@@ -1103,7 +1103,7 @@ POST /v1/incidents/{incident_id}/replay
 ### Update Incident Status
 
 ```http
-PATCH /v1/incidents/{incident_id}/status
+PATCH /engine/v1/incidents/{incident_id}/status
 ```
 
 ```json
@@ -1115,26 +1115,26 @@ PATCH /v1/incidents/{incident_id}/status
 
 ---
 
-## Endpoints: Audit Trail & Compliance (SOC2)
+## Endpoints: Audit Trail
 
-Immutable enterprise audit logging for security compliance, version tracking, and administrative actions.
+Immutable audit logging for workflow version tracking and administrative actions.
 
 ### Get Workflow Audit Log
 
 ```http
-GET /v1/audit/workflow/{workflow_id}?limit=50
+GET /engine/v1/audit/workflow/{workflow_id}?limit=50
 ```
 
 ### Get Recent System Audit Events
 
 ```http
-GET /v1/audit/recent?limit=100
+GET /engine/v1/audit/recent?limit=100
 ```
 
 ### Log Audit Entry
 
 ```http
-POST /v1/audit
+POST /engine/v1/audit
 ```
 
 ```json
@@ -1157,13 +1157,13 @@ Per-workflow token bucket rate limiting and concurrency throttling.
 ### Get Rate Limit Policy
 
 ```http
-GET /v1/rate-limits/workflow/{workflow_id}
+GET /engine/v1/rate-limits/workflow/{workflow_id}
 ```
 
 ### Upsert Rate Limit Policy
 
 ```http
-PUT /v1/rate-limits/workflow/{workflow_id}
+PUT /engine/v1/rate-limits/workflow/{workflow_id}
 ```
 
 ```json
@@ -1176,40 +1176,6 @@ PUT /v1/rate-limits/workflow/{workflow_id}
 
 ---
 
-## Endpoints: Real-time Tracing & Span Telemetry
-
-OpenTelemetry-compatible distributed span waterfall for workflows and nodes.
-
-### Get Execution Trace Waterfall
-
-```http
-GET /v1/runs/{run_id}/telemetry
-```
-
-**Response:**
-```json
-{
-  "run_id": "run_abc123",
-  "workflow_id": "wf_prod",
-  "total_duration_ms": 1420.5,
-  "node_count": 5,
-  "spans": [
-    {
-      "node_id": "prompt_enrich",
-      "node_type": "ai_agent",
-      "started_at": 1725700000.1,
-      "finished_at": 1725700000.8,
-      "duration_ms": 700.0,
-      "status": "completed",
-      "tokens_consumed": 384,
-      "usd_cost": 0.0011
-    }
-  ]
-}
-```
-
----
-
 ## Endpoints: Workflow Simulator & Mocks
 
 Test and simulate entire DAG workflows with mocked API responses, synthetic latency, and assertional contracts without incurring LLM charges or calling external APIs.
@@ -1217,7 +1183,7 @@ Test and simulate entire DAG workflows with mocked API responses, synthetic late
 ### Run Simulation
 
 ```http
-POST /v1/workflows/simulate
+POST /engine/v1/workflows/simulate
 ```
 
 ```json
@@ -1243,7 +1209,7 @@ Persistent semantic vector storage and retrieval with cosine similarity, namespa
 ### Store Document or Embedding
 
 ```http
-POST /v1/memory/store
+POST /engine/v1/memory/store
 ```
 
 ```json
@@ -1262,7 +1228,7 @@ POST /v1/memory/store
 ### Query Semantic Vectors
 
 ```http
-POST /v1/memory/query
+POST /engine/v1/memory/query
 ```
 
 ```json
@@ -1303,13 +1269,13 @@ POST /v1/memory/query
 ### Memory Partition Statistics
 
 ```http
-GET /v1/memory/stats?tenant_id=org_enterprise_1&collection_name=knowledge_base&namespace=customer_support
+GET /engine/v1/memory/stats?tenant_id=org_enterprise_1&collection_name=knowledge_base&namespace=customer_support
 ```
 
 ### Clear Memory Records
 
 ```http
-DELETE /v1/memory/clear?tenant_id=org_enterprise_1&collection_name=knowledge_base&namespace=customer_support
+DELETE /engine/v1/memory/clear?tenant_id=org_enterprise_1&collection_name=knowledge_base&namespace=customer_support
 ```
 
 ---
@@ -1321,7 +1287,7 @@ Calculate deterministic consensus, weighted confidence rankings, and LLM jury ve
 ### Calculate Swarm Consensus
 
 ```http
-POST /v1/swarm/consensus
+POST /engine/v1/swarm/consensus
 ```
 
 ```json
@@ -1358,7 +1324,7 @@ POST /v1/swarm/consensus
 ### Automated LLM Judge / Quality Gate
 
 ```http
-POST /v1/swarm/evaluate
+POST /engine/v1/swarm/evaluate
 ```
 
 ```json
@@ -1676,12 +1642,12 @@ if (incidents.length > 0) {
 
   console.log(`Replay queued with run ID: ${replay.replayed_run_id}`);
 
-  // Fetch execution telemetry waterfall
-  const telemetry = await fetch(`${BASE}/runs/${replay.replayed_run_id}/telemetry`, {
+  // Poll the replayed run for its final status
+  const run = await fetch(`${BASE}/runs/${replay.replayed_run_id}`, {
     headers: { "Authorization": `Bearer ${API_KEY}` },
   }).then(r => r.json());
 
-  console.log(`Telemetry duration: ${telemetry.total_duration_ms}ms over ${telemetry.node_count} nodes`);
+  console.log(`Replay status: ${run.status}`);
 }
 ```
 
@@ -1773,11 +1739,11 @@ The `usd_cap` field acts as a budget cap. Runs fail with `BUDGET_EXCEEDED` if th
 - **Monitor via SSE.** Long-running workflows benefit from real-time event streaming.
 - **Use `spec_override` for testing.** Iterate without saving, then commit once working.
 - **Minimize agent steps.** Set `max_steps` on AI agent nodes to the minimum needed.
-- **Write assertion tests.** Use `POST /v1/tests` to validate workflow behavior automatically.
+- **Write assertion tests.** Use `POST /engine/v1/tests` to validate workflow behavior automatically.
 
 ---
 
 ## Related APIs
 
 - **[Voice Agents](/api/voice-agents)** — spoken conversational agents with their own persona, voice and function tools. A different product to these DAG workflows: realtime and turn-based, not orchestrated.
-- **[Realtime Voice](/api/realtime-voice)** — integration guide for voice sessions. A voice tool call can trigger a workflow via `POST /v1/runs`, giving a caller spoken access to any DAG you have built here.
+- **[Realtime Voice](/api/realtime-voice)** — integration guide for voice sessions. A voice tool call can trigger a workflow via `POST /engine/v1/runs`, giving a caller spoken access to any DAG you have built here.

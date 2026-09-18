@@ -142,7 +142,7 @@ client = FotoHub(
 
 | Environment Variable | Default | Description |
 |:---|:---|:---|
-| `FOTOHUB_API_KEY` | *None* (Required) | API Key starting with `fh_live_` or `fh_test_`. |
+| `FOTOHUB_API_KEY` | *None* (Required) | API key, starting with `fh_live_`. |
 | `FOTOHUB_BASE_URL` | `https://apis.fotohub.app` | Base REST API URL. |
 | `FOTOHUB_COMPUTE_URL`| `https://apis.fotohub.app/compute/v1` | Dedicated compute gateway URL. |
 | `FOTOHUB_TIMEOUT` | `60.0` | Default timeout in seconds for API calls. |
@@ -922,33 +922,20 @@ print(f"Post Scheduled: ID {post.schedule_id} across {len(post.platforms)} platf
 
 ---
 
-## UGC Studio & AI Actors (`client.ugc`)
+## UGC Studio & AI Actors
 
-Generate high-converting user-generated content (UGC) video ads for performance marketing from an e-commerce product URL.
+::: warning No `client.ugc` — and two different hosts underneath
+There is no `client.ugc` in the SDK; call these with raw `httpx`/`requests`. And UGC itself
+splits across two surfaces:
 
-```python
-# 1. Ingest Product and Generate Viral Video Script Hooks
-hooks = client.ugc.generate_script_hooks(
-    product_name="Aura Glow Vitamin C Serum",
-    product_description="Cold-pressed organic brightening serum with hyaluronic acid",
-    target_audience="Women 22-38 interested in clean skincare",
-    count=3
-)
-
-for h in hooks:
-    print(f"Hook [{h.hook_style}]: {h.script_text}")
-
-# 2. Render Multi-Scene UGC Ad with Selected AI Actor
-ad_render = client.ugc.render_campaign(
-    actor_id="actor_sophia_casual_en",
-    script=hooks[0].script_text,
-    product_image_url="https://s1.fotohub.app/storage/v1/object/public/products/serum.jpg",
-    aspect_ratio="9:16",
-    include_subtitles=True
-)
-
-print(f"Rendered UGC Ad: {ad_render.video_url} (Cost: ${ad_render.cost_usd:.2f})")
-```
+- Creative ideation — `POST /ugc/creative/brief`, `/ugc/creative/angles`, `/ugc/creative/script`
+  — is first-party only: a Supabase user session JWT, not an `fh_live_*` API key. `POST /v1/ugc/hooks`
+  does not exist anywhere.
+- Project creation, blueprint, render, job status, and pricing **are** a real `fh_live_*`
+  API-key surface, at `POST/GET /v1/ugc/projects`, `PUT /v1/ugc/projects/{id}/blueprint`,
+  `POST /v1/ugc/projects/{id}/render`, `GET /v1/ugc/jobs/{id}`, and `POST /v1/ugc/estimate`.
+  `POST /v1/ugc/render` (flat, no project) does not exist.
+:::
 
 ---
 
@@ -977,11 +964,20 @@ class InvoiceData(BaseModel):
 
 client = FotoHub()
 
-# Extract structured JSON conforming to your Pydantic schema
-doc = client.document.parse_structured(
-    file_path="sample_invoice.pdf",
-    response_model=InvoiceData
-)
+# There is no client.document namespace or Pydantic-typed wrapper — call
+# POST /v1/ai/document/analyze directly and validate the JSON yourself.
+import base64
+import httpx
+
+with open("sample_invoice.pdf", "rb") as f:
+    doc_b64 = base64.b64encode(f.read()).decode()
+
+raw = httpx.post(
+    "https://apis.fotohub.app/v1/ai/document/analyze",
+    headers={"Authorization": "Bearer fh_live_your_api_key"},
+    json={"document_base64": doc_b64, "features": ["TABLES", "FORMS"]},
+).json()
+doc = InvoiceData.model_validate(raw)
 
 print(f"Vendor: {doc.vendor_name}, Invoice #{doc.invoice_number}")
 print(f"Grand Total: ${doc.grand_total:.2f}")
@@ -991,43 +987,55 @@ for item in doc.items:
 
 ---
 
-## S3 Object Storage & BYOB External Destinations (`client.storage`)
+## S3 Object Storage & BYOB External Destinations
 
 Store assets in managed FOTOhub S3 buckets ($0.0245/GB-month with **$0.00 intra-cluster egress**) or stream outputs directly into your own AWS S3, Cloudflare R2, or GCP buckets.
 
+::: warning No `client.storage` namespace
+There is no `POST /v1/storage/s3/upload` and no SDK wrapper for any of this — S3 uploads go through
+a presigned-URL flow, called over raw HTTP.
+:::
+
 ```python
-# 1. Upload asset directly to FOTOhub S3
+import httpx
+
+api_key = "fh_live_your_api_key"
+headers = {"Authorization": f"Bearer {api_key}"}
+bucket_id = "my-project-assets"
+
+# 1. Ask for a presigned upload URL, then PUT the file straight to S3
+presign = httpx.post(
+    f"https://apis.fotohub.app/v1/storage/s3/buckets/{bucket_id}/objects/presign-upload",
+    headers=headers,
+    json={"key": "audio/raw_recording.wav", "content_type": "audio/wav"},
+).json()
+
 with open("raw_recording.wav", "rb") as f:
-    upload = client.storage.upload_object(
-        bucket="my-project-assets",
-        key="audio/raw_recording.wav",
-        file_obj=f,
-        content_type="audio/wav"
-    )
+    httpx.put(presign["upload_url"], content=f.read(), headers={"Content-Type": "audio/wav"})
 
-print(f"Public Object URL: {upload.public_url}")
+# 2. Generate a presigned download URL (short-lived — it always carries an expiry)
+signed = httpx.post(
+    f"https://apis.fotohub.app/v1/storage/s3/buckets/{bucket_id}/objects/presign-download",
+    headers=headers,
+    json={"key": "audio/raw_recording.wav", "expires_in_seconds": 3600},
+).json()
+print(f"Temporary Download URL: {signed['download_url']}")
 
-# 2. Generate a Presigned Download URL (valid for 1 hour)
-signed_url = client.storage.create_presigned_url(
-    bucket="my-project-assets",
-    key="audio/raw_recording.wav",
-    expires_in_seconds=3600,
-    operation="get_object"
-)
-print(f"Temporary Download URL: {signed_url}")
-
-# 3. Configure Bring-Your-Own-Bucket (BYOB) External Destination
-destination = client.storage.create_destination(
-    name="Enterprise Cloudflare R2",
-    provider="cloudflare_r2",
-    bucket_name="company-media-prod",
-    endpoint_url="https://your_account_id.r2.cloudflarestorage.com",
-    access_key_id="r2_access_key...",
-    secret_access_key="r2_secret_key...",
-    region="auto"
-)
-
-print(f"Destination Verified & Connected: ID {destination.id}")
+# 3. Configure a Bring-Your-Own-Bucket (BYOB) external destination
+destination = httpx.post(
+    "https://apis.fotohub.app/v1/destinations",
+    headers=headers,
+    json={
+        "name": "Enterprise Cloudflare R2",
+        "provider": "cloudflare_r2",
+        "bucket_name": "company-media-prod",
+        "endpoint_url": "https://your_account_id.r2.cloudflarestorage.com",
+        "access_key_id": "r2_access_key...",
+        "secret_access_key": "r2_secret_key...",
+        "region": "auto",
+    },
+).json()
+print(f"Destination Verified & Connected: ID {destination['id']}")
 ```
 
 ---
@@ -1462,7 +1470,7 @@ def test_image_generation_service():
         )
     )
     
-    client = FotoHub(api_key="fh_test_mock_key")
+    client = FotoHub(api_key="fh_live_4f3a9c2e8b71d0a6f5c3e9b2a7d41f68")
     result = client.images.generate(prompt="Test prompt")
     
     assert mock_route.called
@@ -1523,50 +1531,53 @@ if __name__ == "__main__":
 
 ## Full Method Reference
 
+The SDK is a single flat `FotoHub` client — there are no `images.`/`videos.`/`brand.`/`social.`/`ugc.`
+namespaces. Rows marked "raw HTTP only" have no SDK wrapper at all; call the endpoint directly with
+`httpx` (or the client's own `_request` if you are comfortable relying on a private method).
+
 | Domain | Method | Endpoint | Description |
 |:---|:---|:---|:---|
-| **Images** | `images.generate()` | `POST /v1/ai/generate/image` | Text-to-image and img2img with aspect ratio and guidance control |
-| **Images** | `images.stability_upscale()` | `POST /v1/ai/image/upscale` | Fast 2x or generative creative 4x upscaler |
-| **Images** | `images.stability_remove_background()` | `POST /v1/ai/image/background/remove` | Transparent studio cutout |
-| **Images** | `images.stability_inpaint()` | `POST /v1/ai/image/inpaint` | Mask-guided regenerative inpainting |
-| **Images** | `images.stability_outpaint()` | `POST /v1/ai/image/outpaint` | Multi-directional canvas expansion |
-| **Images** | `images.stability_search_replace()` | `POST /v1/ai/image/search-replace` | Semantic replacement of masked visual elements |
-| **Images** | `images.stability_recolor()` | `POST /v1/ai/image/recolor` | Selective color transformation |
-| **Videos** | `videos.generate()` | `POST /v1/ai/generate/video` | Synchronous video generation (Veo 3.1, Sora 2, Wan 2.2) |
-| **Videos** | `videos.generate_seedance()` | `POST /v1/ai/generate/seedance` | Long 30s clips, native audio, video-to-video editing |
-| **Videos** | `videos.register_video_asset()` | `POST /v1/ai/video/assets` | Register character portrait for biometric consistency |
-| **Audio** | `audio.generate_music()` | `POST /v1/ai/generate/music` | Instrumental and vocal music generation |
-| **Audio** | `audio.generate_sfx()` | `POST /v1/ai/generate/sfx` | Contextual cinematic Foley sound effects |
-| **Audio** | `audio.synthesize_speech()` | `POST /v1/ai/tts/synthesize` | Neural speech synthesis (Gemini 30 voices / Azure 700+ voices) |
-| **Audio** | `audio.transcribe()` | `POST /v1/ai/transcribe` | Whisper Large-v3 speech-to-text with timestamps |
-| **3D** | `models_3d.create_job()` | `POST /v1/ai/generate/3d` | Image-to-3D and text-to-3D mesh generation |
-| **3D** | `models_3d.wait_for_completion()` | `GET /v1/ai/generate/3d/{id}` | Poll asynchronous 3D generation status |
-| **Compute** | `compute.catalog.list()` | `GET /compute/v1/catalog` | List 22 EC2 GPU & CPU machines with live Spot/On-Demand rates |
-| **Compute** | `compute.instances.provision()` | `POST /compute/v1/instances` | Provision dedicated EC2 node in eu-central-1 |
-| **Compute** | `compute.instances.estimate_cost()` | `POST /compute/v1/instances/estimate` | Preflight cost estimator for instance + EBS volumes |
-| **Compute** | `compute.instances.start()` / `stop()` | `POST /compute/v1/instances/{id}/*` | Instance lifecycle management (stop preserves EBS state) |
-| **Compute** | `compute.instances.resize()` | `POST /compute/v1/instances/{id}/resize` | Hot-resize instance type (e.g. g5.xlarge -> g5.2xlarge) |
-| **Compute** | `compute.instances.get_metrics()` | `GET /compute/v1/instances/{id}/metrics` | Real-time CloudWatch telemetry (CPU, GPU, VRAM, I/O) |
-| **Compute** | `compute.volumes.attach()` / `detach()` | `POST /compute/v1/instances/{id}/volumes` | Attach/detach persistent gp3/io2 EBS volumes |
-| **Compute** | `compute.dns.create_zone()` | `POST /compute/v1/dns/zones` | Route53 hosted zone management |
-| **Sandbox** | `sandbox.execute()` | `POST /sandbox/exec-python` | Firecracker microVM isolated Python execution (<200ms) |
-| **Shorts** | `shorts.create_clipping_job()` | `POST /v1/shorts/clips` | 11-step viral vertical clipping pipeline |
-| **Shorts** | `shorts.stream_job_events()` | `GET /v1/shorts/events/{id}` | Real-time Server-Sent Events (SSE) stream |
-| **Lip-Sync** | `lip_sync.generate()` | `POST /v1/lip-sync/generate` | LatentSync & MuseTalk neural facial retargeting |
-| **Brand** | `brand.extract_dna()` | `POST /v1/brand/dna/extract` | Extract visual guideline embeddings from moodboards |
-| **Brand** | `brand.create_virtual_face()` | `POST /v1/brand/faces` | Register persistent virtual brand ambassador face |
-| **Social** | `social.schedule_post()` | `POST /v1/social/schedule` | Multi-platform auto-posting (TikTok, IG, YT, X) |
-| **UGC** | `ugc.generate_script_hooks()` | `POST /v1/ugc/hooks` | AI viral marketing hook generator |
-| **UGC** | `ugc.render_campaign()` | `POST /v1/ugc/render` | Multi-scene UGC performance ad rendering |
-| **Document** | `document.parse_structured()` | `POST /v1/ai/document/analyze` | OCR, table extraction, and structured Pydantic parsing |
-| **Storage** | `storage.upload_object()` | `POST /v1/storage/s3/upload` | Upload asset to managed FOTOhub S3 bucket |
-| **Storage** | `storage.create_destination()` | `POST /v1/destinations` | Connect Bring-Your-Own-Bucket (AWS S3, R2, GCS) |
-| **Chat** | `chat()` / `chat.create()` | `POST /v1/ai/chat/completions` | OpenAI-compatible token-metered chat completions |
-| **Chat** | `chat_claude()` | `POST /v1/ai/chat/claude` | Direct Claude Sonnet 4.6 / Opus routing |
-| **Wallet** | `wallet.get_balance()` | `GET /v1/billing/balance` | Inspect prepaid USD wallet balance and monthly spend |
-| **Wallet** | `wallet.estimate()` | `POST /v1/billing/estimate` | Estimate operation basket costs |
-| **Wallet** | `wallet.create_topup()` | `POST /v1/billing/topup` | Purchase balance with volume bonus ladder |
-| **Wallet** | `wallet.set_overage_limit()` | `POST /v1/billing/overage-limit` | Set hard spending cap per account or project |
+| **Images** | `generate_image()` | `POST /v1/ai/generate/image` | Text-to-image and img2img with aspect ratio and guidance control |
+| **Images** | `edit_image()` | `POST /v1/ai/edit/image` | Prompt-driven image editing |
+| **Images** | `stability_upscale()` | `POST /stability/{fast,creative,conservative}-upscale` | Fast 2x or generative creative 4x upscaler |
+| **Images** | `stability_remove_background()` | `POST /stability/remove-background` | Transparent studio cutout |
+| **Images** | `stability_inpaint()` | `POST /stability/inpaint` | Mask-guided regenerative inpainting |
+| **Images** | `stability_outpaint()` | `POST /stability/outpaint` | Multi-directional canvas expansion |
+| **Images** | `stability_search_replace()` | `POST /stability/search-replace` | Semantic replacement of masked visual elements |
+| **Images** | `stability_recolor()` | `POST /stability/search-recolor` | Selective color transformation |
+| **Images** | `stability_erase()` | `POST /stability/erase-object` | Content-aware object removal |
+| **Images** | `stability_style_transfer()` | `POST /stability/style-transfer` | Transfer a reference image's style onto a source image |
+| **Videos** | `generate_video()` | `POST /v1/ai/generate/video` | Synchronous video generation (Veo 3.1, Sora 2, Wan 2.2) |
+| **Videos** | `generate_seedance()` | `POST /v1/ai/generate/video` | Async Seedance generation (long clips, native audio, video-to-video editing) — same endpoint as `generate_video()`, selected by `model`; there is no separate `/v1/ai/generate/seedance` route |
+| **Videos** | `register_video_asset()` | `POST /v1/ai/assets/register` | Register character portrait for biometric consistency (free) |
+| **Videos** | `list_video_assets()` | `GET /v1/ai/assets` | List registered portrait assets |
+| **Audio** | `generate_music()` | `POST /v1/ai/generate/music` | Instrumental and vocal music generation |
+| **Audio** | `generate_sfx()` | `POST /v1/ai/generate/sfx` | Contextual cinematic Foley sound effects |
+| **Audio** | `generate_speech()` | `POST /v1/ai/generate/speech` | Neural speech synthesis. There is no `POST /v1/ai/tts/synthesize` — provider-specific alternatives are `POST /v1/ai/tts/{azure,gemini,polly}/synthesize` |
+| **Audio** | `transcribe()` | `POST /v1/ai/transcribe` | Speech-to-text with timestamps |
+| **3D** | `generate_3d()` | `POST /v1/ai/generate/3d` | Image-to-3D and text-to-3D mesh generation (synchronous) |
+| **3D** | `get_3d_status()` | `GET /v1/ai/generate/3d/{id}` | Re-fetch a signed download URL |
+| **Try-On** | `tryon()` | `POST /v1/ai/tryon` | Dress a person photo in a garment (synchronous) |
+| **Try-On** | `get_tryon_status()` | `GET /v1/ai/tryon/{id}` | Poll or re-fetch a try-on result |
+| **Compute** | — (raw HTTP only) | `GET /compute/v1/catalog`, `GET /compute/v1/instances` | Dedicated EC2 rental. The prefix **does** carry a `v1` segment: `/compute/v1/...`. Full reference in [Compute](/compute/overview) |
+| **Sandbox** | — (raw HTTP only) | `POST /v1/console/sandbox/execute` | Dry-run tester for FOTOhub's own endpoints — not a code sandbox. There is no public code-execution API; `/sandbox/exec-python` does not exist |
+| **Shorts** | — (raw HTTP only) | `POST /v1/shorts/clips` | Viral vertical clipping pipeline |
+| **Shorts** | — (raw HTTP only) | `GET /v1/shorts/clips/events` | Real-time Server-Sent Events (SSE) stream. `/v1/shorts/events/{id}` does not exist |
+| **Lip-Sync** | — (raw HTTP only) | `POST /v1/video/lip-sync` | LatentSync & MuseTalk neural facial retargeting. `/v1/lip-sync/generate` does not exist |
+| **Brand** | — (raw HTTP only) | `POST /brand/v1/brands/{brand_id}/extract-dna` | Extract visual guideline embeddings from moodboards. `/v1/brand/dna/extract` does not exist |
+| **Brand** | — (raw HTTP only) | `POST /brand/v1/brands/{brand_id}/faces/generate` | Register a persistent virtual brand face. The bare `/v1/brand/faces` does not exist; the real, brand-scoped face list/create route is `GET,POST /brand/v1/brands/{brand_id}/faces` |
+| **Social** | — (raw HTTP only) | `POST /social/v1/posts` | Create (optionally schedule via `scheduled_at`) a post. `/v1/social/schedule` does not exist |
+| **UGC** | — (raw HTTP only, first-party session auth, not `fh_live_*`) | `POST /ugc/creative/brief`, `/ugc/creative/angles`, `/ugc/creative/script` | Hook/script generation. `/v1/ugc/hooks` does not exist |
+| **UGC** | — (raw HTTP only, `fh_live_*` API key) | `POST /v1/ugc/projects`, `PUT /v1/ugc/projects/{id}/blueprint`, `POST /v1/ugc/projects/{id}/render`, `GET /v1/ugc/jobs/{id}`, `POST /v1/ugc/estimate` | Multi-scene UGC performance ad rendering, priced and billed against the prepaid USD wallet. `/v1/ugc/render` (flat) does not exist — rendering is project-based |
+| **Document** | — (raw HTTP only) | `POST /v1/ai/document/analyze` | OCR, table extraction, and structured parsing |
+| **Document** | — (raw HTTP only) | `POST /v1/ai/document/analyze-expense` | Invoice/expense parsing |
+| **Storage** | — (raw HTTP only) | `POST /v1/storage/s3/buckets/{bucket_id}/multipart/create` (+ presign-part/complete) | Upload an object to a managed FOTOhub S3 bucket. `/v1/storage/s3/upload` does not exist — uploads are multipart |
+| **Chat** | `chat()` | `POST /v1/ai/chat/completions` | OpenAI-compatible token-metered chat completions |
+| **Chat** | `chat_claude()` | `POST /v1/ai/chat/claude` | Direct Claude routing |
+| **Wallet** | `get_balance()` | `GET /v1/billing/balance` | Inspect prepaid USD wallet balance and monthly spend |
+| **Wallet** | `estimate_cost()` | `POST /v1/billing/estimate` | Estimate operation basket costs |
+| **Wallet** | `create_topup()` | `POST /v1/billing/topup` | Purchase balance with volume bonus ladder |
+| **Wallet** | `set_overage_limit()` | `PUT /v1/billing/overage-limit` | Set hard spending cap per account or project |
 
 ---
 
@@ -2112,11 +2123,11 @@ from fotohub.exceptions import InsufficientFundsError
 
 @pytest.fixture
 def sync_client():
-    return FotoHub(api_key="fh_test_mock_key_12345")
+    return FotoHub(api_key="fh_live_4f3a9c2e8b71d0a6f5c3e9b2a7d41f68")
 
 @pytest.fixture
 def async_client():
-    return AsyncFotoHub(api_key="fh_test_mock_key_12345")
+    return AsyncFotoHub(api_key="fh_live_4f3a9c2e8b71d0a6f5c3e9b2a7d41f68")
 
 @respx.mock
 def test_image_generation_success(sync_client):
@@ -3544,76 +3555,53 @@ Brand pipelines run exclusively on high-vRAM GPU clusters. Check `wallet.availab
 
 The `BrandProfile` binds specific stylistic constraints, negative prompts, and lighting preferences to a dedicated identifier. 
 
+::: warning No `client.brand` namespace, and no `/v1/brand/profiles`
+The brand engine is real (`/brand/v1/brands/...`), but no SDK ships a `brand` wrapper for it, and
+there is no "profile" resource — the object you create is a brand (`POST /brand/v1/brands`). Call
+it over raw HTTP, as below.
+:::
+
 ::: code-group
 
 ```python [Python]
-import asyncio
-from fotohub import AsyncFotoHub
-from fotohub.types.brand import BrandProfile, FaceExpression
+import httpx
 
 async def create_brand():
-    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
-        profile: BrandProfile = await client.brand.create_profile(
-            name="Lumiere_Cosmetics",
-            description="Luxury cosmetics virtual ambassador, cinematic lighting, 8k resolution.",
-            base_model="seedream-5-0-260128",
-            negative_prompt="low quality, distorted, cartoon, 3d render",
-            brand_guidelines={
-                "color_palette": ["#FFD700", "#000000", "#FFFFFF"],
-                "tone": "elegant"
-            }
+    headers = {"Authorization": "Bearer fh_live_your_api_key"}
+    async with httpx.AsyncClient() as http:
+        resp = await http.post(
+            "https://apis.fotohub.app/brand/v1/brands",
+            headers=headers,
+            json={
+                "name": "Lumiere_Cosmetics",
+                "description": "Luxury cosmetics virtual ambassador, cinematic lighting, 8k resolution.",
+                "base_model": "seedream-5-0-260128",
+                "negative_prompt": "low quality, distorted, cartoon, 3d render",
+            },
         )
-        print(f"Created brand: {profile.id} (Cost: ${profile.cost_usd:.3f})")
-        return profile
+        brand = resp.json()
+        print(f"Created brand: {brand['id']}")
+        return brand
 ```
 
 ```typescript [TypeScript]
-import { FotoHub, BrandProfile } from 'fotohub';
-
-const client = new FotoHub({ apiKey: 'fh_live_your_api_key' });
-
 async function createBrand() {
-    const profile: BrandProfile = await client.brand.createProfile({
-        name: "Lumiere_Cosmetics",
-        description: "Luxury cosmetics virtual ambassador, cinematic lighting, 8k resolution.",
-        baseModel: "seedream-5-0-260128",
-        negativePrompt: "low quality, distorted, cartoon, 3d render",
-        brandGuidelines: {
-            colorPalette: ["#FFD700", "#000000", "#FFFFFF"],
-            tone: "elegant"
-        }
-    });
-    console.log(`Created brand: ${profile.id} (Cost: $${profile.costUsd})`);
-}
-```
-
-```go [Go]
-package main
-
-import (
-	"context"
-	"fmt"
-	"github.com/fotohub/fotohub-go"
-	"github.com/fotohub/fotohub-go/types"
-)
-
-func main() {
-	client := fotohub.NewClient(fotohub.WithAPIKey("fh_live_your_api_key"))
-	
-	req := types.BrandProfileCreateRequest{
-		Name:           "Lumiere_Cosmetics",
-		Description:    "Luxury cosmetics virtual ambassador",
-		BaseModel:      "seedream-5-0-260128",
-		NegativePrompt: "low quality, distorted",
-	}
-	
-	profile, _ := client.Brand.CreateProfile(context.Background(), req)
-	fmt.Printf("Created brand: %s (Cost: $%.3f)\n", profile.ID, profile.CostUSD)
+  const brand = await fetch('https://apis.fotohub.app/brand/v1/brands', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer fh_live_your_api_key', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Lumiere_Cosmetics',
+      description: 'Luxury cosmetics virtual ambassador, cinematic lighting, 8k resolution.',
+      base_model: 'seedream-5-0-260128',
+      negative_prompt: 'low quality, distorted, cartoon, 3d render',
+    }),
+  }).then((r) => r.json());
+  console.log(`Created brand: ${brand.id}`);
 }
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/brand/profiles \
+curl -X POST https://apis.fotohub.app/brand/v1/brands \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -3629,37 +3617,36 @@ curl -X POST https://apis.fotohub.app/v1/brand/profiles \
 
 Extract DNA from reference images and generate a highly consistent virtual face.
 
+Real endpoints: `POST /brand/v1/brands/{brand_id}/extract-dna`,
+`POST /brand/v1/brands/{brand_id}/faces/generate`,
+`POST /brand/v1/brands/{brand_id}/faces/{face_id}/perspectives`,
+`POST /brand/v1/brands/{brand_id}/faces/{face_id}/expressions`. There is no SDK wrapper.
+
 ```python
-async def setup_ambassador(profile_id: str):
-    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
-        # Extract facial DNA (Cost: $0.050)
-        dna = await client.brand.extract_dna(
-            reference_image_urls=[
-                "https://storage.fotohub.app/ref1.jpg",
-                "https://storage.fotohub.app/ref2.jpg"
-            ]
-        )
-        
-        # Lock in the face (Cost: $0.150)
-        face = await client.brand.generate_face(
-            profile_id=profile_id,
-            dna_id=dna.id,
-            ethnicity="east_asian",
-            age=25
-        )
-        
-        # Generate essential perspectives (Cost: $0.025 per perspective)
-        perspectives = await client.brand.get_perspectives(
-            face_id=face.id,
-            angles=["front", "profile_left", "profile_right", "high_angle"]
-        )
-        
+async def setup_ambassador(brand_id: str):
+    headers = {"Authorization": "Bearer fh_live_your_api_key"}
+    base = f"https://apis.fotohub.app/brand/v1/brands/{brand_id}"
+    async with httpx.AsyncClient() as http:
+        # Extract facial DNA
+        dna = (await http.post(f"{base}/extract-dna", headers=headers, json={
+            "image_urls": ["https://storage.fotohub.app/ref1.jpg", "https://storage.fotohub.app/ref2.jpg"],
+        })).json()
+
+        # Lock in the face
+        face = (await http.post(f"{base}/faces/generate", headers=headers, json={
+            "demographics": {"ethnicity": "east_asian", "age": 25},
+        })).json()
+
+        # Generate essential perspectives
+        perspectives = (await http.post(f"{base}/faces/{face['id']}/perspectives", headers=headers, json={
+            "angles": ["front", "profile_left", "profile_right", "high_angle"],
+        })).json()
+
         # Get expressions
-        expressions = await client.brand.get_expressions(
-            face_id=face.id,
-            emotions=["smile", "surprise", "serious"]
-        )
-        
+        expressions = (await http.post(f"{base}/faces/{face['id']}/expressions", headers=headers, json={
+            "types": ["smile", "surprise", "serious"],
+        })).json()
+
         return face
 ```
 
@@ -3731,103 +3718,20 @@ async def run_agency():
 
 ---
 
-## UGC Studio: Automated Ad Factory (`client.ugc`)
+## UGC Studio: Automated Ad Factory
 
-The UGC (User Generated Content) Studio combines text-to-speech (TTS), LipSync/MuseTalk (on GPU3), and rendering nodes to mass-produce social media ads programmatically. 
+::: warning No `client.ugc` — and two different hosts underneath
+There is no `client.ugc` in any SDK; call these with raw HTTP. `POST /v1/ugc/render` (flat, no
+project) does not exist anywhere. What does exist:
 
-### End-to-End Pipeline
-
-1. **Brief** → Create the campaign brief.
-2. **Script** → LLM writes the script variants.
-3. **Audio** → TTS node synthesizes voices (Cost: $0.002 / sec).
-4. **Render** → LipSync model animates the avatar (Cost: $0.080 / sec).
-5. **Deliver** → S3 / CloudFront delivery.
-
-::: code-group
-
-```python [Python]
-async def ugc_pipeline():
-    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
-        # 1. Create Script (Cost: $0.010)
-        script = await client.ugc.generate_script(
-            product_url="https://example.com/shoe",
-            angles=["pain_point", "unboxing", "lifestyle"],
-            duration_target=15
-        )
-        
-        # 2. Estimate Cost
-        estimate = await client.ugc.estimate_cost(
-            script_id=script.id,
-            actor="ugc_actor_f_01"
-        )
-        print(f"Estimated Render Cost: ${estimate.total_usd:.3f}")
-        
-        # 3. Trigger Render Webhook-driven (Cost: ~ $1.200 per 15s)
-        job = await client.ugc.render(
-            script_id=script.id,
-            actor="ugc_actor_f_01",
-            voice="eleven_multilingual_v2",
-            webhook_url="https://api.yourdomain.com/webhooks/fotohub"
-        )
-        
-        print(f"Render Job {job.id} queued. Awaiting webhook.")
-```
-
-```typescript [TypeScript]
-import { FotoHub } from 'fotohub';
-
-async function ugcPipeline() {
-    const client = new FotoHub({ apiKey: 'fh_live_your_api_key' });
-    
-    const script = await client.ugc.generateScript({
-        productUrl: "https://example.com/shoe",
-        angles: ["pain_point", "unboxing", "lifestyle"],
-        durationTarget: 15
-    });
-    
-    const job = await client.ugc.render({
-        scriptId: script.id,
-        actor: "ugc_actor_f_01",
-        voice: "eleven_multilingual_v2",
-        webhookUrl: "https://api.yourdomain.com/webhooks/fotohub"
-    });
-    console.log(`Job ${job.id} queued.`);
-}
-```
-
-```go [Go]
-package main
-
-import (
-	"context"
-	"fmt"
-	"github.com/fotohub/fotohub-go"
-	"github.com/fotohub/fotohub-go/types"
-)
-
-func main() {
-	client := fotohub.NewClient(fotohub.WithAPIKey("fh_live_your_api_key"))
-	
-	job, _ := client.UGC.Render(context.Background(), types.UGCRenderRequest{
-		ScriptID:   "scr_12345",
-		Actor:      "ugc_actor_f_01",
-		WebhookURL: "https://api.yourdomain.com/webhooks/fotohub",
-	})
-	fmt.Printf("Job queued: %s\n", job.ID)
-}
-```
-
-```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/ugc/render \
-  -H "Authorization: Bearer fh_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "script_id": "scr_12345",
-    "actor": "ugc_actor_f_01",
-    "webhook_url": "https://api.yourdomain.com/webhooks/fotohub"
-  }'
-```
-
+- `POST /ugc/creative/brief`, `/ugc/creative/angles`, `/ugc/creative/script` for the brief/angle/
+  script steps — first-party session auth (a Supabase user JWT), **not** an `fh_live_*` API key.
+- `POST /v1/ugc/projects`, `PUT /v1/ugc/projects/{id}/blueprint`,
+  `POST /v1/ugc/projects/{id}/render`, `GET /v1/ugc/jobs/{id}`, `POST /v1/ugc/estimate` —
+  the real `fh_live_*` API-key surface for creating a project, saving its blueprint, pricing it,
+  rendering it and polling the job. A public SDK integration can call this half today, with an
+  API key; it has to produce the brief/angle/script content another way (its own LLM call) to
+  reach it without a first-party session.
 :::
 
 ### Verifying Webhooks (HMAC-SHA256)
@@ -3885,248 +3789,107 @@ async def batch_ugc(products, angles, actors):
 
 ---
 
-## Social Studio & Multi-Platform Publishing (`client.social`)
+## Social Studio & Multi-Platform Publishing
 
-FOTOhub can directly syndicate your generated media and AI-optimized captions to Instagram, TikTok, and X (Twitter) using native APIs. 
+::: warning No `client.social` namespace, and no `/v1/social/schedule`
+No SDK ships a `social` wrapper. The real endpoint is `POST /social/v1/posts` (behind the `/social/`
+gateway prefix) — pass a `scheduled_at` field to schedule it, or omit it to publish immediately.
+Caption generation is `POST /social/v1/ai/generate-caption`.
+:::
 
 ### Immediate Publishing and Captioning
-
-Use the Social Studio to generate platform-specific captions with hashtags, and instantly publish or schedule.
 
 ::: code-group
 
 ```python [Python]
+import httpx
+
 async def schedule_social_campaign(image_url: str):
-    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
-        # Generate Caption (Cost: $0.005)
-        caption = await client.social.generate_caption(
-            image_url=image_url,
-            platform="instagram",
-            tone="witty",
-            include_hashtags=True
-        )
-        
-        # Schedule Post (Cost: $0.000, flat tier)
-        post = await client.social.schedule_post(
-            media_urls=[image_url],
-            caption=caption.text,
-            platforms=["instagram", "tiktok"],
-            scheduled_time="2026-10-31T14:00:00Z"
-        )
-        
-        # Publish now immediately
-        now_post = await client.social.publish_now(
-            media_urls=[image_url],
-            caption=caption.text,
-            platforms=["twitter"]
-        )
-        
-        print(f"Scheduled Post ID: {post.id} across {len(post.platforms)} platforms.")
-```
+    headers = {"Authorization": "Bearer fh_live_your_api_key"}
+    async with httpx.AsyncClient() as http:
+        caption = (await http.post(
+            "https://apis.fotohub.app/social/v1/ai/generate-caption",
+            headers=headers,
+            json={"image_url": image_url, "platform": "instagram", "tone": "witty"},
+        )).json()
 
-```typescript [TypeScript]
-import { FotoHub } from 'fotohub';
+        post = (await http.post(
+            "https://apis.fotohub.app/social/v1/posts",
+            headers=headers,
+            json={
+                "media_urls": [image_url],
+                "caption": caption["text"],
+                "platforms": ["instagram", "tiktok"],
+                "scheduled_at": "2026-10-31T14:00:00Z",
+            },
+        )).json()
 
-async function scheduleSocial() {
-    const client = new FotoHub({ apiKey: 'fh_live_your_api_key' });
-    
-    const caption = await client.social.generateCaption({
-        imageUrl: "https://storage.fotohub.app/img.jpg",
-        platform: "instagram",
-        tone: "witty"
-    });
-    
-    const post = await client.social.schedulePost({
-        mediaUrls: ["https://storage.fotohub.app/img.jpg"],
-        caption: caption.text,
-        platforms: ["instagram", "tiktok"],
-        scheduledTime: "2026-10-31T14:00:00Z"
-    });
-}
-```
-
-```go [Go]
-package main
-
-import (
-	"context"
-	"github.com/fotohub/fotohub-go"
-	"github.com/fotohub/fotohub-go/types"
-)
-
-func main() {
-	client := fotohub.NewClient(fotohub.WithAPIKey("fh_live_your_api_key"))
-	
-	client.Social.SchedulePost(context.Background(), types.SocialPostRequest{
-		MediaURLs:     []string{"https://storage.fotohub.app/img.jpg"},
-		Caption:       "Hello world! #AI",
-		Platforms:     []string{"instagram", "tiktok"},
-		ScheduledTime: "2026-10-31T14:00:00Z",
-	})
-}
+        print(f"Scheduled Post ID: {post['id']}")
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/social/schedule \
+curl -X POST https://apis.fotohub.app/social/v1/posts \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
     "media_urls": ["https://storage.fotohub.app/img.jpg"],
     "caption": "Hello world! #AI",
     "platforms": ["instagram", "tiktok"],
-    "scheduled_time": "2026-10-31T14:00:00Z"
+    "scheduled_at": "2026-10-31T14:00:00Z"
   }'
 ```
 :::
 
-### Content Calendar Automation (20 Posts)
-
-```python
-async def schedule_week(client, assets):
-    # Schedule 20 posts for the week
-    for i, asset in enumerate(assets[:20]):
-        time = f"2026-11-{10 + i // 3}T10:00:00Z"
-        await client.social.schedule_post(
-            media_urls=[asset.url],
-            caption="Daily Drop",
-            platforms=["instagram"],
-            scheduled_time=time
-        )
-```
-
-### Retrieving Analytics
-
-Wait 24 hours after a post goes live, then pull engagement metrics (Likes, Comments, Shares, Impressions).
-
-```python
-async def analyze_engagement(post_id: str):
-    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
-        analytics = await client.social.get_analytics(post_id=post_id)
-        print(f"Total Impressions: {analytics.total_impressions}")
-        print(f"Cost of analysis: ${analytics.cost_usd:.4f}")
-```
-
-### A/B Caption Testing
-Evaluate caption performance across multiple posts over time.
-
-### Social Studio Parameter Reference
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `media_urls` | `list[str]`| Yes | - | List of media URLs (images/video). |
-| `caption` | `str` | Yes | - | Post text. |
-| `platforms` | `list[str]`| Yes | - | `["instagram", "tiktok", "twitter", "linkedin"]` |
-| `scheduled_time`| `str` | No | `None` | ISO 8601 string. If None, uses `publish_now()`. |
-
 ---
 
-## Document Intelligence & OCR (`client.documents`)
+## Document Intelligence & OCR
 
-The `client.documents` namespace provides highly robust document intelligence, extracting structured data, tables, and JSON from raw PDFs, receipts, and invoices. 
+::: warning No `client.documents` namespace, and no PII redaction
+There is no `documents` wrapper in the SDK — call the endpoints directly. There is also no
+redaction endpoint anywhere on the platform; `redact_pii()` below does not correspond to anything
+real and has been removed from this example.
+:::
 
 ### Invoice Automation Pipeline
 
-Automatically extract invoice data, redact Personally Identifiable Information (PII), and pipe to your ERP (like QuickBooks).
-
-::: tip Pydantic V2 Powered
-All responses in `client.documents` automatically parse into strict Pydantic V2 classes. The JSON structure is statically verified before it reaches your application code.
-:::
+Extract invoice data with `POST /v1/ai/document/analyze-expense` (specialised) or
+`POST /v1/ai/document/analyze` (general tables/forms/signatures), and pipe the result to your ERP.
 
 ::: code-group
 
 ```python [Python]
-from fotohub import FotoHub
-from fotohub.types.documents import InvoiceData
+import httpx
 
 def process_expenses(pdf_url: str):
-    client = FotoHub(api_key="fh_live_your_api_key")
-    
-    # 1. Basic Fast OCR (Cost: $0.002)
-    text = client.documents.detect_text(url=pdf_url)
-    
-    # 2. Analyze Document Forms + Tables (Cost: $0.015 per page)
-    doc_analysis = client.documents.analyze_document(url=pdf_url)
-    
-    # 3. Analyze Expense/Invoice specifically (Cost: $0.020 per page)
-    invoice: InvoiceData = client.documents.analyze_expense(url=pdf_url)
-    
-    # 4. Redact PII for storage (Cost: $0.005 per page)
-    redacted_pdf_url = client.documents.redact_pii(
-        url=pdf_url,
-        entities=["SSN", "CREDIT_CARD", "HOME_ADDRESS"]
-    )
-    
-    print(f"Extracted Total: ${invoice.total_amount_usd}")
-    print(f"Vendor: {invoice.vendor_name}")
-    print(f"Redacted PDF saved to: {redacted_pdf_url}")
-    
-    # Push to QuickBooks JSON ...
-```
+    headers = {"Authorization": "Bearer fh_live_your_api_key"}
 
-```typescript [TypeScript]
-import { FotoHub } from 'fotohub';
+    # General OCR / tables / forms
+    doc_analysis = httpx.post(
+        "https://apis.fotohub.app/v1/ai/document/analyze",
+        headers=headers,
+        json={"document_url": pdf_url, "features": ["TABLES", "FORMS"]},
+    ).json()
 
-async function processExpenses() {
-    const client = new FotoHub({ apiKey: 'fh_live_your_api_key' });
-    
-    const invoice = await client.documents.analyzeExpense({ url: "https://storage/invoice.pdf" });
-    
-    const redactedPdf = await client.documents.redactPii({
-        url: "https://storage/invoice.pdf",
-        entities: ["SSN", "CREDIT_CARD", "HOME_ADDRESS"]
-    });
-    
-    console.log(`Extracted Total: $${invoice.totalAmountUsd}`);
-}
-```
+    # Expense/invoice specifically
+    invoice = httpx.post(
+        "https://apis.fotohub.app/v1/ai/document/analyze-expense",
+        headers=headers,
+        json={"document_url": pdf_url},
+    ).json()
 
-```go [Go]
-package main
-
-import (
-	"context"
-	"fmt"
-	"github.com/fotohub/fotohub-go"
-	"github.com/fotohub/fotohub-go/types"
-)
-
-func main() {
-	client := fotohub.NewClient(fotohub.WithAPIKey("fh_live_your_api_key"))
-	
-	invoice, _ := client.Documents.AnalyzeExpense(context.Background(), types.DocumentAnalyzeRequest{
-		URL: "https://storage/invoice.pdf",
-	})
-	
-	fmt.Printf("Vendor: %s, Total: $%.2f\n", invoice.VendorName, invoice.TotalAmountUSD)
-}
+    print(f"Extracted Total: ${invoice.get('total_amount_usd')}")
+    print(f"Vendor: {invoice.get('vendor_name')}")
 ```
 
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/v1/documents/analyze-expense \
+curl -X POST https://apis.fotohub.app/v1/ai/document/analyze-expense \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://storage/invoice.pdf"
+    "document_url": "https://storage/invoice.pdf"
   }'
 ```
 :::
-
-### Batch Processing 100 Documents (Async)
-```python
-async def batch_process(urls: list[str]):
-    async with AsyncFotoHub(api_key="fh_live_your_api_key") as client:
-        # process 100 documents ...
-        pass
-```
-
-### Document Intelligence Parameter Reference
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `url` | `str` | Yes | - | URL to the PDF or image file. |
-| `pages` | `str` | No | `"1-5"` | Page range to process. |
-| `extract_tables`| `bool` | No | `True` | Return parsed markdown tables. |
-| `entities` | `list[str]`| No | `[]` | Used for `redact_pii`. |
 
 ---
 
@@ -4293,8 +4056,10 @@ class WebhookPayload(BaseModel):
 
 We recommend using `pytest`, `respx`, and the SDK's built-in sandbox keys to write tests.
 
-::: info Sandbox API Keys
-Use `fh_test_...` prefixed keys. Sandbox requests bypass GPU provisioning, return mocked results immediately, and do **not** deduct USD from your wallet balance.
+::: warning There is no sandbox
+FOTOhub has no test-key prefix and no mock-response mode — every key is
+`fh_live_*` and every successful call spends real wallet balance. Test against a
+mocked transport instead; RESPX below is the idiomatic way to do that in Python.
 :::
 
 ### Mocking with RESPX
@@ -4310,12 +4075,12 @@ from fotohub.exceptions import InsufficientFundsError
 
 @pytest.fixture
 def client():
-    return FotoHub(api_key="fh_test_12345")
+    return FotoHub(api_key="fh_live_4f3a9c2e8b71d0a6f5c3e9b2a7d41f68")
 
 @respx.mock
 def test_insufficient_funds(client):
     # Mock the API returning 402
-    respx.post("https://apis.fotohub.app/v1/images/generate").mock(
+    respx.post("https://apis.fotohub.app/v1/ai/generate/image").mock(
         return_value=Response(
             402, 
             json={"error": "Insufficient funds in prepaid USD wallet", "shortfall_usd": 5.0}
@@ -4323,7 +4088,7 @@ def test_insufficient_funds(client):
     )
     
     with pytest.raises(InsufficientFundsError) as exc_info:
-        client.images.generate(prompt="Test")
+        client.generate_image(prompt="Test")
         
     assert exc_info.value.shortfall_usd == 5.0
 ```
@@ -4337,8 +4102,8 @@ def test_insufficient_funds(client):
     ("fotohub-flux", 0.025)
 ])
 def test_image_generation_pricing(client, model, expected_cost):
-    # If using fh_test_* keys, the API returns a simulated cost match
-    res = client.images.generate(prompt="A test image", model=model)
+    # Costs come from the live pricing table; mock the transport to assert on them
+    res = client.generate_image(prompt="A test image", model=model)
     assert res.cost_usd == expected_cost
 ```
 
@@ -4346,7 +4111,7 @@ def test_image_generation_pricing(client, model, expected_cost):
 ```python
 @respx.mock
 def test_rate_limit(client):
-    respx.post("https://apis.fotohub.app/v1/images/generate").mock(
+    respx.post("https://apis.fotohub.app/v1/ai/generate/image").mock(
         return_value=Response(429, json={"error": "Rate limited"})
     )
     # Test retry logic or exception...

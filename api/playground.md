@@ -279,16 +279,15 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/sfx \
   }'
 ```
 
-### Text-to-Speech (IDA Voice)
+### Text-to-Speech (AWS Polly voices)
 
 Convert text to natural-sounding voice. Cost: **$0.015 / 1K characters**.
 
 ```bash
-curl -X POST https://apis.fotohub.app/v1/ai/tts \
+curl -X POST https://apis.fotohub.app/v1/ai/tts/polly/synthesize \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "polly",
     "text": "Welcome to FOTOhub Creative AI Platform. Your creative possibilities are limitless.",
     "voice_id": "Joanna",
     "engine": "neural",
@@ -328,23 +327,24 @@ curl -X POST https://apis.fotohub.app/v1/images/remove-background/advanced \
 
 ### Extract Text from PDF
 
-Cost: **$0.005 / page**.
+Cost: **$0.005 / page**. Raw text detection, no table/form structure — the document goes in the JSON body as base64, not multipart.
 
 ```bash
-curl -X POST https://apis.fotohub.app/v1/documents/extract \
+curl -X POST https://apis.fotohub.app/v1/ai/document/detect-text \
   -H "Authorization: Bearer fh_live_your_api_key" \
-  -F "file=@invoice.pdf" \
-  -F "output_format=json" \
-  -F "include_layout=true"
+  -H "Content-Type: application/json" \
+  -d "{\"document\": \"$(base64 -w0 invoice.pdf)\"}"
 ```
 
 ### Table Extraction
 
+Structured extraction with tables/forms/signatures. Also base64 in the JSON body.
+
 ```bash
-curl -X POST https://apis.fotohub.app/v1/documents/analyze \
+curl -X POST https://apis.fotohub.app/v1/ai/document/analyze \
   -H "Authorization: Bearer fh_live_your_api_key" \
-  -F "file=@financial_statement.pdf" \
-  -F "features=tables,forms,signatures"
+  -H "Content-Type: application/json" \
+  -d "{\"document\": \"$(base64 -w0 financial_statement.pdf)\", \"features\": [\"TABLES\", \"FORMS\", \"SIGNATURES\"]}"
 ```
 
 ---
@@ -353,21 +353,19 @@ curl -X POST https://apis.fotohub.app/v1/documents/analyze \
 
 Generate a textured 3D mesh from an image. Cost: **$0.120 / model**.
 
+The image goes in the JSON body as base64 (`image_base64`), not a URL, and `mode` must be either `image-to-3d` or `text-to-3d`. This endpoint is **synchronous** — it holds the connection open (up to ~3 minutes) and returns the finished model's `url` in the same response. There is no job/poll pattern here.
+
 ```bash
-# Submit generation job
-JOB_ID=$(curl -s -X POST https://apis.fotohub.app/v1/models-3d/generate \
+curl -s -X POST https://apis.fotohub.app/v1/ai/generate/3d \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{
-    "image_url": "https://s3point.fotohub.app/uploads/sneaker.jpg",
-    "model": "fh-3d-pro",
-    "output_formats": ["glb", "usdz"],
-    "texture_resolution": 2048
-  }' | jq -r '.job_id')
-
-# Poll for completion
-curl "https://apis.fotohub.app/v1/models-3d/$JOB_ID" \
-  -H "Authorization: Bearer fh_live_your_api_key"
+  -d "{
+    \"mode\": \"image-to-3d\",
+    \"model\": \"fh-pro-3d\",
+    \"image_base64\": \"$(base64 -w0 sneaker.jpg)\",
+    \"format\": \"glb\",
+    \"quality\": \"high\"
+  }" | jq -r '.url'
 ```
 
 ---
@@ -422,7 +420,7 @@ curl -X POST https://apis.fotohub.app/v1/shorts/clips \
 Sync audio to video with neural lip-sync. Cost: **$0.080 / 5s video**.
 
 ```bash
-curl -X POST https://apis.fotohub.app/v1/lip-sync \
+curl -X POST https://apis.fotohub.app/v1/video/lip-sync \
   -H "Authorization: Bearer fh_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -540,9 +538,9 @@ curl "https://apis.fotohub.app/v1/models?category=image" \
 curl "https://apis.fotohub.app/v1/models?category=video" \
   -H "Authorization: Bearer fh_live_your_api_key" | jq '.models[] | {id, usd_per_5s}'
 
-# Get a specific model's details
-curl "https://apis.fotohub.app/v1/models/seedance-2-0-pro" \
-  -H "Authorization: Bearer fh_live_your_api_key"
+# Get a specific model's details (there is no per-model endpoint — filter the list)
+curl "https://apis.fotohub.app/v1/models?category=video" \
+  -H "Authorization: Bearer fh_live_your_api_key" | jq '.models[] | select(.id == "seedance-2-0-pro")'
 ```
 
 ---

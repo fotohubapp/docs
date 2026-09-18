@@ -6,7 +6,7 @@ description: Complete guide to Application Load Balancers, Auto Scaling Groups, 
 
 # Application Load Balancers & Auto Scaling Clusters
 
-Deploy highly available, fault-tolerant GPU and CPU clusters in **Frankfurt (`eu-central-1`)** with automated health checks, dynamic scale-out policies, and Application Load Balancers (ALB).
+Deploy highly available, fault-tolerant GPU and CPU clusters in **Frankfurt (`eu-central-1`)** with target-group health checks, Auto Scaling Groups, and Application Load Balancers (ALB). Note upfront: CloudWatch alarms through this API are observability-only (see section 5) and there is no automatic scale-out trigger — you drive ASG size changes yourself.
 
 All load balancing and autoscaling primitives map directly to native AWS infrastructure via the **Compute Engine** (`/compute/v1/aws/*`), billed transparently to your prepaid USD wallet without hidden management surcharges.
 
@@ -44,14 +44,14 @@ flowchart TD
             Node3["Spot Worker 3 (A10G - eu-central-1c)"]
         end
         
-        CW["CloudWatch GPU / CPU Alarm (>80% Utilization)"]
+        CW["CloudWatch CPU Alarm (observability only — does not auto-trigger scaling)"]
     end
 
     Users --> DNS --> ALB
     ALB -->|Health Checks / Round-Robin| TG
     TG --> Node1 & Node2 & Node3
     Node1 & Node2 & Node3 -.->|Metrics| CW
-    CW -.->|Trigger Scale-Out (+1 Node)| TG
+    CW -.->|You poll this and call PUT /aws/auto-scaling/name yourself| TG
 ```
 
 ---
@@ -91,19 +91,28 @@ FOTOhub exposes several powerful instance families for varied workloads. We emph
   - Data Egress: **FREE intra-cluster egress** (No charge for traffic between your S3 bucket and your EC2 instances within `eu-central-1`).
 
 ::: tip Firecracker Sandbox
-Need secure, isolated environment execution without managing VMs? Check out our Firecracker Sandbox API at `https://apis.fotohub.app/sandbox/exec-python` for serverless python execution.
+Need secure, isolated code execution without managing VMs? See [Firecracker Sandboxes](/compute/agent-sandboxes) — it runs through an Agent Engine `code.python` workflow node, not a directly callable REST endpoint.
 :::
 
 ---
 
 ## 3. Complete ALB Setup Guide
 
-Setting up an Application Load Balancer requires a sequence of API calls. You must:
-1. Provision the **Load Balancer**
-2. Create a **Target Group**
-3. Configure **Listener Rules**
-4. Register **Instances** (or attach to an ASG)
-5. Add **Health Checks**
+:::warning No listener endpoint
+There is no `POST /aws/load-balancers/listeners` route or any other way to attach a listener
+through this API — `create_load_balancer` in `compute-engine` only creates the ALB resource
+itself via `elbv2.create_load_balancer`, nothing wires a listener to a target group. A load
+balancer created through this API has no listeners and will not route traffic until you attach
+one directly through the AWS Console or the AWS CLI/SDK against the returned ARN, outside of
+FOTOhub's API. Max **5 load balancers per user**.
+:::
+
+Setting up an Application Load Balancer today is:
+1. Provision the **Load Balancer** (via this API)
+2. Create a **Target Group** (via this API)
+3. Register **Instances** to the target group (via this API)
+4. Attach a **Listener** connecting the target group to the load balancer — **outside this API**,
+   directly against AWS
 
 ### Step 3.1: Provision the Application Load Balancer (ALB)
 
@@ -152,11 +161,12 @@ print(response.json())
 
 ```json
 {
-  "load_balancer_arn": "arn:aws:elasticloadbalancing:eu-central-1:123456789:loadbalancer/app/prod-inference-alb/50dc6c495c0c9188",
+  "arn": "arn:aws:elasticloadbalancing:eu-central-1:123456789:loadbalancer/app/prod-inference-alb/50dc6c495c0c9188",
+  "name": "prod-inference-alb",
   "dns_name": "prod-inference-alb-123456789.eu-central-1.elb.amazonaws.com",
-  "status": "provisioning",
-  "created_at": "2023-10-15T12:00:00Z",
   "type": "application",
+  "state": "provisioning",
+  "scheme": "internet-facing",
   "vpc_id": "vpc-0a12f94b8"
 }
 ```
@@ -189,20 +199,19 @@ curl -X POST https://apis.fotohub.app/compute/v1/aws/target-groups \
 
 ```json
 {
-  "target_group_arn": "arn:aws:elasticloadbalancing:eu-central-1:123456789:targetgroup/vllm-cluster-tg/60dc6c495c0c9199",
+  "arn": "arn:aws:elasticloadbalancing:eu-central-1:123456789:targetgroup/vllm-cluster-tg/60dc6c495c0c9199",
   "name": "vllm-cluster-tg",
-  "protocol": "HTTP",
   "port": 8000,
-  "vpc_id": "vpc-0a12f94b8",
-  "health_check_path": "/health",
-  "health_check_interval": 15,
-  "target_type": "instance"
+  "protocol": "HTTP",
+  "vpc_id": "vpc-0a12f94b8"
 }
 ```
 
 ### Step 3.3: Register Instances to Target Group
 
-If you are not using an ASG, you can manually register EC2 instances.
+If you are not using an ASG, you can manually register EC2 instances. Note `instance_ids` here
+means the **raw AWS EC2 instance ID** (`i-0abc...`), not FOTOhub's internal instance UUID — and
+every instance must already belong to you, checked server-side before registration.
 
 **Endpoint:** `POST /aws/target-groups/register`
 
@@ -213,46 +222,35 @@ curl -X POST https://apis.fotohub.app/compute/v1/aws/target-groups/register \
   -H "Content-Type: application/json" \
   -d '{
     "target_group_arn": "arn:aws:elasticloadbalancing:...:targetgroup/vllm-cluster-tg/...",
-    "targets": [
-      { "id": "i-098234abcf", "port": 8000 },
-      { "id": "i-098234abcd", "port": 8000 }
-    ]
+    "instance_ids": ["i-098234abcf", "i-098234abcd"],
+    "port": 8000
   }'
 ```
 :::
 
+Note the single `port` applies to every instance in the call — you cannot register instances at
+different ports in one request.
+
 #### Register Targets JSON Response Schema
 
 ```json
-{
-  "success": true,
-  "registered_targets": [
-    { "id": "i-098234abcf", "status": "initial" },
-    { "id": "i-098234abcd", "status": "initial" }
-  ]
-}
+{ "success": true }
 ```
 
-### Step 3.4: Configure Listener Rules
+### Step 3.4: Attaching a Listener (outside FOTOhub's API)
 
-Connect your Target Group to your Load Balancer by adding a listener on port 80 or 443.
+As noted above, there is no FOTOhub endpoint for this. Once you have the load balancer ARN and
+target group ARN from the steps above, create the listener directly against AWS:
 
-**Endpoint:** `POST /aws/load-balancers/listeners`
-
-```json
-// POST Payload
-{
-  "load_balancer_arn": "arn:aws:elasticloadbalancing:eu-central-1:123456789:loadbalancer/app/prod-inference-alb/50dc6c495c0c9188",
-  "protocol": "HTTP",
-  "port": 80,
-  "default_actions": [
-    {
-      "type": "forward",
-      "target_group_arn": "arn:aws:elasticloadbalancing:eu-central-1:123456789:targetgroup/vllm-cluster-tg/60dc6c495c0c9199"
-    }
-  ]
-}
+```bash
+aws elbv2 create-listener \
+  --load-balancer-arn "arn:aws:elasticloadbalancing:eu-central-1:123456789:loadbalancer/app/prod-inference-alb/50dc6c495c0c9188" \
+  --protocol HTTP --port 80 \
+  --default-actions Type=forward,TargetGroupArn="arn:aws:elasticloadbalancing:eu-central-1:123456789:targetgroup/vllm-cluster-tg/60dc6c495c0c9199"
 ```
+
+This requires AWS credentials with `elasticloadbalancing:CreateListener` on the resource FOTOhub
+provisioned for you — reach out to support if you don't have a way to do this today.
 
 ---
 
@@ -262,18 +260,20 @@ Auto Scaling Groups dynamically scale your worker pool based on traffic demands 
 
 ### Provisioning an ASG
 
-**Endpoint:** `POST /aws/auto-scaling`
+**Endpoint:** `POST /aws/auto-scaling`. Max **5 Auto Scaling Groups per user**, and `max_size` is
+silently capped at **20** regardless of what you request.
 
 | Parameter | Type | Required | Default | Description |
 |:---|:---|:---:|:---:|:---|
-| `name` | string | **Yes** | — | Unique name for the Auto Scaling Group. |
-| `min_size` | integer | **Yes** | `1` | Minimum number of running instances. |
-| `max_size` | integer | **Yes** | `5` | Upper ceiling to prevent runaway billing. |
-| `desired_capacity` | integer | **Yes** | `1` | Initial targeted number of instances. |
-| `instance_type` | string | **Yes** | — | Catalog ID (e.g. `g5.xlarge`, `c5.2xlarge`). |
-| `ami_id` | string | **Yes** | — | Base Golden AMI ID pre-configured with models. |
-| `target_group_arns`| array | **Yes** | `[]` | ARNs of target groups to register new nodes to. |
-| `availability_zones`| array | No | `["eu-central-1a", "eu-central-1b"]` | Multi-AZ redundancy distribution. |
+| `name` | string | No | auto-generated | Unique name for the Auto Scaling Group. |
+| `min_size` | integer | No | `1` | Minimum number of running instances. |
+| `max_size` | integer | No | `5` | Upper ceiling; capped at 20 server-side. |
+| `desired` | integer | No | `1` | Initial targeted number of instances. |
+| `instance_type` | string | Conditional | — | Catalog ID (e.g. `g5.xlarge`, `c5.2xlarge`). Required if you don't supply `launch_template_id`. |
+| `ami_id` | string | Conditional | — | Your own AMI ID (see [Golden AMI pattern](/compute/volumes-storage)). Required alongside `instance_type` if you don't supply `launch_template_id`. |
+| `launch_template_id`| string | No | — | Use an existing EC2 launch template instead of `instance_type`/`ami_id`. |
+| `target_group_arns`| array | No | `[]` | ARNs of target groups to register new nodes to. |
+| `availability_zones`| array | No | `["eu-central-1a"]` | Multi-AZ redundancy distribution. |
 
 ::: code-group
 ```bash [cURL]
@@ -284,7 +284,7 @@ curl -X POST https://apis.fotohub.app/compute/v1/aws/auto-scaling \
     "name": "qwen-inference-asg",
     "min_size": 1,
     "max_size": 6,
-    "desired_capacity": 2,
+    "desired": 2,
     "instance_type": "g5.xlarge",
     "ami_id": "ami-0a912837bc901ef",
     "target_group_arns": ["arn:aws:elasticloadbalancing:eu-central-1:...:targetgroup/vllm-cluster-tg/..."],
@@ -297,12 +297,10 @@ curl -X POST https://apis.fotohub.app/compute/v1/aws/auto-scaling \
 
 ```json
 {
-  "auto_scaling_group_name": "qwen-inference-asg",
-  "auto_scaling_group_arn": "arn:aws:autoscaling:eu-central-1:123456789:autoScalingGroup:1234-5678:autoScalingGroupName/qwen-inference-asg",
+  "name": "qwen-inference-asg",
   "min_size": 1,
   "max_size": 6,
-  "desired_capacity": 2,
-  "status": "provisioning"
+  "desired": 2
 }
 ```
 
@@ -318,63 +316,60 @@ Attach metrics alarms that trigger scaling actions automatically. For example, i
 
 **Endpoint:** `POST /aws/alarms`
 
-::: code-group
-```bash [Scale-Out Alarm]
+:::warning These alarms are observability only — they cannot trigger scaling
+The real `AlarmRequest` schema is `instance_id` (required — one alarm watches one instance, not
+an ASG), `metric`, `threshold`, `comparison`, `statistic`, `period`, `evaluation_periods`. There
+is no `alarm_name` field (the server names it for you: `fh-{user}-{metric}-{instance}`) and no
+`action_arn` field. Worse: the underlying `put_metric_alarm` call is created with
+**`ActionsEnabled=False`** — hardcoded server-side — so even a matching alarm state never fires
+anything. `metric` must be one of `CPUUtilization`, `NetworkIn`, `NetworkOut`, `DiskReadOps`,
+`DiskWriteOps`, `StatusCheckFailed` (all built-in EC2 metrics; no GPU metric). Max 50 alarms per
+user.
+:::
+
+```bash [Create an Alarm]
 curl -X POST https://apis.fotohub.app/compute/v1/aws/alarms \
   -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "alarm_name": "HighCPU-ScaleOut",
+    "instance_id": "inst_90f23b",
     "metric": "CPUUtilization",
     "threshold": 80.0,
     "comparison": "GreaterThanThreshold",
     "statistic": "Average",
     "period": 300,
-    "evaluation_periods": 2,
-    "action_arn": "arn:aws:autoscaling:...:scale-out-policy"
+    "evaluation_periods": 2
   }'
 ```
-
-```bash [Scale-In Alarm]
-curl -X POST https://apis.fotohub.app/compute/v1/aws/alarms \
-  -H "Authorization: Bearer fh_live_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "alarm_name": "LowCPU-ScaleIn",
-    "metric": "CPUUtilization",
-    "threshold": 20.0,
-    "comparison": "LessThanThreshold",
-    "statistic": "Average",
-    "period": 300,
-    "evaluation_periods": 2,
-    "action_arn": "arn:aws:autoscaling:...:scale-in-policy"
-  }'
-```
-:::
 
 #### Alarm JSON Response Schema
 
 ```json
 {
-  "alarm_arn": "arn:aws:cloudwatch:eu-central-1:123456789:alarm:HighCPU-ScaleOut",
-  "alarm_name": "HighCPU-ScaleOut",
-  "status": "created"
+  "alarm_name": "fh-a1b2c3d4-CPUUtilization-90f23b12",
+  "metric": "CPUUtilization",
+  "threshold": 80.0,
+  "comparison": "GreaterThanThreshold"
 }
 ```
 
-### 5.2 Target Tracking vs Step Scaling vs Scheduled Scaling
+### 5.2 Target Tracking, Step Scaling, Scheduled Scaling — Not Implemented
 
-FOTOhub supports multiple scaling strategies:
+None of these exist. There is no scaling-policy endpoint, no target-tracking configuration, no
+step-scaling configuration, and no scheduled-scaling configuration anywhere in `compute-engine` —
+`aws_extended.py` has instance-scoped alarms (inert, see above) and ASG size fields (`min_size`/
+`max_size`/`desired`) and nothing that connects the two automatically. If you want your ASG to
+actually respond to load, you need to poll CloudWatch/your own metrics yourself and call
+`PUT /aws/auto-scaling/{name}` to change `desired` — see the Python automation example below,
+which does exactly that.
 
-- **Target Tracking Scaling:** The easiest approach. You set a target metric (e.g., maintain 50% CPU utilization). The ASG automatically calculates the adjustments needed.
-- **Step Scaling:** Define specific steps. E.g., if CPU > 70%, add 1 instance; if CPU > 90%, add 3 instances. Best for bursty workloads.
-- **Scheduled Scaling:** Pre-warm your cluster based on time. If traffic always spikes at 9 AM CET, schedule the desired capacity to increase at 8:45 AM CET.
+### 5.3 GPU Cluster Scaling by Queue Depth — Roll Your Own
 
-### 5.3 GPU Cluster Auto-Scaling by Queue Depth
-
-For ML inference, CPU isn't always the best metric. Instead, use a custom metric tracking the number of requests in your message queue (e.g., SQS or Redis).
-
-You can scale from 0 to N `g5.xlarge` instances by pushing a custom CloudWatch metric for `QueueDepth` and setting a Target Tracking Policy of 10 requests per instance.
+There is no custom-metric ingestion endpoint (no `put_metric_data` equivalent) and no
+target-tracking policy support. To scale `g5.xlarge` instances by queue depth, poll your own
+queue (SQS, Redis, etc.) from an external process and call the ASG update endpoint directly —
+see the reconciliation loop under [Python SDK & Boto3](/compute/cli-iac) for the same pattern
+applied to raw instances.
 
 ---
 
@@ -389,11 +384,14 @@ To update your application without downtime:
 
 ### 6.2 Blue/Green Deployment with Listener Rule Swapping
 
-A faster, safer alternative to rolling deployments for critical infrastructure:
+A faster, safer alternative to rolling deployments for critical infrastructure. The listener swap
+in step 4 happens **outside FOTOhub's API** (see the listener caveat in section 3) — you'll need
+AWS credentials with `elasticloadbalancing:ModifyListener` for the load balancer FOTOhub
+provisioned:
 1. **Blue Environment:** Current ASG attached to Target Group A.
-2. **Green Environment:** Spin up a new ASG with updated code, attached to Target Group B.
+2. **Green Environment:** Spin up a new ASG with updated code, attached to Target Group B (both via `POST /aws/auto-scaling` + `POST /aws/target-groups`).
 3. **Warm-up:** Send test traffic directly to Target Group B to verify.
-4. **Swap:** Update the ALB Listener Rule to forward 100% of traffic to Target Group B.
+4. **Swap:** Update the ALB Listener directly via AWS (`aws elbv2 modify-listener`) to forward 100% of traffic to Target Group B.
 5. **Drain & Terminate:** Drain connections from Blue, then terminate the Blue ASG.
 
 ---
@@ -523,12 +521,17 @@ The ALB connected, but your application took too long to respond.
 
 ## Appendix: Summary of Hardware Limits
 
-| Resource | Default Limit | Request Increase |
-|:---|:---:|:---:|
-| ALB per Region | 50 | Support Ticket |
-| Target Groups | 100 | Support Ticket |
-| ASG Max Size | 500 nodes | Account Rep |
-| G5 / G4dn Quota | 20 vCPUs | Pre-pay $100 |
+These are enforced server-side in `compute-engine` (`aws_extended.py`), not adjustable via a
+support ticket today:
+
+| Resource | Limit |
+|:---|:---:|
+| Load Balancers per user | **5** |
+| Auto Scaling Groups per user | **5** |
+| ASG `max_size` | **20** (silently capped, regardless of what you request) |
+| CloudWatch Alarms per user | **50** |
+| S3 Buckets per user | **10** |
+| Target Groups per user | No FOTOhub-imposed cap |
 
 *End of Document*
 

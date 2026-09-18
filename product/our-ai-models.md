@@ -8,14 +8,14 @@ Gabriel is FOTOhub's intelligent platform orchestrator — a proprietary AI laye
 
 ### What Gabriel Does
 
-| Capability | Description | Latency |
-|-----------|-------------|---------|
-| **Intent Classification** | Understands natural language requests and maps them to platform features | <100ms |
-| **Model Selection** | Dynamically selects the optimal model based on task, quality needs, and cost | <50ms |
-| **Prompt Engineering** | Enriches user prompts with model-specific optimizations | <200ms |
-| **Multi-step Workflows** | Orchestrates complex tasks requiring sequential operations | <500ms |
-| **Proactive Suggestions** | Context-aware recommendations as users navigate the platform | <50ms |
-| **Auto-translation** | Real-time translation across 30+ languages | <300ms |
+| Capability | Description |
+|-----------|-------------|
+| **Intent Classification** | Understands natural language requests and maps them to platform features |
+| **Model Selection** | Dynamically selects the optimal model based on task, quality needs, and cost |
+| **Prompt Engineering** | Enriches user prompts with model-specific optimizations |
+| **Multi-step Workflows** | Orchestrates complex tasks requiring sequential operations |
+| **Proactive Suggestions** | Context-aware recommendations as users navigate the platform |
+| **Auto-translation** | Real-time translation across 30+ languages |
 
 ### Architecture
 
@@ -35,9 +35,7 @@ User Input → Gabriel Orchestrator
 | Intent accuracy | 96.2% | Tested on 10,000+ real user queries across PL/EN/DE |
 | Routing precision | 98.7% | Correct model selected for the task type |
 | Prompt enhancement lift | +34% | Quality improvement measured by user satisfaction ratings |
-| Response latency (P95) | 180ms | Single-shot classification, EU datacenter |
-| Streaming first token | <80ms | SSE stream begins before full classification completes |
-| Availability | 99.97% | Multi-model failover chain, auto-recovery |
+| Reliability | No published number | Requests route through a multi-model failover chain — if the selected model or engine fails, Gabriel retries against the next healthy candidate and a failed generation is refunded rather than silently dropped |
 
 ### Key Features
 
@@ -194,8 +192,10 @@ Billed at exact provider rates ($0.025–$0.045 per minute) directly from your p
 
 ```bash
 POST https://apis.fotohub.app/v1/ai/generate/music          # Generate music
-POST https://apis.fotohub.app/v1/ai/generate/music/compose   # AI lyrics composer (free)
 ```
+
+There is no separate lyrics-composer endpoint — pass your own lyrics (or omit them
+for an instrumental track) directly in the `POST /v1/ai/generate/music` request.
 
 See [Music & Audio API Reference](/api/music-audio) for complete endpoint documentation.
 
@@ -289,16 +289,18 @@ Beyond dedicated models, FOTOhub's AI layer provides:
 
 ## Infrastructure
 
-All proprietary models run on FOTOhub's dedicated GPU cluster:
+Most proprietary models run on FOTOhub's dedicated GPU cluster in the EU. The one
+exception is textured 3D generation, which runs on a GPU in the US — no EU cloud
+zone had the required GPU capacity available, so that specific workload is not
+EU-hosted.
 
 | Resource | Specification |
 |----------|--------------|
-| **Location** | EU (Frankfurt, eu-central-1) |
+| **Location** | EU (Frankfurt, eu-central-1), except textured 3D generation (US) |
 | **GPU** | NVIDIA A100 80GB / L4 |
 | **Inference** | Custom optimized pipeline |
-| **Availability** | 99.97% uptime (multi-node redundancy) |
+| **Reliability** | Multi-model failover — a failed generation retries against a healthy alternative and is refunded rather than left to fail silently. No uptime SLA is published. |
 | **Data** | GDPR-compliant, no training on user data |
-| **Latency** | <200ms P95 for European users |
 
 ### Why Self-Hosted
 

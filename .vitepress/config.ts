@@ -57,6 +57,7 @@ export default defineConfig({
           text: 'Getting Started',
           items: [
             { text: 'Introduction', link: '/api/getting-started' },
+            { text: 'API Surface Map', link: '/api/surface-map' },
             { text: 'Authentication', link: '/api/authentication' },
             { text: 'Playground', link: '/api/playground' },
             { text: 'Rate Limits', link: '/api/rate-limits' },
@@ -244,6 +245,18 @@ export default defineConfig({
             { text: 'Quickstart', link: '/guides/quickstart' },
             { text: 'CLI Setup', link: '/guides/cli-setup' },
             { text: 'SDK Installation', link: '/guides/sdk-setup' },
+          ],
+        },
+        {
+          // One quickstart per modality, because the three things a developer
+          // has to know up front -- which endpoint, sync or async, and what the
+          // billing unit is -- differ per modality and nowhere else.
+          text: 'Quickstarts by modality',
+          items: [
+            { text: 'Images', link: '/guides/quickstart-image' },
+            { text: 'Video', link: '/guides/quickstart-video' },
+            { text: 'Audio, Speech & Music', link: '/guides/quickstart-audio' },
+            { text: '3D Models', link: '/guides/quickstart-3d' },
           ],
         },
         {
