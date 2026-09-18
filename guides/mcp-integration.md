@@ -114,17 +114,19 @@ Add to Cursor's MCP settings (Settings → MCP Servers → Add):
 
 Once connected, your AI assistant can use these tools:
 
+This is a small sample — FOTOhub's MCP server exposes 57 active tools across image, editing, video, audio, 3D, UGC studio, chat, pricing, storage, and utility. Full catalog with parameters: [MCP API Reference](/api/mcp).
+
 | Tool | Description | Example prompt |
 |------|-------------|----------------|
 | `generate_image` | Generate images from text | "Generate a product mockup of headphones" |
 | `generate_video` | Generate videos (async) | "Create a 5s video of a sunset" |
 | `edit_image` | Edit existing images | "Remove the background from this image" |
 | `upscale_image` | Upscale image resolution | "Upscale this image to 4K" |
-| `chat` | AI text generation | "Summarize this document" |
+| `chat_completion` | AI text generation (Claude/Nova-class models) | "Summarize this document" |
 | `text_to_speech` | Convert text to speech | "Read this paragraph aloud" |
 | `generate_music` | Generate music/audio | "Create a calm lo-fi beat" |
 | `list_models` | List available models | "What image models are available?" |
-| `check_usage` | Check credit balance | "How many credits do I have left?" |
+| `check_balance` | Check prepaid USD wallet balance | "How much do I have left to spend?" |
 
 ---
 
@@ -148,52 +150,71 @@ The assistant will use FOTOhub's MCP tools to generate the image and can save it
 
 ## Programmatic MCP Client
 
-Build your own MCP client to integrate FOTOhub tools into custom agents:
+The `fotohub` Python/TypeScript SDKs are plain REST clients and do **not** include an MCP client. To call FOTOhub tools over MCP from your own code, use the official MCP SDKs directly against the Streamable HTTP endpoint:
 
 ::: code-group
 ```python [Python]
-from fotohub import FotoHub
+# pip install mcp
+import asyncio
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
 
-# The SDK includes MCP client support
-client = FotoHub()
+async def main():
+    async with streamablehttp_client(
+        url="https://apis.fotohub.app/mcp/",
+        headers={"Authorization": "Bearer fh_live_your_api_key"},
+    ) as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
 
-# List available tools
-tools = client.mcp.list_tools()
-for tool in tools:
-    print(f"  {tool.name}: {tool.description}")
+            tools = await session.list_tools()
+            for tool in tools.tools:
+                print(f"  {tool.name}: {tool.description}")
 
-# Call a tool directly
-result = client.mcp.call_tool(
-    name="generate_image",
-    arguments={
-        "prompt": "A serene mountain lake at dawn",
-        "model": "seedream-5-0-260128",
-        "aspect_ratio": "16:9",
-    },
-)
-print(f"Image URL: {result.content[0].text}")
+            result = await session.call_tool(
+                "generate_image",
+                arguments={
+                    "prompt": "A serene mountain lake at dawn",
+                    "model": "seedream-5-0-260128",
+                    "aspect_ratio": "16:9",
+                },
+            )
+            print(f"Image result: {result.content[0].text}")
+
+asyncio.run(main())
 ```
 ```typescript [TypeScript]
-import { FotoHub } from "fotohub";
+// npm install @modelcontextprotocol/sdk
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-const client = new FotoHub({ apiKey: process.env.FOTOHUB_API_KEY! });
+async function main() {
+  const transport = new StreamableHTTPClientTransport(
+    new URL('https://apis.fotohub.app/mcp/'),
+    { headers: { Authorization: 'Bearer fh_live_your_api_key' } },
+  );
+  const client = new Client({ name: 'my-app', version: '1.0.0' });
+  await client.connect(transport);
 
-// List available tools
-const tools = await client.mcp.listTools();
-tools.forEach((tool) => {
-  console.log(`  ${tool.name}: ${tool.description}`);
-});
+  const tools = await client.listTools();
+  tools.tools.forEach((tool) => {
+    console.log(`  ${tool.name}: ${tool.description}`);
+  });
 
-// Call a tool
-const result = await client.mcp.callTool({
-  name: "generate_image",
-  arguments: {
-    prompt: "A serene mountain lake at dawn",
-    model: "seedream-5-0-260128",
-    aspectRatio: "16:9",
-  },
-});
-console.log(`Image URL: ${result.content[0].text}`);
+  const result = await client.callTool({
+    name: 'generate_image',
+    arguments: {
+      prompt: 'A serene mountain lake at dawn',
+      model: 'seedream-5-0-260128',
+      aspect_ratio: '16:9',
+    },
+  });
+  console.log(`Image result: ${result.content[0].text}`);
+
+  await client.close();
+}
+
+main().catch(console.error);
 ```
 ```go [Go]
 package main

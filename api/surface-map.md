@@ -41,7 +41,7 @@ is stripped before the service sees the request, which is why a service's own
 | `/ads/`, `/marketing/`, `/video-director/`, `/seedance/` | as named | Domain services |
 | `/v1/chat/` | chat-live | Chat session and MCP OAuth plumbing |
 | `/v1/commerce/` | commerce-bridge | E-commerce connectors |
-| `/mcp/` | mcp-server | Model Context Protocol endpoint and health |
+| `/mcp/` | mcp-server | Model Context Protocol — 57 tools for ChatGPT, Claude and any MCP client. See [MCP overview](/integrations/mcp) |
 | `/ugc/` | ugc-engine | **First-party only** — session JWT, rejects API keys |
 | `/stability/` | api-server | Advanced image editing tools |
 
@@ -138,6 +138,20 @@ internal proxy secret and reached only by the `code.python` node inside an Agent
 Engine workflow. There is no public endpoint that takes a `code` parameter, and
 `/sandbox/exec-python` does not exist. To have FOTOhub run your code, use a
 workflow node or rent an instance under `/compute/v1/*`.
+
+## Assistants reach all of this through MCP
+
+Everything above is also callable by an AI assistant, without you writing a
+client. The MCP server at `/mcp/` exposes 57 of these capabilities as tools,
+with OAuth 2.1 sign-in, and it is listed in the official MCP registry as
+`app.fotohub/fotohub`.
+
+- [FOTOhub in ChatGPT](/integrations/mcp-chatgpt) — published in the app directory
+- [FOTOhub in Claude](/integrations/mcp-claude) — added as a custom connector
+- [IDE setup](/integrations/mcp-ide-setup) — Cursor, VS Code, Cline
+
+Note the billing difference: an OAuth sign-in spends subscription credits before
+the USD wallet, while an `fh_live_*` key spends the wallet only.
 
 ## Things that are priced but have no endpoint
 

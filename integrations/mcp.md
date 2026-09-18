@@ -1,70 +1,82 @@
 # MCP (Model Context Protocol)
 
-Connect FOTOhub's 30 creative AI tools to any MCP-compatible client — Claude Desktop, Cursor, Windsurf, VS Code Copilot, and more.
+MCP is the open standard that lets an AI assistant call someone else's tools.
+FOTOhub runs an MCP server, so any MCP-capable client can generate and edit
+images, video, speech, music and 3D on our own GPUs — and be told exactly what
+each call cost.
 
-## Quick Start
+FOTOhub is listed in the official MCP registry as **`app.fotohub/fotohub`**.
 
-### Claude Desktop
+## Pick your client
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+| Client | How you connect | Guide |
+|---|---|---|
+| **ChatGPT** | Published in the app directory — search for FOTOhub and enable it | [FOTOhub in ChatGPT](/integrations/mcp-chatgpt) |
+| **Claude** (web, Desktop, Code) | Add a custom connector pointing at the server URL, then sign in | [FOTOhub in Claude](/integrations/mcp-claude) |
+| **Cursor, VS Code, Windsurf, other IDEs** | Config file with the server URL and an API key | [IDE setup](/integrations/mcp-ide-setup) |
+| **Your own client** | Streamable HTTP or local stdio | [Protocol reference](/api/mcp) |
+
+## The server
+
+```
+https://apis.fotohub.app/mcp/     primary
+https://mcp.fotohub.app/          dedicated hostname, same service
+```
+
+`GET https://apis.fotohub.app/mcp/health` is public and returns the live tool
+count — treat it as authoritative over any number written in these docs.
+
+**Transports:** Streamable HTTP for remote clients, stdio for a local process.
+
+## Two ways to authenticate, and they bill differently
+
+This is the single most important thing on this page.
+
+| Credential | How you get it | What it spends |
+|---|---|---|
+| **OAuth 2.1 sign-in** | Enabling the ChatGPT app, or adding the Claude connector — the client registers itself | **Subscription credits first**, then the prepaid USD wallet. One call can be split across both. |
+| **`fh_live_*` API key** | [Console → Keys](https://fotohub.app/console/keys), passed as `Authorization: Bearer` | The prepaid USD wallet only. |
+
+The OAuth path needs no pre-registration: the server supports dynamic client
+registration, PKCE (`S256`) and refresh tokens. Discovery lives at
+`/.well-known/oauth-authorization-server`, with scopes `mcp:read`, `mcp:write`,
+`mcp:image`, `mcp:video`, `mcp:audio`, `mcp:chat`, `mcp:training` and
+`mcp:billing`.
+
+## Inline results, where the host supports them
+
+The server publishes three UI resources — a **gallery** for anything that
+returns pictures, a **player** for video and audio, and a **price table** for
+model comparisons — so results render as components instead of link lists.
+Hosts that implement the MCP Apps UI extension draw them; every other client
+gets the text block, which is always sent alongside. Nothing is lost either way.
+
+## Skills ship with the server
+
+Four workflow skills (`fotohub-generation-basics`,
+`fotohub-product-photography`, `fotohub-short-video-ad`, `fotohub-brand-kit`)
+are served directly by the server over the MCP skills extension. A client that
+supports it imports them on connect, which is what makes an assistant run the
+cut-out → background → shadow order correctly instead of guessing.
+
+## Quick start with an API key
+
+If you are wiring up an IDE or your own client rather than ChatGPT or Claude,
+the shape is the same everywhere: the URL plus a Bearer token.
 
 ```json
 {
   "mcpServers": {
     "fotohub": {
       "url": "https://apis.fotohub.app/mcp/",
-      "headers": {
-        "Authorization": "Bearer fh_live_YOUR_API_KEY"
-      }
+      "headers": { "Authorization": "Bearer fh_live_YOUR_API_KEY" }
     }
   }
 }
 ```
 
-### Cursor / Windsurf
-
-Add to your MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "fotohub": {
-      "url": "https://apis.fotohub.app/mcp/",
-      "headers": {
-        "Authorization": "Bearer fh_live_YOUR_API_KEY"
-      }
-    }
-  }
-}
-```
-
-### VS Code (GitHub Copilot)
-
-In `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "fotohub": {
-      "type": "http",
-      "url": "https://apis.fotohub.app/mcp/",
-      "headers": {
-        "Authorization": "Bearer fh_live_YOUR_API_KEY"
-      }
-    }
-  }
-}
-```
-
-## Authentication
-
-All requests require a Bearer token with your FOTOhub API key:
-
-```
-Authorization: Bearer fh_live_YOUR_API_KEY
-```
-
-Get your API key at [fotohub.app/console](https://fotohub.app/console) → API Keys.
+VS Code's `.vscode/mcp.json` uses `servers` with `"type": "http"` instead of
+`mcpServers`. Per-IDE files are in the [IDE setup guide](/integrations/mcp-ide-setup).
 
 ## Available tools (57)
 
@@ -231,6 +243,27 @@ Pre-built prompt templates for common workflows:
 
 ## Billing
 
-Each generation tool call deducts pure USD from your prepaid wallet. Use `check_balance` to monitor usage. Pricing varies by model — use `list_models` to see current rates.
+What a call settles against depends on how you connected — see
+[the two credentials](#two-ways-to-authenticate-and-they-bill-differently)
+above. An OAuth sign-in spends subscription credits first and falls through to
+the prepaid USD wallet; a raw `fh_live_*` key spends the wallet only. A single
+call can be split across both.
 
-If wallet funds run out mid-request, you'll receive an error: `"insufficient_funds — top up at fotohub.app/console"`
+Every tool result states what was actually charged and what is left. Use that
+figure rather than an estimate.
+
+Quoting is free. `get_price`, `estimate_cost` and `compare_prices` take nothing
+from your account, so price a video before you render one. `check_balance`
+reports what you have.
+
+When both credits and wallet are exhausted the call fails with
+`insufficient_funds` **before** any GPU work starts, so an underfunded account
+costs you nothing but the round trip. Top up at
+[fotohub.app/console](https://fotohub.app/console).
+
+## Next
+
+[FOTOhub in ChatGPT](/integrations/mcp-chatgpt) ·
+[FOTOhub in Claude](/integrations/mcp-claude) ·
+[IDE setup](/integrations/mcp-ide-setup) ·
+[Protocol reference](/api/mcp)

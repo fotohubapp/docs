@@ -232,5 +232,19 @@ Pick the quickstart for what you are building:
 
 Then: [Authentication](/api/authentication) ·
 [Model catalogue](/api/models) ·
+[API surface map](/api/surface-map) ·
 [Webhooks](/guides/webhooks) ·
 [Python SDK](/sdk/python)
+
+## Or skip the code entirely
+
+If what you want is an assistant that can do this for you, FOTOhub runs an MCP
+server — 57 of these capabilities as tools, with sign-in instead of an API key.
+
+- [FOTOhub in ChatGPT](/integrations/mcp-chatgpt) — published in the app directory
+- [FOTOhub in Claude](/integrations/mcp-claude) — added as a custom connector
+- [IDE setup](/integrations/mcp-ide-setup) — Cursor, VS Code, Cline
+
+One thing to know before you switch: signing in through MCP spends your
+subscription credits first and only then the prepaid USD wallet, whereas the
+`fh_live_*` key you just used spends the wallet only.

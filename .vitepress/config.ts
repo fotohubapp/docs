@@ -149,8 +149,19 @@ export default defineConfig({
             { text: 'Shoper', link: '/integrations/shoper' },
             { text: 'n8n', link: '/integrations/n8n' },
             { text: 'Zapier & Make', link: '/integrations/zapier' },
-            { text: 'MCP (AI Assistants)', link: '/integrations/mcp' },
-            { text: 'MCP IDE Setup (Cursor, Claude, Cline)', link: '/integrations/mcp-ide-setup' },
+          ],
+        },
+        {
+          // MCP gets its own group: the three clients connect in genuinely
+          // different ways (directory app, custom connector, config file) and
+          // bill differently depending on whether you signed in or pasted a key.
+          text: 'AI assistants (MCP)',
+          items: [
+            { text: 'Overview', link: '/integrations/mcp' },
+            { text: 'FOTOhub in ChatGPT', link: '/integrations/mcp-chatgpt' },
+            { text: 'FOTOhub in Claude', link: '/integrations/mcp-claude' },
+            { text: 'IDE setup (Cursor, VS Code, Cline)', link: '/integrations/mcp-ide-setup' },
+            { text: 'Protocol reference', link: '/api/mcp' },
           ],
         },
       ],

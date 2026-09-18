@@ -77,12 +77,27 @@ curl -X POST https://apis.fotohub.app/v1/ai/generate/speech \
 
 | Field | Notes |
 |---|---|
-| `text` | Required. Max 3,000 characters. |
-| `model` | `google`, `ida-voice` or `grok`. |
-| `voice_id` | Optional, model-specific. |
+| `text` | Required. Length cap depends on the model — see below. |
+| `model` | `google`, `ida-voice-pro`, `ida-voice` or `grok`. |
+| `voice_id` | Optional, model-specific. Leave it out for the model's default; `grok` takes names like `eve`. |
 | `language` | e.g. `pl`, `en`, `de`. |
 | `speed` | Default `1.0`. |
 | `pitch` | Default `0`. |
+
+| Model | Character cap | Notes |
+|---|---|---|
+| `google` | 3,000 | The cheap, fast tier |
+| `grok` | 3,000 | 26 multilingual voices |
+| `ida-voice-pro` | **1,200** | The natural-sounding tier |
+| `ida-voice` | **1,200** | Self-hosted on our own GPU |
+
+`mars-flash`, `mars-pro`, `chatterbox-tts` and the legacy `elevenlabs` alias are
+also accepted and map onto the same engines. Anything else is rejected with a
+`400` naming the supported set.
+
+Over-length text is rejected **before** the wallet is touched, and the error
+says which cap you hit and that up to 3,000 characters is available on the
+`mars-pro` / `mars-flash` voices — so a too-long string costs you nothing.
 
 Billed per 1,000 characters of **input text**, not per request — the same
 200-character string costs the same whether the audio is fast or slow.

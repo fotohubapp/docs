@@ -2,12 +2,17 @@
 
 FOTOhub exposes a fully-compliant MCP (Model Context Protocol) server that lets AI assistants and agents call creative AI tools directly. This page documents the server endpoint, authentication, protocol details, and available capabilities.
 
-::: warning Three tools on this page are not registered in production
+::: warning Three tools are not registered in production, two more are registered but inert
 The registry defines 60 tools; production serves **57**. `generate_shorts`,
 `create_training_job` and `get_training_status` are gated on services that are
 not deployed (`SHORTS_ENGINE_URL` and `TRAINING_ENGINE_URL`), so they do not
 appear in `tools/list` and cannot be called today. They are documented below
 because the gate is configuration, not removal — but do not build against them.
+
+Separately, `voice_clone` and `separate_stems` **are** registered and answer
+`tools/call` successfully, but they call no backend — they always return a
+fixed "not yet available via MCP" message. So 55 of the 57 listed tools
+actually do something.
 
 `GET https://apis.fotohub.app/mcp/health` returns the live count and is
 authoritative over any number written on this page.
@@ -35,17 +40,43 @@ Returns `200 OK` with `{"status": "ok"}` when the server is operational.
 
 ## Authentication
 
-All MCP requests require a Bearer token in the `Authorization` header:
+There are two ways to authenticate, and they bill differently (see [Billing](#billing)).
+
+### API Key
+
+All MCP requests can use a Bearer token in the `Authorization` header:
 
 ```
 Authorization: Bearer fh_live_YOUR_API_KEY
 ```
 
-Get your API key at [fotohub.app/settings/api](https://fotohub.app/settings/api).
+Get your API key at [fotohub.app/settings/api](https://fotohub.app/settings/api). There is no separate sandbox/test key prefix — `fh_live_*` is the only kind issued.
 
 ::: warning
 MCP connections inherit the permissions of the API key. Use scoped keys for production integrations.
 :::
+
+### OAuth 2.1
+
+The server also supports OAuth 2.1 with PKCE and dynamic client registration, used by clients such as ChatGPT and Claude's own "Sign in" connector flow — you do not need to pre-generate an API key for this path. Discovery documents:
+
+```
+GET https://apis.fotohub.app/.well-known/oauth-authorization-server
+GET https://apis.fotohub.app/.well-known/oauth-protected-resource
+```
+
+| Field | Value |
+|-------|-------|
+| Issuer | `https://apis.fotohub.app/mcp` |
+| Authorization endpoint | `https://apis.fotohub.app/mcp/oauth/authorize` |
+| Token endpoint | `https://apis.fotohub.app/mcp/oauth/token` |
+| Registration endpoint | `https://apis.fotohub.app/mcp/oauth/register` (dynamic client registration) |
+| Grant types | `authorization_code`, `refresh_token` |
+| PKCE | `S256` |
+| Token auth methods | `client_secret_post`, `none` |
+| Scopes | `mcp:read`, `mcp:write`, `mcp:image`, `mcp:video`, `mcp:audio`, `mcp:chat`, `mcp:training`, `mcp:billing` |
+
+A key minted through this flow carries `metadata.billing_mode = "credits_first"` and spends the account's subscription credits before falling back to the prepaid USD wallet — unlike a raw `fh_live_*` key, which always spends the USD wallet only.
 
 ---
 
@@ -80,6 +111,8 @@ All requests follow the JSON-RPC 2.0 format:
 
 ### Response Format
 
+Tool results are **human-readable text**, not a JSON payload embedded in the text block — a heading, each asset URL on its own line, then a cost line:
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -88,7 +121,7 @@ All requests follow the JSON-RPC 2.0 format:
     "content": [
       {
         "type": "text",
-        "text": "{\"images\": [\"https://s1.fotohub.app/storage/v1/object/public/...\"], \"billing\": {\"usd_charged\": 0.2250}}"
+        "text": "Generated with seedream-5-0-260128:\nhttps://s1.fotohub.app/storage/v1/object/public/...\nCost: $0.0315 · wallet $6.51 left"
       }
     ]
   }
@@ -113,20 +146,38 @@ The FOTOhub MCP server advertises the following capabilities:
 
 ---
 
-## Tools (30)
+## Tools (57 active, 60 registered)
 
 ### Image Tools
 
 | Tool Name | Description | Parameters |
 |-----------|-------------|------------|
-| `generate_image` | Generate image from text prompt | `prompt`, `model`, `aspect_ratio`, `style`, `negative_prompt` |
-| `edit_image` | Edit an image (inpaint, outpaint, background swap) | `image_url`, `prompt`, `mask_url`, `operation` |
+| `generate_image` | Generate image from text prompt | `prompt`, `model`, `width`, `height`, `negative_prompt`, `num_images`, `aspect_ratio` |
+| `edit_image` | Edit an image (edit, inpaint, outpaint, style, background) | `image_url`, `prompt`, `mode`, `model`, `mask_url` |
 | `upscale_image` | AI super-resolution (2x or 4x) | `image_url`, `scale` |
-| `remove_background` | Remove background from an image | `image_url`, `format` |
-| `enhance_prompt` | AI-enhance a prompt for better generation results | `prompt`, `model`, `style` |
+| `remove_background` | Remove background from an image | `image_url` |
+| `enhance_prompt` | AI-enhance a prompt for better generation results | `prompt`, `style` |
 | `analyze_image` | Analyze image (tags, colors, NSFW, OCR) | `image_url`, `features` |
-| `style_transfer` | Apply artistic style to an image | `image_url`, `style`, `strength` |
+| `style_transfer` | Apply artistic style to an image | `image_url`, `style_prompt`, `strength` |
 | `inpaint_image` | Remove or replace objects in an image | `image_url`, `mask_url`, `prompt` |
+
+### Editing Tools
+
+Image/video post-processing — background follow-ups, restoration, and video finishing.
+
+| Tool Name | Description | Parameters |
+|-----------|-------------|------------|
+| `replace_background` | Remove a background and replace it with a color/gradient/image | `image_url`, `background`, `background_type`, `feather`, `output_format` |
+| `blur_background` | Blur the background, keep the subject sharp (portrait mode) | `image_url`, `blur_radius`, `feather`, `output_format` |
+| `add_shadow` | Add a realistic drop shadow to a cut-out subject | `image_url`, `shadow_type`, `shadow_opacity`, `shadow_offset_x`, `shadow_offset_y`, `shadow_blur`, `shadow_color`, `output_format` |
+| `enhance_image` | One-pass AI auto-enhancement (exposure, contrast, sharpness, color) | `image_url`, `mode`, `strength`, `output_format` |
+| `denoise_image` | Remove grain/noise from a photo | `image_url`, `strength`, `output_format` |
+| `restore_faces` | Restore blurry/degraded faces (GFPGAN) | `image_url`, `upscale`, `output_format` |
+| `depth_map` | Generate a monocular depth map from an image | `image_url`, `output_type`, `output_format` |
+| `upscale_video` | Upscale a video's resolution | `video_url`, `scale` |
+| `transcode_video` | Convert container/codec/resolution/quality | `video_url`, `output_format`, `codec`, `quality`, `resolution` |
+| `add_watermark` | Burn a text watermark into a video | `video_url`, `text`, `position`, `opacity`, `font_size`, `color` |
+| `change_video_speed` | Slow-motion or time-lapse retiming | `video_url`, `speed`, `interpolation` |
 
 ### Video Tools
 
@@ -136,7 +187,7 @@ The FOTOhub MCP server advertises the following capabilities:
 | `image_to_video` | Animate a still image into video | `image_url`, `prompt`, `duration` |
 | `extend_video` | Extend an existing video | `video_url`, `prompt`, `seconds` |
 | `generate_story` | Create multi-scene film with voiceover | `scenes`, `voice`, `music` |
-| `generate_shorts` ⚠️ | Auto-cut long video into social shorts — **not registered in production** | `video_url`, `count`, `style` |
+| `generate_shorts` ⚠️ | Auto-cut long video into social shorts — **not registered in production** | `video_url`, `target_count`, `style`, `add_captions` |
 | `get_job_status` | Check status of async jobs | `job_id` |
 | `add_subtitles` | Add subtitles to a video | `video_url`, `language`, `style` |
 
@@ -144,28 +195,67 @@ The FOTOhub MCP server advertises the following capabilities:
 
 | Tool Name | Description | Parameters |
 |-----------|-------------|------------|
-| `text_to_speech` | Convert text to speech | `text`, `voice`, `language`, `speech_model` |
-| `generate_music` | Generate music from description (async) | `prompt`, `duration`, `genre` |
+| `text_to_speech` | Convert text to speech | `text`, `voice`, `model`, `language`, `speed` |
+| `generate_music` | Generate music from description (synchronous) | `prompt`, `duration`, `model`, `instrumental`, `genre` |
 | `generate_sfx` | Generate sound effects | `prompt`, `duration` |
 | `transcribe_audio` | Speech-to-text transcription | `audio_url`, `language` |
-| `voice_clone` | Clone a voice from audio sample | `audio_url`, `name` |
-| `separate_stems` | Separate audio into tracks | `audio_url`, `stems` |
+| `voice_clone` ⚠️ | **Registered but inert** — returns a fixed "not yet available via MCP" message, calls no backend | `audio_url`, `name` |
+| `separate_stems` ⚠️ | **Registered but inert** — returns a fixed "not yet available via MCP" message, calls no backend | `audio_url`, `stems` |
+
+### 3D Tools
+
+| Tool Name | Description | Parameters |
+|-----------|-------------|------------|
+| `generate_3d_from_text` | Generate a 3D model from a text description | `prompt`, `quality`, `output_format` |
+| `generate_3d_from_image` | Generate a 3D model from a single image | `image_base64`, `model`, `quality`, `output_format` |
+| `list_3d_models` | List available 3D models with prices | (none) |
+| `get_3d_result` | Fetch a finished 3D generation by job id | `job_id` |
+
+### Studio Tools (UGC Ads)
+
+| Tool Name | Description | Parameters |
+|-----------|-------------|------------|
+| `create_ugc_project` | Create a new UGC ad project (free) | `title`, `brief` |
+| `list_ugc_projects` | List the caller's UGC ad projects | (none) |
+| `estimate_ugc_cost` | Price a UGC blueprint before rendering (free) | `document` |
+| `set_ugc_blueprint` | Save the scene-script blueprint a render is made from (free) | `project_id`, `blueprint_json` |
+| `render_ugc_video` | Start rendering a UGC ad video (async) | `project_id`, `variant_label`, `idempotency_key` |
+| `get_ugc_job` | Check a UGC render's progress and running cost | `job_id` |
 
 ### Chat Tools
 
 | Tool Name | Description | Parameters |
 |-----------|-------------|------------|
-| `chat_completion` | LLM chat (Claude, GPT, Gemini) | `messages`, `model`, `temperature` |
-| `translate_text` | Translate text between languages | `text`, `source_lang`, `target_lang` |
+| `chat_completion` | LLM chat completion (Claude- and Nova-class models only) | `prompt`, `model`, `system_prompt`, `max_tokens`, `temperature` |
+| `translate_text` | Translate text between languages | `text`, `target_language`, `source_language` |
 | `gabriel_route` | Smart intent classifier for prompt routing | `prompt` |
+
+### Pricing Tools
+
+| Tool Name | Description | Parameters |
+|-----------|-------------|------------|
+| `get_price` | Look up the exact USD price for one model | `model` |
+| `estimate_cost` | Estimate the USD cost of a generation before calling it | `model`, `count`, `seconds`, `characters`, `minutes`, `resolution`, `quality`, `tokens_in`, `tokens_out`, `with_audio`, `video_input` |
+| `compare_prices` | Compare USD prices across every model in a category | `category` |
+
+### Storage Tools
+
+| Tool Name | Description | Parameters |
+|-----------|-------------|------------|
+| `list_buckets` | List your FOTOhub-managed S3 storage buckets | (none) |
+| `list_files` | List files/folders inside a storage bucket | `bucket`, `prefix`, `max_keys` |
+| `save_to_storage` | Copy a (short-lived) generation link into your own bucket | `url`, `bucket`, `key` |
+| `get_download_link` | Get a temporary signed download URL for a stored file | `bucket`, `key`, `expires_in` |
 
 ### Utility Tools
 
 | Tool Name | Description | Parameters |
 |-----------|-------------|------------|
-| `check_balance` | Check your credit balance | (none) |
-| `list_models` | List available AI models with pricing | `category` |
-| `list_generations` | View generation history | `limit`, `offset` |
+| `check_balance` | Check your prepaid USD wallet balance and month-to-date spend | (none) |
+| `list_models` | List available AI models with pricing (`image`\|`video`\|`audio`\|`text`) | `category` |
+| `list_generations` | List your most recent generated **images** (max 12) | `limit` |
+| `get_usage_summary` | Summarize the last 30 days of API call volume | (none) |
+| `get_transactions` | List recent USD wallet transactions (ledger) | `limit` |
 | `search_photos` | Semantic photo search in your library | `query`, `limit` |
 
 ### Training Tools
@@ -190,7 +280,7 @@ Generate an AI image from a text description.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | `string` | Yes | — | Text description of the image to generate |
-| `model` | `string` | No | `seedream-5-0-260128` | Model ID. Options: `seedream-5-0-260128`, `flux-2-pro`, `imagen-4-standard`, `grok-imagine-image-pro`, `dall-e-3-standard`, `kling-v3-omni`, `minimax-image-01` |
+| `model` | `string` | No | `seedream-5-0-260128` | Model ID. Options: `seedream-5-0-260128`, `flux-2-pro`, `imagen-4-standard`, `grok-imagine-image-quality`, `gpt-image-1`, `kling-v3-omni`, `minimax-image-01`. `dall-e-3` is retired — the route rejects it with a 400 pointing at `gpt-image-1`. |
 | `width` | `integer` | No | `1024` | Output width in pixels |
 | `height` | `integer` | No | `1024` | Output height in pixels |
 | `negative_prompt` | `string` | No | `""` | What to avoid in the image |
@@ -407,6 +497,177 @@ Replace a masked area in an image with AI-generated content.
 
 ---
 
+### Editing Tools (11)
+
+Image/video post-processing — the finishing work done right after a generation, or on a photo/clip the user already has. Every route here is billed in USD from the same prepaid wallet as generation.
+
+#### `replace_background`
+
+Remove an image's background and replace it with a new one (color, gradient, or another image).
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | `string` | Yes | — | URL of the source image |
+| `background` | `string` | Yes | — | Hex color (`#ffffff`), CSS gradient, or an image URL. AI-generated (free-text) backgrounds are NOT supported — passing free text fails with 501 before anything is charged. |
+| `background_type` | `string` | No | `auto` | `color`, `gradient`, `image`, or `auto` (detected from `background`) |
+| `feather` | `integer` | No | `2` | 0-20, edge softness where the subject meets the new background |
+| `output_format` | `string` | No | `png` | `png`, `jpeg`, or `webp` |
+
+**Returns:** The composited image plus the cut-out transparent PNG.
+
+---
+
+#### `blur_background`
+
+Blur an image's background while keeping the subject sharp (bokeh / portrait mode).
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | `string` | Yes | — | URL of the source image |
+| `blur_radius` | `integer` | No | `15` | 1-50, Gaussian blur strength |
+| `feather` | `integer` | No | `2` | 0-20, edge softness at the subject boundary |
+| `output_format` | `string` | No | `jpeg` | `png`, `jpeg`, or `webp` |
+
+**Returns:** The composited image.
+
+---
+
+#### `add_shadow`
+
+Add a realistic drop shadow to a cut-out subject. Requires a transparent PNG as input — run `remove_background` first if needed.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | `string` | Yes | — | URL of the (transparent) source image |
+| `shadow_type` | `string` | No | `natural` | `natural` (AI-detected lighting), `drop` (simple offset), or `contact` (flat, along the bottom edge) |
+| `shadow_opacity` | `float` | No | `0.5` | 0-1 |
+| `shadow_offset_x` | `integer` | No | `0` | Pixels, negative moves left |
+| `shadow_offset_y` | `integer` | No | `10` | Pixels, negative moves up |
+| `shadow_blur` | `integer` | No | `10` | 0-50 |
+| `shadow_color` | `string` | No | `#000000` | Hex color |
+| `output_format` | `string` | No | `png` | `png`/`webp` keep transparency; `jpeg` mattes onto white |
+
+**Returns:** The image with shadow applied.
+
+---
+
+#### `enhance_image`
+
+AI auto-enhancement — fixes exposure, contrast, sharpness and color in one pass. Good default for "make this photo look better" with no specific problem named.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | `string` | Yes | — | URL of the source image |
+| `mode` | `string` | No | `auto` | Accepted for forward compatibility — the current deployment runs a single fixed enhancement pass regardless of value |
+| `strength` | `float` | No | `1.0` | Accepted for forward compatibility, same caveat as `mode` |
+| `output_format` | `string` | No | `jpeg` | `jpeg`, `png`, or `webp` |
+
+**Returns:** The enhanced image.
+
+---
+
+#### `denoise_image`
+
+Remove grain/noise from a photo (e.g. a low-light or high-ISO shot).
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | `string` | Yes | — | URL of the source image |
+| `strength` | `float` | No | `0.5` | 0.1 (light) to 1.0 (aggressive) — higher values also soften fine detail |
+| `output_format` | `string` | No | `jpeg` | `jpeg`, `png`, or `webp` |
+
+**Returns:** The denoised image.
+
+---
+
+#### `restore_faces`
+
+Restore blurry, low-resolution, or degraded faces in a photo (GFPGAN). Faces are detected automatically across the whole image.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | `string` | Yes | — | URL of the source image |
+| `upscale` | `integer` | No | `1` | `1` (no resize), `2`, or `4` — upscales the whole image while restoring faces |
+| `output_format` | `string` | No | `png` | `jpeg`, `png`, or `webp` |
+
+**Returns:** The restored image.
+
+---
+
+#### `depth_map`
+
+Generate a monocular depth map from a single image (Depth Anything V2). Useful for 3D/parallax effects, relighting, or as a mask input for other edits.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | `string` | Yes | — | URL of the source image |
+| `output_type` | `string` | No | `grayscale` | `grayscale` (near=dark/far=light) or `colored` (viridis colormap). Raw 16-bit metric depth is not supported. |
+| `output_format` | `string` | No | `png` | `png` or `webp` |
+
+**Returns:** The depth map as an image.
+
+---
+
+#### `upscale_video`
+
+Upscale a video's resolution using AI super-resolution. Slow — large/long videos can take several minutes; the call blocks until the render finishes.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `video_url` | `string` | Yes | — | URL of the source video |
+| `scale` | `integer` | No | `2` | `2`, `3`, or `4` |
+
+**Returns:** A link to the upscaled video (no inline preview — MCP image content blocks only carry pictures).
+
+---
+
+#### `transcode_video`
+
+Convert a video to a different container, codec, resolution, or quality.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `video_url` | `string` | Yes | — | URL of the source video |
+| `output_format` | `string` | No | `mp4` | `mp4`, `webm`, `mov`, `gif`, or `prores` |
+| `codec` | `string` | No | *(format default)* | `h264`, `h265`, `vp9`, or `prores` |
+| `quality` | `string` | No | `high` | `draft`, `standard`, `high`, or `ultra` — FFmpeg presets; an unlisted value is rejected before anything is charged |
+| `resolution` | `string` | No | *(source)* | `480p`, `720p`, `1080p`, `1440p`, or `4K` |
+
+**Returns:** A link to the converted video.
+
+---
+
+#### `add_watermark`
+
+Burn a text watermark into a video. Text only — image/logo watermarks are not supported by this endpoint.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `video_url` | `string` | Yes | — | URL of the source video |
+| `text` | `string` | No | `FOTOhub` | Watermark text |
+| `position` | `string` | No | `bottom_right` | `top_left`, `top_right`, `bottom_left`, `bottom_right`, `center`, or `tiled` |
+| `opacity` | `float` | No | `0.3` | 0.05-1.0 |
+| `font_size` | `integer` | No | `24` | 10-120pt |
+| `color` | `string` | No | `white` | `white`, `black`, `red`, `yellow`, or `gray` |
+
+**Returns:** A link to the watermarked video.
+
+---
+
+#### `change_video_speed`
+
+Change a video's playback speed — slow-motion or time-lapse.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `video_url` | `string` | Yes | — | URL of the source video |
+| `speed` | `float` | Yes | — | 0.1-10.0. Below 1.0 slows down (0.25 = 4x slow-motion), above 1.0 speeds up |
+| `interpolation` | `string` | No | `blend` | `none` (fastest, choppiest), `blend` (balanced), or `mci` (motion-compensated, smoothest but slowest) |
+
+**Returns:** A link to the retimed video.
+
+---
+
 ### Video Tools (7)
 
 #### `generate_video`
@@ -416,7 +677,7 @@ Generate a video from text (or animate an image with `image_url`). This is an **
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | `string` | Yes | — | Text description of the video |
-| `model` | `string` | No | `veo-3.1-generate-001` | See `GET /v1/models?category=video` for the full list. Examples: `veo-3.1-generate-001`, `hailuo-o2`, `kling-v3`, `sora-2`, `seedance-2-0-pro`, `wan2.2-t2v-plus`, `gemini-omni-flash`, `grok-imagine-video-1.5` |
+| `model` | `string` | No | `veo-3.1-generate-001` | See `GET /v1/models?category=video` for the full list, or trigger the route's own 400 by passing an unknown id (it names every supported id). Examples: `veo-3.1-generate-001`, `veo-3.1-fast-generate-001`, `sora-2`, `kling-v2-1-master`, `hailuo-2.3`, `seedance-2-0-mini`, `wan2.2-t2v-plus` |
 | `duration` | `integer` | No | `5` | Duration in seconds: `5` or `10` (model-dependent) |
 | `aspect_ratio` | `string` | No | `16:9` | Aspect ratio: `16:9`, `9:16`, `1:1` |
 | `image_url` | `string` | No | `""` | Source image for image-to-video generation |
@@ -531,7 +792,7 @@ Animate a still image into a video. **Async** — returns `job_id`.
 |-----------|------|----------|---------|-------------|
 | `image_url` | `string` | Yes | — | URL of the source image to animate |
 | `prompt` | `string` | No | `""` | Motion description (what should happen in the video) |
-| `model` | `string` | No | `kling` | Best i2v models: `kling`, `seedance`, `hailuo` |
+| `model` | `string` | No | `kling-v2-1-master` | Best i2v models: `kling-v2-1-master`, `seedance-2-0-mini`, `hailuo-2.3` |
 | `duration` | `integer` | No | `5` | Duration in seconds |
 
 **Returns:** Job ID and status.
@@ -620,9 +881,9 @@ Convert text to speech using AI voice synthesis.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `text` | `string` | Yes | — | Text to convert to speech |
-| `voice` | `string` | No | `alloy` | Voice ID. For gpt-audio: `alloy`, `nova`, `shimmer`. Varies by model. |
-| `model` | `string` | No | `gpt-audio` | TTS model: `gpt-audio`, `elevenlabs`, `google-tts` |
+| `text` | `string` | Yes | — | Text to convert to speech. Max 3000 characters, or 1200 for the `ida-voice` models. |
+| `voice` | `string` | No | *(model default)* | Leave empty for the model's default. `grok` takes names like `eve`. |
+| `model` | `string` | No | `google` | `google` (fast), `ida-voice-pro` (natural), `ida-voice` (cloning), `grok` (26 multilingual voices). Anything else is rejected with 400. |
 | `language` | `string` | No | `en` | Language code |
 | `speed` | `float` | No | `1.0` | Speech speed multiplier |
 
@@ -643,8 +904,8 @@ resp = httpx.post(
             "name": "text_to_speech",
             "arguments": {
                 "text": "Welcome to FOTOhub, where creativity meets AI.",
-                "voice": "nova",
-                "model": "gpt-audio",
+                "voice": "eve",
+                "model": "grok",
                 "language": "en"
             }
         }
@@ -667,8 +928,8 @@ const resp = await fetch("https://apis.fotohub.app/mcp/", {
       name: "text_to_speech",
       arguments: {
         text: "Welcome to FOTOhub, where creativity meets AI.",
-        voice: "nova",
-        model: "gpt-audio",
+        voice: "eve",
+        model: "grok",
         language: "en"
       }
     }
@@ -686,8 +947,8 @@ body, _ := json.Marshal(map[string]any{
         "name": "text_to_speech",
         "arguments": map[string]any{
             "text":     "Welcome to FOTOhub, where creativity meets AI.",
-            "voice":    "nova",
-            "model":    "gpt-audio",
+            "voice":    "eve",
+            "model":    "grok",
             "language": "en",
         },
     },
@@ -714,8 +975,8 @@ curl -X POST https://apis.fotohub.app/mcp/ \
       "name": "text_to_speech",
       "arguments": {
         "text": "Welcome to FOTOhub, where creativity meets AI.",
-        "voice": "nova",
-        "model": "gpt-audio",
+        "voice": "eve",
+        "model": "grok",
         "language": "en"
       }
     }
@@ -732,11 +993,12 @@ Generate AI music from a text description. **Async** — returns `job_id`.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | `string` | Yes | — | Description of the music (genre, mood, instruments) |
-| `duration` | `integer` | No | `30` | Duration in seconds: 10-120 |
-| `model` | `string` | No | `music-minimax` | Model: `music-minimax`, `music-elevenlabs` |
+| `duration` | `integer` | No | `30` | Duration in seconds: 10-300 |
+| `model` | `string` | No | `minimax` | `minimax` or `elevenlabs` |
 | `instrumental` | `boolean` | No | `false` | If `true`, generate without vocals |
+| `genre` | `string` | No | `""` | **Required** when `model=elevenlabs` |
 
-**Returns:** Job ID (async) or audio URL (if model returns immediately).
+**Returns:** The finished audio URL — this call is **synchronous**, not async (use `estimate_cost` beforehand to check the price).
 
 ---
 
@@ -747,7 +1009,7 @@ Generate a sound effect from a text description.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | `string` | Yes | — | Description of the sound (e.g. "thunder crack", "footsteps on gravel", "laser beam") |
-| `duration` | `float` | No | `3.0` | Duration in seconds: 0.5-10 |
+| `duration` | `float` | No | `3.0` | Duration in seconds, clamped up to 30 |
 
 **Returns:** Audio URL.
 
@@ -766,29 +1028,166 @@ Transcribe speech to text from an audio or video file. Returns the full transcri
 
 ---
 
-#### `voice_clone`
+#### `voice_clone` ⚠️ {#voice-clone}
 
-Clone a voice from an audio sample (5-30 seconds of clear speech). **Async** — returns `job_id`. After training, the voice can be used in `text_to_speech`.
+::: danger Registered but inert
+This tool is present in `tools/list` and returns HTTP 200, but it calls no backend. The old route it targeted (`POST /voice_clone/train` on the chatterbox proxy) never existed and always 404'd, so this call never worked. The real cloning routes have no billed public API endpoint fronting them yet. It always returns the fixed string *"Voice cloning is not yet available via MCP. Use the FOTOhub dashboard's Voice Cloning page instead."* — nothing is charged.
+:::
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `audio_url` | `string` | Yes | — | URL of the voice sample (5-30s of clear speech) |
-| `name` | `string` | No | `custom_voice` | Name for the cloned voice |
+| `audio_url` | `string` | Yes | — | URL of the voice sample (accepted but unused) |
+| `name` | `string` | No | `custom_voice` | Name for the cloned voice (accepted but unused) |
 
-**Returns:** Job ID and voice name.
+**Returns:** A fixed "not yet available" message. No job is created.
 
 ---
 
-#### `separate_stems`
+#### `separate_stems` ⚠️ {#separate-stems}
 
-Separate an audio track into individual stems using Demucs AI. **Async**.
+::: danger Registered but inert
+This tool is present in `tools/list` and returns HTTP 200, but it calls no backend. The underlying route (music-server `/stems`) is real but only sees an internal proxy principal, never a real `user_id`, so it has no billed public API endpoint fronting it. It always returns the fixed string *"Stem separation is not yet available via MCP. Use the FOTOhub dashboard's Audio Stems tool instead."* — nothing is charged.
+:::
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `audio_url` | `string` | Yes | — | URL of the audio file |
-| `stems` | `string` | No | `vocals,drums,bass,other` | Comma-separated stems to extract |
+| `audio_url` | `string` | Yes | — | URL of the audio file (accepted but unused) |
+| `stems` | `string` | No | `vocals,drums,bass,other` | Comma-separated stems to extract (accepted but unused) |
 
-**Returns:** Job ID (async), or URLs for each separated stem.
+**Returns:** A fixed "not yet available" message. No job is created.
+
+---
+
+### 3D Tools (4)
+
+3D generation is proxied through the `ai-generate-3d` edge function, billed in USD from the same prepaid wallet as image/video generation. Model ids use the public `fh-*` names.
+
+#### `generate_3d_from_text`
+
+Generate a 3D model from a text description. Best for simple, recognisable objects — a chair, a mug, a rocket. For anything detailed, generate an image first and use `generate_3d_from_image` instead — image-conditioned reconstruction is markedly better than text-to-3D at this size.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `prompt` | `string` | Yes | — | Text description of the 3D object |
+| `quality` | `string` | No | `standard` | `draft`, `standard`, or `high` |
+| `output_format` | `string` | No | `glb` | `glb`, `obj`, `stl`, or `usdz` |
+
+**Returns:** A download link plus the credits/USD charged.
+
+---
+
+#### `generate_3d_from_image`
+
+Generate a 3D model from a single image. Pass the image as base64 **without** a `data:` prefix.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_base64` | `string` | Yes | — | Source image, base64-encoded, no `data:` prefix |
+| `model` | `string` | No | `fh-lite-3d` | `fh-lite-3d` (fast, ~3s, untextured geometry) or `fh-pro-3d` (high detail + PBR textures, ~2-3min, requires a Professional plan) |
+| `quality` | `string` | No | `standard` | `draft`, `standard`, or `high`. Maps to real engine settings (diffusion steps, mesh resolution) on `fh-pro-3d`; on `fh-lite-3d` it affects post-processing only. |
+| `output_format` | `string` | No | `glb` | `glb`, `obj`, `stl`, or `usdz` |
+
+**Returns:** A download link plus the credits/USD charged.
+
+---
+
+#### `list_3d_models`
+
+List the available 3D models with prices and what each one is for. Call before generating if unsure which model fits — a model can be temporarily offline for maintenance.
+
+*(No parameters.)*
+
+**Returns:** Each model's id, description, USD price, and speed.
+
+---
+
+#### `get_3d_result`
+
+Fetch a finished 3D generation by its job id, with a fresh download link. Links expire — re-fetch rather than reusing an old URL.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `job_id` | `string` | Yes | — | The job id from `generate_3d_from_text` / `generate_3d_from_image` |
+
+**Returns:** Status and a fresh download link.
+
+---
+
+### Studio Tools — UGC Ads (6)
+
+UGC (user-generated-content-style) ads are multi-scene product videos with an AI avatar speaking a script, proxied at `/v1/ugc/*` to ugc-engine. It is **not** a single generate-and-done call — it is a 4-stage pipeline: **project** (`create_ugc_project`) → **blueprint** (`set_ugc_blueprint`, the scene script — required before rendering) → **render** (`render_ugc_video`, starts an async job, gates on wallet balance) → **job** (`get_ugc_job`, poll for progress — the wallet is charged scene-by-scene as each one finishes, not upfront). `list_ugc_projects` and `estimate_ugc_cost` are read-only/pricing-only and fit anywhere in that order. UGC never touches subscription credits through this API — it settles from the same prepaid USD wallet as every other route.
+
+#### `create_ugc_project`
+
+Create a new UGC ad project. Free — nothing is generated yet. This is stage 1 of 4; the returned project id is needed for every later step.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `title` | `string` | No | `Untitled UGC` | A short name for the project |
+| `brief` | `object` | No | `{}` | Optional free-form dict describing the product/campaign |
+
+**Returns:** The new project's id, title, and status.
+
+---
+
+#### `list_ugc_projects`
+
+List the caller's UGC ad projects, newest first.
+
+*(No parameters.)*
+
+**Returns:** Id, title, status, and creation time for each project.
+
+---
+
+#### `estimate_ugc_cost`
+
+Price a UGC blueprint before rendering it. Charges nothing.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `document` | `object` | Yes | — | The full blueprint JSON (scenes, avatar, script lines, product shots, timing) |
+
+**Returns:** Estimated video seconds / spoken lines and the price in USD. The price can be partial — token-metered voice providers cannot be quoted up front and are priced once a scene is actually delivered.
+
+---
+
+#### `set_ugc_blueprint`
+
+Save the blueprint (shooting document) a UGC render is made from. This is the step between creating a project and rendering it — without it, `render_ugc_video` always fails with 409. Free.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `project_id` | `string` | Yes | — | From `create_ugc_project` |
+| `blueprint_json` | `string` | Yes | — | The blueprint document as a JSON object string (actor, scenes, script, product shots) |
+
+**Returns:** The saved version and, when the engine reports one, a price estimate.
+
+---
+
+#### `render_ugc_video`
+
+Start rendering a UGC ad video from a project's saved blueprint. **Async.** Requires a blueprint to already be attached (409 otherwise). Refuses to start (402, nothing charged) if the wallet cannot cover the blueprint's estimated cost.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `project_id` | `string` | Yes | — | From `create_ugc_project` / `list_ugc_projects` |
+| `variant_label` | `string` | No | — | Label if rendering multiple variants of the same project |
+| `idempotency_key` | `string` | No | — | A repeated call with the same key returns the already-started render instead of starting a second one |
+
+**Returns:** The job id and the quoted (not-yet-charged) price. Nothing is charged by this call itself — charges happen scene-by-scene as the render progresses.
+
+---
+
+#### `get_ugc_job`
+
+Check a UGC render's progress and what it has cost so far.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `job_id` | `string` | Yes | — | The id returned by `render_ugc_video` |
+
+**Returns:** Overall status, the running USD cost charged so far, and each scene's own status.
 
 ---
 
@@ -796,17 +1195,17 @@ Separate an audio track into individual stems using Demucs AI. **Async**.
 
 #### `chat_completion`
 
-Get an AI chat completion from Claude, GPT, Gemini, or DeepSeek.
+Get an AI chat completion from a Claude- or Nova-class model. GPT, Gemini, and DeepSeek model ids are **not** accepted on this route — passing one is rejected with 400.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` | `string` | Yes | — | The user message |
-| `model` | `string` | No | `claude-haiku-4-5` | Model: `claude-haiku-4-5`, `claude-sonnet-4`, `gpt-4o`, `gpt-4o-mini`, `gemini-2.5-flash`, `gemini-2.5-pro`, `deepseek-r1`, `nova-pro` |
+| `model` | `string` | No | `claude-haiku-4.5` | `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-sonnet-4`, `claude-haiku-4.5`, `nova-pro`, `nova-lite`, `nova-micro`, `nova-premier`, `nova-2-lite` |
 | `system_prompt` | `string` | No | `""` | System prompt for context |
 | `max_tokens` | `integer` | No | `2048` | Maximum tokens to generate |
 | `temperature` | `float` | No | `0.7` | Sampling temperature: 0.0-2.0 |
 
-**Returns:** Generated text, token usage, and credits cost.
+**Returns:** Generated text, token usage, and the USD cost charged to the prepaid wallet.
 
 ::: code-group
 ```python [Python]
@@ -823,7 +1222,7 @@ resp = httpx.post(
             "name": "chat_completion",
             "arguments": {
                 "prompt": "Explain quantum computing in 3 sentences",
-                "model": "claude-haiku-4-5",
+                "model": "claude-haiku-4.5",
                 "temperature": 0.5
             }
         }
@@ -846,7 +1245,7 @@ const resp = await fetch("https://apis.fotohub.app/mcp/", {
       name: "chat_completion",
       arguments: {
         prompt: "Explain quantum computing in 3 sentences",
-        model: "claude-haiku-4-5",
+        model: "claude-haiku-4.5",
         temperature: 0.5
       }
     }
@@ -864,7 +1263,7 @@ body, _ := json.Marshal(map[string]any{
         "name": "chat_completion",
         "arguments": map[string]any{
             "prompt":      "Explain quantum computing in 3 sentences",
-            "model":       "claude-haiku-4-5",
+            "model":       "claude-haiku-4.5",
             "temperature": 0.5,
         },
     },
@@ -891,7 +1290,7 @@ curl -X POST https://apis.fotohub.app/mcp/ \
       "name": "chat_completion",
       "arguments": {
         "prompt": "Explain quantum computing in 3 sentences",
-        "model": "claude-haiku-4-5",
+        "model": "claude-haiku-4.5",
         "temperature": 0.5
       }
     }
@@ -927,17 +1326,119 @@ Intelligent AI router — analyzes user intent and suggests the best action. Gab
 
 ---
 
-### Utility Tools (4)
+### Pricing Tools (3)
+
+#### `get_price`
+
+Look up the exact USD price FOTOhub charges for one AI model. Use before recommending a model, or whenever the user asks how much a model costs. Pass the same id you would give a `generate_*` tool.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `model` | `string` | Yes | — | The model id |
+
+**Returns:** Every priced "leg" of the model (most have one leg named `output`; video and TTS models can have several) with its unit (`per_piece`, `per_second`, `per_minute`, `per_1k_chars`, `per_1k_tokens`, `per_1m_tokens`, `per_request`, `per_gb_month`) and rate.
+
+---
+
+#### `estimate_cost`
+
+Estimate the USD cost of a generation **before** calling a `generate_*` tool. Pass only the parameters that apply to the model's kind (see the tool's own description for the full dispatch logic — it varies by pricing shape: per-image, per-second-with-resolution, per-character, dual-token, or flat-rate).
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `model` | `string` | Yes | — | The model id |
+| `count` | `integer` | No | `1` | Number of images / flat-rate units |
+| `seconds` | `float` | No | `0.0` | Clip duration for per-second/resolution models |
+| `characters` | `integer` | No | `0` | Text length for per-1K-character TTS models |
+| `minutes` | `float` | No | `0.0` | For per-minute jobs (translation, dubbing, audio-stems) |
+| `resolution` | `string` | No | `""` | Required for resolution-alternative legs (e.g. Seedance) |
+| `quality` | `string` | No | `""` | `low`/`medium`/`high` for the gpt-image-* tier family |
+| `tokens_in` / `tokens_out` | `integer` | No | `0` | For dual-token speech models (these two add together) |
+| `with_audio` / `video_input` | `boolean` | No | `false` | Selects the `audio`/`video_in` leg where it exists — replaces the resolution rate, never adds to it |
+
+**Returns:** The computed USD amount with the arithmetic shown, or an explanation of what parameter is missing.
+
+---
+
+#### `compare_prices`
+
+Compare FOTOhub's USD prices across every model in one category.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `category` | `string` | Yes | — | `image`, `video`, `audio`, `chat`, `3d`, or `storage` |
+
+**Returns:** Every model in the category, cheapest to priciest, with its rate. Category classification is a best-effort heuristic — confirm any specific model with `get_price`.
+
+---
+
+### Storage Tools (4)
+
+FOTOhub-managed S3 storage, proxied to s3-engine. The real problem this module solves: a generation result link is a short-lived signed URL (expires roughly an hour after the call) — `save_to_storage` copies the bytes into a bucket the user actually owns before that window closes.
+
+#### `list_buckets`
+
+List your FOTOhub-managed S3 storage buckets. Call before `list_files`, `save_to_storage`, or `get_download_link` to find a bucket's name/id.
+
+*(No parameters.)*
+
+**Returns:** Each bucket's display name, region, and current size. Empty means no buckets yet — buckets are bought at fotohub.app/console/storage, not created by this tool.
+
+---
+
+#### `list_files`
+
+List files (and folders) inside one of your storage buckets.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `bucket` | `string` | Yes | — | Bucket display name (as `list_buckets` shows it) or UUID |
+| `prefix` | `string` | No | `""` | Narrows the listing to one folder, e.g. `renders/2026-09/` |
+| `max_keys` | `integer` | No | `100` | Max files to return (1-1000) |
+
+**Returns:** Up to `max_keys` files with size and last-modified time, plus any subfolders visible at this level. A listing with only subfolders and no files is not empty — descend into one of them.
+
+---
+
+#### `save_to_storage`
+
+Download a generated file and save it into your own storage bucket. Call this right after `generate_image`/`generate_video`/`generate_*` returns a URL — those links expire roughly an hour later.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `url` | `string` | Yes | — | The exact link a generation tool just returned |
+| `bucket` | `string` | Yes | — | Bucket display name or UUID |
+| `key` | `string` | Yes | — | Path to save it under inside the bucket, e.g. `renders/sunset.png` |
+
+**Returns:** Confirmation with the byte size saved, or an error if the source link already expired. Does not overwrite-protect — an existing object at `key` is replaced.
+
+---
+
+#### `get_download_link`
+
+Get a temporary signed download URL for a file already in your storage bucket.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `bucket` | `string` | Yes | — | Bucket display name or UUID |
+| `key` | `string` | Yes | — | The object's key (check with `list_files` first) |
+| `expires_in` | `integer` | No | `3600` | Seconds until the link stops working (max `604800` = 7 days) — not a permanent URL |
+
+**Returns:** The signed download URL.
+
+---
+
+### Utility Tools (6)
 
 #### `check_balance`
 
-Check your current credit balance and wallet status.
+Check your prepaid USD wallet balance and this month's spend. The API is prepaid in USD and has no credits — this tool does **not** return a subscription tier or a 4h/period credit count (an earlier version did; that shape no longer exists on the route).
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | *(none)* | — | — | — | No parameters required |
 
-**Returns:** Tier, remaining credits (4h window and period), wallet balance in USD.
+**Returns:** Available wallet balance (USD), pending holds, month-to-date spend (and any monthly spend limit), and your API plan name.
 
 ---
 
@@ -947,22 +1448,43 @@ List available AI models with pricing.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `category` | `string` | No | `""` | Filter by category: `image`, `video`, `audio`, `chat`, `3d` (empty = all) |
+| `category` | `string` | No | `""` | `image`, `video`, `audio`, `text` (empty = all). `chat` is accepted as an alias for `text`. **3D models are not in this catalog** — passing `3d` returns an explanation instead of results; call `list_3d_models` instead. |
 
-**Returns:** Table of model names, categories, and credit costs.
+**Returns:** Model id, category, and the USD rate the wallet is actually billed at (falls back to the catalog's display price, marked `(list)`, when no billing rate is published — call `get_price` before quoting one of those, since the display price is often higher than the real charge).
 
 ---
 
 #### `list_generations`
 
-List your recent AI generations (images, videos, music).
+List the **images** you have generated on FOTOhub most recently. The platform publishes no listing route for video or audio, so a generated clip cannot be found this way.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `limit` | `integer` | No | `10` | Number of results (max 50) |
-| `category` | `string` | No | `""` | Filter by category |
+| `limit` | `integer` | No | `10` | Number of results, capped at `12` |
 
-**Returns:** List of generations with type, model, timestamp, and output URL.
+**Returns:** Newest first — the prompt each one was made from, when, and a fresh (about one hour) download link.
+
+---
+
+#### `get_usage_summary`
+
+Summarize your last 30 days of API usage — call **volume**, not spend. For the wallet ledger use `get_transactions`; for the current balance use `check_balance`.
+
+*(No parameters.)*
+
+**Returns:** Total requests and tokens over 30 days, cost by currency, and the top 5 endpoints and top 5 models by call count.
+
+---
+
+#### `get_transactions`
+
+List your recent wallet transactions — the USD wallet ledger (top-ups, per-call charges, refunds), not usage volume or the current balance.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `limit` | `integer` | No | `20` | Number of results, capped at `200` |
+
+**Returns:** Timestamp, type, amount, and description for each transaction, newest first. Rows recorded before the platform's PLN→USD migration may show PLN instead of USD.
 
 ---
 
@@ -979,7 +1501,7 @@ Semantic search through your photo library using AI embeddings. Finds images mat
 
 ---
 
-### Training tools (2 — not registered in production)
+### Training Tools (2 — not registered in production)
 
 ::: danger Not registered in production
 Both training tools are gated on `TRAINING_ENGINE_URL`, which is unset because
@@ -1127,8 +1649,11 @@ MCP resources provide browsable context for AI assistants:
 | `fotohub://models/image` | Available image generation models |
 | `fotohub://models/video` | Available video generation models |
 | `fotohub://models/audio` | Available audio/music models |
+| `fotohub://models/3d` | Available 3D generation models |
 | `fotohub://pricing` | Current pricing table (all models) |
-| `fotohub://balance` | Your current credit balance |
+| `fotohub://balance` | Your current prepaid USD wallet balance |
+| `fotohub://guide/getting-started` | Onboarding guide for a new MCP client |
+| `fotohub://limits` | Current per-tool limits (character caps, durations, etc.) |
 
 ### Reading a Resource
 
@@ -1151,9 +1676,15 @@ Pre-built prompt templates for common workflows:
 
 | Prompt Name | Description | Arguments |
 |-------------|-------------|-----------|
-| `creative_brief` | Generate a creative brief for a project | `project_type`, `audience`, `tone` |
+| `creative_brief` | Structured image-generation brief | `subject`, `style`, `mood`, `format` |
 | `video_director` | Plan a multi-scene video production | `concept`, `duration`, `style` |
-| `product_photo` | Generate product photography | `product`, `background`, `lighting` |
+| `product_photo` | Generate product photography | `product`, `background`, `angle`, `lighting` |
+| `ecommerce_product_shots` | A set of product photos across several background variants | `product_name`, `key_features`, `background_variants`, `aspect_ratio` |
+| `social_media_pack` | Copy + matching visuals sized for several platforms from one idea | `idea`, `platforms`, `brand_voice`, `num_variants` |
+| `ugc_ad_pipeline` | Plan and produce a UGC-style ad within a fixed USD budget | `product_name`, `target_audience`, `budget_usd`, `duration_seconds`, `platform` |
+| `avatar_profile_photo` | Generate an avatar / profile photo from a description | `description`, `style`, `background`, `aspect_ratio` |
+| `voiceover_script` | Turn a script into narration, handling TTS length limits | `script_text`, `tone`, `language`, `voice_model` |
+| `budget_constrained_generation` | Plan any generation task inside a fixed USD budget | `goal`, `budget_usd`, `category` |
 
 ### Using a Prompt
 
@@ -1165,9 +1696,10 @@ Pre-built prompt templates for common workflows:
   "params": {
     "name": "creative_brief",
     "arguments": {
-      "project_type": "social media campaign",
-      "audience": "young professionals",
-      "tone": "bold and playful"
+      "subject": "a mountain lake at dawn",
+      "style": "photorealistic",
+      "mood": "serene",
+      "format": "landscape"
     }
   }
 }
@@ -1198,59 +1730,52 @@ Video generation, music creation, and training jobs are asynchronous. Tool calls
 
 ## Error Handling
 
-MCP errors follow JSON-RPC 2.0 error format:
+Authentication and transport-level failures are plain HTTP errors, not JSON-RPC error objects — a missing/invalid bearer token returns HTTP 401 with a JSON body (`{"error": "..."}"`) and a `WWW-Authenticate` header pointing at OAuth discovery, before the request ever reaches the MCP layer:
+
+```json
+{"error": "Invalid or expired API key"}
+```
+
+Once inside the MCP layer, a tool that fails (insufficient wallet balance, a model rejecting the request, a downstream 5xx) returns a normal `tools/call` **result** whose content is an error message — MCP tool errors are reported as text content, not as JSON-RPC-level failures, so check the returned text rather than assuming a thrown exception. Genuine JSON-RPC-level errors are limited to the protocol layer itself:
 
 ```json
 {
   "jsonrpc": "2.0",
   "id": 1,
   "error": {
-    "code": -32001,
-    "message": "Insufficient credits",
-    "data": {
-      "balance": 2,
-      "required": 5,
-      "top_up_url": "https://fotohub.app/console"
-    }
+    "code": -32602,
+    "message": "Unknown skill: <uri>"
   }
 }
 ```
 
-### Error Codes
+### Error Codes (JSON-RPC / protocol layer)
 
 | Code | Meaning |
 |------|---------|
 | `-32600` | Invalid request (malformed JSON-RPC) |
 | `-32601` | Method not found |
-| `-32602` | Invalid params |
-| `-32001` | Insufficient credits |
-| `-32002` | Rate limited (retry after `Retry-After` seconds) |
-| `-32003` | Authentication failed |
-| `-32004` | Model unavailable |
-| `-32005` | Content policy violation |
+| `-32602` | Invalid params, or an unknown `skill://` URI |
+| `-32002` | Resource not found (`resources/read` on an unknown `fotohub://` URI) |
+
+Domain-level failures (insufficient balance, an unavailable model, a content-policy rejection) do **not** have dedicated JSON-RPC codes — they come back as the tool's own text result (e.g. a 402 from the wallet gate is surfaced as an explanatory string, not a JSON-RPC error).
 
 ---
 
 ## Rate Limits
 
-MCP requests share rate limits with the REST API:
-
-| Plan | Requests/min | Concurrent jobs |
-|------|-------------|-----------------|
-| Free | 10 | 2 |
-| Pro | 60 | 10 |
-| Business | 300 | 50 |
-| Enterprise | Custom | Custom |
-
-When rate limited, the error response includes a `retry_after` field (seconds).
+MCP requests are authenticated the same way as the REST API and share the same account-level limits. See [API Rate Limits](/api/rate-limits) for current numbers — there is no MCP-specific rate limit table.
 
 ---
 
 ## Billing
 
-Each tool call deducts credits from your account based on the model and operation used. Use the `check_balance` tool to monitor usage, or `list_models` to see current rates.
+Billing depends on how the calling credential was obtained, not on which tool was called:
 
-Credit costs are identical to REST API calls for the same operations.
+- **A raw `fh_live_*` API key** (the kind you create at [fotohub.app/settings/api](https://fotohub.app/settings/api)) spends only the account's prepaid **USD wallet**. There is no credits concept on this path.
+- **A key minted through the OAuth 2.1 flow** (see [Authentication](#authentication) below) carries `metadata.billing_mode = "credits_first"` and spends the account's **subscription credits first**, falling back to the prepaid USD wallet once those are exhausted — a single call can even be split across both.
+
+Use `check_balance` to check the current wallet balance, `get_transactions` for the wallet ledger, `get_usage_summary` for call volume, and `get_price` / `estimate_cost` / `compare_prices` to see rates before generating.
 
 ---
 
@@ -1323,7 +1848,7 @@ FOTOhub Chat-Live allows users to connect their own external MCP servers, giving
 ### Architecture
 
 ```
-User Message → Chat-Live → LLM (Claude/Gemini/GPT)
+User Message → Chat-Live → Claude (tool_use loop)
                               ↓ tool_use
                          MCP Manager → External Server
                               ↓ result
@@ -1339,7 +1864,7 @@ All endpoints require Supabase JWT authentication.
 #### Register a Server
 
 ```
-POST https://apis.fotohub.app/chat/mcp/servers
+POST https://apis.fotohub.app/v1/chat/mcp/servers
 ```
 
 | Field | Type | Required | Description |
@@ -1353,7 +1878,7 @@ POST https://apis.fotohub.app/chat/mcp/servers
 import httpx
 
 resp = httpx.post(
-    "https://apis.fotohub.app/chat/mcp/servers",
+    "https://apis.fotohub.app/v1/chat/mcp/servers",
     headers={
         "Authorization": "Bearer <supabase_jwt>",
         "Content-Type": "application/json"
@@ -1368,7 +1893,7 @@ server = resp.json()
 # {"id": "uuid", "name": "my-tools", "tools": [...discovered tools...]}
 ```
 ```typescript [TypeScript]
-const resp = await fetch("https://apis.fotohub.app/chat/mcp/servers", {
+const resp = await fetch("https://apis.fotohub.app/v1/chat/mcp/servers", {
   method: "POST",
   headers: {
     "Authorization": "Bearer <supabase_jwt>",
@@ -1390,7 +1915,7 @@ body, _ := json.Marshal(map[string]any{
     "auth_token": "sk_my_server_token",
 })
 
-req, _ := http.NewRequest("POST", "https://apis.fotohub.app/chat/mcp/servers", bytes.NewReader(body))
+req, _ := http.NewRequest("POST", "https://apis.fotohub.app/v1/chat/mcp/servers", bytes.NewReader(body))
 req.Header.Set("Authorization", "Bearer <supabase_jwt>")
 req.Header.Set("Content-Type", "application/json")
 
@@ -1400,7 +1925,7 @@ result, _ := io.ReadAll(resp.Body)
 fmt.Println(string(result))
 ```
 ```bash [cURL]
-curl -X POST https://apis.fotohub.app/chat/mcp/servers \
+curl -X POST https://apis.fotohub.app/v1/chat/mcp/servers \
   -H "Authorization: Bearer <supabase_jwt>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1416,7 +1941,7 @@ On registration, Chat-Live immediately connects to the server, calls `tools/list
 #### List Servers
 
 ```
-GET https://apis.fotohub.app/chat/mcp/servers
+GET https://apis.fotohub.app/v1/chat/mcp/servers
 ```
 
 Returns all active MCP servers for the authenticated user, including their discovered tools.
@@ -1424,7 +1949,7 @@ Returns all active MCP servers for the authenticated user, including their disco
 #### Delete a Server
 
 ```
-DELETE https://apis.fotohub.app/chat/mcp/servers/:server_id
+DELETE https://apis.fotohub.app/v1/chat/mcp/servers/:server_id
 ```
 
 Removes the server and its stored credentials from Vault.
@@ -1436,7 +1961,7 @@ Removes the server and its stored credentials from Vault.
 When a user sends a chat message with `mcpEnabled: true`, Chat-Live:
 
 1. **Collects tools** — fetches all discovered tools from the user's registered external MCP servers
-2. **Formats for LLM** — converts MCP tool schemas to the format expected by the active model (Claude `tool_use`, Gemini `function_declarations`, or OpenAI `functions`)
+2. **Formats for the model** — converts MCP tool schemas to Claude's `tool_use` format (Chat-Live's tool-calling loop runs on a Claude model regardless of which model answers elsewhere in the app)
 3. **Sends to LLM** — includes tools in the model request alongside the user message
 4. **Executes tool calls** — if the LLM responds with `tool_use`, Chat-Live connects to the appropriate external MCP server and calls the tool
 5. **Returns result** — feeds the tool result back to the LLM for the next round
@@ -1449,22 +1974,21 @@ Tool names are namespaced as `server_name__tool_name` to prevent collisions acro
 During streaming responses, Chat-Live emits SSE events that include tool execution status:
 
 ```
-data: {"type": "tool_start", "tool": "my-tools__search", "arguments": {...}}
+data: {"type": "mcp_tool_start", "server": "my-tools", "tool": "search", "arguments": {...}}
 
-data: {"type": "tool_result", "tool": "my-tools__search", "content": "..."}
+data: {"type": "mcp_tool_result", "server": "my-tools", "tool": "search", "result": {...}}
 
 data: {"type": "delta", "content": "Based on the search results..."}
 
-data: {"type": "done", "usd_charged": 0.0000.45, "model": "claude-haiku-4-5"}
+data: {"type": "done", "credits_used": 0.000045, "input_tokens": 512, "output_tokens": 128, "model": "claude-haiku-4.5"}
 
 data: [DONE]
 ```
 
 | Event Type | Description |
 |------------|-------------|
-| `tool_start` | LLM requested a tool call (includes tool name and arguments) |
-| `tool_result` | Tool execution completed (includes result content) |
-| `tool_error` | Tool execution failed (includes error message) |
+| `mcp_tool_start` | The model requested a tool call (includes server, tool name and arguments) |
+| `mcp_tool_result` | Tool execution completed (includes the server, tool name and result) |
 | `delta` | Text content chunk from the LLM |
 | `reasoning` | Thinking/reasoning token (for thinking models) |
 | `done` | Final message with billing and token usage |
@@ -1576,7 +2100,7 @@ async def generate_and_wait():
                 "generate_video",
                 arguments={
                     "prompt": "Ocean waves crashing on rocks, cinematic slow motion",
-                    "model": "kling-v3",
+                    "model": "kling-v2-1-master",
                     "duration": 5,
                 }
             )
@@ -1723,7 +2247,7 @@ async function createVideoFromPrompt(concept: string) {
       arguments: {
         image_url: imageUrl,
         prompt: betterPrompt,
-        model: 'kling',
+        model: 'kling-v2-1-master',
         duration: 5,
       },
     });

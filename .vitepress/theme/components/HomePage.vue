@@ -208,7 +208,7 @@ const products = [
   {
     icon: `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>`,
     title: 'MCP Server',
-    description: 'Connect FOTOhub to Claude, ChatGPT, Cursor, and any AI assistant via Model Context Protocol.',
+    description: '57 tools in ChatGPT, Claude, Cursor and any MCP client. Published in the ChatGPT app directory and the official MCP registry.',
     link: '/integrations/mcp'
   },
   {
