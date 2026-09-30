@@ -115,7 +115,7 @@ Every error from these endpoints uses one envelope, including validation errors 
 | `plan-unavailable` | 503 | Your plan could not be verified. Retryable. |
 | `busy` | 429 | Auto-Edit has no free slot. Retryable; the base fee is refunded. |
 | `auto-edit-unavailable` | 502 / 503 | Auto-Edit is temporarily unavailable. Retryable. If the message says the start was not confirmed, the run may exist: read the job list before starting another. |
-| `rebase-conflict` | 409 | `apply` after a `save-conflict` with `expectedSaveRev` set to `currentSaveRev`: the draft could not be replayed on the current project. Nothing was written and the draft is kept. `details` has `currentSaveRev` and `draftBaseSaveRev`. |
+| `rebase-conflict` | 409 | `apply` of a draft created on an older revision of the project (after a `save-conflict`, or a finished run whose project was saved since) with `expectedSaveRev` set to `currentSaveRev`: the draft could not be replayed on the current project. Nothing was written and the draft is kept. `details` has `currentSaveRev`, `draftBaseSaveRev` and `reason` (for example `clip-missing`, `invariant-violation`, or `id-mapping-ambiguous` when the ids of clips the draft created cannot be matched safely to the replay); the failing `batch`, `op` and `opKind` are included when known. |
 | `job-running` | 409 | `apply` on an Auto-Edit run that has not finished. Retry later. |
 | `no-draft` | 409 | `apply` on a run with no draft to commit: it was applied already, it failed (other than with `save-conflict`), or it ran with `autoApply: true`. |
 | `expected-save-rev-required` | 422 | `apply` on a run that ended in `save-conflict` without `expectedSaveRev`. `details.currentSaveRev` has the current revision. |
@@ -311,7 +311,7 @@ A single string is accepted in place of a one-item array. The response carries t
       "message": "Source file is missing from storage (or the clip has no usable link).",
       "clipId": "clip-3",
       "trackId": "track-1",
-      "suggestion": "Upload the media again and re-add it via its new storagePath.",
+      "suggestion": "Create a new project with this media (upload it again) and redo the edit there.",
       "fix": "relink"
     }
   ],
@@ -1199,7 +1199,7 @@ An Auto-Edit run is billed in two parts:
 Refunds of the base fee:
 
 - A run that fails, is cancelled or cannot be started is refunded.
-- A run that ends in `save-conflict` keeps its draft so you can commit it with `apply`, so its fee stays charged for now. It stays available for applying for about 70 minutes from the run start (the draft itself lives at most 60 minutes); if it is not applied by then, the fee is refunded.
+- A run that ends in `save-conflict` keeps its draft so you can commit it with `apply`, so its fee stays charged for now. It can be applied only while the draft lives (at most 60 minutes from the run start); if it is not applied by about 70 minutes from the run start, the fee is refunded.
 - A run whose result was applied is never refunded.
 
 To protect accounts, Auto-Edit stops when your account reaches the 24-hour AI usage cap: the start call answers `429 budget`.
