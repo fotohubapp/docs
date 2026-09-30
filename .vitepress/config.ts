@@ -87,6 +87,7 @@ export default defineConfig({
           text: 'Video & Shorts',
           items: [
             { text: 'Video Editing', link: '/api/video-editing' },
+            { text: 'Video Timeline API', link: '/api/video-timeline' },
             { text: 'Shorts & Clips', link: '/api/shorts-clips' },
             { text: 'Shorts Console', link: '/api/shorts-console' },
             { text: 'Story Studio', link: '/api/story-studio' },
@@ -294,6 +295,7 @@ export default defineConfig({
             { text: 'Streaming', link: '/guides/streaming' },
             { text: 'Batch Processing', link: '/guides/batch-processing' },
             { text: 'MCP Integration', link: '/guides/mcp-integration' },
+            { text: 'Edit Video with an Agent', link: '/guides/edit-video-with-an-agent' },
           ],
         },
         {
