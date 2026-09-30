@@ -74,7 +74,8 @@ Every error from these endpoints uses one envelope, including validation errors 
 | `payment-required` | 402 / 403 | No funds for a paid call. Nothing was charged. Top up, then retry. |
 | `insufficient-credits` | 402 | The render was refused for lack of credits. |
 | `not-found` | 404 | The project, job or version does not exist, or is not yours. The two cases are deliberately indistinguishable. |
-| `route-not-found` | 404 | No such route. |
+| `route-not-found` | 404 | No such route on the editing service. An unknown `/v1/video/*` path answers `not-found` from the API itself. |
+| `forbidden` | 403 | The request is not allowed for this account or resource. |
 | `media-not-found` | 404 / 422 | `mediaId` does not exist in that project (analysis, 404), or a `storagePath` on create points at nothing (422). |
 | `draft-not-found` | 404 | `apply` on an Auto-Edit draft that was already applied or has expired. |
 | `bad-request` | 400 | Malformed request. |
@@ -114,6 +115,7 @@ Every error from these endpoints uses one envelope, including validation errors 
 | `plan-unavailable` | 503 | Your plan could not be verified. Retryable. |
 | `busy` | 429 | Auto-Edit has no free slot. Retryable; the base fee is refunded. |
 | `auto-edit-unavailable` | 502 / 503 | Auto-Edit is temporarily unavailable. Retryable. If the message says the start was not confirmed, the run may exist: read the job list before starting another. |
+| `rebase-conflict` | 409 | `apply` after a `save-conflict` with `expectedSaveRev` set to `currentSaveRev`: the draft could not be replayed on the current project. Nothing was written and the draft is kept. `details` has `currentSaveRev` and `draftBaseSaveRev`. |
 | `job-running` | 409 | `apply` on an Auto-Edit run that has not finished. Retry later. |
 | `no-draft` | 409 | `apply` on a run with no draft to commit: it was applied already, it failed (other than with `save-conflict`), or it ran with `autoApply: true`. |
 | `expected-save-rev-required` | 422 | `apply` on a run that ended in `save-conflict` without `expectedSaveRev`. `details.currentSaveRev` has the current revision. |
@@ -306,10 +308,10 @@ A single string is accepted in place of a one-item array. The response carries t
     {
       "rule": "SOURCE_MISSING",
       "severity": "error",
-      "message": "Source file is missing; relink it before exporting.",
+      "message": "Source file is missing from storage (or the clip has no usable link).",
       "clipId": "clip-3",
       "trackId": "track-1",
-      "suggestion": "Source is missing; re-add the media via its storagePath.",
+      "suggestion": "Upload the media again and re-add it via its new storagePath.",
       "fix": "relink"
     }
   ],
@@ -328,7 +330,7 @@ A single string is accepted in place of a one-item array. The response carries t
 | `at`, `atSeconds` | Start of the range on the project timeline, in ticks and in seconds. |
 | `end`, `endSeconds` | End of that range, in ticks and in seconds. |
 | `params` | Numbers and strings behind the finding (for example `{ "seconds": 1.4 }`; times are in seconds). |
-| `fix` | A hint: `relink`, `trim-to-content` or `none`. |
+| `fix` | A hint: `relink`, `trim-to-content` or `none`. `relink` cannot be done through `/ops`: media are fixed when the project is created (see [Media](#media)). |
 | `suggestion` | A short text on how to resolve it, when there is one. |
 
 Every field except `rule`, `severity` and `message` is optional.
@@ -340,8 +342,8 @@ Every field except `rule`, `severity` and `message` is optional.
 | `HOLE_IN_COVERAGE` | A stretch of the timeline where nothing is visible. |
 | `CLIP_NEVER_VISIBLE` | A clip that is fully covered by another, or otherwise never shown. `params.reason` says why. |
 | `ZERO_DURATION` | A clip with zero or invalid duration. |
-| `SOURCE_MISSING` | A clip whose media file was deleted from storage or has no usable link. Upload the media again and re-add it. |
-| `SOURCE_EXPIRED` | A media link that expired and the automatic re-signing could not refresh. Re-add the media through its `storagePath`. |
+| `SOURCE_MISSING` | A clip whose media file was deleted from storage or has no usable link. Operations cannot attach media to an existing project, so upload the file again and create a new project with it, then redo the edit there. |
+| `SOURCE_EXPIRED` | A media link that expired and the automatic re-signing could not refresh. Create a new project from the media's `storagePath`. |
 | `TEXT_OUTSIDE_SAFE_AREA` | Text that may extend past the safe area of the project's aspect ratio (an estimate). |
 | `CAPTIONS_OVERLAP` | Two captions that overlap in time at the same screen position. |
 | `AUDIO_CLIPPING` | Audio likely to clip (an estimate from the clip volume). |
@@ -444,11 +446,11 @@ Capture, render and Auto-Edit all return a job. Statuses: `queued`, `running`, `
 }
 ```
 
-A running job may include `queuePosition`; a finished one may include `warnings`. A `failed` or `cancelled` job has `error` (a short, safe message), sometimes `reason`, and `refunded: true` when the charge was returned. Poll every 3 to 5 seconds; jobs are only visible to the account that started them. Download render output promptly: result URLs are temporary.
+A running job may include `queuePosition`; a finished one may include `warnings`. A `failed` or `cancelled` job has `error` (a short, safe message; for Auto-Edit an object `{ "code", "message" }`), sometimes `reason`, and `refunded: true` when the charge was returned. Poll every 3 to 5 seconds; jobs are only visible to the account that started them. Download render output promptly: result URLs are temporary.
 
 ## Operations reference
 
-`GET /v1/video/ops/catalog` returns the JSON Schema of the `ops` array (`schema`), explanatory `notes`, `ticksPerSecond` and `maxOps`. Use it to validate or generate operations. The tables below are generated from the same schema.
+`GET /v1/video/ops/catalog` returns the JSON Schema of the `ops` array (`schema`), explanatory `notes`, `ticksPerSecond` and `maxOps`. Use it to validate or generate operations. The tables below are generated from the same schema and list the shape of each operation; what an operation does (ripple, `ref`, tick arithmetic, clamping) is in the catalog's `notes`.
 
 Insert a 3 s clip at 10 s (the media id comes from the project's `media`):
 
@@ -1133,7 +1135,7 @@ POST /v1/video/projects/{id}/auto-edit
 | `style` | string | — | `viral`, `podcast`, `explainer`, `storytelling` or `captions-only`. Required for `auto_edit`. |
 | `toggles` | object | all on | Switch parts of the edit off with `false`: `cutSilences`, `removeFillers`, `broll`, `zooms`, `graphics`, `sfx`, `music`, `captions`, `maps`. |
 | `language` | string | `auto` | Spoken language: `auto`, `pl`, `en` or `de`. |
-| `aspect` | string | project aspect | `16:9`, `9:16`, `1:1` or `4:5`. |
+| `aspect` | string | project aspect | `16:9`, `9:16`, `1:1` or `4:5`. A project in another aspect (for example 4:3) is edited as `16:9`. |
 | `aiBudgetUsd` | number | `0` | The most this run may spend on generated media, in USD, 0 to 50. `0` uses stock and existing media only. |
 | `autoApply` | boolean | `true` | `false` keeps the result as a draft until you call `apply`. |
 | `brief` | object | — | `cut` mode only, and required there: the cut brief (for example profile, target length, pacing, order). |
@@ -1150,7 +1152,7 @@ The project needs at least one video or audio media file. Send an `X-Idempotency
 }
 ```
 
-The call answers `202`. Poll [`GET /v1/video/jobs/{jobId}`](#jobs) every 3 to 5 seconds.
+The call answers `202`; the response may also carry `chargedCredits` when plan credits paid the fee. Poll [`GET /v1/video/jobs/{jobId}`](#jobs) every 3 to 5 seconds.
 
 ### Job status
 
@@ -1160,11 +1162,15 @@ An Auto-Edit job has `"kind": "auto_edit"` and the [usual job fields](#jobs), pl
 |-------|---------|
 | `stages` | Progress by stage, in order: `signals`, `cuts`, `brief`, `broll`, `graphics`, `audio`, `captions`, `apply`. Each entry has `stage`, `status` and, when known, `pct` and `detail`. |
 | `report` | What the run did and what it skipped, including the media spend (`creditsSpent`) and whether the result was committed. |
-| `usage` | AI usage of the run, for your information: `inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`. It is covered by the base fee. |
+| `usage` | AI usage of the run, for your information: `inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, plus `billed` and `units`. `billed` stays `false` because the base fee covers the tokens. |
 | `committed` | `true` when the result was written to the project. |
 | `saveRev` | The project's new revision after the result was committed. |
 | `baseSaveRev` | The revision the run started from. |
-| `expiresInSeconds` | On a finished `autoApply: false` run, how long the draft is kept (about 30 minutes from creation). |
+| `expiresInSeconds` | On a finished `autoApply: false` run, how long the draft is kept: 30 minutes, renewed on use, but never longer than 60 minutes from the draft's creation. |
+| `currentSaveRev` | On a `save-conflict` run: the project revision now. Pass it as `expectedSaveRev` to `apply`. |
+| `draftId` | The kept draft, when the run left one (`autoApply: false`, or `save-conflict`). |
+| `unchanged` | `true` when the run made no change to the project. |
+| `error` | On a failed run: `{ "code", "message" }` (not a string, unlike render and capture jobs). Branch on `code`, for example `save-conflict`. |
 | `refunded` | On a `failed` or `cancelled` job: `true` when the base fee was returned. |
 
 Nothing is left half-edited: if the run's own operations are rejected, the draft is discarded instead of being applied to your project.
@@ -1179,9 +1185,9 @@ POST /v1/video/projects/{id}/auto-edit/{jobId}/apply
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `expectedSaveRev` | integer | No | The project revision the draft may replace. Defaults to the revision the run started from. **Required** after `save-conflict`: pass the job's `currentSaveRev` to commit the draft over the newer changes. |
+| `expectedSaveRev` | integer | No | The project revision the draft may replace. Defaults to the revision the run started from. **Required** after `save-conflict`: pass the job's `currentSaveRev` to the service then **rebases** the draft onto the current project (see below). |
 
-In the MCP server the same step is `video_auto_edit` with `apply_job_id`. On success it answers `{ "jobId", "projectId", "committed": true, "saveRev" }`, with the new `digest` when the project changed. If the project changed since the run started, you get `409 save-conflict` with `details.currentSaveRev`, and the draft is kept: re-run, or pass the current `expectedSaveRev` if you accept the changes over the draft. Applying before the run has finished answers `409 job-running`; applying a run with no draft answers `409 no-draft`.
+In the MCP server the same step is `video_auto_edit` with `apply_job_id`. On success it answers `{ "jobId", "projectId", "committed": true, "saveRev" }`, with the new `digest` when the project changed. If the project changed since the run started, you get `409 save-conflict` with `details.currentSaveRev`, and the draft is kept: re-run, or pass `expectedSaveRev: currentSaveRev` to have the service rebase the draft onto the current project. If the draft can no longer be replayed you get `409 rebase-conflict` and nothing is written. Applying before the run has finished answers `409 job-running`; applying a run with no draft answers `409 no-draft`.
 
 ### Billing
 
@@ -1193,7 +1199,7 @@ An Auto-Edit run is billed in two parts:
 Refunds of the base fee:
 
 - A run that fails, is cancelled or cannot be started is refunded.
-- A run that ends in `save-conflict` keeps its draft so you can commit it with `apply`, so its fee stays charged for now. It is refunded only if the draft is not applied within about 90 minutes of the run starting.
+- A run that ends in `save-conflict` keeps its draft so you can commit it with `apply`, so its fee stays charged for now. It stays available for applying for about 70 minutes from the run start (the draft itself lives at most 60 minutes); if it is not applied by then, the fee is refunded.
 - A run whose result was applied is never refunded.
 
 To protect accounts, Auto-Edit stops when your account reaches the 24-hour AI usage cap: the start call answers `429 budget`.
