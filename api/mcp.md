@@ -147,7 +147,7 @@ The FOTOhub MCP server advertises the following capabilities:
 ---
 
 ::: info Video Timeline tools are counted separately
-The numbers above do not include the [Video Timeline](/api/video-timeline#mcp-tools) tools (`video_project_create`, `video_apply_edit`, `video_lint`, `video_capture`, `video_render` and others). They are registered only when the deployment enables the Video Timeline API: 12 tools, or 13 when Auto-Edit (`video_auto_edit`) is enabled as well. Check `GET /mcp/health` or `tools/list` for what your deployment serves.
+The numbers above do not include the [Video Timeline](/api/video-timeline#mcp-tools) tools (`video_project_create`, `video_apply_edit`, `video_lint`, `video_capture`, `video_render` and others). They are registered only when the deployment enables the Video Timeline API: 12 tools, or 13 when Auto-Edit (`video_auto_edit`, which also commits a kept draft through `apply_job_id`) is enabled as well. Check `GET /mcp/health` or `tools/list` for what your deployment serves.
 :::
 
 ## Tools (57 active, 60 registered)

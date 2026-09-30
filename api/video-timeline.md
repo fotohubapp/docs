@@ -20,7 +20,7 @@ Use it to build automated montage pipelines, to let an AI agent cut footage thro
 | `POST /v1/video/projects/{id}/lint` | Check the edit for problems | Free |
 | `POST /v1/video/projects/{id}/capture` | Still frames and contact sheets (async job) | Flat fee per call |
 | `POST /v1/video/projects/{id}/render` | Render to a video file (async job) | Per output minute |
-| `POST /v1/video/projects/{id}/auto-edit` | Edit the project for you (async job) | Base fee + AI usage |
+| `POST /v1/video/projects/{id}/auto-edit` | Edit the project for you (async job) | One base fee, plus generated media |
 | `POST /v1/video/projects/{id}/auto-edit/{jobId}/apply` | Commit the draft of an Auto-Edit run | Free |
 | `GET /v1/video/jobs/{jobId}` | State of a capture, render or Auto-Edit job | Free |
 | `GET /v1/video/ops/catalog` | JSON Schema of every operation | Free |
@@ -32,7 +32,7 @@ Use it to build automated montage pipelines, to let an AI agent cut footage thro
 
 Capture, render and the analysis endpoints are billed per call or per minute. The amount charged is in the `billing` block of each response and in your usage history; the [Pricing](/guides/pricing) guide does not list these operations yet. Failed capture and render jobs are refunded automatically. When you use a FOTOhub account (OAuth) on a plan that includes rendering, a render is included in the plan and nothing is charged; its `billing` block says so.
 
-Auto-Edit is billed in three parts, described in [Auto-Edit](#auto-edit).
+Auto-Edit is billed with one base fee per run, plus any media it generates, as described in [Auto-Edit](#auto-edit).
 
 ## Conventions
 
@@ -115,7 +115,10 @@ Every error from these endpoints uses one envelope, including validation errors 
 | `busy` | 429 | Auto-Edit has no free slot. Retryable; the base fee is refunded. |
 | `auto-edit-unavailable` | 502 / 503 | Auto-Edit is temporarily unavailable. Retryable. If the message says the start was not confirmed, the run may exist: read the job list before starting another. |
 | `job-running` | 409 | `apply` on an Auto-Edit run that has not finished. Retry later. |
-| `no-draft` | 409 | `apply` on a run with no draft to commit: it was applied already, it failed, or it ran with `autoApply: true`. |
+| `no-draft` | 409 | `apply` on a run with no draft to commit: it was applied already, it failed (other than with `save-conflict`), or it ran with `autoApply: true`. |
+| `expected-save-rev-required` | 422 | `apply` on a run that ended in `save-conflict` without `expectedSaveRev`. `details.currentSaveRev` has the current revision. |
+| `budget` | 429 | Auto-Edit refused: your account reached the 24-hour AI usage cap. Try again the next day. Not retryable sooner. |
+| `usage-unavailable` | 503 | The daily usage check is unavailable, so the run was not started. Retryable. |
 | `rate-limited` | 429 | Too many requests. Wait `Retry-After` seconds. See [Limits](#limits). |
 | `engine-busy` | 503 / 429 | The media processor has no free slot. `Retry-After` says when to retry. |
 | `idempotency-key-invalid` | 400 | `X-Idempotency-Key` is longer than 255 characters. |
@@ -126,7 +129,6 @@ Every error from these endpoints uses one envelope, including validation errors 
 | `timeline-unavailable` | 502 | The editing backend returned an invalid response or is unreachable. Retryable. |
 | `engine-unavailable` | 502 | The video engine is unreachable. Retryable; a paid call is refunded. |
 | `render-unavailable` | 502 | Rendering is temporarily unavailable. Retryable. |
-| `lint-unavailable` | 501 | Lint is not available on this deployment. |
 | `analysis-failed` | 502 | The analysis could not complete for this file (check it is a valid recording). Refunded. |
 | `analysis-unavailable` | 502 | The analysis service is unavailable. Refunded. |
 | `analysis-timeout` | 504 | The file took too long to analyse. Use a shorter file. Refunded. |
@@ -232,7 +234,7 @@ POST /v1/video/projects/{id}/ops
 | `dryRun` | boolean | No | Validate and preview the result without saving. |
 | `expectedSaveRev` | integer | No | Fail with `save-conflict` if the project's `saveRev` is different (someone else edited it). |
 | `label` | string | No | Save a named version of the project as it is **after** this batch, so you can find that state later. Up to 60 characters. Without `label`, a version is also saved automatically every 10 saves. |
-| `note` | string | No | Free-form note on why the batch was applied. Up to 2000 characters. |
+| `note` | string | No | Free-form note on why the batch was applied. Up to 2000 characters. Without `label`, the first 60 characters of the note become the label of the saved version. |
 
 ### Batch semantics
 
@@ -277,7 +279,7 @@ With an empty body it returns `{ "saveRev", "digest" }`. Send `{ "view": "clips"
 POST /v1/video/projects/{id}/lint
 ```
 
-Checks the edit for common problems without changing it. Lint first, then capture: it is free and instant.
+Checks the edit for common problems without changing it. Lint is always available. Lint first, then capture: it is free and instant. Before checking, FOTOhub refreshes expired media links automatically.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -338,8 +340,8 @@ Every field except `rule`, `severity` and `message` is optional.
 | `HOLE_IN_COVERAGE` | A stretch of the timeline where nothing is visible. |
 | `CLIP_NEVER_VISIBLE` | A clip that is fully covered by another, or otherwise never shown. `params.reason` says why. |
 | `ZERO_DURATION` | A clip with zero or invalid duration. |
-| `SOURCE_MISSING` | A clip whose media file is missing. |
-| `SOURCE_EXPIRED` | A media link that expired and could not be refreshed. |
+| `SOURCE_MISSING` | A clip whose media file was deleted from storage or has no usable link. Upload the media again and re-add it. |
+| `SOURCE_EXPIRED` | A media link that expired and the automatic re-signing could not refresh. Re-add the media through its `storagePath`. |
 | `TEXT_OUTSIDE_SAFE_AREA` | Text that may extend past the safe area of the project's aspect ratio (an estimate). |
 | `CAPTIONS_OVERLAP` | Two captions that overlap in time at the same screen position. |
 | `AUDIO_CLIPPING` | Audio likely to clip (an estimate from the clip volume). |
@@ -1086,7 +1088,7 @@ A timeout does not stop the job: keep polling it with `get_video_job` / `getVide
 
 ## MCP tools
 
-The [FOTOhub MCP server](/api/mcp) exposes the same workflow to AI agents as **13 tools**. Whether they appear is decided per deployment, not per account: they are switched on together with the Video Timeline API, and `video_auto_edit` has a second switch of its own. Without Auto-Edit the server lists 12 tools; with it, 13. If your client shows no `video_*` tools, the deployment you are connected to has not enabled them.
+The [FOTOhub MCP server](/api/mcp) exposes the same workflow to AI agents as **13 tools**. Whether they appear is decided per deployment, not per account: they are switched on together with the Video Timeline API, and `video_auto_edit` has a second switch of its own. Without Auto-Edit the server lists 12 tools; with it, 13. Applying a kept draft is a mode of `video_auto_edit` (`apply_job_id`, optional `expected_save_rev`); there is no separate apply tool. If your client shows no `video_*` tools, the deployment you are connected to has not enabled them.
 
 | Tool | Does |
 |------|------|
@@ -1098,7 +1100,7 @@ The [FOTOhub MCP server](/api/mcp) exposes the same workflow to AI agents as **1
 | `video_capture` | Frames and contact sheets (flat fee). |
 | `video_render` | Render the final file (per minute); returns a job. |
 | `video_job_status` | Poll a capture, render or Auto-Edit job. |
-| `video_auto_edit` | Start an Auto-Edit run (the 13th tool; it has its own switch). |
+| `video_auto_edit` | Start an Auto-Edit run, or commit the kept draft of a finished one with `apply_job_id` (the 13th tool; it has its own switch). |
 | `video_detect_scenes`, `video_detect_silence`, `video_detect_beats` | Analysis. |
 | `video_transcribe` | Word-level transcript in seconds. |
 
@@ -1158,7 +1160,7 @@ An Auto-Edit job has `"kind": "auto_edit"` and the [usual job fields](#jobs), pl
 |-------|---------|
 | `stages` | Progress by stage, in order: `signals`, `cuts`, `brief`, `broll`, `graphics`, `audio`, `captions`, `apply`. Each entry has `stage`, `status` and, when known, `pct` and `detail`. |
 | `report` | What the run did and what it skipped, including the media spend (`creditsSpent`) and whether the result was committed. |
-| `usage` | AI usage: `inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens` and `billed`. Once billed it also has `units` and what was charged (`chargedUsd`, `chargedCredits`). |
+| `usage` | AI usage of the run, for your information: `inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`. It is covered by the base fee. |
 | `committed` | `true` when the result was written to the project. |
 | `saveRev` | The project's new revision after the result was committed. |
 | `baseSaveRev` | The revision the run started from. |
@@ -1169,7 +1171,7 @@ Nothing is left half-edited: if the run's own operations are rejected, the draft
 
 ### Apply a draft
 
-With `autoApply: false`, a finished run keeps its result as a draft. Review it, then commit it:
+A draft can be committed in two cases: a finished run started with `autoApply: false`, and a run with `autoApply: true` that ended in `save-conflict` because the project changed while it worked. Review the draft, then commit it:
 
 ```
 POST /v1/video/projects/{id}/auto-edit/{jobId}/apply
@@ -1177,19 +1179,26 @@ POST /v1/video/projects/{id}/auto-edit/{jobId}/apply
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `expectedSaveRev` | integer | No | The project revision the draft may replace. Defaults to the revision the run started from. |
+| `expectedSaveRev` | integer | No | The project revision the draft may replace. Defaults to the revision the run started from. **Required** after `save-conflict`: pass the job's `currentSaveRev` to commit the draft over the newer changes. |
 
-On success it answers `{ "jobId", "projectId", "committed": true, "saveRev" }`, with the new `digest` when the project changed. If the project changed since the run started, you get `409 save-conflict` with `details.currentSaveRev`, and the draft is kept: re-run, or pass the current `expectedSaveRev` if you accept the changes over the draft. Applying before the run has finished answers `409 job-running`; applying a run with no draft answers `409 no-draft`.
+In the MCP server the same step is `video_auto_edit` with `apply_job_id`. On success it answers `{ "jobId", "projectId", "committed": true, "saveRev" }`, with the new `digest` when the project changed. If the project changed since the run started, you get `409 save-conflict` with `details.currentSaveRev`, and the draft is kept: re-run, or pass the current `expectedSaveRev` if you accept the changes over the draft. Applying before the run has finished answers `409 job-running`; applying a run with no draft answers `409 no-draft`.
 
 ### Billing
 
-An Auto-Edit run is billed in three parts:
+An Auto-Edit run is billed in two parts:
 
-1. **A base fee per run**, charged when the run starts. It is refunded if the run fails or is cancelled, and when the run cannot be started.
-2. **AI usage**, billed by tokens after the run. Tokens used by a run that fails are still billed, because the work was done.
-3. **Generated media**, billed as usual at each model's rate and capped by `aiBudgetUsd`. It is not refunded with the base fee.
+1. **One base fee per run**, charged when the run starts. It covers the work of the AI assistant that plans and checks the edit; that work is not billed separately.
+2. **Generated media** (stock, images, video, music, sound effects), billed as usual per item at each model's rate and capped by `aiBudgetUsd`. It is not refunded with the base fee.
 
-The `billing` block of the start response shows the base fee charged, and the finished job's `usage` shows what AI usage cost. The amounts charged are in the `billing` block of the start response and in the finished job. On the FOTOhub account (OAuth) it uses your plan credits first and then the wallet, as everywhere else; it requires a paid plan there (`plan-required` otherwise). It is limited to 10 requests per minute and its self-check uses the same hourly capture allowance as [Capture](#capture).
+Refunds of the base fee:
+
+- A run that fails, is cancelled or cannot be started is refunded.
+- A run that ends in `save-conflict` keeps its draft so you can commit it with `apply`, so its fee stays charged for now. It is refunded only if the draft is not applied within about 90 minutes of the run starting.
+- A run whose result was applied is never refunded.
+
+To protect accounts, Auto-Edit stops when your account reaches the 24-hour AI usage cap: the start call answers `429 budget`.
+
+The amounts charged are in the `billing` block of the start response and in your usage history. On the FOTOhub account (OAuth) it uses your plan credits first and then the wallet, as everywhere else; it requires a paid plan there (`plan-required` otherwise). It is limited to 10 requests per minute and its self-check uses the same hourly capture allowance as [Capture](#capture).
 
 ### Examples
 
