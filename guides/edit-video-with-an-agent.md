@@ -23,7 +23,7 @@ Add FOTOhub to your client:
 }
 ```
 
-When the Video Timeline API is enabled for your account, the client lists the timeline tools: `video_project_create`, `video_project_get`, `video_ops_catalog`, `video_apply_edit`, `video_lint`, `video_capture`, `video_render`, `video_job_status`, the analysis tools (`video_detect_scenes`, `video_detect_silence`, `video_detect_beats`, `video_transcribe`) and, in preview, `video_auto_edit`. See [MCP tools](/api/video-timeline#mcp-tools) for what each does.
+When the Video Timeline API is enabled for your account, the client lists the timeline tools: `video_project_create`, `video_project_get`, `video_ops_catalog`, `video_apply_edit`, `video_lint`, `video_capture`, `video_render`, `video_job_status`, the analysis tools (`video_detect_scenes`, `video_detect_silence`, `video_detect_beats`, `video_transcribe`) and `video_auto_edit`. See [MCP tools](/api/video-timeline#mcp-tools) for what each does.
 
 ## 2. Add the video editor skill
 

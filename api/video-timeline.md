@@ -20,7 +20,9 @@ Use it to build automated montage pipelines, to let an AI agent cut footage thro
 | `POST /v1/video/projects/{id}/lint` | Check the edit for problems | Free |
 | `POST /v1/video/projects/{id}/capture` | Still frames and contact sheets (async job) | Flat fee per call |
 | `POST /v1/video/projects/{id}/render` | Render to a video file (async job) | Per output minute |
-| `GET /v1/video/jobs/{jobId}` | State of a capture or render job | Free |
+| `POST /v1/video/projects/{id}/auto-edit` | Edit the project for you (async job) | Base fee + AI usage |
+| `POST /v1/video/projects/{id}/auto-edit/{jobId}/apply` | Commit the draft of an Auto-Edit run | Free |
+| `GET /v1/video/jobs/{jobId}` | State of a capture, render or Auto-Edit job | Free |
 | `GET /v1/video/ops/catalog` | JSON Schema of every operation | Free |
 | `POST /v1/video/detect-scenes` | Find scene cuts in a media file | Per call |
 | `POST /v1/video/detect-silence` | Find silent ranges | Per call |
@@ -30,7 +32,7 @@ Use it to build automated montage pipelines, to let an AI agent cut footage thro
 
 Capture, render and the analysis endpoints are billed per call or per minute. Amounts are on the [Pricing](/guides/pricing) page and in the `billing` block of each response; the current rates are also returned by [`GET /v1/billing/pricing`](/api/billing). Failed capture and render jobs are refunded automatically.
 
-Auto-Edit (`/auto-edit`) is described separately in [Auto-Edit (preview)](#auto-edit-preview).
+Auto-Edit is billed in three parts, described in [Auto-Edit](#auto-edit).
 
 ## Conventions
 
@@ -89,7 +91,14 @@ Every error from these endpoints uses one envelope, including validation errors 
 | `invalid-times` | 422 | Capture `times` outside the timeline. |
 | `too-long` | 422 | Capture on a timeline longer than 15 minutes. |
 | `invalid-size` | 422 | Capture `width` gives a shorter side under 16 px. |
-| `lint-unavailable` | 501 | Lint is not enabled on this deployment yet. |
+| `unknown-rule` | 422 | A name in lint `rules` is not a known rule. `details.known` lists the valid names. |
+| `no-footage` | 422 | Auto-Edit on a project with no video or audio media. |
+| `plan-required` | 403 | Auto-Edit needs a paid FOTOhub plan when you use it with your FOTOhub account. |
+| `plan-unavailable` | 503 | Your plan could not be verified. Retryable. |
+| `busy` | 429 | Auto-Edit has no free slot. Retryable; the base fee is refunded. |
+| `auto-edit-unavailable` | 502 | Auto-Edit is temporarily unavailable. Retryable. If the message says the start was not confirmed, the run may exist: read the job list before starting another. |
+| `job-running` | 409 | `apply` on an Auto-Edit run that has not finished. Retry later. |
+| `no-draft` | 409 | `apply` on a run with no draft to commit: it was applied already, it failed, or it ran with `autoApply: true`. |
 | `rate-limited` | 429 | Too many requests. Wait `Retry-After` seconds. See [Limits](#limits). |
 | `engine-busy` | 503 / 429 | The media processor has no free slot. `Retry-After` says when to retry. |
 | `idempotency-key-invalid` | 400 | `X-Idempotency-Key` is longer than 255 characters. |
@@ -121,7 +130,7 @@ Rate limits are per API key (or OAuth session) and answer `429 rate-limited` wit
 | `/v1/video/projects` (create, list, get, delete, digest, lint) | 120 / min, shared |
 | `/v1/video/projects/{id}/ops` | 240 / min |
 | `/v1/video/projects/{id}/capture` | 20 / min, and **20 per hour per account** |
-| `/v1/video/projects/{id}/render` | 10 / min |
+| `/v1/video/projects/{id}/render`, `/auto-edit` | 10 / min |
 | `/v1/video/jobs/{jobId}` | 60 / min, shared across your jobs |
 | `/v1/video/ops/catalog` | 240 / min |
 | `/v1/video/detect-scenes`, `detect-silence`, `detect-beats` | 20 / min, **one shared bucket** |
@@ -199,7 +208,8 @@ POST /v1/video/projects/{id}/ops
 | `ops` | array | Yes | 1 to 40 [operations](#operations-reference). |
 | `dryRun` | boolean | No | Validate and preview the result without saving. |
 | `expectedSaveRev` | integer | No | Fail with `save-conflict` if the project's `saveRev` is different (someone else edited it). |
-| `label` | string | No | Save a named version of the project before this batch, so you can find the state later. |
+| `label` | string | No | Save a named version of the project before this batch, so you can find the state later. Up to 60 characters. |
+| `note` | string | No | Free-form note on why the batch was applied. Up to 2000 characters. |
 
 ### Batch semantics
 
@@ -244,7 +254,72 @@ With an empty body it returns `{ "saveRev", "digest" }`. Send `{ "view": "clips"
 POST /v1/video/projects/{id}/lint
 ```
 
-Checks the edit for common problems without changing it. Optional `rules` (array of rule names) and `severity` (`error`, `warn` or `info`) narrow the report. Lint first, then capture: it is free and instant.
+Checks the edit for common problems without changing it. Lint first, then capture: it is free and instant.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `rules` | array of strings | No | Only run these [rules](#lint-rules). An empty array means all rules. An unknown name answers `422 unknown-rule`. |
+| `severity` | array of strings | No | Only report these levels: `error`, `warn` or `info` (`warning` is accepted as a synonym of `warn`). An empty array means all levels. |
+
+A single string is accepted in place of a one-item array. The response carries the project's `saveRev`, the `findings` and a `counts` object:
+
+```json
+{
+  "saveRev": 7,
+  "findings": [
+    {
+      "rule": "HOLE_IN_COVERAGE",
+      "severity": "warn",
+      "message": "No video or image covers 1.4s here: the export shows background colour.",
+      "at": 74400,
+      "atSeconds": 12.4,
+      "end": 82800,
+      "endSeconds": 13.8,
+      "params": { "seconds": 1.4 },
+      "fix": "none"
+    },
+    {
+      "rule": "SOURCE_MISSING",
+      "severity": "error",
+      "message": "Source file is missing; relink it before exporting.",
+      "clipId": "clip-3",
+      "trackId": "track-1",
+      "suggestion": "Source is missing; re-add the media via its storagePath.",
+      "fix": "relink"
+    }
+  ],
+  "counts": { "error": 1, "warn": 1, "info": 0 },
+  "available": true
+}
+```
+
+| Finding field | Meaning |
+|---------------|---------|
+| `rule` | The rule code. |
+| `severity` | `error`, `warn` or `info`. |
+| `message` | English, self-contained description. Branch on `rule`, not on the text. |
+| `clipId`, `clipIds` | The first clip concerned, and all of them when more than one is (for example both overlapping captions). |
+| `trackId` | The track concerned, when the rule names one. |
+| `at`, `atSeconds` | Start of the range on the project timeline, in ticks and in seconds. |
+| `end`, `endSeconds` | End of that range, in ticks and in seconds. |
+| `params` | Numbers and strings behind the finding (for example `{ "seconds": 1.4 }`; times are in seconds). |
+| `fix` | A hint: `relink`, `trim-to-content` or `none`. |
+| `suggestion` | A short text on how to resolve it, when there is one. |
+
+Every field except `rule`, `severity` and `message` is optional.
+
+### Lint rules {#lint-rules}
+
+| Rule | Reports |
+|------|---------|
+| `HOLE_IN_COVERAGE` | A stretch of the timeline where nothing is visible. |
+| `CLIP_NEVER_VISIBLE` | A clip that is fully covered by another, or otherwise never shown. `params.reason` says why. |
+| `ZERO_DURATION` | A clip with zero or invalid duration. |
+| `SOURCE_MISSING` | A clip whose media file is missing. |
+| `SOURCE_EXPIRED` | A media link that expired and could not be refreshed. |
+| `TEXT_OUTSIDE_SAFE_AREA` | Text that may extend past the safe area of the project's aspect ratio (an estimate). |
+| `CAPTIONS_OVERLAP` | Two captions that overlap in time at the same screen position. |
+| `AUDIO_CLIPPING` | Audio likely to clip (an estimate from the clip volume). |
 
 ## Capture
 
@@ -330,7 +405,7 @@ Rendering is billed **per minute of output** (rounded up, at least one minute); 
 GET /v1/video/jobs/{jobId}
 ```
 
-Capture and render both return a job. Statuses: `queued`, `running`, `completed`, `failed`, `cancelled`.
+Capture, render and Auto-Edit all return a job. Statuses: `queued`, `running`, `completed`, `failed`, `cancelled`.
 
 ```json
 {
@@ -565,6 +640,8 @@ There are 22 operations. Every operation is an object with an `op` discriminator
 | `animationIn` | [ClipAnimation](#shape-clipanimation) | no |
 | `animationOut` | [ClipAnimation](#shape-clipanimation) | no |
 | `bgColor` | string | no |
+| `blendMode` | `"multiply"` \| `"screen"` \| `"darken"` \| `"lighten"` \| `"difference"` \| `"exclusion"` \| `"overlay"` \| `"soft-light"` \| `"hard-light"` \| `"color-dodge"` \| `"color-burn"` \| `"lighter"` | no |
+| `captionPreset` | `"oneWord"` \| `"whisper"` \| `"cascade"` \| `"spotlight"` \| `"paper"` \| `"pop"` \| `"stark"` | no |
 | `color` | string | no |
 | `colorCorrection` | [ColorCorrection](#shape-colorcorrection) | no |
 | `cropRegion` | [CropRegion](#shape-cropregion) | no |
@@ -970,6 +1047,7 @@ const transcript = await client.getVideoTranscription(job.jobId!);
 | Digest / lint | `digest_video_project`, `lint_video_project` | `digestVideoProject`, `lintVideoProject` |
 | Capture | `capture_video_project(project_id, times= / count= / cuts=, width=, wait=)` | `captureVideoProject(projectId, { times / count / cuts, width, wait })` |
 | Render | `render_video_project(project_id, format=, quality=, resolution=, wait=)` | `renderVideoProject(projectId, { format, quality, resolution, wait })` |
+| Auto-Edit | `auto_edit_video_project(project_id, style=, mode=, toggles=, language=, aspect=, ai_budget_usd=, auto_apply=, wait=)`, `apply_video_auto_edit(project_id, job_id, expected_save_rev=)` | `autoEditVideoProject(projectId, { style, mode, toggles, language, aspect, aiBudgetUsd, autoApply, brief, wait })`, `applyVideoAutoEdit(projectId, jobId, { expectedSaveRev })` |
 | Jobs | `get_video_job`, `wait_for_video_job` | `getVideoJob`, `waitForVideoJob` |
 | Catalog | `get_video_ops_catalog` | `getVideoOpsCatalog` |
 | Analysis | `detect_video_scenes`, `detect_video_silence`, `detect_video_beats`, `transcribe_video`, `get_video_transcription` | `detectVideoScenes`, `detectVideoSilence`, `detectVideoBeats`, `transcribeVideo`, `getVideoTranscription` |
@@ -990,7 +1068,7 @@ The [FOTOhub MCP server](/api/mcp) exposes the same workflow to AI agents as **1
 | `video_capture` | Frames and contact sheets (flat fee). |
 | `video_render` | Render the final file (per minute); returns a job. |
 | `video_job_status` | Poll a capture, render or Auto-Edit job. |
-| `video_auto_edit` | Auto-Edit (preview, see below). |
+| `video_auto_edit` | Start an Auto-Edit run (enabled separately from the other tools). |
 | `video_detect_scenes`, `video_detect_silence`, `video_detect_beats` | Analysis. |
 | `video_transcribe` | Word-level transcript in seconds. |
 
@@ -1007,28 +1085,132 @@ Both call the public API with your account, so the billing and limits above appl
 
 ---
 
-## Auto-Edit (preview)
+## Auto-Edit
 
-::: warning Coming soon
-Auto-Edit through the API is a preview and is not generally available yet. Names, parameters and prices in this section may still change, and calls return an error until it is enabled for your account. This section is kept separate so it can be finalised when the feature ships.
-:::
+Auto-Edit lets FOTOhub edit a project for you, the same way it does in the editor: it analyses the footage, cuts, adds captions, b-roll and audio, and checks its own result before it finishes. It runs as a background job.
 
-Auto-Edit lets FOTOhub edit a project for you, the same way it does in the editor: it analyses the footage, cuts, adds captions, and checks its own result with capture before it finishes.
+### Start a run
 
 ```
 POST /v1/video/projects/{id}/auto-edit
-POST /v1/video/projects/{id}/auto-edit/{jobId}/apply
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `style` | string | — | `viral`, `podcast`, `explainer`, `storytelling` or `captions-only`. |
 | `mode` | string | `auto_edit` | `auto_edit` for a full edit, or `cut` for a cut proposal only. |
-| `language` | string | auto | Spoken language. |
-| `aspect` | string | project aspect | Target aspect ratio. |
-| `aiBudgetUsd` | number | `0` | Ceiling for AI-generated media in USD, 0 to 50. `0` uses stock footage only. |
-| `autoApply` | boolean | `true` | `false` leaves the result as a draft until you call the `apply` route. |
+| `style` | string | — | `viral`, `podcast`, `explainer`, `storytelling` or `captions-only`. Required for `auto_edit`. |
+| `toggles` | object | all on | Switch parts of the edit off with `false`: `cutSilences`, `removeFillers`, `broll`, `zooms`, `graphics`, `sfx`, `music`, `captions`, `maps`. |
+| `language` | string | `auto` | Spoken language: `auto`, `pl`, `en` or `de`. |
+| `aspect` | string | project aspect | `16:9`, `9:16`, `1:1` or `4:5`. |
+| `aiBudgetUsd` | number | `0` | The most this run may spend on generated media, in USD, 0 to 50. `0` uses stock and existing media only. |
+| `autoApply` | boolean | `true` | `false` keeps the result as a draft until you call `apply`. |
+| `brief` | object | — | `cut` mode only, and required there: the cut brief (for example profile, target length, pacing, order). |
 
-The call returns a job (poll it like a render). The finished job carries a `report` of what was done and what was skipped, and, once applied, the new `saveRev`. Nothing is left half-edited: if a batch of the agent's own operations is rejected, the draft is discarded instead of being applied to your project. Access follows the editor: accounts on a paid plan can use it; on a prepaid API wallet it is billed per call, plus any AI generation up to `aiBudgetUsd`. It is limited to 10 requests per minute and its self-check uses the same hourly capture allowance as [Capture](#capture).
+The project needs at least one video or audio media file. Send an `X-Idempotency-Key` to make a retry safe: within 24 hours the same key returns the first result instead of starting, and charging for, a second run.
 
-The SDK methods are `auto_edit_video_project` / `apply_video_auto_edit` (Python) and `autoEditVideoProject` / `applyVideoAutoEdit` (TypeScript), marked experimental, and the MCP tool is `video_auto_edit`.
+```json
+{
+  "jobId": "a3b1c4d2-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+  "status": "running",
+  "projectId": "6f1c2a52-6b1e-4f0a-9d2f-1d0f1b6f7a10",
+  "currency": "USD",
+  "billing": { "currency": "USD", "method": "wallet" }
+}
+```
+
+The call answers `202`. Poll [`GET /v1/video/jobs/{jobId}`](#jobs) every 3 to 5 seconds.
+
+### Job status
+
+An Auto-Edit job has `"kind": "auto_edit"` and the [usual job fields](#jobs), plus:
+
+| Field | Meaning |
+|-------|---------|
+| `stages` | Progress by stage, in order: `signals`, `cuts`, `brief`, `broll`, `graphics`, `audio`, `captions`, `apply`. Each entry has `stage`, `status` and, when known, `pct` and `detail`. |
+| `report` | What the run did and what it skipped, including the media spend (`creditsSpent`) and whether the result was committed. |
+| `usage` | AI usage: `inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens` and `billed`. Once billed it also has `units` and what was charged (`chargedUsd`, `chargedCredits`). |
+| `committed` | `true` when the result was written to the project. |
+| `saveRev` | The project's new revision after the result was committed. |
+| `baseSaveRev` | The revision the run started from. |
+| `expiresInSeconds` | On a finished `autoApply: false` run, how long the draft is kept (about 30 minutes from creation). |
+| `refunded` | On a `failed` or `cancelled` job: `true` when the base fee was returned. |
+
+Nothing is left half-edited: if the run's own operations are rejected, the draft is discarded instead of being applied to your project.
+
+### Apply a draft
+
+With `autoApply: false`, a finished run keeps its result as a draft. Review it, then commit it:
+
+```
+POST /v1/video/projects/{id}/auto-edit/{jobId}/apply
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `expectedSaveRev` | integer | No | The project revision the draft may replace. Defaults to the revision the run started from. |
+
+On success it answers `{ "jobId", "projectId", "committed": true, "saveRev" }`, with the new `digest` when the project changed. If the project changed since the run started, you get `409 save-conflict` with `details.currentSaveRev`, and the draft is kept: re-run, or pass the current `expectedSaveRev` if you accept the changes over the draft. Applying before the run has finished answers `409 job-running`; applying a run with no draft answers `409 no-draft`.
+
+### Billing
+
+An Auto-Edit run is billed in three parts:
+
+1. **A base fee per run**, charged when the run starts. It is refunded if the run fails or is cancelled, and when the run cannot be started.
+2. **AI usage**, billed by tokens after the run. Tokens used by a run that fails are still billed, because the work was done.
+3. **Generated media**, billed as usual at each model's rate and capped by `aiBudgetUsd`. It is not refunded with the base fee.
+
+The `billing` block of the start response shows the base fee charged, and the finished job's `usage` shows what AI usage cost. Amounts and current rates are on the [Pricing](/guides/pricing) page. On the FOTOhub account (OAuth) it uses your plan credits first and then the wallet, as everywhere else; it requires a paid plan there (`plan-required` otherwise). It is limited to 10 requests per minute and its self-check uses the same hourly capture allowance as [Capture](#capture).
+
+### Examples
+
+::: code-group
+
+```python [Python]
+from fotohub import FotoHub
+
+client = FotoHub(api_key="fh_live_...")
+
+job = client.auto_edit_video_project(
+    project_id,
+    style="podcast",
+    language="en",
+    ai_budget_usd=0,
+    auto_apply=False,
+    wait=True,
+)
+print(job["report"])
+
+# Happy with it? Commit the draft.
+client.apply_video_auto_edit(project_id, job["jobId"], expected_save_rev=job["baseSaveRev"])
+```
+
+```typescript [TypeScript]
+import { FotoHub } from "fotohub";
+
+const client = new FotoHub({ apiKey: "fh_live_..." });
+
+const job = await client.autoEditVideoProject(projectId, {
+  style: "podcast",
+  language: "en",
+  aiBudgetUsd: 0,
+  autoApply: false,
+  wait: true,
+});
+console.log(job.report);
+
+// Happy with it? Commit the draft.
+await client.applyVideoAutoEdit(projectId, job.jobId, { expectedSaveRev: job.baseSaveRev });
+```
+
+```bash [curl]
+curl -s -X POST "$API/v1/video/projects/$ID/auto-edit" \
+  -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{ "style": "podcast", "language": "en", "autoApply": false }'
+
+curl -s -X POST "$API/v1/video/projects/$ID/auto-edit/$JOB/apply" \
+  -H "$AUTH" -H "Content-Type: application/json" -d '{}'
+```
+
+:::
+
+The SDK methods are marked experimental. The MCP tool is `video_auto_edit`.
