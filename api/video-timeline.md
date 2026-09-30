@@ -30,7 +30,7 @@ Use it to build automated montage pipelines, to let an AI agent cut footage thro
 | `POST /v1/video/transcribe` | Start a transcription (job) | Per call |
 | `GET /v1/video/transcribe/{jobId}` | Transcription state and result | Free |
 
-Capture, render and the analysis endpoints are billed per call or per minute. Amounts are on the [Pricing](/guides/pricing) page and in the `billing` block of each response; the current rates are also returned by [`GET /v1/billing/pricing`](/api/billing). Failed capture and render jobs are refunded automatically.
+Capture, render and the analysis endpoints are billed per call or per minute. The amount charged is in the `billing` block of each response and in your usage history; the [Pricing](/guides/pricing) guide does not list these operations yet. Failed capture and render jobs are refunded automatically. When you use a FOTOhub account (OAuth) on a plan that includes rendering, a render is included in the plan and nothing is charged; its `billing` block says so.
 
 Auto-Edit is billed in three parts, described in [Auto-Edit](#auto-edit).
 
@@ -38,7 +38,7 @@ Auto-Edit is billed in three parts, described in [Auto-Edit](#auto-edit).
 
 ### Wire format
 
-Requests and responses use **camelCase** (`projectId`, `saveRev`, `editorUrl`, `expectedSaveRev`). On requests, the snake_case spellings (`expected_save_rev`, `dry_run`, `storage_path`, `place_media`, `clip_ids`, `media_id`, `project_id`, `noise_floor_db`, `min_silence_duration`, `min_scene_duration`) are accepted as aliases. Unknown request fields are rejected with `invalid-body`.
+Requests and responses use **camelCase** (`projectId`, `saveRev`, `editorUrl`, `expectedSaveRev`). On requests, the snake_case spellings (`expected_save_rev`, `dry_run`, `storage_path`, `place_media`, `clip_ids`, `media_id`, `project_id`, `noise_floor_db`, `min_silence_duration`, `min_scene_duration`) are accepted as aliases. Unknown request fields are rejected with `invalid-body`. Two things are not camelCase: the `billing` block and the top-level `cost_usd` on paid responses are snake_case, and a failed transcription carries `error_kind` and `error_message` next to the camelCase `errorKind` and `errorMessage`. Examples on this page leave `cost_usd` out.
 
 ### Time
 
@@ -46,7 +46,7 @@ Timeline values in operations are **ticks**: integers, where one second is `tick
 
 ### Media
 
-A project refers to media by the **media id** returned when you create it (the `assetId` field on each item of `media`). Media are never referenced by URL inside operations. To add media to an existing project, create the project with them, or start a new project.
+A project refers to media by the **media id** returned when you create it (the `assetId` field on each item of `media`). Media are never referenced by URL inside operations, and media cannot be added to a project after it is created: put every file you need in `media` when you create it.
 
 Media you pass as `url` must be public **HTTPS** URLs. FOTOhub copies the file into your own storage first; private and internal addresses are refused (`media-blocked`). Alternatively pass `storagePath` of a file already in your storage (`<bucket>/<userId>/...`). Limits: 2 GB per video, 200 MB per audio file, 50 MB per image, 50 media items per project.
 
@@ -64,39 +64,56 @@ Every error from these endpoints uses one envelope, including validation errors 
 }
 ```
 
-`details` is optional and depends on the code (for example `path`, a JSON pointer to the offending field, or `retryable`). Always branch on `code`, not on the text. Codes:
+`details` is optional and depends on the code. Errors raised by the editing service carry `details.path`, a JSON pointer to the offending field. Validation errors raised by the API itself (an unknown field, an empty `ops` array, more than 40 operations) carry `details.errors`, a list of `{ "loc", "msg", "type" }` entries instead. Other details you may see are `retryable`, `currentSaveRev` and `known`. Always branch on `code`, not on the text.
+
+**Status and code do not always match one to one.** An error from the editing service keeps its code; a server-side failure there arrives as `502` with the same code (for example `internal`). Codes:
 
 | Code | HTTP | Meaning |
 |------|------|---------|
 | `unauthorized` | 401 | Missing or invalid credentials. |
 | `payment-required` | 402 / 403 | No funds for a paid call. Nothing was charged. Top up, then retry. |
+| `insufficient-credits` | 402 | The render was refused for lack of credits. |
 | `not-found` | 404 | The project, job or version does not exist, or is not yours. The two cases are deliberately indistinguishable. |
-| `media-not-found` | 404 | `mediaId` does not exist in that project (analysis endpoints). |
-| `invalid-body` | 422 | The request failed validation. `details.path` points at the field. |
-| `invalid-ops` | 422 | An `ops` batch does not match the catalog. `details.path` is a JSON pointer, for example `/ops/0/ids`. |
+| `route-not-found` | 404 | No such route. |
+| `media-not-found` | 404 / 422 | `mediaId` does not exist in that project (analysis, 404), or a `storagePath` on create points at nothing (422). |
+| `draft-not-found` | 404 | `apply` on an Auto-Edit draft that was already applied or has expired. |
+| `bad-request` | 400 | Malformed request. |
+| `method-not-allowed` | 405 | The route does not accept that method. |
+| `invalid-body` | 422 | The request failed validation. `details.path` or `details.errors[]` says where. |
+| `invalid-ops` | 422 | An `ops` batch does not match the catalog: `details.path` is a JSON pointer such as `/ops/0/ids`, or `details.errors[]` with `loc` such as `["body","ops","0","ids"]`. |
+| `invalid-request` | 422 | The render or capture request was rejected as a whole. |
 | `save-conflict` | 409 | `expectedSaveRev` does not match. The project changed since you read it. `details.currentSaveRev` has the current value. |
 | `document-too-large` | 413 | The edit would push the project document past 2 MB. |
 | `payload-too-large` | 413 | Request body over the limit (2 MB). |
 | `project-limit` | 409 | You reached the limit of 200 API projects. Delete some. |
-| `media-blocked` | 422 | A media URL is not allowed: not HTTPS, or it resolves to a private or internal address. |
+| `invalid-media` | 422 | On create: the media could not be placed on the timeline, or does not fit the template slots. `details` lists `failed`, `violations` or a `reason`. |
+| `media-kind-mismatch` | 422 | On create: an item's `kind` does not match the file, or a `storagePath` is in the wrong bucket for its type. |
+| `media-blocked` | 422 | A media URL is not allowed: not HTTPS, private or internal address, or a file type that cannot be used in a project. |
 | `media-too-large` | 413 | A media file exceeds the size limit for its type. |
-| `media-unsupported` | 422 | The file type is not supported. |
+| `media-unsupported` | 422 | Analysis endpoints: only audio and video files can be analysed. |
 | `media-unreadable` | 422 | The file could not be read (no duration, corrupt or not playable). |
 | `media-upload-failed` | 502 | Copying the media into your storage failed. `details.retryable` is `true`. |
 | `media-unavailable` | 502 | The media could not be fetched. |
 | `media-timeout` | 504 | Fetching and copying the media took longer than 60 s. Use smaller files, or upload them and pass `storagePath`. |
 | `create-timeout` | 504 | Creating the project took too long **and it may still exist**. See [Retrying safely](#retrying-safely). |
+| `timeline-timeout` | 504 | The editing backend did not answer in time. `details.retryable` is `true`, but when the call was `/ops` the batch **may have been saved**: see [Retrying safely](#retrying-safely). |
+| `start-timeout` | 504 | Preparing a capture or render took too long. Nothing was charged. Retry. |
 | `empty-timeline` | 422 | The project has no clips to capture or render. |
 | `no-cuts` | 422 | `cuts` capture on a project whose main track has no clips. |
 | `invalid-times` | 422 | Capture `times` outside the timeline. |
 | `too-long` | 422 | Capture on a timeline longer than 15 minutes. |
 | `invalid-size` | 422 | Capture `width` gives a shorter side under 16 px. |
+| `too-large` | 422 | The capture frame size is outside the allowed range. |
 | `unknown-rule` | 422 | A name in lint `rules` is not a known rule. `details.known` lists the valid names. |
+| `render-rejected` | 422 | The renderer refused the render settings. The message says which. |
+| `text-raster-failed` | 422 | A text clip could not be prepared for rendering. `details.clipId` names it. |
+| `raster-upload-failed` | 502 | Text overlays could not be stored for rendering. Retryable. |
 | `no-footage` | 422 | Auto-Edit on a project with no video or audio media. |
+| `ai-budget-exceeded` | 422 | The Auto-Edit request cannot be done within `aiBudgetUsd`. |
 | `plan-required` | 403 | Auto-Edit needs a paid FOTOhub plan when you use it with your FOTOhub account. |
 | `plan-unavailable` | 503 | Your plan could not be verified. Retryable. |
 | `busy` | 429 | Auto-Edit has no free slot. Retryable; the base fee is refunded. |
-| `auto-edit-unavailable` | 502 | Auto-Edit is temporarily unavailable. Retryable. If the message says the start was not confirmed, the run may exist: read the job list before starting another. |
+| `auto-edit-unavailable` | 502 / 503 | Auto-Edit is temporarily unavailable. Retryable. If the message says the start was not confirmed, the run may exist: read the job list before starting another. |
 | `job-running` | 409 | `apply` on an Auto-Edit run that has not finished. Retry later. |
 | `no-draft` | 409 | `apply` on a run with no draft to commit: it was applied already, it failed, or it ran with `autoApply: true`. |
 | `rate-limited` | 429 | Too many requests. Wait `Retry-After` seconds. See [Limits](#limits). |
@@ -105,12 +122,18 @@ Every error from these endpoints uses one envelope, including validation errors 
 | `idempotency-key-reuse` | 422 | The same key was used with a different request body. |
 | `idempotency-in-progress` | 409 | The first request with this key is still running. Retry after `Retry-After` (5 s). |
 | `job-store-unavailable` | 502 | Job bookkeeping is unavailable. Retryable; a paid call is refunded. |
+| `store-unavailable` | 502 | Project storage is unavailable. Retryable. |
 | `timeline-unavailable` | 502 | The editing backend returned an invalid response or is unreachable. Retryable. |
+| `engine-unavailable` | 502 | The video engine is unreachable. Retryable; a paid call is refunded. |
 | `render-unavailable` | 502 | Rendering is temporarily unavailable. Retryable. |
+| `lint-unavailable` | 501 | Lint is not available on this deployment. |
 | `analysis-failed` | 502 | The analysis could not complete for this file (check it is a valid recording). Refunded. |
 | `analysis-unavailable` | 502 | The analysis service is unavailable. Refunded. |
 | `analysis-timeout` | 504 | The file took too long to analyse. Use a shorter file. Refunded. |
-| `internal-error` | 500 | Unexpected failure. |
+| `internal` | 502 | An unexpected failure in the editing backend. |
+| `internal-error` | 500 | An unexpected failure in the API. |
+
+A job that fails after it started reports its own short code in the job's `reason` (see [Jobs](#jobs)), for example `render-failed`, or `start-lost` for an Auto-Edit run that never started.
 
 ### Retrying safely
 
@@ -119,7 +142,7 @@ Send an `X-Idempotency-Key` header (any string up to 255 characters, for example
 Two rules worth knowing:
 
 - **Creating a project.** If you get `create-timeout`, the project may already exist. Do not retry with the same key (it replays the same ambiguous answer); list your projects first, and retry with a new key only if it is not there.
-- **Applying operations.** A batch that timed out may or may not have been saved, and replaying it would apply the operations twice. Send `expectedSaveRev` with every batch: if the first attempt was saved, the replay answers `save-conflict` instead of applying twice.
+- **Applying operations.** A `timeline-timeout` or `timeline-unavailable` on `/ops` is ambiguous (`retryable` is `false` there): the batch may or may not have been saved. Retrying **with the same idempotency key** replays that same error while the key is retained; it never applies the batch twice. Applying twice can only happen when you retry **without** the key, which is why you should also send `expectedSaveRev` with every batch: if the first attempt was saved, the retry answers `save-conflict`. After an ambiguous error, read the project (`GET`) and compare `saveRev` before deciding.
 
 ### Limits
 
@@ -137,7 +160,7 @@ Rate limits are per API key (or OAuth session) and answer `429 rate-limited` wit
 | `POST /v1/video/transcribe` | 15 / min |
 | `GET /v1/video/transcribe/{jobId}` | 60 / min per job |
 
-The hourly capture limit is per account and is shared with anything else on your account that uses capture, including Auto-Edit. When you hit it the `Retry-After` header tells you how long to wait. Other limits: 40 operations per batch, 24 capture times per call, 2 MB per project document, 200 API projects, 50 saved versions per project. A single render is limited to a small number of concurrent renders per account.
+The hourly capture limit is per account and is shared with anything else on your account that uses capture, including Auto-Edit. When you hit it the `Retry-After` header tells you how long to wait. Other limits: 40 operations per batch, 24 capture times per call, 2 MB per project document, 200 API projects, 50 saved versions per project. When the renderer has no free slot the call answers `engine-busy` with a `Retry-After` header.
 
 ---
 
@@ -151,7 +174,7 @@ POST /v1/video/projects
 |-----------|------|----------|---------|-------------|
 | `title` | string | No | `Untitled` | Project title, up to 200 characters. |
 | `aspect` | string | No | `16:9` | `16:9`, `9:16`, `1:1`, `4:5` or `4:3`. |
-| `fps` | integer | No | template or 30 | Frames per second. |
+| `fps` | integer | No | template or 30 | Frames per second: `24`, `25`, `30`, `50` or `60`. |
 | `media` | array | No | `[]` | Up to 50 items: `{ "url": "https://..." }` or `{ "storagePath": "bucket/userId/..." }`, plus optional `kind` (`video`, `audio`, `image`) and `name`. Give exactly one of `url` or `storagePath` per item. |
 | `template` | object | No | — | `{ "id": "<template id>" }`. Media fill the template's slots. |
 | `placeMedia` | string | No | `sequence` | `sequence` lays the media one after another on the timeline; `none` registers them without placing them. Ignored with a template. |
@@ -195,7 +218,7 @@ GET    /v1/video/projects/{id}
 DELETE /v1/video/projects/{id}
 ```
 
-`GET /{id}` returns `projectId`, `title`, `saveRev`, `updatedAt`, `ticksPerSecond`, `digest`, `media`, `editorUrl` and `versions`. Add `?include=doc` to also get the full project document. `versions` lists saved snapshots (`id`, `createdAt`, optional `label`); a snapshot is saved whenever you pass `label` to an ops call. The list returns `projects[]` with `projectId`, `title`, `updatedAt` and `editorUrl`. `limit` is 1 to 100.
+`GET /{id}` returns `projectId`, `title`, `saveRev`, `updatedAt`, `ticksPerSecond`, `digest`, `media`, `editorUrl` and `versions`. Add `?include=doc` to also get the full project document. `versions` lists saved snapshots (`id`, `createdAt`, optional `label`); a snapshot of the state after the batch is saved whenever you pass `label` to an ops call, and automatically every 10 saves. The list returns `projects[]` with `projectId`, `title`, `updatedAt` and `editorUrl`. `limit` is 1 to 100.
 
 ## Apply operations
 
@@ -208,7 +231,7 @@ POST /v1/video/projects/{id}/ops
 | `ops` | array | Yes | 1 to 40 [operations](#operations-reference). |
 | `dryRun` | boolean | No | Validate and preview the result without saving. |
 | `expectedSaveRev` | integer | No | Fail with `save-conflict` if the project's `saveRev` is different (someone else edited it). |
-| `label` | string | No | Save a named version of the project before this batch, so you can find the state later. Up to 60 characters. |
+| `label` | string | No | Save a named version of the project as it is **after** this batch, so you can find that state later. Up to 60 characters. Without `label`, a version is also saved automatically every 10 saves. |
 | `note` | string | No | Free-form note on why the batch was applied. Up to 2000 characters. |
 
 ### Batch semantics
@@ -336,7 +359,7 @@ Give **exactly one** selector:
 | `times` | number[] | Timeline seconds, 1 to 24 values. |
 | `count` | integer | 1 to 24 frames spread evenly across the timeline. |
 | `cuts` | boolean | `true` for one frame per shot of the main track. |
-| `width` | integer | Frame width in pixels, 16 to 1280. |
+| `width` | integer | Frame width in pixels, 16 to 1280. The shorter side is capped at 720 px, so a wide `width` on a vertical project is scaled down. |
 | `sheet` | object | `{ "maxCells": 1-12, "maxEdge": 256-1568 }` to shape the contact sheets. |
 
 **`cuts` semantics.** With `cuts: true` the frame is taken at the **midpoint of each shot** (the middle of the clip, not at the edit point), so you see what the viewer sees during the shot. Each shot appears once. If the main track has more than 24 shots the frames are thinned evenly, and the response says so in `cuts`.
@@ -388,8 +411,8 @@ Renders the project to a video file. It is asynchronous: the call answers `202` 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `format` | string | `mp4` | `mp4`, `webm`, `mov`, `gif`, `mp3` or `wav`. Case-insensitive. |
-| `codec` | string | — | `h264`, `h265` or `prores`. |
-| `quality` | string | — | `draft`, `standard`, `high` or `ultra`. `draft` is the lowest quality. |
+| `codec` | string | `h264` | `h264`, `h265` or `prores`. |
+| `quality` | string | `standard` | `standard`, `high` or `ultra`. `draft` is accepted as an alias of `standard`, not a lower tier. |
 | `resolution` | string | project size | `720p`, `1080p`, `2k` or `4k`. |
 | `fps` | integer | project fps | 1 to 120. |
 | `bitrate` | string | auto | For example `8M` or `4500k`. |
@@ -857,7 +880,7 @@ There are 22 operations. Every operation is an object with an `op` discriminator
 
 ## Analysis endpoints
 
-Analysis endpoints read a media file and return timings you can turn into operations. Each takes a source: **either** `url` (public HTTPS) **or** both `projectId` and `mediaId` (a media item of one of your projects). They are billed per call (see [Pricing](/guides/pricing)); a call that fails is refunded.
+Analysis endpoints (files up to 512 MB) read a media file and return timings you can turn into operations. Each takes a source: **either** `url` (public HTTPS) **or** both `projectId` and `mediaId` (a media item of one of your projects). They are billed per call (the `billing` block of the response shows the amount); a call that fails is refunded.
 
 ### Detect scenes
 
@@ -1043,20 +1066,27 @@ const transcript = await client.getVideoTranscription(job.jobId!);
 |-----------|-------------------------------|------------------------------------|
 | Create | `create_video_project` | `createVideoProject` |
 | List / get / delete | `list_video_projects`, `get_video_project`, `delete_video_project` | `listVideoProjects`, `getVideoProject`, `deleteVideoProject` |
-| Apply operations | `apply_video_ops(project_id, ops, dry_run=, expected_save_rev=, label=)` | `applyVideoOps(projectId, { ops, dryRun, expectedSaveRev, label })` |
+| Apply operations | `apply_video_ops(project_id, ops, dry_run=, expected_save_rev=, label=, note=)` | `applyVideoOps(projectId, { ops, dryRun, expectedSaveRev, label, note })` |
 | Digest / lint | `digest_video_project`, `lint_video_project` | `digestVideoProject`, `lintVideoProject` |
-| Capture | `capture_video_project(project_id, times= / count= / cuts=, width=, wait=)` | `captureVideoProject(projectId, { times / count / cuts, width, wait })` |
-| Render | `render_video_project(project_id, format=, quality=, resolution=, wait=)` | `renderVideoProject(projectId, { format, quality, resolution, wait })` |
-| Auto-Edit | `auto_edit_video_project(project_id, style=, mode=, toggles=, language=, aspect=, ai_budget_usd=, auto_apply=, wait=)`, `apply_video_auto_edit(project_id, job_id, expected_save_rev=)` | `autoEditVideoProject(projectId, { style, mode, toggles, language, aspect, aiBudgetUsd, autoApply, brief, wait })`, `applyVideoAutoEdit(projectId, jobId, { expectedSaveRev })` |
+| Capture | `capture_video_project(project_id, times= / count= / cuts=, width=, sheet=, wait=)` | `captureVideoProject(projectId, { times / count / cuts, width, sheet, wait })` |
+| Render | `render_video_project(project_id, format=, quality=, resolution=, codec=, fps=, bitrate=, time_range=, wait=)` | `renderVideoProject(projectId, { format, quality, resolution, codec, fps, bitrate, range, wait })` |
+| Auto-Edit | `auto_edit_video_project(project_id, style=, mode=, toggles=, language=, aspect=, ai_budget_usd=, auto_apply=, brief=, wait=)`, `apply_video_auto_edit(project_id, job_id, expected_save_rev=)` | `autoEditVideoProject(projectId, { style, mode, toggles, language, aspect, aiBudgetUsd, autoApply, brief, wait })`, `applyVideoAutoEdit(projectId, jobId, { expectedSaveRev })` |
 | Jobs | `get_video_job`, `wait_for_video_job` | `getVideoJob`, `waitForVideoJob` |
 | Catalog | `get_video_ops_catalog` | `getVideoOpsCatalog` |
 | Analysis | `detect_video_scenes`, `detect_video_silence`, `detect_video_beats`, `transcribe_video`, `get_video_transcription` | `detectVideoScenes`, `detectVideoSilence`, `detectVideoBeats`, `transcribeVideo`, `getVideoTranscription` |
 
-The Python `AsyncFotoHub` client has the same methods. The SDKs send an idempotency key for you where it is safe. With `wait=True` (`wait: true`) capture and render return the finished job, and a failed job raises `JobFailedError` (the job's `reason`, when it has one, is the error code; whether the charge was refunded is in its details).
+The Python `AsyncFotoHub` client has the same methods. The SDKs send an idempotency key for you where it is safe. Python's `render_video_project` defaults `quality` to `high` and `capture_video_project` defaults `width` to 640; the API itself defaults to `standard` quality.
+
+With `wait=True` (`wait: true`) capture, render and Auto-Edit return the finished job. A job that ends `failed` or `cancelled` raises an exception:
+
+- **Python** raises `VideoJobFailedError` with `job_id`, `reason` and `refunded` attributes; its `code` is the job's `code`, when it has one. Waiting past `max_wait` raises `VideoJobTimeoutError`.
+- **TypeScript** raises `JobFailedError`, whose `code` is the job's `reason` (or `job_failed`) and whose `details.refunded` says whether the charge was returned. Waiting past `maxWaitMs` raises `JobTimeoutError`.
+
+A timeout does not stop the job: keep polling it with `get_video_job` / `getVideoJob`.
 
 ## MCP tools
 
-The [FOTOhub MCP server](/api/mcp) exposes the same workflow to AI agents as **13 tools**. They are enabled together with the Video Timeline API, so they appear in your client's tool list only on accounts where it is available.
+The [FOTOhub MCP server](/api/mcp) exposes the same workflow to AI agents as **13 tools**. Whether they appear is decided per deployment, not per account: they are switched on together with the Video Timeline API, and `video_auto_edit` has a second switch of its own. Without Auto-Edit the server lists 12 tools; with it, 13. If your client shows no `video_*` tools, the deployment you are connected to has not enabled them.
 
 | Tool | Does |
 |------|------|
@@ -1068,17 +1098,17 @@ The [FOTOhub MCP server](/api/mcp) exposes the same workflow to AI agents as **1
 | `video_capture` | Frames and contact sheets (flat fee). |
 | `video_render` | Render the final file (per minute); returns a job. |
 | `video_job_status` | Poll a capture, render or Auto-Edit job. |
-| `video_auto_edit` | Start an Auto-Edit run (enabled separately from the other tools). |
+| `video_auto_edit` | Start an Auto-Edit run (the 13th tool; it has its own switch). |
 | `video_detect_scenes`, `video_detect_silence`, `video_detect_beats` | Analysis. |
 | `video_transcribe` | Word-level transcript in seconds. |
 
-Together with the `fotohub-video-editor` skill, the tools give an agent the working loop: analyse footage, apply operations, lint, capture, fix, and render only when the edit is done. See [Edit video with an agent](/guides/edit-video-with-an-agent).
+The `fotohub-video-editor` skill is enabled by the same switch as the tools. Together with it, the tools give an agent the working loop: analyse footage, apply operations, lint, capture, fix, and render only when the edit is done. See [Edit video with an agent](/guides/edit-video-with-an-agent).
 
 ## Flows nodes
 
 Two nodes bring the API into [Flows](/api/agents):
 
-- **Timeline Edit** (`fotohub.video.timeline_edit`) applies a batch of operations (up to 40) to a project, with an optional dry run. If the batch is rolled back, the node leaves through its error port rather than reporting success. It outputs the new `saveRev` and the refs of created clips.
+- **Timeline Edit** (`fotohub.video.timeline_edit`) applies a batch of operations (up to 40) to a project, with an optional dry run. If the batch is rolled back, or no operation is accepted (`ok` is `false`), the node leaves through its error port rather than reporting success. It outputs the new `saveRev` and the refs of created clips.
 - **Render Timeline** (`fotohub.video.render_timeline`) renders a project as your own account, optionally applying operations first, and either waits and returns the file URL or returns the job id for a later step.
 
 Both call the public API with your account, so the billing and limits above apply.
@@ -1159,7 +1189,7 @@ An Auto-Edit run is billed in three parts:
 2. **AI usage**, billed by tokens after the run. Tokens used by a run that fails are still billed, because the work was done.
 3. **Generated media**, billed as usual at each model's rate and capped by `aiBudgetUsd`. It is not refunded with the base fee.
 
-The `billing` block of the start response shows the base fee charged, and the finished job's `usage` shows what AI usage cost. Amounts and current rates are on the [Pricing](/guides/pricing) page. On the FOTOhub account (OAuth) it uses your plan credits first and then the wallet, as everywhere else; it requires a paid plan there (`plan-required` otherwise). It is limited to 10 requests per minute and its self-check uses the same hourly capture allowance as [Capture](#capture).
+The `billing` block of the start response shows the base fee charged, and the finished job's `usage` shows what AI usage cost. The amounts charged are in the `billing` block of the start response and in the finished job. On the FOTOhub account (OAuth) it uses your plan credits first and then the wallet, as everywhere else; it requires a paid plan there (`plan-required` otherwise). It is limited to 10 requests per minute and its self-check uses the same hourly capture allowance as [Capture](#capture).
 
 ### Examples
 

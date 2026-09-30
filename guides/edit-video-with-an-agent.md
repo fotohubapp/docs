@@ -23,7 +23,7 @@ Add FOTOhub to your client:
 }
 ```
 
-When the Video Timeline API is enabled for your account, the client lists the timeline tools: `video_project_create`, `video_project_get`, `video_ops_catalog`, `video_apply_edit`, `video_lint`, `video_capture`, `video_render`, `video_job_status`, the analysis tools (`video_detect_scenes`, `video_detect_silence`, `video_detect_beats`, `video_transcribe`) and `video_auto_edit`. See [MCP tools](/api/video-timeline#mcp-tools) for what each does.
+When the Video Timeline API is enabled on the FOTOhub deployment you connect to (a deployment-wide setting, not per account), the client lists the timeline tools: `video_project_create`, `video_project_get`, `video_ops_catalog`, `video_apply_edit`, `video_lint`, `video_capture`, `video_render`, `video_job_status`, the analysis tools (`video_detect_scenes`, `video_detect_silence`, `video_detect_beats`, `video_transcribe`) and, when Auto-Edit is also enabled, `video_auto_edit`: 12 tools without it, 13 with it. See [MCP tools](/api/video-timeline#mcp-tools) for what each does.
 
 ## 2. Add the video editor skill
 
@@ -92,7 +92,7 @@ The same steps in TypeScript use `detectVideoSilence`, `applyVideoOps`, `lintVid
 ## Costs and safety
 
 - Creating projects, applying operations, linting and reading state are free.
-- Capture is a flat fee per call; rendering is billed per minute of output; analysis is billed per call. See [Pricing & Costs](/guides/pricing). Failed capture, render and analysis jobs are refunded automatically.
+- Capture is a flat fee per call; rendering is billed per minute of output; analysis is billed per call. The `billing` block of each response shows the amount charged; a render on a plan that includes it is not charged. Failed capture, render and analysis jobs are refunded automatically.
 - Give the agent a bounded task. Capture is limited to 20 calls per hour per account, and every response carries a `Retry-After` header when a limit is hit.
 - Send an `X-Idempotency-Key` on calls the agent might repeat, so a retry never creates a second project or a second charge.
 
